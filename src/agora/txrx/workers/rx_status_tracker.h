@@ -78,6 +78,7 @@ class RxStatusTracker {
 
   inline size_t SamplesAvailable() const { return samples_available_; }
   inline size_t NumChannels() const { return tracking_.size(); }
+  inline long long StartTime() const { return sample_start_rx_time_; }
   //Get memory locations for Rx calls
   inline const std::vector<void*> GetRxPtrs() const {
     const size_t num_locations = tracking_.size();

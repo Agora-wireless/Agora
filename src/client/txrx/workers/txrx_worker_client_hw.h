@@ -57,7 +57,8 @@ class TxRxWorkerClientHw : public TxRxWorker {
 
   std::vector<std::vector<std::complex<int16_t>>> frame_zeros_;
   std::vector<std::vector<std::complex<int16_t>>> frame_storage_;
-  std::vector<std::vector<std::complex<int16_t>>*> rx_frame_;
+  std::vector<RxPacket> rx_frame_pkts_;
+  std::vector<RxPacket*> rx_pkts_ptrs_;
 
   //For each interface.
   std::vector<TxRxWorkerRx::RxStatusTracker> rx_status_;

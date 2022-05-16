@@ -11,9 +11,10 @@
 
 #include "logger.h"
 
-static constexpr size_t kSyncDetectChannel = 0;
-static constexpr bool kVerifyFirstSync = true;
-static constexpr size_t kReSyncRetryCount = 100u;
+constexpr size_t kSyncDetectChannel = 0;
+constexpr bool kVerifyFirstSync = true;
+constexpr size_t kReSyncRetryCount = 100u;
+constexpr float kBeaconDetectWindow = 2.33f;
 
 TxRxWorkerClientHw::TxRxWorkerClientHw(
     size_t core_offset, size_t tid, size_t interface_count,
@@ -36,15 +37,28 @@ TxRxWorkerClientHw::TxRxWorkerClientHw(
           std::vector<std::complex<int16_t>>(
               (config->SampsPerSymbol() * config->Frame().NumTotalSyms()),
               std::complex<int16_t>(0, 0))),
+      //kOffsetOfData to allocate space for the Packet * header.
       frame_storage_(
           config->NumUeChannels(),
           std::vector<std::complex<int16_t>>(
-              (config->SampsPerSymbol() * config->Frame().NumTotalSyms()),
+              Packet::kOffsetOfData +
+                  (config->SampsPerSymbol() * config->Frame().NumTotalSyms()),
               std::complex<int16_t>(0, 0))),
-      rx_frame_(config->NumUeChannels()) {
-  for (size_t channel = 0; channel < config->NumUeChannels(); channel++) {
-    rx_frame_.at(channel) = &frame_storage_.at(channel);
+      rx_frame_pkts_(config->NumUeChannels()),
+      rx_pkts_ptrs_(config->NumUeChannels()) {
+  for (size_t ch = 0; ch < config->NumUeChannels(); ch++) {
+    auto* pkt_memory = reinterpret_cast<Packet*>(frame_storage_.at(ch).data());
+    auto& scratch_rx_memory = rx_frame_pkts_.at(ch);
+    scratch_rx_memory.Set(pkt_memory);
+    rx_pkts_ptrs_.at(ch) = &scratch_rx_memory;
+
+    AGORA_LOG_INFO(
+        "TxRxWorkerClientHw - rx pkt memory %ld:%ld data location %ld\n",
+        reinterpret_cast<intptr_t>(pkt_memory),
+        reinterpret_cast<intptr_t>(scratch_rx_memory.RawPacket()),
+        reinterpret_cast<intptr_t>(scratch_rx_memory.RawPacket()->data_));
   }
+  //throw std::runtime_error("Rx Prt locations");
   RtAssert(interface_count == 1,
            "Interface count must be set to 1 for use with this class");
 
@@ -89,11 +103,12 @@ void TxRxWorkerClientHw::DoTxRx() {
 
   ssize_t rx_adjust_samples = 0;
 
-  const size_t beacon_detect_window =
-      static_cast<size_t>(static_cast<float>(samples_per_symbol) * 2.33f);
+  //Probably most efficient to make this a multiple of 64
+  const size_t beacon_detect_window = static_cast<size_t>(
+      static_cast<float>(samples_per_symbol) * kBeaconDetectWindow);
   const size_t alignment_samples = samples_per_frame - beacon_detect_window;
   RtAssert(beacon_detect_window < samples_per_frame,
-           "Frame must be greater than 3 Symbols");
+           "Frame must be greater than the beacon detect window");
 
   //Scope the variables
   {
@@ -104,9 +119,9 @@ void TxRxWorkerClientHw::DoTxRx() {
                           Configuration()->OfdmTxZeroPrefix();
       AGORA_LOG_INFO(
           "TxRxWorkerClientHw [%zu]: Beacon detected for radio %zu, "
-          "sync_index: %ld, rx sample offset: %ld\n",
+          "sync_index: %ld, rx sample offset: %ld, alignment removal %zu\n",
           tid_, local_interface + interface_offset_, sync_index,
-          rx_adjust_samples);
+          rx_adjust_samples, alignment_samples);
 
       AdjustRx(local_interface, alignment_samples + rx_adjust_samples);
       rx_adjust_samples = 0;
@@ -258,113 +273,115 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
   const size_t radio_id = interface_id + interface_offset_;
   const size_t first_ant_id = radio_id * channels_per_interface_;
   std::vector<Packet*> result_packets;
+  auto& rx_info = rx_status_.at(interface_id);
 
-  size_t num_rx_samps = Configuration()->SampsPerSymbol();
-
-  std::vector<RxPacket*> memory_tracking(channels_per_interface_);
-  std::vector<size_t> ant_ids(channels_per_interface_);
-  std::vector<void*> rx_samples(channels_per_interface_);
-
-  //Allocate memory for reception
-  for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-    RxPacket& rx = GetRxPacket();
-    memory_tracking.at(ch) = &rx;
-    ant_ids.at(ch) = first_ant_id + ch;
-    //Align current symbol, and read less for remaining (+2 is for I/Q)
-    if (sample_offset < 0) {
-      const size_t padding = (-2 * sample_offset);
-      std::memset(rx.RawPacket()->data_, 0u, padding);
-      rx_samples.at(ch) = &rx.RawPacket()->data_[padding];
-    } else {
-      rx_samples.at(ch) = rx.RawPacket()->data_;
-    }
-    AGORA_LOG_TRACE("TxRxWorkerClientHw[%zu]: Using Packet at location %zu\n",
-                    tid_, reinterpret_cast<size_t>(&rx));
-  }
+  size_t num_rx_samps =
+      Configuration()->SampsPerSymbol() - rx_info.SamplesAvailable();
+  RtAssert(num_rx_samps > rx_info.SamplesAvailable(), "Rx Samples must be > 0");
 
   //Sample offset alignment
   if (sample_offset < 0) {
-    //Don't read an entire symbol due to the offset
+    //Don't read an entire symbol due to the offset ( + a negative number )
     num_rx_samps = num_rx_samps + sample_offset;
   } else if (sample_offset > 0) {
     //Otherwise throw out the offset (could just add this to the next symbol but our buffers are not large enough)
     num_rx_samps = sample_offset;
   }
 
-  Radio::RxFlags out_flags;
-  const int rx_status = radio_.RadioRx(radio_id, rx_samples, num_rx_samps,
-                                       out_flags, receive_time);
-  if (rx_status < 0) {
-    AGORA_LOG_ERROR(
-        "TxRxWorkerClientHw[%zu]: Interface %zu | Radio %zu - Rx failure RX "
-        "status = %d is less than 0\n",
-        tid_, interface_id, interface_id + interface_offset_, rx_status);
-  } else if (static_cast<size_t>(rx_status) != num_rx_samps) {
-    AGORA_LOG_ERROR(
-        "TxRxWorkerClientHw[%zu]: Interface %zu | Radio %zu - Rx failure RX "
-        "status = %d is less than num samples %zu\n",
-        tid_, interface_id, interface_id + interface_offset_, rx_status,
-        num_rx_samps);
-  } else {
-    //sample_offset > 0 means we ignore the rx'd data (don't update the symbol / frame tracking)
-    if (sample_offset <= 0) {
-      // Expected rx, Set the symbol / frame id's
-      if (Configuration()->UeHwFramer()) {
-        global_frame_id = static_cast<size_t>(receive_time >> 32);
-        global_symbol_id = static_cast<size_t>((receive_time >> 16) & 0xFFFF);
-      } else {
-        //Update the rx-symbol
-        global_symbol_id++;
-        if (global_symbol_id == Configuration()->Frame().NumTotalSyms()) {
-          global_symbol_id = 0;
-          global_frame_id++;
-        }
-      }
-
-      if (kDebugPrintInTask) {
-        AGORA_LOG_INFO(
-            "TxRxWorkerClientHw [%zu]: Rx (Frame %zu, Symbol %zu, Radio "
-            "%zu) - at time %lld\n",
-            tid_, global_frame_id, global_symbol_id, radio_id, receive_time);
-      }
-
-      if (IsRxSymbol(global_symbol_id)) {
-        for (size_t ant = 0; ant < ant_ids.size(); ant++) {
-          auto* rx_packet = memory_tracking.at(ant);
-          auto* raw_pkt = rx_packet->RawPacket();
-          new (raw_pkt)
-              Packet(global_frame_id, global_symbol_id, 0, ant_ids.at(ant));
-          result_packets.push_back(raw_pkt);
-
-          AGORA_LOG_FRAME(
-              "TxRxWorkerClientHw [%zu]: Rx Downlink (Frame %zu, Symbol %zu, "
-              "Ant %zu) from Radio %zu at time %lld\n",
-              tid_, global_frame_id, global_symbol_id, ant_ids.at(ant),
-              radio_id, receive_time);
-
-          // Push kPacketRX event into the queue.
-          EventData rx_message(EventType::kPacketRX, rx_tag_t(*rx_packet).tag_);
-          NotifyComplete(rx_message);
-          memory_tracking.at(ant) = nullptr;
-        }
-      }  // end is RxSymbol
-    }    // sample offset <= 0
+  //Check for completion
+  if (rx_info.SamplesAvailable() >= num_rx_samps) {
     sample_offset = 0;
-  }
-
-  //Free memory from most recent allocated to latest
-  AGORA_LOG_TRACE("TxRxWorkerClientHw[%zu]: Memory allocation %zu\n", tid_,
-                  memory_tracking.size());
-  for (ssize_t idx = (memory_tracking.size() - 1); idx > -1; idx--) {
-    auto* memory_location = memory_tracking.at(idx);
-    AGORA_LOG_TRACE("TxRxWorkerClientHw[%zu]: Checking location %zu\n", tid_,
-                    (intptr_t)memory_location);
-    if (memory_location != nullptr) {
-      AGORA_LOG_TRACE(
-          "TxRxWorkerClientHw[%zu]: Returning Packet at location %zu\n", tid_,
-          (intptr_t)memory_location);
-      ReturnRxPacket(*memory_location);
+    if (rx_info.SamplesAvailable() > num_rx_samps) {
+      //Reset Sample
+      throw std::runtime_error("Need to implment this!!!");
+    } else {
+      ResetRxStatus(interface_id, true);
     }
+    //Reset Sample
+  } else {
+    auto rx_locations = rx_info.GetRxPtrs();
+
+    Radio::RxFlags out_flags;
+    long long current_rx_time;
+    const int rx_status = radio_.RadioRx(radio_id, rx_locations, num_rx_samps,
+                                         out_flags, current_rx_time);
+
+    if (rx_status < 0) {
+      AGORA_LOG_ERROR(
+          "TxRxWorkerClientHw[%zu]: Interface %zu | Radio %zu - Rx failure RX "
+          "status = %d is less than 0\n",
+          tid_, interface_id, interface_id + interface_offset_, rx_status);
+    } else if (rx_status > 0) {
+      const size_t new_samples = static_cast<size_t>(rx_status);
+      rx_info.Update(new_samples, current_rx_time);
+      if (new_samples < num_rx_samps) {
+        //Didn't receive everything we requested, try again next time (status saved in rx_info)
+        AGORA_LOG_TRACE(
+            "TxRxWorkerClientHw[%zu]: Interface %zu | Radio %zu - Rx failure "
+            "RX status = %d is less than num samples %zu\n",
+            tid_, interface_id, interface_id + interface_offset_, rx_status,
+            num_rx_samps);
+      } else if (new_samples == num_rx_samps) {
+        //sample_offset > 0 means we ignore the rx'd data (don't update the symbol / frame tracking)
+        receive_time = rx_info.StartTime();
+        bool ignore = true;
+        if (sample_offset <= 0) {
+          // Expected rx, Set the symbol / frame id's
+          if (Configuration()->UeHwFramer()) {
+            global_frame_id = static_cast<size_t>(receive_time >> 32);
+            global_symbol_id =
+                static_cast<size_t>((receive_time >> 16) & 0xFFFF);
+          } else {
+            //Update the rx-symbol
+            global_symbol_id++;
+            if (global_symbol_id == Configuration()->Frame().NumTotalSyms()) {
+              global_symbol_id = 0;
+              global_frame_id++;
+            }
+          }
+
+          if (kDebugPrintInTask) {
+            AGORA_LOG_INFO(
+                "TxRxWorkerClientHw [%zu]: Rx (Frame %zu, Symbol %zu, Radio "
+                "%zu) - at time %lld\n",
+                tid_, global_frame_id, global_symbol_id, radio_id,
+                receive_time);
+          }
+
+          ignore = (IsRxSymbol(global_symbol_id) == false);
+          if (ignore == false) {
+            auto packets = rx_info.GetRxPackets();
+            for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+              auto* rx_packet = packets.at(ch);
+              auto* raw_pkt = rx_packet->RawPacket();
+              new (raw_pkt) Packet(global_frame_id, global_symbol_id, 0,
+                                   first_ant_id + ch);
+              result_packets.push_back(raw_pkt);
+
+              AGORA_LOG_FRAME(
+                  "TxRxWorkerClientHw [%zu]: Rx Downlink (Frame %zu, Symbol "
+                  "%zu, Ant %zu) from Radio %zu at time %lld\n",
+                  tid_, global_frame_id, global_symbol_id, first_ant_id + ch,
+                  radio_id, receive_time);
+
+              // Push kPacketRX event into the queue.
+              EventData rx_message(EventType::kPacketRX,
+                                   rx_tag_t(*rx_packet).tag_);
+              NotifyComplete(rx_message);
+            }
+          }  // end is RxSymbol
+        }    // sample offset <= 0
+        sample_offset = 0;
+        ResetRxStatus(interface_id, ignore);
+      } else {
+        AGORA_LOG_ERROR(
+            "TxRxWorkerClientHw[%zu]: Interface %zu | Radio %zu - Rx failure "
+            "new samples %zu requested samples %zu samples rx'd exceed "
+            "request\n",
+            tid_, interface_id, interface_id + interface_offset_, new_samples,
+            num_rx_samps);
+      }
+    }  // rx_status > 0
   }
   return result_packets;
 }
@@ -430,7 +447,8 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
           NotifyComplete(complete_event);
         }
         AGORA_LOG_TRACE(
-            "TxRxWorkerClientHw::DoTx[%zu]: Frame %zu Transmit Complete for Ue "
+            "TxRxWorkerClientHw::DoTx[%zu]: Frame %zu Transmit Complete for "
+            "Ue "
             "%zu\n",
             tid_, frame_id, interface_id);
       }
@@ -439,25 +457,42 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
   return tx_events.size();
 }
 
+///\todo for the multi radio case should let this return if not enough data is found
+/// This function blocks untill all the discard_samples are received for a given local_interface
 void TxRxWorkerClientHw::AdjustRx(size_t local_interface,
                                   size_t discard_samples) {
   const size_t radio_id = local_interface + interface_offset_;
   long long rx_time = 0;
-  while (Configuration()->Running() && (discard_samples > 0)) {
+
+  size_t request_samples = discard_samples;
+  TxRxWorkerRx::RxStatusTracker rx_tracker(channels_per_interface_);
+  rx_tracker.Reset(rx_pkts_ptrs_);
+
+  while (Configuration()->Running() && (request_samples > 0)) {
+    auto rx_locations = rx_tracker.GetRxPtrs();
     Radio::RxFlags out_flags;
-    const int rx_status = radio_.RadioRx(radio_id, rx_frame_, discard_samples,
-                                         out_flags, rx_time);
+    const int rx_status = radio_.RadioRx(radio_id, rx_locations,
+                                         request_samples, out_flags, rx_time);
 
     if (rx_status < 0) {
-      std::cerr << "RadioTxRx [" << radio_id << "]: BAD SYNC Receive("
-                << rx_status << "/" << discard_samples << ") at Time "
-                << rx_time << std::endl;
+      AGORA_LOG_ERROR("AdjustRx [%zu]: BAD SYNC Received (%d/%zu) %lld\n", tid_,
+                      rx_status, request_samples, rx_time);
     } else {
-      discard_samples = discard_samples - rx_status;
+      size_t new_samples = static_cast<size_t>(rx_status);
+      rx_tracker.Update(new_samples, rx_time);
+      if (new_samples <= request_samples) {
+        request_samples -= new_samples;
+      } else {
+        AGORA_LOG_ERROR(
+            "SycBeacon [%zu]: BAD SYNC Rx more samples then requested "
+            "(%zu/%zu) %lld\n",
+            tid_, new_samples, request_samples, rx_time);
+      }
     }
-  }
+  }  // request_samples > 0
 }
 
+///\todo for the multi radio case should let this return if not enough data is found
 ssize_t TxRxWorkerClientHw::SyncBeacon(size_t local_interface,
                                        size_t sample_window) {
   const size_t radio_id = local_interface + interface_offset_;
@@ -466,20 +501,47 @@ ssize_t TxRxWorkerClientHw::SyncBeacon(size_t local_interface,
   assert(sample_window <= (Configuration()->SampsPerSymbol() *
                            Configuration()->Frame().NumTotalSyms()));
 
-  //\todo add a retry exit.
-  while ((Configuration()->Running() == true) && (sync_index < 0)) {
-    Radio::RxFlags out_flags;
-    const int rx_status =
-        radio_.RadioRx(radio_id, rx_frame_, sample_window, out_flags, rx_time);
+  size_t request_samples = sample_window;
+  TxRxWorkerRx::RxStatusTracker rx_tracker(channels_per_interface_);
+  rx_tracker.Reset(rx_pkts_ptrs_);
 
-    if (rx_status != static_cast<int>(sample_window)) {
-      std::cerr << "RadioTxRx [" << radio_id << "]: BAD SYNC Receive("
-                << rx_status << "/" << sample_window << ") at Time " << rx_time
-                << std::endl;
+  while (Configuration()->Running() && (sync_index < 0)) {
+    auto rx_locations = rx_tracker.GetRxPtrs();
+    Radio::RxFlags out_flags;
+    const int rx_status = radio_.RadioRx(radio_id, rx_locations,
+                                         request_samples, out_flags, rx_time);
+
+    if (rx_status < 0) {
+      AGORA_LOG_ERROR("SyncBeacon [%zu]: BAD SYNC Received (%d/%zu) %lld\n",
+                      tid_, rx_status, sample_window, rx_time);
     } else {
-      sync_index = FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
-                                      rx_frame_.at(kSyncDetectChannel)),
-                                  sample_window);
+      size_t new_samples = static_cast<size_t>(rx_status);
+      rx_tracker.Update(new_samples, rx_time);
+      if (new_samples == request_samples) {
+        AGORA_LOG_TRACE(
+            "SyncBeacon - Samples %zu:%zu, Window %zu - Check Beacon %ld\n",
+            new_samples, rx_tracker.SamplesAvailable(), sample_window,
+            reinterpret_cast<intptr_t>(
+                rx_pkts_ptrs_.at(kSyncDetectChannel)->RawPacket()->data_));
+
+        sync_index = FindSyncBeacon(
+            reinterpret_cast<std::complex<int16_t>*>(
+                rx_pkts_ptrs_.at(kSyncDetectChannel)->RawPacket()->data_),
+            sample_window);
+        //Throw out samples until we detect the beacon
+        request_samples = sample_window;
+        rx_tracker.Reset(rx_pkts_ptrs_);
+      } else if (new_samples < request_samples) {
+        AGORA_LOG_TRACE("SyncBeacon - Samples %zu:%zu, Window %zu\n",
+                        new_samples, rx_tracker.SamplesAvailable(),
+                        sample_window);
+        request_samples -= new_samples;
+      } else {
+        AGORA_LOG_ERROR(
+            "SycBeacon [%zu]: BAD SYNC Rx more samples then requested "
+            "(%zu/%zu) %lld\n",
+            tid_, new_samples, request_samples, rx_time);
+      }
     }
   }  // end while sync_index < 0
   return sync_index;
@@ -630,8 +692,11 @@ void TxRxWorkerClientHw::InitRxStatus() {
   for (auto& status : rx_status_) {
     for (auto& new_packet : rx_packets) {
       new_packet = &GetRxPacket();
-      AGORA_LOG_TRACE("InitRxStatus[%zu]: Using Packet at location %d\n", tid_,
-                      reinterpret_cast<intptr_t>(new_packet));
+      AGORA_LOG_INFO(
+          "InitRxStatus[%zu]: Using Packet at location %ld, data location "
+          "%ld\n",
+          tid_, reinterpret_cast<intptr_t>(new_packet),
+          reinterpret_cast<intptr_t>(new_packet->RawPacket()->data_));
     }
     //Allocate memory for each interface / channel
     status.Reset(rx_packets);

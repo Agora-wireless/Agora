@@ -166,6 +166,7 @@ std::vector<Packet*> TxRxWorkerHw::DoRx(size_t interface_id,
     //Check for successful finish
     if ((new_samples == request_samples) ||
         (out_flags == Radio::RxFlags::EndSamples)) {
+      frame_time = rx_info.StartTime();
       const size_t ant_id = radio_id * channels_per_interface_;
       const size_t cell_id = Configuration()->CellId().at(radio_id);
 
