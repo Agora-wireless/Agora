@@ -165,7 +165,7 @@ std::vector<Packet*> TxRxWorkerHw::DoRx(size_t interface_id,
 
     //Check for successful finish
     if ((new_samples == request_samples) ||
-        (out_flags == Radio::RxFlags::EndSamples)) {
+        (out_flags == Radio::RxFlags::EndReceive)) {
       frame_time = rx_info.StartTime();
       const size_t ant_id = radio_id * channels_per_interface_;
       const size_t cell_id = Configuration()->CellId().at(radio_id);
@@ -548,15 +548,15 @@ bool TxRxWorkerHw::IsTxSymbolNext(size_t radio_id, size_t current_symbol) {
   return tx_symbol_next;
 }
 
-int TxRxWorkerHw::GetTxFlags(size_t radio_id, size_t tx_symbol_id) {
-  int tx_flags;
+Radio::TxFlags TxRxWorkerHw::GetTxFlags(size_t radio_id, size_t tx_symbol_id) {
+  Radio::TxFlags tx_flags;
   //Flags == 1   // HAS_TIME
   //Flags == 2;  // HAS_TIME & END_BURST, name me
   const auto tx_again = IsTxSymbolNext(radio_id, tx_symbol_id);
   if (tx_again) {
-    tx_flags = 1;
+    tx_flags = Radio::TxFlags::TxFlagNone;
   } else {
-    tx_flags = 2;
+    tx_flags = Radio::TxFlags::EndTransmit;
   }
   return tx_flags;
 }
@@ -686,7 +686,7 @@ void TxRxWorkerHw::PrintRxSymbolTiming(
 long long int TxRxWorkerHw::GetHwTime() {
   long long hw_time = 0;
   if (Configuration()->HwFramer() == false) {
-    constexpr int kBeacontxFlags = 2;  // END BURST
+    constexpr auto kBeacontxFlags = Radio::TxFlags::EndTransmit;  // END BURST
     // Read some dummy symbols to get the hardware time and then schedule
     // TX/RX accordingly
     const size_t beacon_radio =
@@ -840,7 +840,7 @@ void TxRxWorkerHw::TxDownlinkZeros(size_t frame_id, size_t radio_id,
           (static_cast<long long>(frame_id) << 32) | (tx_symbol_id << 16);
     }
 
-    const int tx_flags = GetTxFlags(radio_id, tx_symbol_id);
+    const auto tx_flags = GetTxFlags(radio_id, tx_symbol_id);
 
     const int tx_ret =
         radio_config_.RadioTx(radio_id, tx_buffs.data(), tx_flags, frame_time);

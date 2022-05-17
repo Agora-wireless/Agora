@@ -20,10 +20,8 @@ class ClientRadioConfig {
   bool RadioStart();
   void RadioStop();
   void ReadSensors();
-  int RadioTx(size_t radio_id, void** buffs, size_t num_samps, int flags,
-              long long& tx_time);
-  //int RadioRx(size_t radio_id, void** buffs, size_t num_samps,
-  //            long long& rx_time);
+  int RadioTx(size_t radio_id, void** buffs, size_t num_samps,
+              Radio::TxFlags flags, long long& tx_time);
 
   int RadioRx(size_t radio_id,
               std::vector<std::vector<std::complex<int16_t>>>& rx_data,

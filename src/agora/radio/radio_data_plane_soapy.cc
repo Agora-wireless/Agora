@@ -60,7 +60,7 @@ int RadioDataPlaneSoapy::Rx(
 int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
                             Radio::RxFlags& out_flags, long long& rx_time_ns) {
   constexpr long kRxTimeout = 1;  // 1uS
-  out_flags = Radio::RxFlags::None;
+  out_flags = Radio::RxFlags::RxFlagNone;
   //constexpr long kRxTimeout = 1000000;  // 1uS
   // SOAPY_SDR_ONE_PACKET; SOAPY_SDR_END_BURST
   int soapy_rx_flags = 0;
@@ -90,7 +90,7 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
               "RadioDataPlaneSoapy::Rx - short rx call %zu:%zu but it is the "
               "end of the rx samples %d\n",
               rx_samples, rx_size, soapy_rx_flags);
-          out_flags = Radio::RxFlags::EndSamples;
+          out_flags = Radio::RxFlags::EndReceive;
         }
       } else {
         if ((soapy_rx_flags & SOAPY_SDR_END_BURST) == 0) {

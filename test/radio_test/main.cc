@@ -84,8 +84,8 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
   RtAssert(
       (cfg->SampsPerSymbol() % kRxPerSymbol) == 0,
       "Target must be a multiple of samples per symbol for hw framer mode!");
-  // Radio::RxFlags::None | RxFlagNone
-  auto rx_flag = Radio::RxFlags::None;
+  // Radio::RxFlags::RxFlagNone | RxFlagNone
+  auto rx_flag = Radio::RxFlags::RxFlagNone;
   // Using RxFlagNone with a soapy radio will sometimes return sub symbol packets
 
   std::cout << "Testing " << total_radios << " radios with " << num_channels
@@ -160,7 +160,7 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
 
           rx_info.Update(new_samples, rx_time);
           if (new_samples < request_samples) {
-            if (rx_flag == Radio::RxFlags::EndSamples) {
+            if (rx_flag == Radio::RxFlags::EndReceive) {
               AGORA_LOG_WARN(
                   "Received less than symbol amount of samples %zu:%zu:%zu rx "
                   "time %lld (Frame %zu, Symbol %zu)\n",
@@ -233,8 +233,8 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
   const size_t radio_hi = total_radios;
   const size_t cell_id = 0;
   const size_t target_samples = cfg->SampsPerSymbol();
-  // Radio::RxFlags::None | RxFlagNone
-  auto rx_flag = Radio::RxFlags::None;
+  // Radio::RxFlags::RxFlagNone | EndReceive
+  auto rx_flag = Radio::RxFlags::RxFlagNone;
 
   RtAssert(
       (cfg->SampsPerSymbol() % kRxPerSymbol) == 0,
@@ -314,7 +314,7 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
 
           rx_info.Update(new_samples, rx_time);
           if (new_samples < request_samples) {
-            if (rx_flag == Radio::RxFlags::EndSamples) {
+            if (rx_flag == Radio::RxFlags::EndReceive) {
               AGORA_LOG_WARN(
                   "Received less than symbol amount of samples %zu:%zu:%zu rx "
                   "time %lld (Frame %zu, Symbol %zu)\n",

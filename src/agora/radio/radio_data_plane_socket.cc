@@ -123,9 +123,9 @@ int RadioDataPlaneSocket::Rx(std::vector<void*>& rx_locations, size_t rx_size,
   if (rx_return > 0) {
     const size_t rx_samples = static_cast<size_t>(rx_return);
     if (rx_samples != rx_size) {
-      out_flags = Radio::RxFlags::EndSamples;
+      out_flags = Radio::RxFlags::EndReceive;
     } else {
-      out_flags = Radio::RxFlags::None;
+      out_flags = Radio::RxFlags::RxFlagNone;
     }
     AGORA_LOG_TRACE("Rx'd sample count %d\n", rx_return);
   } else if (rx_return < 0) {

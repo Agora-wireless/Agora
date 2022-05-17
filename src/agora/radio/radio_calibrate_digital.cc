@@ -39,7 +39,7 @@ auto RadioConfig::TxArrayToRef(
     }
 
     // Send a separate pilot from each antenna
-    int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
+    const auto tx_flags = Radio::TxFlags::EndTransmit;
     auto ret =
         radios_.at(radio_i)->Tx(txbuff.data(), read_len, tx_flags, tx_time);
 
@@ -50,7 +50,7 @@ auto RadioConfig::TxArrayToRef(
     radios_.at(ref)->Activate();
     Go();  // trigger
 
-    auto rx_flags = Radio::RxFlags::None;
+    auto rx_flags = Radio::RxFlags::RxFlagNone;
     ret = radios_.at(ref)->Rx(rx_buffs, read_len, rx_flags, rx_time);
     if (ret < (int)read_len) {
       std::cout << "bad read (" << ret << ") at node " << ref
@@ -85,7 +85,7 @@ auto RadioConfig::TxRefToArray(
   // Allocate buffers for uplink directions
   std::vector<std::vector<std::complex<int16_t>>> ul_buff(cfg_->BfAntNum());
   std::vector<std::complex<int16_t>> dummybuff(read_len);
-  int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
+  const auto tx_flags = Radio::TxFlags::EndTransmit;
   int ret = radios_.at(ref)->Tx(txbuff.data(), read_len, tx_flags, tx_time);
   if (ret < (int)read_len) {
     std::cout << "bad transmit in TxRefToArray\n";
@@ -97,7 +97,7 @@ auto RadioConfig::TxRefToArray(
   }
   Go();  // Trigger
 
-  auto rx_flags = Radio::RxFlags::None;
+  auto rx_flags = Radio::RxFlags::RxFlagNone;
   for (size_t radio_i = 0; radio_i < num_radios; radio_i++) {
     const size_t ant_i = radio_i * cfg_->NumChannels();
     for (size_t i = 0; i < cfg_->NumChannels(); i++) {
@@ -397,7 +397,7 @@ bool RadioConfig::InitialCalib() {
 
       // Send a separate pilot from each antenna
       for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
-        int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
+        const auto tx_flags = Radio::TxFlags::EndTransmit;
         size_t retry = 0;
         bool bad_read = false;
         while (retry < max_retries) {
@@ -411,7 +411,7 @@ bool RadioConfig::InitialCalib() {
           radios_.at(ref)->Activate();
           Go();  // trigger
 
-          auto rx_flags = Radio::RxFlags::None;
+          auto rx_flags = Radio::RxFlags::RxFlagNone;
           std::vector<std::vector<std::complex<int16_t>>*> rx_buff(
               cfg_->NumChannels(), &dummybuff);
           rx_buff.at(0) = &buff.at(cfg_->NumChannels() * i + ch);
@@ -433,7 +433,7 @@ bool RadioConfig::InitialCalib() {
     }
     // Transmit from Ref Antenna to Beamforming Antennas (Up)
     if (good_csi == true) {
-      int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
+      const auto tx_flags = Radio::TxFlags::EndTransmit;
       size_t retry = 0;
       bool bad_read = false;
       while (retry < max_retries) {
@@ -452,7 +452,7 @@ bool RadioConfig::InitialCalib() {
 
         Go();  // Trigger
 
-        auto rx_flags = Radio::RxFlags::None;
+        auto rx_flags = Radio::RxFlags::RxFlagNone;
         for (size_t i = 0; i < r; i++) {
           if (good_csi == false) {
             break;
@@ -488,7 +488,7 @@ bool RadioConfig::InitialCalib() {
     if (good_csi == true) {
       noise_buff.resize(m);
       for (size_t i = 0; i < r; i++) {
-        auto rx_flags = Radio::RxFlags::None;
+        auto rx_flags = Radio::RxFlags::RxFlagNone;
         radios_.at(i)->Activate();
 
         std::vector<std::vector<std::complex<int16_t>>*> rx_buff(

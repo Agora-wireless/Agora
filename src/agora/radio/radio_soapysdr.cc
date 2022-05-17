@@ -272,26 +272,27 @@ void RadioSoapySdr::Deactivate() {
   Correlator(false);
 }
 
-int RadioSoapySdr::Tx(const void* const* tx_buffs, size_t tx_size, int flags,
-                      long long& tx_time_ns) {
+int RadioSoapySdr::Tx(const void* const* tx_buffs, size_t tx_size,
+                      Radio::TxFlags flags, long long& tx_time_ns) {
   constexpr size_t kTxTimeoutUs = 1000000;
-  int tx_flags = 0;
-  if (flags == 1) {
-    tx_flags = SOAPY_SDR_HAS_TIME;
-  } else if (flags == 2) {
-    tx_flags = SOAPY_SDR_HAS_TIME | SOAPY_SDR_END_BURST;
+
+  int soapy_flags;
+  if (flags == Radio::TxFlags::TxFlagNone) {
+    soapy_flags = SOAPY_SDR_HAS_TIME;
+  } else if (flags == Radio::TxFlags::EndTransmit) {
+    soapy_flags = (SOAPY_SDR_HAS_TIME | SOAPY_SDR_END_BURST);
+  } else {
+    AGORA_LOG_ERROR("Unsupported radio tx flag %d\n", static_cast<int>(flags));
+    soapy_flags = 0;
   }
 
-  int w;
-  if (cfg_->HwFramer() == true) {
-    w = dev_->writeStream(txs_, tx_buffs, tx_size, tx_flags, tx_time_ns,
-                          kTxTimeoutUs);
-  } else {
+  if (HwFramer() == false) {
     // For UHD device xmit from host using frameTimeNs
-    long long frame_time_ns = SoapySDR::ticksToTimeNs(tx_time_ns, cfg_->Rate());
-    w = dev_->writeStream(txs_, tx_buffs, tx_size, tx_flags, frame_time_ns,
-                          kTxTimeoutUs);
+    tx_time_ns = SoapySDR::ticksToTimeNs(tx_time_ns, cfg_->Rate());
   }
+  const int write_status = dev_->writeStream(
+      txs_, tx_buffs, tx_size, soapy_flags, tx_time_ns, kTxTimeoutUs);
+
   if (kDebugRadioTX) {
     size_t chan_mask;
     long timeout_us(0);
@@ -299,10 +300,10 @@ int RadioSoapySdr::Tx(const void* const* tx_buffs, size_t tx_size, int flags,
     const int s = dev_->readStreamStatus(txs_, chan_mask, status_flag,
                                          tx_time_ns, timeout_us);
     std::cout << "radio " << SerialNumber() << "(" << Id() << ") tx returned "
-              << w << " and status " << s << " when flags was " << flags
-              << std::endl;
+              << write_status << " and status " << s << " when flags was "
+              << flags << std::endl;
   }
-  return w;
+  return write_status;
 }
 
 int RadioSoapySdr::Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,

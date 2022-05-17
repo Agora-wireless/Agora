@@ -24,11 +24,11 @@ class RadioConfig {
   bool RadioStart();
   void RadioStop();
   void ReadSensors();
-  int RadioTx(size_t radio_id, const void* const* buffs, int flags,
+  int RadioTx(size_t radio_id, const void* const* buffs, Radio::TxFlags flags,
               long long& tx_time);
   int RadioTx(size_t radio_id,
               const std::vector<std::vector<std::complex<int16_t>>>& tx_data,
-              int flags, long long& tx_time_ns);
+              Radio::TxFlags flags, long long& tx_time_ns);
 
   int RadioRx(size_t radio_id,
               std::vector<std::vector<std::complex<int16_t>>>& rx_data,

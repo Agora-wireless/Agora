@@ -64,7 +64,8 @@ void TxRxWorkerUsrp::DoTxRx() {
   // Schedule the first beacon in the future
   tx_time_bs_ = rx_time_bs_ + Configuration()->SampsPerSymbol() *
                                   Configuration()->Frame().NumTotalSyms() * 40;
-  radio_config_.RadioTx(0, beaconbuff.data(), 2, tx_time_bs_);
+  radio_config_.RadioTx(0, beaconbuff.data(), Radio::TxFlags::EndTransmit,
+                        tx_time_bs_);
   long long bs_init_rx_offset = tx_time_bs_ - rx_time_bs_;
   for (int it = 0;
        it < std::floor(bs_init_rx_offset / Configuration()->SampsPerSymbol());
@@ -99,7 +100,8 @@ void TxRxWorkerUsrp::DoTxRx() {
       tx_time_bs_ = rx_time_bs_ + Configuration()->SampsPerSymbol() *
                                       Configuration()->Frame().NumTotalSyms() *
                                       20;
-      int tx_ret = radio_config_.RadioTx(0, beaconbuff.data(), 2, tx_time_bs_);
+      int tx_ret = radio_config_.RadioTx(
+          0, beaconbuff.data(), Radio::TxFlags::EndTransmit, tx_time_bs_);
       if (tx_ret != (int)Configuration()->SampsPerSymbol()) {
         std::cerr << "BAD Transmit(" << tx_ret << "/"
                   << Configuration()->SampsPerSymbol() << ") at Time "
@@ -240,8 +242,8 @@ int TxRxWorkerUsrp::DequeueSend() {
   }
 
   size_t last = Configuration()->Frame().GetDLSymbolLast();
-  int flags = (symbol_id != last) ? 1   // HAS_TIME
-                                  : 2;  // HAS_TIME & END_BURST, fixme
+  Radio::TxFlags flags = (symbol_id != last) ? Radio::TxFlags::TxFlagNone
+                                             : Radio::TxFlags::EndTransmit;
   long long frame_time = ((long long)frame_id << 32) | (symbol_id << 16);
   radio_config_.RadioTx(radio_id, txbuffs.data(), flags, frame_time);
 
@@ -312,9 +314,9 @@ int TxRxWorkerUsrp::DequeueSend(int frame_id, int symbol_id) {
   }
 
   const size_t last = Configuration()->Frame().GetDLSymbolLast();
-  int flags = (symbol_id != static_cast<int>(last))
-                  ? 1   // HAS_TIME
-                  : 2;  // HAS_TIME & END_BURST, fixme
+  Radio::TxFlags flags = (symbol_id != static_cast<int>(last))
+                             ? Radio::TxFlags::TxFlagNone
+                             : Radio::TxFlags::EndTransmit;
   long long frame_time = ((long long)frame_id << 32) | (symbol_id << 16);
   radio_config_.RadioTx(radio_id, txbuffs.data(), flags, frame_time);
 

@@ -94,7 +94,7 @@ void ClientRadioConfig::Go() {
 }
 
 int ClientRadioConfig::RadioTx(size_t radio_id, void** buffs, size_t num_samps,
-                               int flags, long long& tx_time) {
+                               Radio::TxFlags flags, long long& tx_time) {
   return radios_.at(radio_id)->Tx(buffs, num_samps, flags, tx_time);
 }
 

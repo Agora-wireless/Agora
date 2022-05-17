@@ -28,7 +28,7 @@ class RadioSoapySdr : public Radio {
   void Close() final;
   void Flush() final;
 
-  int Tx(const void* const* tx_buffs, size_t tx_size, int tx_flags,
+  int Tx(const void* const* tx_buffs, size_t tx_size, Radio::TxFlags tx_flags,
          long long& tx_time_ns) final;
 
   int Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,

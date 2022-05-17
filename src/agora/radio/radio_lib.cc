@@ -286,16 +286,16 @@ void RadioConfig::Go() {
   }
 }
 
-int RadioConfig::RadioTx(size_t radio_id, const void* const* buffs, int flags,
-                         long long& tx_time) {
+int RadioConfig::RadioTx(size_t radio_id, const void* const* buffs,
+                         Radio::TxFlags flags, long long& tx_time) {
   return radios_.at(radio_id)->Tx(buffs, cfg_->SampsPerSymbol(), flags,
                                   tx_time);
 }
 
 int RadioConfig::RadioTx(
     size_t radio_id,
-    const std::vector<std::vector<std::complex<int16_t>>>& tx_data, int flags,
-    long long& tx_time)
+    const std::vector<std::vector<std::complex<int16_t>>>& tx_data,
+    Radio::TxFlags flags, long long& tx_time)
 
 {
   std::vector<const void*> buffs(tx_data.size());

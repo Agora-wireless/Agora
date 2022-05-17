@@ -591,7 +591,7 @@ void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
   const size_t samples_per_frame =
       samples_per_symbol * Configuration()->Frame().NumTotalSyms();
   long long tx_time;
-  int flags_tx = 1;  // HAS_TIME
+  Radio::TxFlags flags_tx = Radio::TxFlags::TxFlagNone;
 
   std::vector<void*> tx_data(channels_per_interface_);
   for (size_t ul_symbol_idx = 0;
@@ -614,7 +614,7 @@ void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
     }
 
     if (tx_symbol_id == Configuration()->Frame().GetULSymbolLast()) {
-      flags_tx = 2;  // HAS_TIME & END_BURST, fixme
+      flags_tx = Radio::TxFlags::EndTransmit;
     }
     const int tx_status = radio_.RadioTx(radio_id, tx_data.data(),
                                          samples_per_symbol, flags_tx, tx_time);
@@ -627,7 +627,7 @@ void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
           "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Symbol (Frame "
           "%zu:%zu, Symbol %zu, Ue %zu) at time %lld flags %d\n",
           tid_, frame_id, tx_frame_id, tx_symbol_id, radio_id, tx_time,
-          flags_tx);
+          static_cast<int>(flags_tx));
     }
   }
 }
@@ -654,18 +654,18 @@ void TxRxWorkerClientHw::TxPilot(size_t pilot_ant, size_t frame_id,
   const size_t pilot_symbol_id =
       Configuration()->Frame().GetPilotSymbol(pilot_ant);
 
-  int flags_tx = 2;  // END_BURST
+  Radio::TxFlags flags_tx = Radio::TxFlags::EndTransmit;
   //See if we need to set end burst for the last channel
   // (see if the next symbol is an uplink symbol)
   if ((pilot_channel + 1) == channels_per_interface_) {
     if (Configuration()->Frame().NumULSyms() > 0) {
       const size_t first_ul_symbol = Configuration()->Frame().GetULSymbol(0);
       if ((pilot_symbol_id + 1) == (first_ul_symbol)) {
-        flags_tx = 1;
+        flags_tx = Radio::TxFlags::TxFlagNone;
       }
     }
   } else {
-    flags_tx = 1;
+    flags_tx = Radio::TxFlags::TxFlagNone;
   }
 
   if (Configuration()->UeHwFramer()) {
@@ -693,7 +693,7 @@ void TxRxWorkerClientHw::TxPilot(size_t pilot_ant, size_t frame_id,
         "%zu:%zu, Symbol %zu, Ue %zu, Ant %zu:%zu) at time %lld flags "
         "%d\n",
         tid_, frame_id, tx_frame_id, pilot_symbol_id, radio, pilot_channel,
-        pilot_ant, tx_time, flags_tx);
+        pilot_ant, tx_time, static_cast<int>(flags_tx));
   }
 }
 

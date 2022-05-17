@@ -8,14 +8,16 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "config.h"
 
 class Radio {
  public:
   enum RadioType { SoapySdrStream, SoapySdrSocket };
-  //EndSamples is set when the samples returned are the last of a contiguous set
-  enum RxFlags { None = 0, EndSamples = 1 };
+  //EndReceive is set when the samples returned are the last of a contiguous set
+  enum RxFlags { RxFlagNone = 0, EndReceive = 1 };
+  enum TxFlags { TxFlagNone = 0, EndTransmit = 1 };
   static std::unique_ptr<Radio> Create(RadioType type);
 
   enum ActivationTypes { kActivate, kActivateWaitTrigger };
@@ -24,6 +26,7 @@ class Radio {
   //Accessors
   inline size_t Id() const { return id_; }
   inline const std::string& SerialNumber() const { return serial_number_; }
+  inline bool HwFramer() const { return hw_framer_; }
 
   virtual void Init(const Config* cfg, size_t id, const std::string& serial,
                     const std::vector<size_t>& enabled_channels,
@@ -39,7 +42,7 @@ class Radio {
   virtual void Close() = 0;
   virtual void Flush() = 0;
 
-  virtual int Tx(const void* const* tx_buffs, size_t tx_size, int tx_flags,
+  virtual int Tx(const void* const* tx_buffs, size_t tx_size, TxFlags tx_flags,
                  long long& tx_time_ns) = 0;
 
   virtual int Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,

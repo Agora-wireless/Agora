@@ -56,7 +56,7 @@ class TxRxWorkerHw : public TxRxWorker {
 
   void TxBeaconHw(size_t frame_id, size_t interface_id, long long time0);
   bool IsTxSymbolNext(size_t radio_id, size_t current_symbol);
-  int GetTxFlags(size_t radio_id, size_t tx_symbol_id);
+  Radio::TxFlags GetTxFlags(size_t radio_id, size_t tx_symbol_id);
   long long int GetHwTime();
 
   bool IsRxSymbol(size_t interface, size_t symbol_id);
