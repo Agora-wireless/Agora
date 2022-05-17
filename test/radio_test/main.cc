@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
     PinToCoreWithOffset(ThreadType::kMasterTX, 0, 0);
     agora_comm::ListLocalInterfaces();
     //TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
-    //TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrSocket);
+    TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrSocket);
     TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
     //UE socket doesnt work right now... (never get any data)
     //TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrSocket);
@@ -330,8 +330,7 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
                   "Received less than symbol amount of samples %zu:%zu:%zu rx "
                   "time %lld (Frame %zu, Symbol %zu) - Retrying\n",
                   new_samples, request_samples, rx_info.SamplesAvailable(),
-                  rx_time, static_cast<size_t>(rx_time >> 32),
-                  static_cast<size_t>((rx_time >> 16) & 0xFFFF));
+                  rx_time, 0, num_rx_symbols);
             }
           } else if (new_samples == request_samples) {
             //Rx data.....
