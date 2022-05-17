@@ -224,6 +224,10 @@ std::vector<Packet*> TxRxWorkerHw::DoRx(size_t interface_id,
           auto* raw_pkt = rx_packet->RawPacket();
           new (raw_pkt) Packet(frame_id, symbol_id, cell_id, ant_id + ch);
           result_packets.push_back(raw_pkt);
+          AGORA_LOG_TRACE(
+              "TxRxWorkerHw[%zu]: Frame %zu Symbol %zu Ant %zu - Radio %zu - "
+              "Received Symbol\n",
+              tid_, frame_id, symbol_id, ant_id + ch, radio_id);
 
           // Push kPacketRX event into the queue.
           EventData rx_message(EventType::kPacketRX, rx_tag_t(*rx_packet).tag_);

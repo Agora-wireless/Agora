@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "buffer.h"
+#include "logger.h"
 
 namespace TxRxWorkerRx {
 
@@ -59,12 +60,25 @@ class RxStatusTracker {
     return rx_packets;
   }
 
+  //Append new samples to data_set tracker
   void Update(size_t new_samples, long long sample_rx_start) {
     if (samples_available_ == 0) {
       RtAssert(
           sample_start_rx_time_ == 0,
           "RxStatusTracker::Update - Expected samples start time to be 0\n");
       sample_start_rx_time_ = sample_rx_start;
+    } else {
+      //Verify sample time.....
+      const long long expected_start =
+          sample_start_rx_time_ + samples_available_;
+      if (expected_start != sample_rx_start) {
+        AGORA_LOG_WARN(
+            "RxStatusTracker::Update - Available %zu Rx Start %lld, New Start "
+            "%lld, Expected Start %lld\n",
+            samples_available_, sample_start_rx_time_, sample_rx_start,
+            expected_start);
+        throw std::runtime_error("Unexpected sample rx time");
+      }
     }
 
     //Update (incrememt) the rx memory locations by the number of new samples

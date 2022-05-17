@@ -63,7 +63,7 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
   out_flags = Radio::RxFlags::RxFlagNone;
   //constexpr long kRxTimeout = 1000000;  // 1uS
   // SOAPY_SDR_ONE_PACKET; SOAPY_SDR_END_BURST
-  int soapy_rx_flags = 0;
+  int soapy_rx_flags = 0;  //SOAPY_SDR_END_BURST;  //(1 << 29);
 
   int rx_status = 0;
   long long frame_time_ns(0);
@@ -80,19 +80,22 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
       if (rx_samples != rx_size) {
         if ((soapy_rx_flags & SOAPY_SDR_END_BURST) == 0) {
           AGORA_LOG_TRACE(
-              "RadioDataPlaneSoapy::Rx - short rx call %zu:%zu, more data "
-              "could be available? %d\n",
-              rx_samples, rx_size, soapy_rx_flags);
+              "RadioDataPlaneSoapy::Rx %s(%zu) - short rx call %zu:%zu, more "
+              "data could be available? %d\n",
+              radio_->SerialNumber().c_str(), radio_->Id(), rx_samples, rx_size,
+              soapy_rx_flags);
           //Soapy could print a 'D' if this happens. But this would be acceptable
         } else if ((soapy_rx_flags & SOAPY_SDR_END_BURST) ==
                    SOAPY_SDR_END_BURST) {
           AGORA_LOG_WARN(
-              "RadioDataPlaneSoapy::Rx - short rx call %zu:%zu but it is the "
-              "end of the rx samples %d\n",
-              rx_samples, rx_size, soapy_rx_flags);
+              "RadioDataPlaneSoapy::Rx %s(%zu) - short rx call %zu:%zu end of "
+              "the receive data status %d\n",
+              radio_->SerialNumber().c_str(), radio_->Id(), rx_samples, rx_size,
+              soapy_rx_flags);
           out_flags = Radio::RxFlags::EndReceive;
         }
       } else {
+        /// rx_samples == rx_size
         if ((soapy_rx_flags & SOAPY_SDR_END_BURST) == 0) {
           //This usually happens when the timeout is not long enough to wait for multiple packets for a given requested rx length
           AGORA_LOG_WARN(
@@ -119,9 +122,11 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
 
     if (kDebugPrintRx) {
       std::printf(
-          "Soapy RX return count %d out of requested %zu - flags: %d - HAS "
-          "TIME: %d | END BURST: %d | MORE FRAGS: %d | SINGLE PKT: %d\n",
-          rx_status, rx_size, soapy_rx_flags,
+          "Rx Radio %s(%zu) RadioSoapy RX return count %d out of "
+          "requested %zu - flags: %d - HAS TIME: %d | END BURST: %d | MORE "
+          "FRAGS: %d | SINGLE PKT: %d\n",
+          radio_->SerialNumber().c_str(), radio_->Id(), rx_status, rx_size,
+          soapy_rx_flags,
           (soapy_rx_flags & SOAPY_SDR_HAS_TIME) == SOAPY_SDR_HAS_TIME,
           (soapy_rx_flags & SOAPY_SDR_END_BURST) == SOAPY_SDR_END_BURST,
           (soapy_rx_flags & SOAPY_SDR_MORE_FRAGMENTS) ==
