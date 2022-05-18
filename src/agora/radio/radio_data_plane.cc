@@ -67,7 +67,12 @@ void RadioDataPlane::Activate(Radio::ActivationTypes type) {
       if (type == Radio::ActivationTypes::kActivateWaitTrigger) {
         soapy_flags = SOAPY_SDR_WAIT_TRIGGER;
       }
-      device->activateStream(remote_stream_, soapy_flags);
+      const auto status = device->activateStream(remote_stream_, soapy_flags);
+      //SOAPY_SDR_STREAM_ERROR (-2) ?????
+      if (status < 0) {
+        AGORA_LOG_WARN("Activate soapy stream with error status %d %s\n",
+                       status, SoapySDR_errToStr(status));
+      }
       mode_ = kModeActive;
     }
   } else {
@@ -84,7 +89,10 @@ void RadioDataPlane::Deactivate() {
           "Deactivate");
     } else {
       auto device = dynamic_cast<RadioSoapySdr*>(radio_)->SoapyDevice();
-      device->deactivateStream(remote_stream_);
+      auto status = device->deactivateStream(remote_stream_);
+      //SOAPY_SDR_STREAM_ERROR (-2) ?????
+      AGORA_LOG_INFO("Deactivate soapy rx stream with status %d %s\n", status,
+                     SoapySDR_errToStr(status));
       mode_ = kModeDeactive;
     }
   } else {
@@ -105,6 +113,8 @@ void RadioDataPlane::Close() {
   }
 
   if (mode_ == kModeDeactive) {
+    AGORA_LOG_INFO("RadioDataPlane::Closing stream for radio %s(%d)\n",
+                   radio_->SerialNumber().c_str(), radio_->Id());
     auto device = dynamic_cast<RadioSoapySdr*>(radio_)->SoapyDevice();
     device->closeStream(remote_stream_);
     remote_stream_ = nullptr;
@@ -118,6 +128,12 @@ void RadioDataPlane::Setup(const SoapySDR::Kwargs& args) {
     auto device = radio->SoapyDevice();
     remote_stream_ = device->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16,
                                          radio->EnabledChannels(), args);
+    if (remote_stream_ == nullptr) {
+      AGORA_LOG_ERROR(
+          "RadioDataPlane::Setup - SetupStream returned an error\n");
+      throw std::runtime_error(
+          "RadioDataPlane::Setup - SetupStream returned an error");
+    }
     mode_ = kModeDeactive;
   } else {
     AGORA_LOG_WARN(

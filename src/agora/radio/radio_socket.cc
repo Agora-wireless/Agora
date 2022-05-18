@@ -5,6 +5,7 @@
 #include "radio_socket.h"
 
 #include <cassert>
+#include <chrono>
 
 #include "logger.h"
 #include "utils.h"
@@ -149,7 +150,6 @@ void RadioSocket::Create(size_t samples_per_symbol,
   }
   DEBUG_OUTPUT(" ip6_dst %s\n udp_dst %s\n", socket_->Address().c_str(),
                socket_->Port().c_str());
-  Flush();
 }
 
 /// returns the number of samples inserted into out_data
@@ -435,17 +435,38 @@ bool RadioSocket::CheckSymbolComplete(const std::byte* in_data,
 }
 
 void RadioSocket::Flush() {
-  constexpr size_t kMaxFlushAttempts = 100;
+  constexpr size_t kTotalTimeoutSec = 5;
+  constexpr size_t kRxTimeoutSec = 1;
   int rx_return = 1;
-  size_t flush_attempts = 0;
+  AGORA_LOG_INFO("*****Flushing *****\n");
 
-  while ((rx_return > 0) || (flush_attempts < kMaxFlushAttempts)) {
+  std::chrono::time_point<std::chrono::system_clock> last_rx_time;
+  std::chrono::duration<double> rx_elapsed_seconds;
+  std::chrono::duration<double> total_elapsed_seconds;
+
+  const auto start_flush = std::chrono::system_clock::now();
+  last_rx_time = start_flush;
+  rx_elapsed_seconds = last_rx_time - last_rx_time;
+
+  while ((rx_elapsed_seconds.count() < kRxTimeoutSec) &&
+         (total_elapsed_seconds.count() < kTotalTimeoutSec)) {
     rx_return = socket_->Recv(&rx_buffer_.at(0), rx_buffer_.size());
+    const auto time_now = std::chrono::system_clock::now();
     if (rx_return > 0) {
-      AGORA_LOG_INFO("Flushing %d bytes from socket\n", rx_return);
+      AGORA_LOG_TRACE(
+          "Flushing %d bytes from socket - elapsed %2.1f:%2.1f seconds\n",
+          rx_return, rx_elapsed_seconds.count(), total_elapsed_seconds.count());
+      last_rx_time = time_now;
     }
-    flush_attempts++;
+    rx_elapsed_seconds = time_now - last_rx_time;
+    total_elapsed_seconds = time_now - start_flush;
   }
+
+  if (total_elapsed_seconds.count() >= kTotalTimeoutSec) {
+    AGORA_LOG_INFO("Flushing exceeded total timeout - elapsed %2.f seconds\n",
+                   total_elapsed_seconds.count());
+  }
+
   rx_bytes_ = 0;
   rx_samples_ = 0;
   sample_buffer_.clear();

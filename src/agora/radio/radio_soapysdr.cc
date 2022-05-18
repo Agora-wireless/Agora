@@ -28,6 +28,7 @@ RadioSoapySdr::RadioSoapySdr(RadioDataPlane::DataPlaneType rx_dp_type)
   //Reduce the soapy log level
   AGORA_LOG_INFO("Create RadioSoapySdr Radio\n");
   //SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_NOTICE);
+  //SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_SSI);
   SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_DEBUG);
 }
 
@@ -39,16 +40,20 @@ RadioSoapySdr::~RadioSoapySdr() {
 
 void RadioSoapySdr::Close() {
   AGORA_LOG_INFO("Close RadioSoapySdr %s(%zu)\n", SerialNumber().c_str(), Id());
-  rxp_.reset();
-  if (txs_ != nullptr) {
-    dev_->closeStream(txs_);
-  }
-  txs_ = nullptr;
+
   if (dev_ != nullptr) {
+    if (rxp_ != nullptr) {
+      rxp_->Close();
+      rxp_.reset();
+    }
+    if (txs_ != nullptr) {
+      dev_->closeStream(txs_);
+      txs_ = nullptr;
+    }
     SoapySDR::Device::unmake(dev_);
+    dev_ = nullptr;
+    Radio::Close();
   }
-  dev_ = nullptr;
-  Radio::Close();
 }
 
 void RadioSoapySdr::Init(const Config* cfg, size_t id,
@@ -242,7 +247,11 @@ void RadioSoapySdr::Activate(Radio::ActivationTypes type) {
     if (type == Radio::ActivationTypes::kActivateWaitTrigger) {
       soapy_flags = SOAPY_SDR_WAIT_TRIGGER;
     }
-    dev_->activateStream(txs_, soapy_flags);
+    const auto status = dev_->activateStream(txs_, soapy_flags);
+    if (status < 0) {
+      AGORA_LOG_WARN("Activate soapy tx stream with status % d %s\n", status,
+                     SoapySDR_errToStr(status));
+    }
   } else {
     if (is_ue) {
       dev_->setTimeSource("internal");
@@ -257,7 +266,12 @@ void RadioSoapySdr::Activate(Radio::ActivationTypes type) {
     //std::this_thread::sleep_for(std::chrono::seconds(kUhdInitTimeSec -1));
     //dev_->activateStream(rxs_, SOAPY_SDR_HAS_TIME, kUhdInitTimeSec * 1e9, 0);
     rxp_->Activate(type);
-    dev_->activateStream(txs_, SOAPY_SDR_HAS_TIME, kUhdInitTimeSec * 1e9, 0);
+    const auto status = dev_->activateStream(txs_, SOAPY_SDR_HAS_TIME,
+                                             kUhdInitTimeSec * 1e9, 0);
+    if (status < 0) {
+      AGORA_LOG_WARN("Activate soapy tx stream with status % d %s\n", status,
+                     SoapySDR_errToStr(status));
+    }
   }
 }
 
@@ -266,7 +280,12 @@ void RadioSoapySdr::Deactivate() {
                  Id());
   const std::string tdd_conf_str = "{\"tdd_enabled\":false}";
   rxp_->Deactivate();
-  dev_->deactivateStream(txs_);
+  const auto status = dev_->deactivateStream(txs_);
+  if (status < 0) {
+    AGORA_LOG_WARN("Deactivate soapy tx stream with status % d %s\n", status,
+                   SoapySDR_errToStr(status));
+  }
+
   dev_->writeSetting("TDD_MODE", "false");
   dev_->writeSetting("TDD_CONFIG", tdd_conf_str);
   Correlator(false);
