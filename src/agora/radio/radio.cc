@@ -33,11 +33,13 @@ Radio::~Radio() {
 }
 
 void Radio::Close() {
-  AGORA_LOG_INFO("Close Radio %s(%zu)\n", serial_number_.c_str(), id_);
-  id_ = 0;
-  serial_number_ = "";
-  enabled_channels_.clear();
-  cfg_ = nullptr;
+  if ((serial_number_.size() == 0) && (cfg_ == nullptr)) {
+    AGORA_LOG_INFO("Close Radio %s(%zu)\n", serial_number_.c_str(), id_);
+    id_ = 0;
+    serial_number_ = "";
+    enabled_channels_.clear();
+    cfg_ = nullptr;
+  }
 }
 
 void Radio::Init(const Config* cfg, size_t id, const std::string& serial,
