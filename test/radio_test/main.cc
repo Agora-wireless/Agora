@@ -172,7 +172,7 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
               //throw std::runtime_error("Why are there not enough samples?");
               //This is an error.... should probably dump samples maybe?
             } else {
-              AGORA_LOG_INFO(
+              AGORA_LOG_TRACE(
                   "Received less than symbol amount of samples %zu:%zu:%zu rx "
                   "time %lld (Frame %zu, Symbol %zu) - Retrying\n",
                   new_samples, request_samples, rx_info.SamplesAvailable(),
@@ -326,7 +326,7 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
               //throw std::runtime_error("Why are there not enough samples?");
               //This is an error.... should probably dump samples maybe?
             } else {
-              AGORA_LOG_INFO(
+              AGORA_LOG_TRACE(
                   "Received less than symbol amount of samples %zu:%zu:%zu rx "
                   "time %lld (Frame %zu, Symbol %zu) - Retrying\n",
                   new_samples, request_samples, rx_info.SamplesAvailable(),
