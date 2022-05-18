@@ -150,9 +150,10 @@ UDPServerIPv6::UDPServerIPv6(const std::string& local_address,
 }
 
 UDPServerIPv6::~UDPServerIPv6() {
-  if (sock_fd_ < 0) {
+  if (sock_fd_ > 0) {
     ::close(sock_fd_);
     sock_fd_ = -1;
+    AGORA_LOG_INFO("Closing the UDPServerIPv6 socket\n");
   }
 
   if (server_address_info_ != nullptr) {
