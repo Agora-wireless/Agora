@@ -8,6 +8,7 @@
 #include <complex>
 #include <cstddef>
 #include <memory>
+#include <queue>
 #include <string>
 #include <vector>
 
@@ -52,6 +53,7 @@ class RadioSocket {
 
   std::unique_ptr<UDPServerIPv6> socket_;
   std::vector<std::byte> rx_buffer_;
+  std::queue<size_t> rx_pkt_byte_count_;
 
   //Buffer to place "extra" samples that come during a socket read
   std::vector<std::complex<int16_t>> sample_buffer_;
