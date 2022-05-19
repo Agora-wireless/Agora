@@ -63,7 +63,7 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
   out_flags = Radio::RxFlags::RxFlagNone;
   //constexpr long kRxTimeout = 1000000;  // 1uS
   // SOAPY_SDR_ONE_PACKET; SOAPY_SDR_END_BURST
-  int soapy_rx_flags = 0;  //SOAPY_SDR_END_BURST;  //(1 << 29);
+  int soapy_rx_flags = (1 << 29);  //SOAPY_SDR_END_BURST;  //(1 << 29);
 
   int rx_status = 0;
   long long frame_time_ns(0);
