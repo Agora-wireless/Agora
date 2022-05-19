@@ -15,16 +15,15 @@ RadioDataPlaneSocket::~RadioDataPlaneSocket() { Close(); }
 
 void RadioDataPlaneSocket::Init(Radio* radio, const Config* cfg,
                                 bool hw_framer) {
-  return RadioDataPlane::Init(radio, cfg, hw_framer);
+  RadioDataPlane::Init(radio, cfg, hw_framer);
 }
 
 inline void RadioDataPlaneSocket::Activate(Radio::ActivationTypes type) {
+  socket_.Flush();
   RadioDataPlane::Activate(type);
 }
 
-inline void RadioDataPlaneSocket::Deactivate() {
-  return RadioDataPlane::Deactivate();
-}
+inline void RadioDataPlaneSocket::Deactivate() { RadioDataPlane::Deactivate(); }
 
 inline void RadioDataPlaneSocket::Close() { return RadioDataPlane::Close(); }
 
@@ -78,10 +77,11 @@ void RadioDataPlaneSocket::Setup() {
     SoapySDR::Kwargs rxstream_args;
     //Not sure if "bypass mode" works
     rxstream_args["remote:prot"] = "none";
+    rxstream_args["remote:mtu"] = "1500";
     rxstream_args["iris:ip6_dst"] = socket_.Address();
     rxstream_args["iris:udp_dst"] = socket_.Port();
 
-    AGORA_LOG_INFO(" iris:ip6_dst %s\n iris:udp_dst %s\n",
+    AGORA_LOG_INFO("iris:ip6_dst %s\n iris:udp_dst %s\n",
                    rxstream_args["iris:ip6_dst"].c_str(),
                    rxstream_args["iris:udp_dst"].c_str());
 

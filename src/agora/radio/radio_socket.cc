@@ -435,18 +435,18 @@ bool RadioSocket::CheckSymbolComplete(const std::byte* in_data,
 }
 
 void RadioSocket::Flush() {
-  constexpr size_t kTotalTimeoutSec = 5;
-  constexpr size_t kRxTimeoutSec = 1;
+  constexpr float kTotalTimeoutSec = 5.0f;
+  constexpr float kRxTimeoutSec = 0.2f;
   int rx_return = 1;
-  AGORA_LOG_INFO("*****Flushing *****\n");
 
   std::chrono::time_point<std::chrono::system_clock> last_rx_time;
-  std::chrono::duration<double> rx_elapsed_seconds;
-  std::chrono::duration<double> total_elapsed_seconds;
+  std::chrono::duration<float> rx_elapsed_seconds;
+  std::chrono::duration<float> total_elapsed_seconds;
 
   const auto start_flush = std::chrono::system_clock::now();
   last_rx_time = start_flush;
-  rx_elapsed_seconds = last_rx_time - last_rx_time;
+  total_elapsed_seconds = last_rx_time - last_rx_time;
+  rx_elapsed_seconds = total_elapsed_seconds;
 
   while ((rx_elapsed_seconds.count() < kRxTimeoutSec) &&
          (total_elapsed_seconds.count() < kTotalTimeoutSec)) {

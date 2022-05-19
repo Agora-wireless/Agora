@@ -27,7 +27,7 @@ RadioConfig::RadioConfig(Config* cfg, Radio::RadioType radio_type)
   if (kUseUHD == false) {
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
       SoapySDR::Device* hub_device = nullptr;
-      if (!cfg_->HubId().at(i).empty()) {
+      if (cfg_->HubId().at(i).empty() == false) {
         args["driver"] = "remote";
         args["timeout"] = "100000";
         args["serial"] = cfg_->HubId().at(i);
@@ -35,7 +35,7 @@ RadioConfig::RadioConfig(Config* cfg, Radio::RadioType radio_type)
         args["remote:driver"] = "faros";
         args["remote:mtu"] = "1500";
         args["remote:ipver"] = "6";
-        args["remote:prot"] = "udp";
+        //remote: prot is also an option
 
         for (size_t tries = 0; tries < kSoapyMakeMaxAttempts; tries++) {
           try {
@@ -43,17 +43,23 @@ RadioConfig::RadioConfig(Config* cfg, Radio::RadioType radio_type)
             break;
           } catch (const std::runtime_error& e) {
             const auto* message = e.what();
-            std::printf("RadioConfig::Soapy error[%zu] -- %s\n", tries,
-                        message);
+            AGORA_LOG_WARN("RadioConfig::Soapy error[%zu] -- %s\n", tries,
+                           message);
             std::this_thread::sleep_for(
                 std::chrono::milliseconds(kHubMissingWaitMs));
           }
         }
         if (hub_device == nullptr) {
-          std::printf(
+          AGORA_LOG_ERROR(
               "SoapySDR failed to locate the hub device %s in %zu tries\n",
               cfg_->HubId().at(i).c_str(), kSoapyMakeMaxAttempts);
           throw std::runtime_error("SoapySDR failed to locate the hub device");
+        } else {
+          for (const auto& info : hub_device->getSettingInfo()) {
+            AGORA_LOG_TRACE("Hub[%s(%zu)] setting: %s\n",
+                            cfg_->HubId().at(i).c_str(), i, info.key.c_str());
+            (void)info;
+          }
         }
       }
       hubs_.push_back(hub_device);

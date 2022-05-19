@@ -70,6 +70,10 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
     if (kUseUHD == false) {
       args["driver"] = "iris";
       args["serial"] = SerialNumber();
+      // remote::type = iris for non hub controlled radios
+      // remote::type = faros for hub controlled radios
+      args["remote:mtu"] = "1500";
+      args["remote:ipver"] = "6";
     } else {
       args["driver"] = "uhd";
       args["addr"] = SerialNumber();
@@ -78,6 +82,10 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
     for (size_t tries = 0; tries < kSoapyMakeMaxAttempts; tries++) {
       try {
         dev_ = SoapySDR::Device::make(args);
+        for (const auto& info : dev_->getSettingInfo()) {
+          AGORA_LOG_TRACE("Radio setting: %s\n", info.key.c_str());
+          (void)info;
+        }
         break;
       } catch (const std::runtime_error& e) {
         const auto* message = e.what();
@@ -106,8 +114,6 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
           id);
     }
     rxp_->Init(this, cfg_, hw_framer);
-    //rxs_ = dev_->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, enabled_channels,
-    //                         sargs);
     rxp_->Setup();
 
     txs_ = dev_->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CS16, enabled_channels,
@@ -286,6 +292,12 @@ void RadioSoapySdr::Deactivate() {
                    SoapySDR_errToStr(status));
   }
 
+  //This stops the data flow to the socket
+  dev_->writeSetting("RESET_DATA_LOGIC", "");
+  //If this flush is not here before setting TDD_MODE to false.  This will sometimes
+  //cause errors with the next rx sequence
+  rxp_->Flush();
+  //The following is probably not necessary
   dev_->writeSetting("TDD_MODE", "false");
   dev_->writeSetting("TDD_CONFIG", tdd_conf_str);
   Correlator(false);

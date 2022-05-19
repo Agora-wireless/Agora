@@ -55,10 +55,10 @@ int main(int argc, char* argv[]) {
 
     PinToCoreWithOffset(ThreadType::kMasterTX, 0, 0);
     agora_comm::ListLocalInterfaces();
-    //TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
+    TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
     TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrSocket);
     TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
-    //UE socket doesnt work right now... (never get any data)
+    //UE socket doesnt work right now... (never get any data) probably because traffic comming through a different interface
     //TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrSocket);
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {
