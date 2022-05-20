@@ -80,6 +80,8 @@ void RadioDataPlaneSocket::Setup() {
     rxstream_args["remote:mtu"] = "1500";
     rxstream_args["iris:ip6_dst"] = socket_.Address();
     rxstream_args["iris:udp_dst"] = socket_.Port();
+    //Helps with the disable strea, errors (-2)
+    //rxstream_args["SYNC_ACTIVATE"] = "false";
 
     AGORA_LOG_INFO("iris:ip6_dst %s\n iris:udp_dst %s\n",
                    rxstream_args["iris:ip6_dst"].c_str(),

@@ -60,6 +60,7 @@ RadioConfig::RadioConfig(Config* cfg, Radio::RadioType radio_type)
                             cfg_->HubId().at(i).c_str(), i, info.key.c_str());
             (void)info;
           }
+          hub_device->writeSetting("FEC_SNOOPER_CLEAR", "");
         }
       }
       hubs_.push_back(hub_device);
@@ -184,7 +185,7 @@ bool RadioConfig::RadioStart() {
                 cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
                 Agora_memory::Alignment_t::kAlign64, 1);
   // initialize init_calib to a matrix of zeros
-  for (size_t i = 0; i < cfg_->OfdmDataNum() * cfg_->BfAntNum(); i++) {
+  for (size_t i = 0; i < (cfg_->OfdmDataNum() * cfg_->BfAntNum()); i++) {
     init_calib_dl_processed_[i] = 0;
     init_calib_ul_processed_[i] = 0;
   }
@@ -337,6 +338,7 @@ void RadioConfig::ReadSensors() {
 }
 
 void RadioConfig::RadioStop() {
+  //Could add a threaded deactivate if it speeds things up.
   for (auto& radio : radios_) {
     radio->Deactivate();
   }
@@ -350,7 +352,7 @@ RadioConfig::~RadioConfig() {
     radio->Close();
   }
 
-  for (auto* hub : hubs_) {
+  for (auto hub : hubs_) {
     SoapySDR::Device::unmake(hub);
   }
   hubs_.clear();

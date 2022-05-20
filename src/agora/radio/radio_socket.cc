@@ -488,9 +488,11 @@ void RadioSocket::Flush() {
   }
 
   if (total_elapsed_seconds.count() >= kTotalTimeoutSec) {
-    AGORA_LOG_INFO("Flushing exceeded total timeout - elapsed %2.f seconds\n",
+    AGORA_LOG_WARN("Flushing exceeded total timeout - elapsed %02.f seconds\n",
                    total_elapsed_seconds.count());
   }
+  AGORA_LOG_TRACE("Flushing time %02.2f seconds\n",
+                  total_elapsed_seconds.count());
 
   rx_bytes_ = 0;
   rx_samples_ = 0;

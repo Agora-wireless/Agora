@@ -89,12 +89,14 @@ void RadioDataPlane::Deactivate() {
           "Deactivate");
     } else {
       auto device = dynamic_cast<RadioSoapySdr*>(radio_)->SoapyDevice();
-      auto status = device->deactivateStream(remote_stream_);
+      const auto status = device->deactivateStream(remote_stream_);
       //SOAPY_SDR_STREAM_ERROR (-2) ?????
-      AGORA_LOG_INFO("Deactivate soapy rx stream with status %d %s\n", status,
-                     SoapySDR_errToStr(status));
-      mode_ = kModeDeactive;
+      if (status < 0) {
+        AGORA_LOG_INFO("Deactivate soapy rx stream with error status %d %s\n",
+                       status, SoapySDR_errToStr(status));
+      }
     }
+    mode_ = kModeDeactive;
   } else {
     AGORA_LOG_WARN(
         "Attempting to Deactivate data plane when in wrong state %d\n",

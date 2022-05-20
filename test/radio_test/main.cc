@@ -162,10 +162,11 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
           if (new_samples < request_samples) {
             if (rx_flag == Radio::RxFlags::EndReceive) {
               AGORA_LOG_WARN(
-                  "Received less than symbol amount of samples %zu:%zu:%zu rx "
-                  "time %lld (Frame %zu, Symbol %zu)\n",
-                  new_samples, request_samples, rx_info.SamplesAvailable(),
-                  rx_time, static_cast<size_t>(rx_time >> 32),
+                  "Radio[%zu] : Received less than symbol amount of samples "
+                  "%zu:%zu:%zu rx time %lld (Frame %zu, Symbol %zu)\n",
+                  radio, new_samples, request_samples,
+                  rx_info.SamplesAvailable(), rx_time,
+                  static_cast<size_t>(rx_time >> 32),
                   static_cast<size_t>((rx_time >> 16) & 0xFFFF));
               num_rx_symbols++;
               rx_info.Reset();
