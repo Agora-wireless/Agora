@@ -90,9 +90,9 @@ void RadioDataPlane::Deactivate() {
     } else {
       auto device = dynamic_cast<RadioSoapySdr*>(radio_)->SoapyDevice();
       const auto status = device->deactivateStream(remote_stream_);
-      //SOAPY_SDR_STREAM_ERROR (-2) ?????
       if (status < 0) {
-        AGORA_LOG_INFO("Deactivate soapy rx stream with error status %d %s\n",
+        //SOAPY_SDR_STREAM_ERROR (-2) ?????
+        AGORA_LOG_WARN("Deactivate soapy rx stream with error status %d %s\n",
                        status, SoapySDR_errToStr(status));
       }
     }

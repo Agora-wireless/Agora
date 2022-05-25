@@ -71,7 +71,8 @@ class RxStatusTracker {
       //Verify sample time.....
       const long long expected_start =
           sample_start_rx_time_ + samples_available_;
-      if (expected_start != sample_rx_start) {
+      //New start == 0, means there was frags left from soapy (typically)
+      if ((expected_start != sample_rx_start) && (sample_rx_start != 0)) {
         AGORA_LOG_WARN(
             "RxStatusTracker::Update - Available %zu Rx Start %lld, New Start "
             "%lld, Expected Start %lld\n",

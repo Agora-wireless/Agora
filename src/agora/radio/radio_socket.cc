@@ -141,16 +141,19 @@ void RadioSocket::Create(size_t samples_per_symbol,
                          const std::string& local_port,
                          const std::string& remote_port) {
   samples_per_symbol_ = samples_per_symbol;
-  socket_ = std::make_unique<UDPServerIPv6>(local_addr, local_port);
+  static constexpr size_t kSockBufSize = (1024 * 1024 * 64 * 8) - 1;
+  socket_ =
+      std::make_unique<UDPServerIPv6>(local_addr, local_port, kSockBufSize);
 
   //Creates a 1:1 connection for DATAGRAM sockets
-  size_t ret = socket_->Connect(remote_addr, remote_port);
+  auto ret = socket_->Connect(remote_addr, remote_port);
   if (ret != 0) {
     throw std::runtime_error("RadioSocket::setupStream: Failed to connect to " +
                              remote_addr + " : " + remote_port);
   }
-  DEBUG_OUTPUT(" ip6_dst %s\n udp_dst %s\n", socket_->Address().c_str(),
-               socket_->Port().c_str());
+  AGORA_LOG_INFO(
+      "RadioSocket::Create: ip6_dst %s\n udp_dst %s with connect status %d\n",
+      socket_->Address().c_str(), socket_->Port().c_str(), ret);
 }
 
 /// returns the number of samples inserted into out_data
