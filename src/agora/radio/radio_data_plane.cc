@@ -115,7 +115,7 @@ void RadioDataPlane::Close() {
   }
 
   if (mode_ == kModeDeactive) {
-    AGORA_LOG_INFO("RadioDataPlane::Closing stream for radio %s(%d)\n",
+    AGORA_LOG_INFO("RadioDataPlane::Closing stream for radio %s(%zu)\n",
                    radio_->SerialNumber().c_str(), radio_->Id());
     auto device = dynamic_cast<RadioSoapySdr*>(radio_)->SoapyDevice();
     device->closeStream(remote_stream_);

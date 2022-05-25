@@ -99,10 +99,10 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
           //The first symbol bug appears to periodically cut off a few samples from the first symbol
           AGORA_LOG_WARN(
               "RadioDataPlaneSoapy::Rx %s(%zu) - short rx call %zu:%zu samples "
-              "contained are the last of a symbol %lld:%zu\n",
+              "contained are the last of a symbol %lld:%zu with flags %d\n",
               radio_->SerialNumber().c_str(), radio_->Id(), rx_samples, rx_size,
-              soapy_rx_flags, ((frame_time_ns & 0xFFFF) + rx_samples),
-              Configuration()->SampsPerSymbol());
+              ((frame_time_ns & 0xFFFF) + rx_samples),
+              Configuration()->SampsPerSymbol(), soapy_rx_flags);
           out_flags = Radio::RxFlags::EndReceive;
         }
       } else {
