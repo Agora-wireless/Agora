@@ -30,7 +30,8 @@ TxRxWorkerHw::TxRxWorkerHw(
       radio_config_(radio_config),
       program_start_ticks_(0),
       freq_ghz_(GetTime::MeasureRdtscFreq()),
-      zeros_(config->SampsPerSymbol(), std::complex<int16_t>(0u, 0u)) {
+      zeros_(config->SampsPerSymbol(), std::complex<int16_t>(0u, 0u)),
+      first_symbol_(interface_count, true) {
   InitRxStatus();
 }
 
@@ -91,43 +92,79 @@ void TxRxWorkerHw::DoTxRx() {
         rx_times.at(receive_attempt.interface_).end_ticks_ = rx_time_ticks;
       }
 
-      if (!pkts.empty()) {
+      if (pkts.empty() == false) {
+        bool ignore = false;
         RtAssert(pkts.size() == channels_per_interface_,
                  "Received data but it was the wrong dimension");
-        const size_t rx_symbol_id = pkts.front()->symbol_id_;
+        const size_t rx_symbol_id = pkts.front()->RawPacket()->symbol_id_;
+        const size_t rx_frame_id = pkts.front()->RawPacket()->frame_id_;
 
-        if (unlikely(rx_symbol_id != receive_attempt.symbol_)) {
+        bool is_first = first_symbol_.at(receive_attempt.interface_);
+
+        //This first symbol tracking is only necessary for bad data (at the beginning) for hw_framer mode
+        if (is_first) {
+          //We will ignore the data until we get an acceptable first symbol / frame
+          if ((rx_symbol_id == receive_attempt.symbol_) && (rx_frame_id == 0)) {
+            //Match, don't allow any more incorrect symbol data
+            first_symbol_.at(receive_attempt.interface_) = false;
+            AGORA_LOG_INFO(
+                "TxRxWorkerHw[%zu]: Interface %zu Matched First Symbol "
+                "%zu:%zu\n",
+                tid_, receive_attempt.interface_, rx_symbol_id,
+                receive_attempt.symbol_);
+          } else {
+            ignore = true;
+            AGORA_LOG_WARN(
+                "TxRxWorkerHw[%zu]: Ignoring Rx Data on Interface %zu (Frame "
+                "%zu, Symbol %zu) - Expected symbol %zu\n",
+                tid_, receive_attempt.interface_, rx_frame_id, rx_symbol_id,
+                receive_attempt.symbol_);
+          }
+        } else if (rx_symbol_id != receive_attempt.symbol_) {
+          //Hard error, getting unexpected data
           AGORA_LOG_ERROR(
-              "TxRxWorkerHw[%zu]: Frame %d - Expected symbol %zu but "
-              "received %zu\n",
-              tid_, pkts.front()->frame_id_, receive_attempt.symbol_,
-              rx_symbol_id);
+              "TxRxWorkerHw[%zu]: Frame %zu - Expected symbol %zu but "
+              "received %zu on interface %zu\n",
+              tid_, rx_frame_id, receive_attempt.symbol_, rx_symbol_id,
+              receive_attempt.interface_);
+          RtAssert(
+              rx_symbol_id == receive_attempt.symbol_,
+              "The expected receive symbol does not match the actual symbol");
         }
 
-        RtAssert(
-            rx_symbol_id == receive_attempt.symbol_,
-            "The expected receive symbol does not match the actual symbol");
+        if (ignore == false) {
+          //Publish the symbols to the scheduler
+          for (auto packet : pkts) {
+            EventData rx_message(EventType::kPacketRX, rx_tag_t(packet).tag_);
+            NotifyComplete(rx_message);
+          }
 
-        // Symbol received, change the rx interface
-        TxRxWorkerRx::RxParameters successful_receive = receive_attempt;
-        receive_attempt = UpdateRxInterface(successful_receive);
-        AGORA_LOG_TRACE(
-            "TxRxWorkerHw[%zu]: Last Interface %zu - symbol %zu:%zu, next "
-            "interface %zu - symbol %zu\n",
-            tid_, successful_receive.interface_, successful_receive.symbol_,
-            rx_symbol_id, receive_attempt.interface_, receive_attempt.symbol_);
+          // Symbol received, change the rx interface
+          TxRxWorkerRx::RxParameters successful_receive = receive_attempt;
+          receive_attempt = UpdateRxInterface(successful_receive);
+          AGORA_LOG_TRACE(
+              "TxRxWorkerHw[%zu]: Last Interface %zu - symbol %zu:%zu, next "
+              "interface %zu - symbol %zu\n",
+              tid_, successful_receive.interface_, successful_receive.symbol_,
+              rx_symbol_id, receive_attempt.interface_,
+              receive_attempt.symbol_);
 
-        if (kIsWorkerTimingEnabled) {
-          const auto frame_id = pkts.front()->frame_id_;
-          if (frame_id > prev_frame_id) {
-            rx_frame_start_[frame_id % kNumStatsFrames] = rx_time_ticks;
-            prev_frame_id = frame_id;
+          if (kIsWorkerTimingEnabled) {
+            if (static_cast<ssize_t>(rx_frame_id) > prev_frame_id) {
+              rx_frame_start_[rx_frame_id % kNumStatsFrames] = rx_time_ticks;
+              prev_frame_id = rx_frame_id;
+            }
+          }
+
+          PrintRxSymbolTiming(rx_times, rx_frame_id, successful_receive.symbol_,
+                              receive_attempt.symbol_);
+        }  //!ignore
+        else {
+          //Return the Packets (must be in reverse order)
+          for (size_t i = pkts.size(); i > 0; i--) {
+            ReturnRxPacket(*pkts.at(i - 1));
           }
         }
-
-        PrintRxSymbolTiming(rx_times, pkts.front()->frame_id_,
-                            successful_receive.symbol_,
-                            receive_attempt.symbol_);
       }  // if (pkt.size() > 0)
     }    // DoTx(time0) == 0
   }      // Configuration()->Running() == true
@@ -137,13 +174,13 @@ void TxRxWorkerHw::DoTxRx() {
 //RX data, should return channel number of packets || 0
 // global_frame_id will be used and updated
 // global_symbol_id will be used and updated
-std::vector<Packet*> TxRxWorkerHw::DoRx(size_t interface_id,
-                                        size_t& global_frame_id,
-                                        size_t& global_symbol_id) {
+std::vector<RxPacket*> TxRxWorkerHw::DoRx(size_t interface_id,
+                                          size_t& global_frame_id,
+                                          size_t& global_symbol_id) {
   const size_t radio_id = interface_id + interface_offset_;
 
   //Return value
-  std::vector<Packet*> result_packets;
+  std::vector<RxPacket*> result_packets;
 
   auto& rx_info = rx_status_.at(interface_id);
   const size_t request_samples =
@@ -221,17 +258,13 @@ std::vector<Packet*> TxRxWorkerHw::DoRx(size_t interface_id,
         auto packets = rx_info.GetRxPackets();
         for (size_t ch = 0; ch < channels_per_interface_; ch++) {
           auto* rx_packet = packets.at(ch);
+          result_packets.emplace_back(rx_packet);
           auto* raw_pkt = rx_packet->RawPacket();
           new (raw_pkt) Packet(frame_id, symbol_id, cell_id, ant_id + ch);
-          result_packets.push_back(raw_pkt);
           AGORA_LOG_TRACE(
               "TxRxWorkerHw[%zu]: Frame %zu Symbol %zu Ant %zu - Radio %zu - "
               "Received Symbol\n",
               tid_, frame_id, symbol_id, ant_id + ch, radio_id);
-
-          // Push kPacketRX event into the queue.
-          EventData rx_message(EventType::kPacketRX, rx_tag_t(*rx_packet).tag_);
-          NotifyComplete(rx_message);
         }
       }
       ResetRxStatus(interface_id, ignore_rx_data);

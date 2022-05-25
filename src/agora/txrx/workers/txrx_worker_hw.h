@@ -45,8 +45,8 @@ class TxRxWorkerHw : public TxRxWorker {
 
  private:
   size_t DoTx(long long time0);
-  std::vector<Packet*> DoRx(size_t interface_id, size_t& global_frame_id,
-                            size_t& global_symbol_id);
+  std::vector<RxPacket*> DoRx(size_t interface_id, size_t& global_frame_id,
+                              size_t& global_symbol_id);
 
   void ScheduleTxInit(size_t frames_to_schedule, long long time0);
   void TxDownlinkZeros(size_t frame_id, size_t radio_id, long long time0);
@@ -81,5 +81,6 @@ class TxRxWorkerHw : public TxRxWorker {
 
   //For each interface.
   std::vector<TxRxWorkerRx::RxStatusTracker> rx_status_;
+  std::vector<bool> first_symbol_;
 };
 #endif  // TXRX_WORKER_SIM_H_
