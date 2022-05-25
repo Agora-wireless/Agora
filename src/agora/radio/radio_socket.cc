@@ -152,7 +152,7 @@ void RadioSocket::Create(size_t samples_per_symbol,
                              remote_addr + " : " + remote_port);
   }
   AGORA_LOG_INFO(
-      "RadioSocket::Create: ip6_dst %s\n udp_dst %s with connect status %d\n",
+      "RadioSocket::Create: ip6_dst %s\n udp_dst %s with connect status %ld\n",
       socket_->Address().c_str(), socket_->Port().c_str(), ret);
 }
 

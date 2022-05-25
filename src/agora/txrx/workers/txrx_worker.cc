@@ -103,7 +103,7 @@ std::vector<EventData> TxRxWorker::GetPendingTxEvents(size_t max_events) {
 // This function as implmented is not thread safe
 RxPacket& TxRxWorker::GetRxPacket() {
   RxPacket& new_packet = rx_memory_.at(rx_memory_idx_);
-  AGORA_LOG_TRACE("TxRxWorker [%zu]: Getting new rx packet at location %d\n",
+  AGORA_LOG_TRACE("TxRxWorker [%zu]: Getting new rx packet at location %ld\n",
                   tid_, reinterpret_cast<intptr_t>(&new_packet));
 
   // if rx_buffer is full, exit
@@ -139,7 +139,7 @@ void TxRxWorker::ReturnRxPacket(RxPacket& unused_packet) {
   if (&returned_packet != &unused_packet) {
     AGORA_LOG_WARN(
         "TxRxWorker [%zu]: returned memory that wasn't used last at address "
-        "%d\n",
+        "%ld\n",
         tid_, reinterpret_cast<intptr_t>(&unused_packet));
   } else {
     //If they are the same, reuse the old position
@@ -148,7 +148,7 @@ void TxRxWorker::ReturnRxPacket(RxPacket& unused_packet) {
   // if the returned packet is free, something is wrong
   if (unused_packet.Empty()) {
     AGORA_LOG_ERROR(
-        "TxRxWorker [%zu]: rx buffer returned free memory at address %d\n",
+        "TxRxWorker [%zu]: rx buffer returned free memory at address %ld\n",
         tid_, reinterpret_cast<intptr_t>(&unused_packet));
     throw std::runtime_error("TxRxWorker: rx buffer returned free memory");
   }
