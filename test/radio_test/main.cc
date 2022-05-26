@@ -24,8 +24,6 @@ static void TestBsRadioRx(Config* cfg, const uint32_t max_rx,
                           Radio::RadioType type);
 static void TestUeRadioRx(Config* cfg, const uint32_t max_rx,
                           Radio::RadioType type);
-static ssize_t SyncBeacon(const std::complex<int16_t>* samples,
-                          size_t detect_window, const Config* cfg);
 
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("conf_file : set the configuration filename");

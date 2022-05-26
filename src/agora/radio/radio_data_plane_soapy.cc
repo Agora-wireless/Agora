@@ -9,7 +9,7 @@
 #include "logger.h"
 #include "radio_soapysdr.h"
 
-constexpr bool kDebugPrintRx = false;
+static constexpr bool kDebugPrintRx = false;
 
 RadioDataPlaneSoapy::RadioDataPlaneSoapy() : RadioDataPlane() {}
 
@@ -59,7 +59,7 @@ int RadioDataPlaneSoapy::Rx(
 
 int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
                             Radio::RxFlags& out_flags, long long& rx_time_ns) {
-  constexpr long kRxTimeout = 1;  // 1uS
+  static constexpr long kRxTimeout = 1;  // 1uS
   out_flags = Radio::RxFlags::RxFlagNone;
   //constexpr long kRxTimeout = 1000000;  // 1uS
   // SOAPY_SDR_ONE_PACKET; SOAPY_SDR_END_BURST
@@ -167,7 +167,7 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
 }
 
 void RadioDataPlaneSoapy::Flush() {
-  constexpr size_t kMaxChannels = 2;
+  static constexpr size_t kMaxChannels = 2;
   const long timeout_us(0);
   int flags = 0;
   long long frame_time(0);

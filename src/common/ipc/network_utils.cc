@@ -19,6 +19,8 @@
 
 namespace agora_comm {
 
+static constexpr bool kDebugPrint = false;
+
 int ListLocalInterfaces() {
   ifaddrs *interfaces = nullptr;
   char address_buffer[INET6_ADDRSTRLEN];
@@ -155,8 +157,11 @@ std::string GetLocalAddressFromScope(size_t scope_id) {
         if (scope_id == found_scope_id) {
           inet_ntop(AF_INET6, address_ptr, address_buffer, INET6_ADDRSTRLEN);
           local_address = address_buffer;
-          std::printf("Found local address %s --- %d\n", local_address.c_str(),
-                      found_scope_id);
+          if (kDebugPrint) {
+            std::printf(
+                "GetLocalAddressFromScope: Found local address %s --- %d\n",
+                local_address.c_str(), found_scope_id);
+          }
         }
       }
     }

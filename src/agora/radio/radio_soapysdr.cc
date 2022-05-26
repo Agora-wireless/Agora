@@ -13,23 +13,23 @@
 #include "radio_data_plane.h"
 #include "symbols.h"
 
-constexpr size_t kSoapyMakeMaxAttempts = 3;
-constexpr bool kPrintRadioSettings = false;
-constexpr double kAttnMax = -18.0f;
+static constexpr size_t kSoapyMakeMaxAttempts = 3;
+static constexpr bool kPrintRadioSettings = false;
+static constexpr double kAttnMax = -18.0f;
 
 //Soapy sdr version
-constexpr int kSoapyMajorMinAPI = 0;
-constexpr int kSoapyMinorMinAPI = 8;
-constexpr int kSoapyBuildMinAPI = 0;
+static constexpr int kSoapyMajorMinAPI = 0;
+static constexpr int kSoapyMinorMinAPI = 8;
+static constexpr int kSoapyBuildMinAPI = 0;
 
 //Iris driver version
-constexpr int kIrisDriverYearMinAPI = 2022;
-constexpr int kIrisDriverMonthMinAPI = 5;
-constexpr int kIrisDriverDayMinAPI = 0;
-constexpr int kIrisDriverRelMinAPI = 0;
+static constexpr int kIrisDriverYearMinAPI = 2022;
+static constexpr int kIrisDriverMonthMinAPI = 5;
+static constexpr int kIrisDriverDayMinAPI = 0;
+static constexpr int kIrisDriverRelMinAPI = 0;
 
 // radio init time for UHD devices
-constexpr size_t kUhdInitTimeSec = 3;
+static constexpr size_t kUhdInitTimeSec = 3;
 
 RadioSoapySdr::RadioSoapySdr(RadioDataPlane::DataPlaneType rx_dp_type)
     : Radio(),
@@ -154,10 +154,6 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
     for (const auto& it : dev_->getHardwareInfo()) {
       device_info << it.first << " = " << it.second << std::endl;
 
-      constexpr int kIrisDriverYearMinAPI = 2022;
-      constexpr int kIrisDriverMonthMinAPI = 5;
-      constexpr int kIrisDriverDayMinAPI = 0;
-      constexpr int kIrisDriverRelMinAPI = 0;
       //Driver version compatibility check
       if (it.first.compare("driver") == 0) {
         const auto& driver_version = it.second;
@@ -197,13 +193,13 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
         }
       }
 
-      //Driver version compatibility check
+      //Get the Ip address from the driver
       if (it.first.compare("ip_address") == 0) {
         //+1 to skip over the [
         const size_t start = it.second.find_first_of("[") + 1;
         const size_t end = it.second.find_first_of("]");
         ip_address_ = it.second.substr(start, end - start);
-        AGORA_LOG_INFO("Found ip address: %s\n", ip_address_.c_str());
+        AGORA_LOG_TRACE("Found ip address: %s\n", ip_address_.c_str());
       }
     }
 
@@ -212,40 +208,41 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
       throw std::runtime_error("Device IP address not found");
     }
 
-    auto clock_sources = dev_->listClockSources();
-    for (const auto& source : clock_sources) {
-      AGORA_LOG_TRACE("Clock source %s\n", source.c_str());
-    }
-
-    auto time_sources = dev_->listTimeSources();
-    for (const auto& source : time_sources) {
-      AGORA_LOG_TRACE("Time source %s\n", source.c_str());
-    }
-
-    auto register_interfaces = dev_->listRegisterInterfaces();
-    for (const auto& reg : register_interfaces) {
-      AGORA_LOG_TRACE("Register Interfaces %s\n", reg.c_str());
-    }
-
-    //Another way to get the Ip address.  But it will redo discovery...
-    /*
-    const std::string new_device = "serial=" + SerialNumber();
-    auto enum_info = dev_->enumerate(new_device);
-    for (size_t i = 0; i < enum_info.size(); i++) {
-      device_info << "Found device " << i << std::endl;
-      for (const auto& it : enum_info.at(i)) {
-        device_info << "  " << it.first << " = " << it.second << std::endl;
-        if (it.first.compare("remote") == 0) {
-          //+1 to skip over the [
-          const size_t start = it.second.find_first_of("[") + 1;
-          const size_t end = it.second.find_first_of("]");
-          ip_address_ = it.second.substr(start, end - start);
-          AGORA_LOG_INFO("Found ip address: %s\n", ip_address.c_str());
-        }
+    if (kPrintRadioSettings) {
+      auto clock_sources = dev_->listClockSources();
+      for ([[maybe_unused]] const auto& source : clock_sources) {
+        AGORA_LOG_TRACE("Clock source %s\n", source.c_str());
       }
-      device_info << std::endl;
-    } */
-    AGORA_LOG_INFO("%s\n", device_info.str().c_str());
+
+      auto time_sources = dev_->listTimeSources();
+      for ([[maybe_unused]] const auto& source : time_sources) {
+        AGORA_LOG_INFO("Time source %s\n", source.c_str());
+      }
+
+      auto register_interfaces = dev_->listRegisterInterfaces();
+      for ([[maybe_unused]] const auto& reg : register_interfaces) {
+        AGORA_LOG_INFO("Register Interfaces %s\n", reg.c_str());
+      }
+
+      //Another way to get the Ip address.  But it will redo discovery...
+      const std::string new_device = "serial=" + SerialNumber();
+      auto enum_info = dev_->enumerate(new_device);
+      for (size_t i = 0; i < enum_info.size(); i++) {
+        device_info << "Found device " << i << std::endl;
+        for (const auto& it : enum_info.at(i)) {
+          device_info << "  " << it.first << " = " << it.second << std::endl;
+          if (it.first.compare("remote") == 0) {
+            //+1 to skip over the [
+            const size_t start = it.second.find_first_of("[") + 1;
+            const size_t end = it.second.find_first_of("]");
+            ip_address_ = it.second.substr(start, end - start);
+            AGORA_LOG_INFO("Found ip address: %s\n", ip_address_.c_str());
+          }
+        }
+        device_info << std::endl;
+      }
+      AGORA_LOG_INFO("%s\n", device_info.str().c_str());
+    }
 
     // resets the DATA_clk domain logic.
     SoapySDR::Kwargs hw_info = dev_->getHardwareInfo();

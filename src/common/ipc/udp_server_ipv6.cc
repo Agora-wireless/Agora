@@ -39,7 +39,6 @@ UDPServerIPv6::UDPServerIPv6(const std::string& local_address,
                  local_address.c_str(), local_port.c_str());
 
   //Set node to nullptr for loopback
-  char address_buffer[INET6_ADDRSTRLEN];
   //node = &address_buffer[0u];
   //auto pton_result =
   //    ::inet_pton(kAllowedAiFamily, local_address.c_str(), address_buffer);
@@ -75,17 +74,23 @@ UDPServerIPv6::UDPServerIPv6(const std::string& local_address,
 
   for (addrinfo* rp = server_address_info_; rp != nullptr; rp = rp->ai_next) {
     const int family = rp->ai_family;
-    std::printf("Found address with family : %s (%d) type %d and protocol %d\n",
-                (family == AF_PACKET)  ? "AF_PACKET"
-                : (family == AF_INET)  ? "AF_INET"
-                : (family == AF_INET6) ? "AF_INET6"
-                                       : "???",
-                rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+    AGORA_LOG_TRACE(
+        "Found address with family : %s (%d) type %d and protocol %d\n",
+        (family == AF_PACKET)  ? "AF_PACKET"
+        : (family == AF_INET)  ? "AF_INET"
+        : (family == AF_INET6) ? "AF_INET6"
+                               : "???",
+        rp->ai_family, rp->ai_socktype, rp->ai_protocol);
     if (family == AF_INET6) {
-      auto* address_ptr = &((sockaddr_in6*)rp->ai_addr)->sin6_addr;
-      std::printf("Internet Address:  %s \n",
-                  ::inet_ntop(family, address_ptr, address_buffer,
-                              sizeof(address_buffer)));
+      [[maybe_unused]] auto* address_ptr =
+          &((sockaddr_in6*)rp->ai_addr)->sin6_addr;
+      [[maybe_unused]] char address_buffer[INET6_ADDRSTRLEN];
+      AGORA_LOG_TRACE("Ipv6 Address:  %s \n",
+                      ::inet_ntop(family, address_ptr, address_buffer,
+                                  sizeof(address_buffer)));
+    } else {
+      AGORA_LOG_ERROR(
+          "UDPServerIPv6: Found address with unsupported family %d\n", family);
     }
   }
 
@@ -151,9 +156,17 @@ UDPServerIPv6::UDPServerIPv6(const std::string& local_address,
 
 UDPServerIPv6::~UDPServerIPv6() {
   if (sock_fd_ > 0) {
-    ::close(sock_fd_);
+    auto status = ::close(sock_fd_);
     sock_fd_ = -1;
-    AGORA_LOG_INFO("Closing the UDPServerIPv6 socket\n");
+
+    if (status < 0) {
+      AGORA_LOG_ERROR("UDPServerIPv6: Error %d reported in socket close\n",
+                      status);
+    }
+
+    if (kDebugPrintUdpServerInit) {
+      AGORA_LOG_INFO("UDPServerIPv6: Closing the socket\n");
+    }
   }
 
   if (server_address_info_ != nullptr) {

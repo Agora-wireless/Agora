@@ -8,10 +8,9 @@
 #include "SoapySDR/Logger.hpp"
 #include "logger.h"
 
-constexpr bool kPrintCalibrationMats = false;
-
-constexpr size_t kSoapyMakeMaxAttempts = 3;
-constexpr size_t kHubMissingWaitMs = 100;
+static constexpr bool kPrintCalibrationMats = false;
+static constexpr size_t kSoapyMakeMaxAttempts = 3;
+static constexpr size_t kHubMissingWaitMs = 100;
 
 RadioConfig::RadioConfig(Config* cfg, Radio::RadioType radio_type)
     : cfg_(cfg), num_radios_initialized_(0), num_radios_configured_(0) {

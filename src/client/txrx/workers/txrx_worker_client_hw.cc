@@ -11,10 +11,10 @@
 
 #include "logger.h"
 
-constexpr size_t kSyncDetectChannel = 0;
-constexpr bool kVerifyFirstSync = true;
-constexpr size_t kReSyncRetryCount = 100u;
-constexpr float kBeaconDetectWindow = 2.33f;
+static constexpr size_t kSyncDetectChannel = 0;
+static constexpr bool kVerifyFirstSync = true;
+static constexpr size_t kReSyncRetryCount = 100u;
+static constexpr float kBeaconDetectWindow = 2.33f;
 
 TxRxWorkerClientHw::TxRxWorkerClientHw(
     size_t core_offset, size_t tid, size_t interface_count,

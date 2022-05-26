@@ -8,9 +8,9 @@
 #include "radio_soapysdr.h"
 
 namespace plt = matplotlibcpp;
-constexpr bool kIQImbalancePlot = false;
+static constexpr bool kIQImbalancePlot = false;
+static constexpr double kToneTargetLevel = -10.0f;
 
-constexpr double kToneTargetLevel = -10.0f;
 static size_t CheckTone(size_t channel, std::vector<Radio*>& rx_devs,
                         std::vector<float> tone_levels, double fft_bin) {
   size_t completed = 0;

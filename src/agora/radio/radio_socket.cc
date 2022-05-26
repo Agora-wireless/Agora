@@ -10,12 +10,11 @@
 #include "logger.h"
 #include "utils.h"
 
-constexpr size_t kMaxMTU = 9000;
-constexpr size_t kRxBufferSize = 16384;
+static constexpr size_t kMaxMTU = 9000;
+static constexpr size_t kRxBufferSize = 16384;
 //This can be kRxBufferSize / 6 safely (1 sample per 6 bytes)
-constexpr size_t kRxSampleRemBufSize = 4096;
-
-constexpr bool kDebugIrisRx = false;
+static constexpr size_t kRxSampleRemBufSize = 4096;
+static constexpr bool kDebugIrisRx = false;
 
 //#define SOCKET_DEBUG_OUTPUT
 #if defined(SOCKET_DEBUG_OUTPUT)
@@ -151,7 +150,7 @@ void RadioSocket::Create(size_t samples_per_symbol,
     throw std::runtime_error("RadioSocket::setupStream: Failed to connect to " +
                              remote_addr + " : " + remote_port);
   }
-  AGORA_LOG_INFO(
+  AGORA_LOG_TRACE(
       "RadioSocket::Create: ip6_dst %s\n udp_dst %s with connect status %ld\n",
       socket_->Address().c_str(), socket_->Port().c_str(), ret);
 }
@@ -463,8 +462,8 @@ bool RadioSocket::CheckSymbolComplete(const std::byte* in_data,
 }
 
 void RadioSocket::Flush() {
-  constexpr float kTotalTimeoutSec = 5.0f;
-  constexpr float kRxTimeoutSec = 0.2f;
+  static constexpr float kTotalTimeoutSec = 5.0f;
+  static constexpr float kRxTimeoutSec = 0.2f;
   int rx_return = 1;
 
   std::chrono::time_point<std::chrono::system_clock> last_rx_time;

@@ -16,7 +16,7 @@
 /// Basic UDP server class based on OS sockets that supports receiving messages
 class UDPServerIPv6 {
  public:
-  static const bool kDebugPrintUdpServerInit = true;
+  static constexpr bool kDebugPrintUdpServerInit = false;
 
   // Initialize a UDP server listening on this UDP port with socket buffer
   // size = rx_buffer_size

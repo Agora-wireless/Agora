@@ -25,7 +25,7 @@ ssize_t CommsLib::FindBeaconAvx(const std::complex<int16_t>* iq,
                                 const std::vector<std::complex<float>>& seq,
                                 size_t sample_window) {
   //Sample window must be multiple of 64Bytes (for avx 512)
-  constexpr size_t kWindowAlignment = 64;
+  static constexpr size_t kWindowAlignment = 64;
   const size_t padded_window =
       (((sample_window / kWindowAlignment) + 1) * kWindowAlignment);
 

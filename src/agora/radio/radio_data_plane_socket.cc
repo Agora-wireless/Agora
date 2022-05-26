@@ -62,7 +62,7 @@ void RadioDataPlaneSocket::Setup() {
     const std::string remote_ip_no_scope =
         remote_address.substr(0, remote_address.find_last_of("%"));
 
-    AGORA_LOG_INFO(
+    AGORA_LOG_FRAME(
         " STREAM_PROTOCOL  %s\n ETH0_IPv6_ADDR   %s   RADIO IP   %s\n "
         "UDP_SERVICE_PORT %s\n",
         stream_protocol.c_str(), remote_ip_no_scope.c_str(),
