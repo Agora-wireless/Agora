@@ -7,6 +7,7 @@
 
 #include "SoapySDR/Formats.h"
 #include "logger.h"
+#include "network_utils.h"
 #include "radio_soapysdr.h"
 #include "utils.h"
 
@@ -50,27 +51,36 @@ void RadioDataPlaneSocket::Setup() {
           "port");
     }
 
+    //radio_ip is the IP address that is accessable from "this" server (this scope)
+    //remote_address is the IP address that is accessable from the remote device (local scope)
+    const std::string radio_ip =
+        dynamic_cast<RadioSoapySdr*>(radio_)->IpAddress();
+
+    const std::string radio_ip_no_scope =
+        radio_ip.substr(0, radio_ip.find_last_of("%"));
+
+    const std::string remote_ip_no_scope =
+        remote_address.substr(0, remote_address.find_last_of("%"));
+
     AGORA_LOG_INFO(
-        " STREAM_PROTOCOL  %s\n ETH0_IPv6_ADDR   %s\n UDP_SERVICE_PORT %s\n",
-        stream_protocol.c_str(), remote_address.c_str(), remote_port.c_str());
+        " STREAM_PROTOCOL  %s\n ETH0_IPv6_ADDR   %s   RADIO IP   %s\n "
+        "UDP_SERVICE_PORT %s\n",
+        stream_protocol.c_str(), remote_ip_no_scope.c_str(),
+        radio_ip_no_scope.c_str(), remote_port.c_str());
 
-    std::string connect_address;
-    ///\todo Needs to be fixed
-    const size_t local_interface = 5;
-    //get the scope id to get the remote ipv6 address with the local scope id
-    AGORA_LOG_INFO(" Remote address  %s\n", remote_address.c_str());
-    const auto percent_pos = remote_address.find_last_of('%');
-    if (percent_pos != std::string::npos) {
-      connect_address = remote_address.substr(0, percent_pos + 1) +
-                        std::to_string(local_interface);
-    }
-    AGORA_LOG_INFO(" Connect address %s\n", connect_address.c_str());
+    RtAssert(radio_ip_no_scope.compare(remote_ip_no_scope) == 0,
+             "Remote Ip address is not that same as expected address");
 
-    //Setup the socket interface to the radio for the rx stream
+    const auto scope_pos = radio_ip.find_last_of("%");
+    const size_t scope_id = std::atoi(radio_ip.substr(scope_pos + 1).c_str());
+    auto local_address = agora_comm::GetLocalAddressFromScope(scope_id);
+    /// \todo Not sure why we need this???
+    local_address = local_address + radio_ip.substr(scope_pos);
+
+    //Setup the socket interface to the radio for the rx streams
     //Need to use Bs / Ue depending on what radios?
     socket_.Create(
-        Configuration()->SampsPerSymbol(), Configuration()->BsServerAddr(),
-        connect_address,
+        Configuration()->SampsPerSymbol(), local_address, radio_ip,
         std::to_string(Configuration()->BsServerPort() + radio_->Id()),
         remote_port);
 

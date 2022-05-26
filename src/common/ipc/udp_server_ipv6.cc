@@ -66,9 +66,11 @@ UDPServerIPv6::UDPServerIPv6(const std::string& local_address,
   hints.ai_addr = nullptr;
   hints.ai_next = nullptr;
 
-  int r = ::getaddrinfo(node, port_.c_str(), &hints, &server_address_info_);
-  if (r < 0) {
-    std::printf("getaddrinfo returned error - %s (%d)\n", gai_strerror(r), r);
+  int ret = ::getaddrinfo(node, port_.c_str(), &hints, &server_address_info_);
+  if (ret < 0) {
+    AGORA_LOG_ERROR("getaddrinfo returned error - %s (%d)\n", gai_strerror(ret),
+                    ret);
+    throw std::runtime_error("getaddrinfo returned error");
   }
 
   for (addrinfo* rp = server_address_info_; rp != nullptr; rp = rp->ai_next) {
@@ -87,10 +89,10 @@ UDPServerIPv6::UDPServerIPv6(const std::string& local_address,
     }
   }
 
-  RtAssert((r == 0) && (server_address_info_ != nullptr) &&
+  RtAssert((ret == 0) && (server_address_info_ != nullptr) &&
                (server_address_info_->ai_next == nullptr),
            "Found 0 or more than 1 acceptable address with return status " +
-               std::to_string(r));
+               std::to_string(ret));
 
   if (kDebugPrintUdpServerInit) {
     AGORA_LOG_INFO("Creating UDP server listening at port %s\n", port_.c_str());
@@ -103,8 +105,6 @@ UDPServerIPv6::UDPServerIPv6(const std::string& local_address,
         "UDPServerIPv6: Failed to create local socket. errno = " +
         std::string(std::strerror(errno)));
   }
-
-  int ret = 0;
 
   // Set buffer size
   if (rx_buffer_size != 0) {
@@ -235,14 +235,14 @@ ssize_t UDPServerIPv6::Connect(const std::string& remote_address,
     if ((rem_connect->ai_family == server_address_info_->ai_family) &&
         (rem_connect->ai_socktype == server_address_info_->ai_socktype) &&
         (rem_connect->ai_protocol == server_address_info_->ai_protocol)) {
-      AGORA_LOG_INFO("Found remote with family %d, type %d, proto %d\n",
-                     rem_connect->ai_family, rem_connect->ai_socktype,
-                     rem_connect->ai_protocol);
+      AGORA_LOG_TRACE("Found remote with family %d, type %d, proto %d\n",
+                      rem_connect->ai_family, rem_connect->ai_socktype,
+                      rem_connect->ai_protocol);
       break;
     }
-    AGORA_LOG_TRACE("Found remote with family %d, type %d, proto %d\n",
-                    rem_connect->ai_family, rem_connect->ai_socktype,
-                    rem_connect->ai_protocol);
+    AGORA_LOG_INFO("Found remote with family %d, type %d, proto %d\n",
+                   rem_connect->ai_family, rem_connect->ai_socktype,
+                   rem_connect->ai_protocol);
   }
   // Need to change this to rem_connect if we allow more than 1.
   r = ::connect(sock_fd_, connected_address_info_->ai_addr,

@@ -8,6 +8,7 @@
 #include "SoapySDR/Formats.hpp"
 #include "SoapySDR/Logger.hpp"
 #include "SoapySDR/Time.hpp"
+#include "SoapySDR/Version.hpp"
 #include "logger.h"
 #include "radio_data_plane.h"
 #include "symbols.h"
@@ -15,6 +16,17 @@
 constexpr size_t kSoapyMakeMaxAttempts = 3;
 constexpr bool kPrintRadioSettings = false;
 constexpr double kAttnMax = -18.0f;
+
+//Soapy sdr version
+constexpr int kSoapyMajorMinAPI = 0;
+constexpr int kSoapyMinorMinAPI = 8;
+constexpr int kSoapyBuildMinAPI = 0;
+
+//Iris driver version
+constexpr int kIrisDriverYearMinAPI = 2022;
+constexpr int kIrisDriverMonthMinAPI = 5;
+constexpr int kIrisDriverDayMinAPI = 0;
+constexpr int kIrisDriverRelMinAPI = 0;
 
 // radio init time for UHD devices
 constexpr size_t kUhdInitTimeSec = 3;
@@ -25,8 +37,42 @@ RadioSoapySdr::RadioSoapySdr(RadioDataPlane::DataPlaneType rx_dp_type)
       rxp_(RadioDataPlane::Create(rx_dp_type)),
       txs_(nullptr),
       correlator_enabled_(false) {
+  const auto soapy_version = SoapySDR::getLibVersion();
+  const auto soapy_api = SoapySDR::getAPIVersion();
+  AGORA_LOG_INFO(
+      "Create RadioSoapySdr Radio with SoapySDR - Lib Version: %s - API "
+      "Version: %s - ABI Version: %s\n",
+      soapy_version.c_str(), soapy_api.c_str(),
+      SoapySDR::getABIVersion().c_str());
+
+  //Version compatibility check
+  char delimiter = '.';
+  size_t start = 0;
+  size_t end = soapy_api.find(delimiter);
+  std::vector<int> soapy_api_versions;
+  while (end != std::string::npos) {
+    soapy_api_versions.emplace_back(
+        std::stoi(soapy_api.substr(start, end - start)));
+    start = end + 1;
+    end = soapy_api.find(delimiter, start);
+  }
+  soapy_api_versions.emplace_back(
+      std::stoi(soapy_api.substr(start, end - start)));
+
+  if ((soapy_api_versions.at(0) < kSoapyMajorMinAPI) ||
+      ((soapy_api_versions.at(0) == kSoapyMajorMinAPI) &&
+       (soapy_api_versions.at(1) < kSoapyMinorMinAPI)) ||
+      ((soapy_api_versions.at(0) == kSoapyMajorMinAPI) &&
+       (soapy_api_versions.at(1) == kSoapyMinorMinAPI) &&
+       (soapy_api_versions.at(2) < kSoapyBuildMinAPI))) {
+    AGORA_LOG_WARN(
+        "SoapySDR version does not meet min requirements %d:%d %d:%d %d:%d\n",
+        soapy_api_versions.at(0), kSoapyMajorMinAPI, soapy_api_versions.at(1),
+        kSoapyMinorMinAPI, soapy_api_versions.at(2), kSoapyBuildMinAPI);
+    throw std::runtime_error("SoapySDR version does not meet min requirements");
+  }
+
   //Reduce the soapy log level
-  AGORA_LOG_INFO("Create RadioSoapySdr Radio\n");
   SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_NOTICE);
   //SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_SSI);
   //SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_DEBUG);
@@ -101,6 +147,106 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
       throw std::runtime_error("SoapySDR failed to locate the radio with id " +
                                SerialNumber());
     }
+
+    std::stringstream device_info;
+    device_info << "Driver   = " << dev_->getDriverKey() << std::endl;
+    device_info << "Hardware = " << dev_->getHardwareKey() << std::endl;
+    for (const auto& it : dev_->getHardwareInfo()) {
+      device_info << it.first << " = " << it.second << std::endl;
+
+      constexpr int kIrisDriverYearMinAPI = 2022;
+      constexpr int kIrisDriverMonthMinAPI = 5;
+      constexpr int kIrisDriverDayMinAPI = 0;
+      constexpr int kIrisDriverRelMinAPI = 0;
+      //Driver version compatibility check
+      if (it.first.compare("driver") == 0) {
+        const auto& driver_version = it.second;
+        char delimiter = '.';
+        size_t start = 0;
+        size_t end = driver_version.find(delimiter);
+        std::vector<int> versions;
+        while (end != std::string::npos) {
+          versions.emplace_back(
+              std::stoi(driver_version.substr(start, end - start)));
+          start = end + 1;
+          end = driver_version.find(delimiter, start);
+        }
+        //Last one is divided by a '-'
+        end = driver_version.find("-", start);
+        versions.emplace_back(
+            std::stoi(driver_version.substr(start, end - start)));
+
+        if ((versions.at(0) < kIrisDriverYearMinAPI) ||
+            ((versions.at(0) == kIrisDriverYearMinAPI) &&
+             (versions.at(1) < kIrisDriverMonthMinAPI)) ||
+            ((versions.at(0) == kIrisDriverYearMinAPI) &&
+             (versions.at(1) == kIrisDriverMonthMinAPI) &&
+             (versions.at(2) < kIrisDriverDayMinAPI)) ||
+            ((versions.at(0) == kIrisDriverYearMinAPI) &&
+             (versions.at(1) == kIrisDriverMonthMinAPI) &&
+             (versions.at(2) == kIrisDriverDayMinAPI) &&
+             (versions.at(3) < kIrisDriverRelMinAPI))) {
+          AGORA_LOG_WARN(
+              "Iris driver version does not meet min requirements %d:%d %d:%d "
+              "%d:%d %d:%d\n",
+              versions.at(0), kIrisDriverYearMinAPI, versions.at(1),
+              kIrisDriverMonthMinAPI, versions.at(2), kIrisDriverDayMinAPI,
+              versions.at(3), kIrisDriverRelMinAPI);
+          throw std::runtime_error(
+              "Iris driver version does not meet min requirements");
+        }
+      }
+
+      //Driver version compatibility check
+      if (it.first.compare("ip_address") == 0) {
+        //+1 to skip over the [
+        const size_t start = it.second.find_first_of("[") + 1;
+        const size_t end = it.second.find_first_of("]");
+        ip_address_ = it.second.substr(start, end - start);
+        AGORA_LOG_INFO("Found ip address: %s\n", ip_address_.c_str());
+      }
+    }
+
+    if (ip_address_ == "") {
+      AGORA_LOG_ERROR("Iris Device IP address not found");
+      throw std::runtime_error("Device IP address not found");
+    }
+
+    auto clock_sources = dev_->listClockSources();
+    for (const auto& source : clock_sources) {
+      AGORA_LOG_TRACE("Clock source %s\n", source.c_str());
+    }
+
+    auto time_sources = dev_->listTimeSources();
+    for (const auto& source : time_sources) {
+      AGORA_LOG_TRACE("Time source %s\n", source.c_str());
+    }
+
+    auto register_interfaces = dev_->listRegisterInterfaces();
+    for (const auto& reg : register_interfaces) {
+      AGORA_LOG_TRACE("Register Interfaces %s\n", reg.c_str());
+    }
+
+    //Another way to get the Ip address.  But it will redo discovery...
+    /*
+    const std::string new_device = "serial=" + SerialNumber();
+    auto enum_info = dev_->enumerate(new_device);
+    for (size_t i = 0; i < enum_info.size(); i++) {
+      device_info << "Found device " << i << std::endl;
+      for (const auto& it : enum_info.at(i)) {
+        device_info << "  " << it.first << " = " << it.second << std::endl;
+        if (it.first.compare("remote") == 0) {
+          //+1 to skip over the [
+          const size_t start = it.second.find_first_of("[") + 1;
+          const size_t end = it.second.find_first_of("]");
+          ip_address_ = it.second.substr(start, end - start);
+          AGORA_LOG_INFO("Found ip address: %s\n", ip_address.c_str());
+        }
+      }
+      device_info << std::endl;
+    } */
+    AGORA_LOG_INFO("%s\n", device_info.str().c_str());
+
     // resets the DATA_clk domain logic.
     SoapySDR::Kwargs hw_info = dev_->getHardwareInfo();
     if (hw_info["revision"].find("Iris") != std::string::npos) {

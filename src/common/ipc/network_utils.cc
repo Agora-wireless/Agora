@@ -46,6 +46,10 @@ int ListLocalInterfaces() {
         } else {
           address_ptr =
               &((sockaddr_in6 *)current_if_address->ifa_addr)->sin6_addr;
+          auto scope_id =
+              ((sockaddr_in6 *)current_if_address->ifa_addr)->sin6_scope_id;
+
+          std::printf("Scope Id        :  %d\n", scope_id);
         }
 
         std::printf(
@@ -128,6 +132,41 @@ int ListLocalInterfaces() {
                 std::strerror(errno));
   }
   return status;
+}
+
+std::string GetLocalAddressFromScope(size_t scope_id) {
+  ifaddrs *interfaces = nullptr;
+  char address_buffer[INET6_ADDRSTRLEN];
+  std::string local_address = "";
+
+  int status = ::getifaddrs(&interfaces);
+  if (status == 0) {
+    for (const auto *current_if_address = interfaces;
+         current_if_address != nullptr;
+         current_if_address = current_if_address->ifa_next) {
+      const auto family = current_if_address->ifa_addr->sa_family;
+
+      if (family == AF_INET6) {
+        auto *address_ptr =
+            &((sockaddr_in6 *)current_if_address->ifa_addr)->sin6_addr;
+        auto found_scope_id =
+            ((sockaddr_in6 *)current_if_address->ifa_addr)->sin6_scope_id;
+
+        if (scope_id == found_scope_id) {
+          inet_ntop(AF_INET6, address_ptr, address_buffer, INET6_ADDRSTRLEN);
+          local_address = address_buffer;
+          std::printf("Found local address %s --- %d\n", local_address.c_str(),
+                      found_scope_id);
+        }
+      }
+    }
+    ::freeifaddrs(interfaces);
+    interfaces = nullptr;
+  } else {
+    std::printf("getifaddrs() failed with errno =  %d %s \n", errno,
+                std::strerror(errno));
+  }
+  return local_address;
 }
 
 }  // namespace agora_comm

@@ -72,11 +72,13 @@ class RadioSoapySdr : public Radio {
                                                 size_t read_size);
 
   inline SoapySDR::Device* SoapyDevice() const { return dev_; }
+  inline const std::string& IpAddress() const { return ip_address_; }
 
  private:
   void Correlator(bool enable);
 
   SoapySDR::Device* dev_;
+  std::string ip_address_;
   std::unique_ptr<RadioDataPlane> rxp_;
   SoapySDR::Stream* txs_;
   bool correlator_enabled_;
