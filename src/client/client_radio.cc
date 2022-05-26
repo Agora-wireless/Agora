@@ -81,7 +81,7 @@ bool ClientRadioConfig::RadioStart() {
     }
     radios_.at(i)->Activate(Radio::ActivationTypes::kActivateWaitTrigger);
   }
-  AGORA_LOG_INFO("ClientRadioConfig::RadioStart complete!\n");
+  AGORA_LOG_INFO("ClientRadioConfig: Radio start complete!\n");
   return true;
 }
 
