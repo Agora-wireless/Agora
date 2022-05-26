@@ -37,7 +37,7 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg,
     num_checks++;
     if (num_checks > 1e9) {
       AGORA_LOG_INFO(
-          "RadioConfig: Waiting for radio initialization, %zu of %zu "
+          "ClientRadioConfig: Waiting for radio initialization, %zu of %zu "
           "ready\n",
           num_client_radios_init, total_radios_);
       num_checks = 0;
@@ -53,7 +53,7 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg,
   for (const auto& radio : radios_) {
     radio->PrintSettings();
   }
-  AGORA_LOG_INFO("radio init done!\n");
+  AGORA_LOG_INFO("ClientRadioConfig: Radio init complete\n");
 }
 
 void ClientRadioConfig::InitClientRadio(size_t radio_id) {

@@ -93,9 +93,10 @@ void RadioDataPlaneSocket::Setup() {
     //Helps with the disable strea, errors (-2)
     //rxstream_args["SYNC_ACTIVATE"] = "false";
 
-    AGORA_LOG_INFO("iris:ip6_dst %s\n iris:udp_dst %s\n",
-                   rxstream_args["iris:ip6_dst"].c_str(),
-                   rxstream_args["iris:udp_dst"].c_str());
+    AGORA_LOG_FRAME(
+        "Setting stream destination - iris:ip6_dst %s\n iris:udp_dst %s\n",
+        rxstream_args["iris:ip6_dst"].c_str(),
+        rxstream_args["iris:udp_dst"].c_str());
 
     RadioDataPlane::Setup(rxstream_args);
   } else {

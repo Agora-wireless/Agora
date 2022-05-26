@@ -81,7 +81,9 @@ RadioSoapySdr::RadioSoapySdr(RadioDataPlane::DataPlaneType rx_dp_type)
 RadioSoapySdr::~RadioSoapySdr() {
   AGORA_LOG_INFO("Destroy RadioSoapySdr %s(%zu)\n", SerialNumber().c_str(),
                  Id());
-  Close();
+  if ((dev_ != nullptr) && (rxp_ != nullptr) && (txs_ != nullptr)) {
+    Close();
+  }
 }
 
 void RadioSoapySdr::Close() {

@@ -23,28 +23,29 @@ std::unique_ptr<Radio> Radio::Create(Radio::RadioType type) {
   }
 }
 
-Radio::Radio() : cfg_(nullptr), id_(0), serial_number_("") {
-  AGORA_LOG_INFO("Create Generic Null Radio\n");
+Radio::Radio() : cfg_(nullptr), id_(0), serial_number_(""), hw_framer_(false) {
+  AGORA_LOG_TRACE("Create Generic Null Radio\n");
 }
 
 Radio::~Radio() {
-  AGORA_LOG_INFO("Destroy Radio %s(%zu)\n", serial_number_.c_str(), id_);
+  AGORA_LOG_TRACE("Destroy Radio %s(%zu)\n", serial_number_.c_str(), id_);
   Radio::Close();
 }
 
 void Radio::Close() {
   if ((serial_number_.size() == 0) && (cfg_ == nullptr)) {
-    AGORA_LOG_INFO("Close Radio %s(%zu)\n", serial_number_.c_str(), id_);
+    AGORA_LOG_TRACE("Close Radio %s(%zu)\n", serial_number_.c_str(), id_);
     id_ = 0;
     serial_number_ = "";
     enabled_channels_.clear();
+    hw_framer_ = false;
     cfg_ = nullptr;
   }
 }
 
 void Radio::Init(const Config* cfg, size_t id, const std::string& serial,
                  const std::vector<size_t>& enabled_channels, bool hw_framer) {
-  AGORA_LOG_INFO("Init Radio %s(%zu)\n", serial.c_str(), id);
+  AGORA_LOG_TRACE("Init Radio %s(%zu)\n", serial.c_str(), id);
 
   id_ = id;
   cfg_ = cfg;
@@ -55,14 +56,14 @@ void Radio::Init(const Config* cfg, size_t id, const std::string& serial,
 
 void Radio::Setup([[maybe_unused]] const std::vector<double>& tx_gains,
                   [[maybe_unused]] const std::vector<double>& rx_gains) {
-  AGORA_LOG_INFO("Setup Radio %s(%zu)\n", serial_number_.c_str(), id_);
+  AGORA_LOG_TRACE("Setup Radio %s(%zu)\n", serial_number_.c_str(), id_);
 }
 
 void Radio::Activate(Radio::ActivationTypes type) {
-  AGORA_LOG_INFO("Activate Radio %s(%zu) with type %d\n",
-                 serial_number_.c_str(), id_, static_cast<int>(type));
+  AGORA_LOG_TRACE("Activate Radio %s(%zu) with type %d\n",
+                  serial_number_.c_str(), id_, static_cast<int>(type));
 }
 
 void Radio::Deactivate() {
-  AGORA_LOG_INFO("Deactivate Radio %s(%zu)\n", serial_number_.c_str(), id_);
+  AGORA_LOG_TRACE("Deactivate Radio %s(%zu)\n", serial_number_.c_str(), id_);
 }
