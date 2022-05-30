@@ -16,7 +16,7 @@
 
 namespace CsvLog {
 
-constexpr size_t kFrames = 1000;
+constexpr size_t kFrames = 10;
 constexpr size_t kSCs = 304;
 constexpr size_t kBSAnts = 8;
 constexpr size_t kUEAnts = 1;

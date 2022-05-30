@@ -15,11 +15,13 @@ DoPrecode::DoPrecode(
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
     Table<complex_float>& in_dl_ifft_buffer,
     Table<int8_t>& dl_encoded_or_raw_data /* Encoded if LDPC is enabled */,
-    Stats* in_stats_manager)
+    Stats* in_stats_manager,
+    std::shared_ptr<CsvLog::MatLogger> dlzf_logger)
     : Doer(in_config, in_tid),
       dl_zf_matrices_(dl_zf_matrices),
       dl_ifft_buffer_(in_dl_ifft_buffer),
-      dl_raw_data_(dl_encoded_or_raw_data) {
+      dl_raw_data_(dl_encoded_or_raw_data),
+      dlzf_logger_(std::move(dlzf_logger)) {
   duration_stat_ =
       in_stats_manager->GetDurationStat(DoerType::kPrecode, in_tid);
 
@@ -63,7 +65,8 @@ DoPrecode::~DoPrecode() {
     std::fprintf(stderr, "!!!!Error: Error while destorying MKL JIT\n");
   }
 #endif
-std::cout << "countfunc = " << countfunc << "USE_MKL_JIT = " << USE_MKL_JIT << std::endl;
+  std::cout << "PrecodingPerSc runs " << countfunc << " times per frame\n"
+            << "USE_MKL_JIT = " << USE_MKL_JIT << std::endl;
 }
 
 EventData DoPrecode::Launch(size_t tag) {
@@ -103,29 +106,6 @@ EventData DoPrecode::Launch(size_t tag) {
   size_t max_sc_ite =
       std::min(cfg_->DemulBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
 
-  
-  arma::fmat thinvec = arma::ones<arma::fmat>(cfg_->BsAntNum() - 1, 1); // TEMPORARILY HARDCODE IT
-  int OFF; // num of OFF antennas in one-chain BS
-  OFF= 4;
-  int bsradio;
-  // bsradio = 8;  // hardcoded for a single-chain BS
-  bsradio = cfg_->BsAntNum() - 1;
-  arma::vec indexx = arma::randperm<arma::vec>(bsradio, OFF); 
-  for(int i=0; i < indexx.n_rows; i++)
-  {
-      thinvec(indexx(i)) = 0.0;
-      // std::cout <<"##"<< index(i) << std::endl; // check the rnd seed placed in DoZF
-  }
-  arma::fmat mat_singleton;   // there might be more efficient way
-  mat_singleton.zeros(1,1);
-  thinvec = arma::join_vert(thinvec, mat_singleton); //append an 0 to thinvec, to match size of mat_dl_zf
-  
-  // thinvec.ones(size(thinvec));    //CHECK: ALL-ONE THINVEC
-
-  // // if (symbol_idx_dl==0) {
-  // //   thinvec.ones(size(thinvec));  // check, all-one thinvec
-  // // }
-
   if (kUseSpatialLocality) {
     for (size_t i = 0; i < max_sc_ite; i = i + kSCsPerCacheline) {
       size_t start_tsc1 = GetTime::WorkerRdtsc();
@@ -139,10 +119,10 @@ EventData DoPrecode::Launch(size_t tag) {
       size_t start_tsc2 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
       for (size_t j = 0; j < kSCsPerCacheline; j++) {
-        PrecodingPerSc(frame_slot, base_sc_id + i + j, i + j, thinvec);
-        if (frame_id == 0 && base_sc_id + i + j == 0) {
-          countfunc ++;
+        if (frame_id == 0) {
+          countfunc++;
         }
+        PrecodingPerSc(frame_id, base_sc_id + i + j, i + j);
       }
       duration_stat_->task_count_ =
           duration_stat_->task_count_ + kSCsPerCacheline;
@@ -159,7 +139,7 @@ EventData DoPrecode::Launch(size_t tag) {
       size_t start_tsc2 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
 
-      PrecodingPerSc(frame_slot, cur_sc_id, i, thinvec);
+      PrecodingPerSc(frame_id, cur_sc_id, i);
       duration_stat_->task_count_++;
       duration_stat_->task_duration_[2] += GetTime::WorkerRdtsc() - start_tsc2;
     }
@@ -212,8 +192,9 @@ void DoPrecode::LoadInputData(size_t symbol_idx_dl,
   }
 }
 
-void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
-                               size_t sc_id_in_block, arma::fmat& thinvec ) {
+void DoPrecode::PrecodingPerSc(size_t frame_id, size_t sc_id,
+                               size_t sc_id_in_block) {
+  const size_t frame_slot = frame_id % kFrameWnd;
   auto* precoder_ptr = reinterpret_cast<arma::cx_float*>(
       dl_zf_matrices_[frame_slot][cfg_->GetZfScId(sc_id)]);
   auto* data_ptr = reinterpret_cast<arma::cx_float*>(
@@ -238,14 +219,40 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
 
   //arma::fmat thinvec = arma::ones<arma::fmat>(mat_dl_zf.n_rows-1, 1);
   
+  const size_t bsradio = cfg_->BsAntNum() - 1;
+  const size_t OFF = 0; // num of OFF antennas in one-chain BS
+  arma::vec indexx = arma::randperm<arma::vec>(bsradio, OFF);
+  arma::fmat thinvec = arma::ones<arma::fmat>(cfg_->BsAntNum(), 1);
+  for (size_t i = 0; i < indexx.n_rows; i++) {
+    thinvec(indexx(i)) = 0.0f;
+    // std::cout <<"##"<< index(i) << std::endl; // check the rnd seed
+  }
+  //arma::fmat mat_singleton;   // there might be more efficient way
+  //mat_singleton.zeros(1,1);
+  //thinvec = arma::join_vert(thinvec, mat_singleton); //append an 0 to thinvec, to match size of mat_dl_zf
 
-  mat_precoder = mat_precoder % thinvec;
+  // thinvec.ones(size(thinvec));    //CHECK: ALL-ONE THINVEC
+
+  // if (symbol_idx_dl==0) {
+  //   thinvec.ones(size(thinvec));  // check, all-one thinvec
+  // }
+  arma::cx_fmat mat_precoder_thin = mat_precoder % thinvec;
+  
+  if (dlzf_logger_) {
+    dlzf_logger_->UpdateMatBuf(frame_id, sc_id, mat_precoder_thin);
+  }
 
 #if USE_MKL_JIT
-  my_cgemm_(jitter_, (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
-            (MKL_Complex8*)precoded_ptr);      // functions the same as below
+  my_cgemm_(jitter_, (MKL_Complex8*)mat_precoder_thin.memptr(),
+            (MKL_Complex8*)data_ptr, (MKL_Complex8*)precoded_ptr);
+            // functions the same as below
 #else
-  mat_precoded = mat_precoder * mat_data;
+  mat_precoded = mat_precoder_thin * mat_data; // SUBF or OFDM-SSC
+  // ANI: the precoded vector is the sum of info-bearing signal (which is mat_precoded), and an artificial
+  // noise signal; 
+  // psuedo-code:
+  // mat_ANI = arma::null(mat) * arma::randn(size of mat_dl_zf)
+  // mat_precoded  = mat_precoded +  mat_ANI
 #endif
   // std::cout << "Precoder: \n" << mat_precoder << std::endl;
   // std::cout << "Data: \n" << mat_data << std::endl;

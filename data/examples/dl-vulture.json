@@ -11,7 +11,7 @@
     "sample_rate": 7.68e6,
    ================================================ */
     "rx_gain_a": 68,
-    "tx_gain_a": 75,
+    "tx_gain_a": 79,
     "rx_gain_b": 65,
     "tx_gain_b": 70,
     /*"sample_rate": 3.84e6,*/
@@ -36,7 +36,7 @@
       "Zc": 18
     },
     "beamsweep": false,
-    "beacon_antenna": 7,
+    "beacon_antenna": 0,
     "frame_schedule": [
         "BGCLGGPGGDDDG"
     ],

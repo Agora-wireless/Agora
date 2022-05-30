@@ -18,13 +18,15 @@
 #include "modulation.h"
 #include "stats.h"
 #include "symbols.h"
+#include "mat_logger.h"
 
 class DoPrecode : public Doer {
  public:
   DoPrecode(Config* in_config, int in_tid,
             PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_,
             Table<complex_float>& in_dl_ifft_buffer,
-            Table<int8_t>& dl_encoded_or_raw_data, Stats* in_stats_manager);
+            Table<int8_t>& dl_encoded_or_raw_data, Stats* in_stats_manager,
+            std::shared_ptr<CsvLog::MatLogger> dlzf_logger = {});
   ~DoPrecode() override;
 
   /**
@@ -58,7 +60,7 @@ class DoPrecode : public Doer {
   // Load input data for a single UE and a single subcarrier
   void LoadInputData(size_t symbol_idx_dl, size_t total_data_symbol_idx,
                      size_t user_id, size_t sc_id, size_t sc_id_in_block);
-  void PrecodingPerSc(size_t frame_slot, size_t sc_id, size_t sc_id_in_block, arma::fmat& thinvec);
+  void PrecodingPerSc(size_t frame_id, size_t sc_id, size_t sc_id_in_block);
 
  private:
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_;
@@ -72,6 +74,7 @@ class DoPrecode : public Doer {
   void* jitter_;
   cgemm_jit_kernel_t my_cgemm_;
 #endif
+  std::shared_ptr<CsvLog::MatLogger> dlzf_logger_;
 };
 
 #endif  // DOPRECODE_H_

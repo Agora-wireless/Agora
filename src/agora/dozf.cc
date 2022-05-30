@@ -12,8 +12,8 @@ static constexpr bool kUseSIMDGather = true;
 // Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.
 // This is faster but less accurate than using an SVD-based pseudoinverse.
 static constexpr bool kUseInverseForZF = true;
-static constexpr bool kUseUlZfForDownlink = true; // mag info thrown off
-//static constexpr bool kUseUlZfForDownlink = false;
+//static constexpr bool kUseUlZfForDownlink = true; // mag info thrown off
+static constexpr bool kUseUlZfForDownlink = false;
 
 DoZF::DoZF(Config* config, int tid,
            PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
@@ -103,7 +103,7 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
   arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(ul_zf_mem),
                           cfg_->UeAntNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_zf_tmp;
-  if (kUseInverseForZF) {
+  if (kUseInverseForZF) {  // true
     try {
       mat_ul_zf_tmp = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
     } catch (std::runtime_error&) {
@@ -117,7 +117,7 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
 
   if (cfg_->Frame().NumDLSyms() > 0) {
     arma::cx_fmat mat_dl_zf_tmp;
-    if (kUseUlZfForDownlink == true) {
+    if (kUseUlZfForDownlink == true) {    // false for accuracy
       // With orthonormal calib matrix:
       // pinv(calib * csi) = pinv(csi)*inv(calib)
       // This probably causes a performance hit since we are throwing
@@ -127,13 +127,18 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
       mat_dl_zf_tmp = mat_ul_zf_tmp * inv_calib_mat;
     } else {
       arma::cx_fmat mat_dl_csi = arma::diagmat(calib_sc_vec) * mat_csi;
-      if (kUseInverseForZF) {
+      if (kUseInverseForZF) {      // true
+        // ======COMMENT this part OUT, if want CONJ =======
         try {
           mat_dl_zf_tmp =
               arma::inv_sympd(mat_dl_csi.t() * mat_dl_csi) * mat_dl_csi.t();
         } catch (std::runtime_error&) {
           arma::pinv(mat_dl_zf_tmp, mat_dl_csi, 1e-2, "dc");
         }
+        // ==========================================================
+
+        // OR COMMENT BELOW, if WANT TO DO ZF
+        // mat_dl_zf_tmp = mat_dl_csi.t();       // conjugate beamforming before normalization
       } else {
         arma::pinv(mat_dl_zf_tmp, mat_dl_csi, 1e-2, "dc");
       }
@@ -141,8 +146,18 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     // We should be scaling the beamforming matrix, so the IFFT
     // output can be scaled with OfdmCaNum() across all antennas.
     // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
+
+    // ============== ORIGINAL NORMALIZATION ===========================
+    //const float scale = 1 / (abs(mat_dl_zf_tmp).max());
+    //mat_dl_zf_tmp = mat_dl_zf_tmp * scale;  // at least one radio is transmit at the maximum (<=1)
+    // ==================================================================
+
+    // ======A LOCAL NORMALIZATION:======   SO MY SCALING COMMAND IS MISSING  :(
+    mat_dl_zf_tmp /= arma::square(arma::conv_to<arma::cx_fmat>::from(arma::abs(mat_dl_zf_tmp)));
+      //COMMENT OUT below for loc + glb norm.
     const float scale = 1 / (abs(mat_dl_zf_tmp).max());
     mat_dl_zf_tmp = mat_dl_zf_tmp * scale;
+  
 
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
       if (cfg_->ExternalRefNode(i)) {
@@ -157,7 +172,7 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
                             cfg_->BsAntNum(), cfg_->UeAntNum(), false);    // deref
     
 
-    mat_dl_zf = mat_dl_zf_tmp.st(); // <---Baseline#1: DL bmfm
+    mat_dl_zf = mat_dl_zf_tmp.st(); // <---Baseline#1: DL bmfm   Q: DO WE STILL NEED .st() HERE?
     // std::cout << "check default mat_dl_zf:" <<std::endl
     //     << mat_dl_zf << std::endl;
     /****************************************************
@@ -430,13 +445,13 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
       if (csi_logger_) {
         csi_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_csi);
       }
-
+      /*
       if (dlzf_logger_) {
         arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(
                                     dl_zf_matrices_[frame_slot][cur_sc_id]),
                                 cfg_->BsAntNum(), cfg_->UeAntNum(), false);
         dlzf_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_zf);
-      }
+      }*/
     }
 
     duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;

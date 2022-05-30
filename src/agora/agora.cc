@@ -900,7 +900,8 @@ void Agora::Worker(int tid) {
 
   auto compute_precode = std::make_unique<DoPrecode>(
       this->config_, tid, this->dl_zf_matrices_, this->dl_ifft_buffer_,
-      this->dl_mod_bits_buffer_, this->stats_.get());
+      this->dl_mod_bits_buffer_, this->stats_.get(),
+      mat_loggers_.at(CsvLog::kMatDLZF));
 
   auto compute_encoding = std::make_unique<DoEncode>(
       config_, tid, Direction::kDownlink,
@@ -1025,7 +1026,8 @@ void Agora::WorkerDemul(int tid) {
   /* Initialize Precode operator */
   std::unique_ptr<DoPrecode> compute_precode(
       new DoPrecode(config_, tid, dl_zf_matrices_, dl_ifft_buffer_,
-                    dl_mod_bits_buffer_, this->stats_.get()));
+                    dl_mod_bits_buffer_, this->stats_.get(),
+                    mat_loggers_.at(CsvLog::kMatDLZF)));
 
   assert(false);
 
