@@ -39,7 +39,7 @@ RadioSoapySdr::RadioSoapySdr(RadioDataPlane::DataPlaneType rx_dp_type)
       correlator_enabled_(false) {
   const auto soapy_version = SoapySDR::getLibVersion();
   const auto soapy_api = SoapySDR::getAPIVersion();
-  AGORA_LOG_INFO(
+  AGORA_LOG_FRAME(
       "Create RadioSoapySdr Radio with SoapySDR - Lib Version: %s - API "
       "Version: %s - ABI Version: %s\n",
       soapy_version.c_str(), soapy_api.c_str(),
@@ -79,17 +79,17 @@ RadioSoapySdr::RadioSoapySdr(RadioDataPlane::DataPlaneType rx_dp_type)
 }
 
 RadioSoapySdr::~RadioSoapySdr() {
-  AGORA_LOG_INFO("Destroy RadioSoapySdr %s(%zu)\n", SerialNumber().c_str(),
-                 Id());
+  AGORA_LOG_TRACE("Destroy RadioSoapySdr %s(%zu)\n", SerialNumber().c_str(),
+                  Id());
   if ((dev_ != nullptr) && (rxp_ != nullptr) && (txs_ != nullptr)) {
     Close();
   }
 }
 
 void RadioSoapySdr::Close() {
-  AGORA_LOG_INFO("Close RadioSoapySdr %s(%zu)\n", SerialNumber().c_str(), Id());
-
   if (dev_ != nullptr) {
+    AGORA_LOG_TRACE("Close RadioSoapySdr %s(%zu)\n", SerialNumber().c_str(),
+                    Id());
     if (rxp_ != nullptr) {
       rxp_->Close();
       rxp_.reset();
@@ -108,8 +108,8 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
                          const std::string& serial,
                          const std::vector<size_t>& enabled_channels,
                          bool hw_framer) {
-  AGORA_LOG_INFO("Init RadioSoapySdr %s(%zu)\n", serial.c_str(), id);
   if (dev_ == nullptr) {
+    AGORA_LOG_TRACE("Init RadioSoapySdr %s(%zu)\n", serial.c_str(), id);
     Radio::Init(cfg, id, serial, enabled_channels, hw_framer);
 
     SoapySDR::Kwargs args;
@@ -287,7 +287,8 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
 
 void RadioSoapySdr::Setup(const std::vector<double>& tx_gains,
                           const std::vector<double>& rx_gains) {
-  AGORA_LOG_INFO("Setup RadioSoapySdr %s(%zu)\n", SerialNumber().c_str(), Id());
+  AGORA_LOG_TRACE("Setup RadioSoapySdr %s(%zu)\n", SerialNumber().c_str(),
+                  Id());
   for (auto ch : EnabledChannels()) {
     dev_->setSampleRate(SOAPY_SDR_RX, ch, cfg_->Rate());
     dev_->setSampleRate(SOAPY_SDR_TX, ch, cfg_->Rate());
@@ -398,8 +399,8 @@ void RadioSoapySdr::Setup(const std::vector<double>& tx_gains,
 }
 
 void RadioSoapySdr::Activate(Radio::ActivationTypes type) {
-  AGORA_LOG_INFO("Activate RadioSoapySdr %s(%zu)\n", SerialNumber().c_str(),
-                 Id());
+  AGORA_LOG_TRACE("Activate RadioSoapySdr %s(%zu)\n", SerialNumber().c_str(),
+                  Id());
   const bool is_ue = false;
   if (kUseUHD == false) {
     dev_->setHardwareTime(0, "TRIGGER");
@@ -442,8 +443,8 @@ void RadioSoapySdr::Activate(Radio::ActivationTypes type) {
 }
 
 void RadioSoapySdr::Deactivate() {
-  AGORA_LOG_INFO("Deactivate RadioSoapySdr %s(%zu)\n", SerialNumber().c_str(),
-                 Id());
+  AGORA_LOG_TRACE("Deactivate RadioSoapySdr %s(%zu)\n", SerialNumber().c_str(),
+                  Id());
   const std::string tdd_conf_str = "{\"tdd_enabled\":false}";
   rxp_->Deactivate();
   const auto status = dev_->deactivateStream(txs_);

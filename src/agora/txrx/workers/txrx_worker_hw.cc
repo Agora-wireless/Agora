@@ -107,7 +107,7 @@ void TxRxWorkerHw::DoTxRx() {
           if ((rx_symbol_id == receive_attempt.symbol_) && (rx_frame_id == 0)) {
             //Match, don't allow any more incorrect symbol data
             first_symbol_.at(receive_attempt.interface_) = false;
-            AGORA_LOG_INFO(
+            AGORA_LOG_TRACE(
                 "TxRxWorkerHw[%zu]: Interface %zu Matched First Symbol "
                 "%zu:%zu\n",
                 tid_, receive_attempt.interface_, rx_symbol_id,

@@ -4,6 +4,8 @@
  */
 #include "radio_lib.h"
 
+#include <thread>
+
 #include "SoapySDR/Formats.h"
 #include "SoapySDR/Logger.hpp"
 #include "logger.h"
@@ -266,6 +268,8 @@ bool RadioConfig::RadioStart() {
     init_calib_ul_.Free();
   }
 
+  //Speed up the activations (could have a flush)
+  std::vector<std::thread> activate_radio_threads;
   const size_t beacon_radio = radio_num_;
   for (size_t i = 0; i < radio_num_; i++) {
     if (cfg_->HwFramer()) {
@@ -273,7 +277,13 @@ bool RadioConfig::RadioStart() {
       const bool is_ref_radio = (i == cfg_->RefRadio(cell_id));
       radios_.at(i)->ConfigureTddModeBs(is_ref_radio, beacon_radio);
     }
-    radios_.at(i)->Activate();
+    activate_radio_threads.emplace_back(&Radio::Activate, radios_.at(i).get(),
+                                        Radio::ActivationTypes::kActivate);
+  }
+
+  AGORA_LOG_INFO("RadioStart waiting for activation\n");
+  for (auto& join_thread : activate_radio_threads) {
+    join_thread.join();
   }
   AGORA_LOG_INFO("RadioConfig::RadioStart complete!\n");
   return true;
@@ -338,21 +348,35 @@ void RadioConfig::ReadSensors() {
 
 void RadioConfig::RadioStop() {
   //Could add a threaded deactivate if it speeds things up.
+  std::vector<std::thread> deactivate_radio_threads;
   for (auto& radio : radios_) {
-    radio->Deactivate();
+    deactivate_radio_threads.emplace_back(&Radio::Deactivate, radio.get());
   }
+
+  AGORA_LOG_INFO("RadioStop waiting for deactivation\n");
+  for (auto& join_thread : deactivate_radio_threads) {
+    join_thread.join();
+  }
+  AGORA_LOG_INFO("RadioStop deactivated\n");
 }
 
 RadioConfig::~RadioConfig() {
   FreeBuffer1d(&init_calib_dl_processed_);
   FreeBuffer1d(&init_calib_ul_processed_);
 
+  std::vector<std::thread> close_radio_threads;
   for (auto& radio : radios_) {
-    radio->Close();
+    close_radio_threads.emplace_back(&Radio::Close, radio.get());
+  }
+
+  AGORA_LOG_INFO("~RadioConfig waiting for close\n");
+  for (auto& join_thread : close_radio_threads) {
+    join_thread.join();
   }
 
   for (auto hub : hubs_) {
     SoapySDR::Device::unmake(hub);
   }
   hubs_.clear();
+  AGORA_LOG_INFO("RadioStop destructed\n");
 }

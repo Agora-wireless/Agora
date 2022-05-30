@@ -35,8 +35,8 @@ UDPServerIPv6::UDPServerIPv6(const std::string& local_address,
       sock_fd_(-1),
       server_address_info_(nullptr),
       connected_address_info_(nullptr) {
-  AGORA_LOG_INFO("Creating UDP Server at address %s port %s\n",
-                 local_address.c_str(), local_port.c_str());
+  AGORA_LOG_TRACE("Creating UDP Server at address %s port %s\n",
+                  local_address.c_str(), local_port.c_str());
 
   //Set node to nullptr for loopback
   //node = &address_buffer[0u];
