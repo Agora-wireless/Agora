@@ -77,7 +77,7 @@ EventData DoPrecode::Launch(size_t tag) {
   const size_t symbol_idx_dl = cfg_->Frame().GetDLSymbolIdx(symbol_id);
   const size_t total_data_symbol_idx =
       cfg_->GetTotalDataSymbolIdxDl(frame_id, symbol_idx_dl);
-  const size_t frame_slot = frame_id % kFrameWnd;
+  //const size_t frame_slot = frame_id % kFrameWnd;
 
   // Mark pilot subcarriers in this block
   // In downlink pilot symbols, all subcarriers are used as pilots
@@ -122,7 +122,7 @@ EventData DoPrecode::Launch(size_t tag) {
         if (frame_id == 0) {
           countfunc++;
         }
-        PrecodingPerSc(frame_id, base_sc_id + i + j, i + j);
+        PrecodingPerSc(frame_id, symbol_idx_dl, base_sc_id + i + j, i + j);
       }
       duration_stat_->task_count_ =
           duration_stat_->task_count_ + kSCsPerCacheline;
@@ -139,7 +139,7 @@ EventData DoPrecode::Launch(size_t tag) {
       size_t start_tsc2 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
 
-      PrecodingPerSc(frame_id, cur_sc_id, i);
+      PrecodingPerSc(frame_id, symbol_idx_dl, cur_sc_id, i);
       duration_stat_->task_count_++;
       duration_stat_->task_duration_[2] += GetTime::WorkerRdtsc() - start_tsc2;
     }
@@ -192,8 +192,8 @@ void DoPrecode::LoadInputData(size_t symbol_idx_dl,
   }
 }
 
-void DoPrecode::PrecodingPerSc(size_t frame_id, size_t sc_id,
-                               size_t sc_id_in_block) {
+void DoPrecode::PrecodingPerSc(size_t frame_id, size_t symbol_idx_dl,
+                               size_t sc_id, size_t sc_id_in_block) {
   const size_t frame_slot = frame_id % kFrameWnd;
   auto* precoder_ptr = reinterpret_cast<arma::cx_float*>(
       dl_zf_matrices_[frame_slot][cfg_->GetZfScId(sc_id)]);
@@ -239,7 +239,7 @@ void DoPrecode::PrecodingPerSc(size_t frame_id, size_t sc_id,
   arma::cx_fmat mat_precoder_thin = mat_precoder % thinvec;
   
   if (dlzf_logger_) {
-    dlzf_logger_->UpdateMatBuf(frame_id, sc_id, mat_precoder_thin);
+    dlzf_logger_->UpdateMatBuf(frame_id, symbol_idx_dl, sc_id, mat_precoder_thin);
   }
 
 #if USE_MKL_JIT
