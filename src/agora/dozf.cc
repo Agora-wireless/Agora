@@ -12,8 +12,8 @@ static constexpr bool kUseSIMDGather = true;
 // Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.
 // This is faster but less accurate than using an SVD-based pseudoinverse.
 static constexpr bool kUseInverseForZF = true;
-//static constexpr bool kUseUlZfForDownlink = true; // mag info thrown off
-static constexpr bool kUseUlZfForDownlink = false;
+// static constexpr bool kUseUlZfForDownlink = true; // mag info thrown off, but yielded better BER...
+static constexpr bool kUseUlZfForDownlink = false; // more accurate matrix pinv [fixed]
 
 DoZF::DoZF(Config* config, int tid,
            PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
@@ -116,33 +116,54 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
 
   if (cfg_->Frame().NumDLSyms() > 0) {
     arma::cx_fmat mat_dl_zf_tmp;
-    if (kUseUlZfForDownlink == true) {    // false for accuracy
+    if (kUseUlZfForDownlink == true) {    
       // With orthonormal calib matrix:
       // pinv(calib * csi) = pinv(csi)*inv(calib)
       // This probably causes a performance hit since we are throwing
       // magnitude info away by taking the sign of the calibration matrix
       // Inv is already acheived by UL over DL division outside this function
+
+      // ========= aprx DLZF bmfm ============================================
+      // Note that there should be no so-callled "aprx-CONJ", since the approximation
+      // done here is only for validating pinv(AB) = pinv(B)*pinv(A). Whereas in DL-CONJ,
+      // no pinv operation needed at all.
+
       arma::cx_fmat inv_calib_mat = arma::diagmat(arma::sign(calib_sc_vec));
       mat_dl_zf_tmp = mat_ul_zf_tmp * inv_calib_mat;
-    } else {
-      arma::cx_fmat mat_dl_csi = arma::diagmat(calib_sc_vec) * mat_csi;
+
+      // =========================END=========================================
+
+      // ========= DL-CONJ bmfm (not recommened) ===========================
+      // Another different notion of approximation done here is to assume channel
+      // reciprocity between E2E UL and DL channel (i.e., they are equal); which
+      // is not the case in practice (c.f. Argos paper)
+      // According to OTA tests, the resultant BER is an order-of-magnitude WORSE
+      // than using mat_dl_csi.t() to conj bmfm, mostly.
+
+       mat_dl_zf_tmp = mat_csi.t();   // use UL CSI directly, and to be normalized later on
+
+      // =========================END=========================================
+      
+    } else {       // kUseUlZfForDownlink == false
+      // arma::cx_fmat mat_dl_csi = arma::diagmat(calib_sc_vec) * mat_csi; // original, DO NOT USE
+      arma::cx_fmat mat_dl_csi = arma::inv(arma::diagmat(calib_sc_vec)) * mat_csi; // [fixed]
       if (kUseInverseForZF) {      // true
         // ======COMMENT this part OUT, if want CONJ =======
-        try {
-          mat_dl_zf_tmp =
-              arma::inv_sympd(mat_dl_csi.t() * mat_dl_csi) * mat_dl_csi.t();
-        } catch (std::runtime_error&) {
-          arma::pinv(mat_dl_zf_tmp, mat_dl_csi, 1e-2, "dc");
-        }
+        // try {
+        //   mat_dl_zf_tmp =
+        //       arma::inv_sympd(mat_dl_csi.t() * mat_dl_csi) * mat_dl_csi.t();
+        // } catch (std::runtime_error&) {
+        //   arma::pinv(mat_dl_zf_tmp, mat_dl_csi, 1e-2, "dc");
+        // }
         // ==========================================================
 
-        // OR COMMENT BELOW, if WANT TO DO ZF
-        // mat_dl_zf_tmp = mat_dl_csi.t();       // conjugate beamforming before normalization
+        // OR COMMENT OUT LINE BELOW, if want DLZF
+          mat_dl_zf_tmp = mat_dl_csi.t();       // conjugate beamforming before normalization
 
         if (kEnableMatLog && dlcsi_logger_) {
-          dlcsi_logger_->UpdateMatBuf(frame_id, 0, cur_sc_id, mat_dl_csi);
+          dlcsi_logger_->UpdateMatBuf(frame_id, 0, cur_sc_id, mat_dl_csi); // log DL CSI
         }
-      } else {
+      } else { // kUseInverseForZF == false
         arma::pinv(mat_dl_zf_tmp, mat_dl_csi, 1e-2, "dc");
       }
     }
@@ -151,16 +172,16 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
 
     // ============== ORIGINAL NORMALIZATION ===========================
-    //const float scale = 1 / (abs(mat_dl_zf_tmp).max());
-    //mat_dl_zf_tmp = mat_dl_zf_tmp * scale;  // at least one radio is transmit at the maximum (<=1)
+    // const float scale = 1 / (abs(mat_dl_zf_tmp).max());
+    // mat_dl_zf_tmp = mat_dl_zf_tmp * scale;  // at least one radio is transmit at the maximum (<=1)
     // ==================================================================
 
-    // ======A LOCAL NORMALIZATION:======   SO MY SCALING COMMAND IS MISSING  :(
+    // ======A LOCAL NORMALIZATION:========================================
     mat_dl_zf_tmp /= arma::square(arma::conv_to<arma::cx_fmat>::from(arma::abs(mat_dl_zf_tmp)));
       //COMMENT OUT below for loc + glb norm.
     const float scale = 1 / (abs(mat_dl_zf_tmp).max());
     mat_dl_zf_tmp = mat_dl_zf_tmp * scale;
-  
+    // ====================================================================
 
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
       if (cfg_->ExternalRefNode(i)) {
@@ -209,7 +230,7 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     // }
     // arma::fmat mat_singleton;   // there might be more efficient way
     // mat_singleton.zeros(1,1);
-    // thinvec = arma::join_vert(thinvec, mat_singleton); //append an 0 to thinvec, to match size of mat_dl_zf
+    // thinvec = arma::join_vert(thinvec, mat_singleton);
     // mat_dl_zf = mat_dl_zf % thinvec; //element-wise product
     
     // std::cout << "check: mat_dl_zf after .* with thinvec" << std::endl

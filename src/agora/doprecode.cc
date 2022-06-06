@@ -220,7 +220,7 @@ void DoPrecode::PrecodingPerSc(size_t frame_id, size_t symbol_idx_dl,
   //arma::fmat thinvec = arma::ones<arma::fmat>(mat_dl_zf.n_rows-1, 1);
   
   const size_t bsradio = cfg_->BsAntNum() - 1;
-  const size_t OFF = 0; // num of OFF antennas in one-chain BS
+  const size_t OFF = 3; // num of OFF antennas in one-chain BS
   arma::vec indexx = arma::randperm<arma::vec>(bsradio, OFF);
   arma::fmat thinvec = arma::ones<arma::fmat>(cfg_->BsAntNum(), 1);
   for (size_t i = 0; i < indexx.n_rows; i++) {
