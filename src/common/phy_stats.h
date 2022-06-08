@@ -24,13 +24,14 @@ class PhyStats {
   void UpdateBlockErrors(size_t ue_id, size_t offset, size_t frame_slot,
                          size_t block_error_count);
   void IncrementDecodedBlocks(size_t ue_id, size_t offset, size_t frame_slot);
-  void RecordDlBerSer(size_t frame_id);
+  void RecordBerSer(size_t frame_id);
   void UpdateUncodedBitErrors(size_t ue_id, size_t offset, size_t mod_bit_size,
                               uint8_t tx_byte, uint8_t rx_byte);
   void UpdateUncodedBits(size_t ue_id, size_t offset, size_t new_bits_num);
   void UpdateEvmStats(size_t frame_id, size_t sc_id, const arma::cx_fmat& eq);
   void PrintEvmStats(size_t frame_id);
   void RecordUlEvmSnr(size_t frame_id);
+  void ClearEvmBuffer(size_t frame_id);
   float GetEvmSnr(size_t frame_id, size_t ue_id);
   void UpdateEvmSnr(size_t frame_id, size_t ue_id, float evmsnr);
   void RecordDlEvmSnr(size_t frame_id);
@@ -72,8 +73,7 @@ class PhyStats {
   size_t num_rx_symbols_;
   size_t num_data_symbols_;
 
-  std::array<std::shared_ptr<CsvLog::CsvLogger>, CsvLog::kUlLogs> ul_loggers_;
-  std::array<std::shared_ptr<CsvLog::CsvLogger>, CsvLog::kDlLogs> dl_loggers_;
+  std::array<std::shared_ptr<CsvLog::CsvLogger>, CsvLog::kCsvLogs> csv_loggers_;
 };
 
 #endif  // PHY_STATS_H_

@@ -16,14 +16,14 @@
 
 namespace CsvLog {
 
-constexpr size_t kFrames = 1000;
+constexpr size_t kFrames = 10;
 constexpr size_t kSCs = 304;
 constexpr size_t kBSAnts = 8;
 constexpr size_t kUEAnts = 1;
 
 class MatLogger : public CsvLogger {
  public:
-  MatLogger(const std::string& radio_id, size_t mat_log_id);
+  MatLogger(size_t mat_log_id, const std::string& radio_id, Direction dir);
   bool UpdateMatBuf(const size_t frame_id, const size_t sc_id,
                     const arma::cx_fmat& mat_in);
   ~MatLogger();

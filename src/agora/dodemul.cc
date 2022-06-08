@@ -270,14 +270,8 @@ EventData DoDemul::Launch(size_t tag) {
         mat_equaled %= mat_phase_correct;
 
         // Measure EVM from ground truth
-        if (symbol_idx_ul == cfg_->Frame().ClientUlPilotSymbols()) {
+        if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
           phy_stats_->UpdateEvmStats(frame_id, cur_sc_id, mat_equaled);
-          if (kPrintPhyStats && cur_sc_id == 0) {
-            phy_stats_->PrintEvmStats(frame_id - 1);
-          }
-          if (kEnableCsvLog && cur_sc_id == 0) {
-            phy_stats_->RecordUlEvmSnr(frame_id - 1);
-          }
         }
       }
       size_t start_tsc3 = GetTime::WorkerRdtsc();
