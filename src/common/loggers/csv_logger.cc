@@ -11,7 +11,8 @@
 
 namespace CsvLog {
 
-CsvLogger::CsvLogger(const std::string& radio_id, const size_t log_id) {
+CsvLogger::CsvLogger(size_t log_id, const std::string& radio_id,
+                     Direction dir) {
 #if defined(ENABLE_CSV_LOG)
 
   if (log_id >= kAllLogs) {
@@ -19,14 +20,18 @@ CsvLogger::CsvLogger(const std::string& radio_id, const size_t log_id) {
   } else {
     constexpr size_t kShortIdLen = 3;
     const std::string short_id =
-        radio_id.substr(radio_id.length() - kShortIdLen);
-    std::string filename = kCsvName.at(log_id) + "-" + short_id + ".csv";
+        radio_id.empty() ? (dir == Direction::kUplink ? "BS" : "UE")
+            : (radio_id.length() > kShortIdLen
+                ? radio_id.substr(radio_id.length() - kShortIdLen)
+                : radio_id);
+    std::string filename = kCsvName.at(log_id)
+                           + (dir == Direction::kUplink ? "-ul-" : "-dl-")
+                           + short_id + ".csv";
     std::remove(filename.c_str());
     logger_ = spdlog::create_async_nb<spdlog::sinks::basic_file_sink_mt>(
         kCsvName.at(log_id), filename);
     logger_->set_level(spdlog::level::info);
     logger_->set_pattern("%v");
-    logger_->info(kCsvHeader.at(log_id));
   }
 #else
   unused(radio_id);

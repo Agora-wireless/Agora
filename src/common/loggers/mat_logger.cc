@@ -11,8 +11,11 @@
 
 namespace CsvLog {
 
-MatLogger::MatLogger(const std::string& radio_id, size_t mat_log_id)
-    : CsvLogger(radio_id, mat_log_id + kMatIdStart) {}
+MatLogger::MatLogger(size_t mat_log_id, const std::string& radio_id,
+                     Direction dir)
+         : CsvLogger(mat_log_id + kMatIdStart, radio_id, dir) {
+  logger_->info(kMatHeader.at(mat_log_id));
+}
 
 MatLogger::~MatLogger() { SaveMatBuf(); }
 

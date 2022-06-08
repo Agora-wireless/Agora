@@ -492,7 +492,7 @@ void PhyUe::Start() {
               if (kEnableCsvLog) {
                 this->phy_stats_->RecordDlEvmSnr(frame_id);
                 if (kDownlinkHardDemod) {
-                  this->phy_stats_->RecordDlBerSer(frame_id);
+                  this->phy_stats_->RecordBerSer(frame_id);
                 }
               }
               if (kDownlinkHardDemod == true) {
@@ -540,7 +540,7 @@ void PhyUe::Start() {
               decode_counters_.Reset(frame_id);
 
               if (kEnableCsvLog) {
-                this->phy_stats_->RecordDlBerSer(frame_id);
+                this->phy_stats_->RecordBerSer(frame_id);
               }
               bool finished =
                   FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
