@@ -219,14 +219,27 @@ void DoPrecode::PrecodingPerSc(size_t frame_id, size_t symbol_idx_dl,
 
   //arma::fmat thinvec = arma::ones<arma::fmat>(mat_dl_zf.n_rows-1, 1);
   
+  
   const size_t bsradio = cfg_->BsAntNum() - 1;
   const size_t OFF = 3; // num of OFF antennas in one-chain BS
+
   arma::vec indexx = arma::randperm<arma::vec>(bsradio, OFF);
+  //arma::vec indexx1 = arma::randperm<arma::vec>(bsradio, OFF); //NEW (for thinvec1 generation)
+  //arma::vec indexx2 = arma:randperm<arma::vec>(bsradio, OFF);  //NEW (for thinvec2 generation)
+
   arma::fmat thinvec = arma::ones<arma::fmat>(cfg_->BsAntNum(), 1);
+  //arma::fmat thinvec1 = arma::ones<arma::fmat>(cfg_->BsAntNum(), 1); //NEW (initialize thinvec as all-one)
+  //arma::fmat thinvec2 = arma::ones<arma::fmat>(cfg_->BsAntNum(), 1);   //NEW (initialize thinvec as all-one)
+  // PERHAPS NEED to ensure we didn't mess up random seed here, i.e., thinvec, thinvec1, and thinvec2 are all random
+
+
   for (size_t i = 0; i < indexx.n_rows; i++) {
     thinvec(indexx(i)) = 0.0f;
-    // std::cout <<"##"<< index(i) << std::endl; // check the rnd seed
+    //thinvec1(indexx1(i)) = 0.0f;   //NEW (done generating the 2nd thinvec)
+    //thinvec2(indexx2(i)) = 0.0f;   //NEW (done genreating the last thinvec)
   }
+
+  //==================OLD STUFF TO REMOVE===================================================
   //arma::fmat mat_singleton;   // there might be more efficient way
   //mat_singleton.zeros(1,1);
   //thinvec = arma::join_vert(thinvec, mat_singleton); //append an 0 to thinvec, to match size of mat_dl_zf
@@ -236,8 +249,35 @@ void DoPrecode::PrecodingPerSc(size_t frame_id, size_t symbol_idx_dl,
   // if (symbol_idx_dl==0) {
   //   thinvec.ones(size(thinvec));  // check, all-one thinvec
   // }
-  arma::cx_fmat mat_precoder_thin = mat_precoder % thinvec;
-  
+  //=====================================================================================
+
+  arma::cx_fmat mat_precoder_thin = mat_precoder % thinvec;  // mat_precoder has been glb normed by dozf already!
+  //arma::cx_fmat mat_precoder_thin1 = mat_precoder % thinvec1;   //NEW:mat_precoder_thin1 = "w2" in arma_test
+  //arma::cx_fmat mat_precoder_thin2 = mat_precoder % thinvec2;   //NEW:mat_precoder_thin2 =  "w3" in arma_test
+
+  /* THE FOLLOWING EFFECTIVE CHANNEL GAIN CALCULATION STILL REMAIN AS PSEUDO-CODE, BECAUSE
+   we need to figure out:
+    a). how to access the mat_dl_csi; (maybe make it to be global variable within dozf.cc??)
+    b). given mat_dl_csi format, how to correctly extract DL CSI for each SC (recall there are many zeros)
+    HENCE, BELOW WE USE h to REPRESENT EACH SC's CHANNEL VECTOR, momentarily.
+  */
+  //=======================BEGIN PSEUDO-CODE===================================
+  // arma::mat heff_1; arma::mat heff_2; arma::mat heff_3;  //NEW:initialize effective channel gains
+  // heff_1 = arma::abs(h.t() * mat_precoder_thin);   //NEW: effective channel 1, mismatch remains
+  // heff_2 = arma::abs(h.t() * mat_precoder_thin1);  //NEW: effective channel 2, mismatch remains
+  // heff_3 = arma::abs(h.t() * mat_precoder_thin2);  //NEW: effective channel 3, mismatch remains
+  // MAY need to change "h.t()" to simply h, once size mismatch error returned; actually I tend to believe it should be h...
+  //=======================END OF PSUDO-CODE, and continue===================================
+
+  // arma::mat heff_vec; heff_vec.set_size(3, 1); //NEW:hardcoded size of 3, which is number of D slots in total
+  // heff_vec(0,0) = arma::conv_to<float>::from(heff_1); //NEW: group above channel gains into a column vector
+  // heff_vec(1,0) = arma::conv_to<float>::from(heff_2); //NEW: group into a column vector
+  // heff_vec(2,0) = arma::conv_to<float>::from(heff_3); //NEW: group into a column vector
+  // mat_precoder_thin *= arma::min(heff_vec)/arma::conv_to<float>::from(heff_1); //NEW: second scaling
+  // mat_precoder_thin1 *= arma::min(heff_vec)/arma::conv_to<float>::from(heff_2); //NEW: second scaling
+  // mat_precoder_thin2 *= arma::min(heff_vec)/arma::conv_to<float>::from(heff_3); //NEW: second scaling
+
+
   if (dlzf_logger_) {
     dlzf_logger_->UpdateMatBuf(frame_id, symbol_idx_dl, sc_id, mat_precoder_thin);
   }
@@ -248,6 +288,9 @@ void DoPrecode::PrecodingPerSc(size_t frame_id, size_t symbol_idx_dl,
             // functions the same as below
 #else
   mat_precoded = mat_precoder_thin * mat_data; // SUBF or OFDM-SSC
+  // mat_precoded1 = mat_precoder_thin1 * mat_data; // NEW: not quite if we want to do this...
+  // mat_precoded2 = mat_precoder_thin2 * mat_data; // NEW: not quite...
+
   // ANI: the precoded vector is the sum of info-bearing signal (which is mat_precoded), and an artificial
   // noise signal; 
   // psuedo-code:
