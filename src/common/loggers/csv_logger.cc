@@ -36,6 +36,7 @@ CsvLogger::CsvLogger(size_t log_id, const std::string& radio_id,
 #else
   unused(radio_id);
   unused(log_id);
+  unused(dir);
 #endif  //ENABLE_CSV_LOG
 }
 }  //namespace CsvLog
