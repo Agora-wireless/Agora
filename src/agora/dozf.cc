@@ -24,7 +24,8 @@ DoZF::DoZF(Config* config, int tid,
            PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
            PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
            PhyStats* in_phy_stats, Stats* stats_manager,
-           std::shared_ptr<CsvLog::MatLogger> dlcsi_logger)
+           std::shared_ptr<CsvLog::MatLogger> dlcsi_logger,
+           std::shared_ptr<CsvLog::MatLogger> dlzf_logger)
     : Doer(config, tid),
       csi_buffers_(csi_buffers),
       calib_dl_buffer_(calib_dl_buffer),
@@ -34,7 +35,8 @@ DoZF::DoZF(Config* config, int tid,
       ul_zf_matrices_(ul_zf_matrices),
       dl_zf_matrices_(dl_zf_matrices),
       phy_stats_(in_phy_stats),
-      dlcsi_logger_(std::move(dlcsi_logger)) {
+      dlcsi_logger_(std::move(dlcsi_logger)),
+      dlzf_logger_(std::move(dlzf_logger)) {
   duration_stat_ = stats_manager->GetDurationStat(DoerType::kZF, tid);
   pred_csi_buffer_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
@@ -116,6 +118,7 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
 
   if (cfg_->Frame().NumDLSyms() > 0) {
     arma::cx_fmat mat_dl_zf_tmp;
+    arma::cx_fmat mat_dl_csi = arma::inv(arma::diagmat(calib_sc_vec)) * mat_csi;
     if (kUseUlZfForDownlink == true) {    
       // With orthonormal calib matrix:
       // pinv(calib * csi) = pinv(csi)*inv(calib)
@@ -140,13 +143,13 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
       // According to OTA tests, the resultant BER is an order-of-magnitude WORSE
       // than using mat_dl_csi.t() to conj bmfm, mostly.
 
-       mat_dl_zf_tmp = mat_csi.t();   // use UL CSI directly, and to be normalized later on
+      // mat_dl_zf_tmp = mat_csi.t();   // use UL CSI directly, and to be normalized later on
 
       // =========================END=========================================
       
     } else {       // kUseUlZfForDownlink == false
       // arma::cx_fmat mat_dl_csi = arma::diagmat(calib_sc_vec) * mat_csi; // original, DO NOT USE
-      arma::cx_fmat mat_dl_csi = arma::inv(arma::diagmat(calib_sc_vec)) * mat_csi; // [fixed]
+      // mat_dl_csi = arma::inv(arma::diagmat(calib_sc_vec)) * mat_csi; // [fixed, moved above]
       if (kUseInverseForZF) {      // true
         // ======COMMENT this part OUT, if want CONJ =======
         // try {
@@ -172,15 +175,15 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
 
     // ============== ORIGINAL NORMALIZATION ===========================
-     //const float scale = 1 / (abs(mat_dl_zf_tmp).max());
-     //mat_dl_zf_tmp = mat_dl_zf_tmp * scale;  // at least one radio is transmit at the maximum (<=1)
+    const float scale = 1 / (abs(mat_dl_zf_tmp).max());
+    mat_dl_zf_tmp = mat_dl_zf_tmp * scale;  // at least one radio is transmit at the maximum (<=1)
     // ==================================================================
 
     // ======A LOCAL NORMALIZATION:========================================
-    mat_dl_zf_tmp /= arma::square(arma::conv_to<arma::cx_fmat>::from(arma::abs(mat_dl_zf_tmp)));
+    //mat_dl_zf_tmp /= arma::square(arma::conv_to<arma::cx_fmat>::from(arma::abs(mat_dl_zf_tmp)));
       //COMMENT OUT below for loc + glb norm.
-    const float scale = 1 / (abs(mat_dl_zf_tmp).max());
-    mat_dl_zf_tmp = mat_dl_zf_tmp * scale;
+    //const float scale = 1 / (abs(mat_dl_zf_tmp).max());
+    //mat_dl_zf_tmp = mat_dl_zf_tmp * scale;
     // ====================================================================
 
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
@@ -192,11 +195,29 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
                           arma::fill::zeros));
       }
     }
-    arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(dl_zf_mem),
-                            cfg_->BsAntNum(), cfg_->UeAntNum(), false);    // deref
-    
+    arma::cx_fcube cube_dl_zf(reinterpret_cast<arma::cx_float*>(dl_zf_mem),
+                              cfg_->BsAntNum(), cfg_->UeAntNum(),
+                              cfg_->Frame().NumDLSyms(), false);    // deref
 
-    mat_dl_zf = mat_dl_zf_tmp.st(); // <---Baseline#1: DL bmfm   Q: DO WE STILL NEED .st() HERE?
+    cube_dl_zf.slice(0) = mat_dl_zf_tmp.st(); // <---Baseline#1: DL bmfm   Q: DO WE STILL NEED .st() HERE?
+    for (size_t i = 1; i < cube_dl_zf.n_slices; i++) {
+      cube_dl_zf.slice(i) = cube_dl_zf.slice(0);
+    }
+    constexpr size_t N_OFF = 3; // num of OFF antennas among all BS antennas
+    arma::fvec vec_eff_gain(cube_dl_zf.n_slices);
+    for (size_t i = 0; i < cube_dl_zf.n_slices; i++) {
+      arma::uvec offidx = arma::randperm(cube_dl_zf.n_rows - 1, N_OFF);
+      constexpr arma::cx_float kCxZero(0.0f, 0.0f);
+      for (size_t j = 0; j < offidx.n_rows; j++) {
+        cube_dl_zf.slice(i)(offidx(j), 0) = kCxZero; //update for UE0 only
+      }
+      arma::fmat eff_gain = arma::abs(mat_dl_csi.t() * cube_dl_zf.slice(i));
+      vec_eff_gain(i) = eff_gain(0, 0);
+    }
+    const float min_eff_gain = arma::min(vec_eff_gain);
+    for (size_t i = 0; i < cube_dl_zf.n_slices; i++) {
+      cube_dl_zf.slice(i).col(0) *= min_eff_gain / vec_eff_gain(i);
+    }
     // std::cout << "check default mat_dl_zf:" <<std::endl
     //     << mat_dl_zf << std::endl;
     /****************************************************

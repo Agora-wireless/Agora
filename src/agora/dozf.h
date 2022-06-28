@@ -30,7 +30,8 @@ class DoZF : public Doer {
        PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_,
        PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_,
        PhyStats* in_phy_stats, Stats* stats_manager,
-       std::shared_ptr<CsvLog::MatLogger> dlcsi_logger = {});
+       std::shared_ptr<CsvLog::MatLogger> dlcsi_logger = {},
+       std::shared_ptr<CsvLog::MatLogger> dlzf_logger = {});
   ~DoZF() override;
 
   /**

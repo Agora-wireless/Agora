@@ -51,8 +51,6 @@ DoPrecode::DoPrecode(
   }
   my_cgemm_ = mkl_jit_get_cgemm_ptr(jitter_);
 #endif
-
-  arma::arma_rng::set_seed_random(); // IMPORTANT: always rememeber to set seed!
 }
 
 DoPrecode::~DoPrecode() {
@@ -205,8 +203,8 @@ void DoPrecode::PrecodingPerSc(size_t frame_id, size_t symbol_idx_dl,
   auto* precoded_ptr = reinterpret_cast<arma::cx_float*>(
       precoded_buffer_temp_ + sc_id_in_block * cfg_->BsAntNum());
 
-  arma::cx_fmat mat_precoder(precoder_ptr, cfg_->BsAntNum(), cfg_->UeAntNum(),
-                             false);
+  arma::cx_fcube cube_precoder(precoder_ptr, cfg_->BsAntNum(), cfg_->UeAntNum(),
+                               cfg_->Frame().NumDLSyms(), false);
   arma::cx_fmat mat_data(data_ptr, cfg_->UeAntNum(), 1, false);
   arma::cx_fmat mat_precoded(precoded_ptr, cfg_->BsAntNum(), 1, false);
 
@@ -220,24 +218,24 @@ void DoPrecode::PrecodingPerSc(size_t frame_id, size_t symbol_idx_dl,
   //arma::fmat thinvec = arma::ones<arma::fmat>(mat_dl_zf.n_rows-1, 1);
   
   
-  const size_t bsradio = cfg_->BsAntNum() - 1;
-  const size_t OFF = 3; // num of OFF antennas in one-chain BS
+  //const size_t bsradio = cfg_->BsAntNum() - 1;
+  //const size_t OFF = 3; // num of OFF antennas in one-chain BS
 
-  arma::vec indexx = arma::randperm<arma::vec>(bsradio, OFF);
+  //arma::vec indexx = arma::randperm<arma::vec>(bsradio, OFF);
   //arma::vec indexx1 = arma::randperm<arma::vec>(bsradio, OFF); //NEW (for thinvec1 generation)
   //arma::vec indexx2 = arma:randperm<arma::vec>(bsradio, OFF);  //NEW (for thinvec2 generation)
 
-  arma::fmat thinvec = arma::ones<arma::fmat>(cfg_->BsAntNum(), 1);
+  //arma::fmat thinvec = arma::ones<arma::fmat>(cfg_->BsAntNum(), 1);
   //arma::fmat thinvec1 = arma::ones<arma::fmat>(cfg_->BsAntNum(), 1); //NEW (initialize thinvec as all-one)
   //arma::fmat thinvec2 = arma::ones<arma::fmat>(cfg_->BsAntNum(), 1);   //NEW (initialize thinvec as all-one)
   // PERHAPS NEED to ensure we didn't mess up random seed here, i.e., thinvec, thinvec1, and thinvec2 are all random
 
 
-  for (size_t i = 0; i < indexx.n_rows; i++) {
-    thinvec(indexx(i)) = 0.0f;
+  //for (size_t i = 0; i < indexx.n_rows; i++) {
+  //  thinvec(indexx(i)) = 0.0f;
     //thinvec1(indexx1(i)) = 0.0f;   //NEW (done generating the 2nd thinvec)
     //thinvec2(indexx2(i)) = 0.0f;   //NEW (done genreating the last thinvec)
-  }
+  //}
 
   //==================OLD STUFF TO REMOVE===================================================
   //arma::fmat mat_singleton;   // there might be more efficient way
@@ -251,7 +249,7 @@ void DoPrecode::PrecodingPerSc(size_t frame_id, size_t symbol_idx_dl,
   // }
   //=====================================================================================
 
-  arma::cx_fmat mat_precoder_thin = mat_precoder % thinvec;  // mat_precoder has been glb normed by dozf already!
+  //arma::cx_fmat mat_precoder_thin = mat_precoder % thinvec;  // mat_precoder has been glb normed by dozf already!
   //arma::cx_fmat mat_precoder_thin1 = mat_precoder % thinvec1;   //NEW:mat_precoder_thin1 = "w2" in arma_test
   //arma::cx_fmat mat_precoder_thin2 = mat_precoder % thinvec2;   //NEW:mat_precoder_thin2 =  "w3" in arma_test
 
@@ -277,17 +275,17 @@ void DoPrecode::PrecodingPerSc(size_t frame_id, size_t symbol_idx_dl,
   // mat_precoder_thin1 *= arma::min(heff_vec)/arma::conv_to<float>::from(heff_2); //NEW: second scaling
   // mat_precoder_thin2 *= arma::min(heff_vec)/arma::conv_to<float>::from(heff_3); //NEW: second scaling
 
-
+  const arma::cx_fmat& mat_precoder = cube_precoder.slice(symbol_idx_dl);
   if (dlzf_logger_) {
-    dlzf_logger_->UpdateMatBuf(frame_id, symbol_idx_dl, sc_id, mat_precoder_thin);
+    dlzf_logger_->UpdateMatBuf(frame_id, symbol_idx_dl, sc_id, mat_precoder);
   }
 
 #if USE_MKL_JIT
-  my_cgemm_(jitter_, (MKL_Complex8*)mat_precoder_thin.memptr(),
+  my_cgemm_(jitter_, (MKL_Complex8*)mat_precoder.memptr(),
             (MKL_Complex8*)data_ptr, (MKL_Complex8*)precoded_ptr);
             // functions the same as below
 #else
-  mat_precoded = mat_precoder_thin * mat_data; // SUBF or OFDM-SSC
+  mat_precoded = mat_precoder * mat_data; // SUBF or OFDM-SSC
   // mat_precoded1 = mat_precoder_thin1 * mat_data; // NEW: not quite if we want to do this...
   // mat_precoded2 = mat_precoder_thin2 * mat_data; // NEW: not quite...
 
