@@ -526,8 +526,8 @@ ssize_t TxRxWorkerClientHw::SyncBeacon(size_t local_interface,
     if (rx_status < 0) {
       AGORA_LOG_ERROR("SyncBeacon [%zu]: BAD SYNC Received (%d/%zu) %lld\n",
                       tid_, rx_status, sample_window, rx_time);
-    } else {
-      size_t new_samples = static_cast<size_t>(rx_status);
+    } else if (rx_status > 0) {
+      const size_t new_samples = static_cast<size_t>(rx_status);
       rx_tracker.Update(new_samples, rx_time);
       if (new_samples == request_samples) {
         AGORA_LOG_TRACE(
