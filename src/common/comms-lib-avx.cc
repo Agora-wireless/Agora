@@ -9,6 +9,7 @@
  */
 
 #include <immintrin.h>
+#include <limits.h>
 
 #include <iomanip>
 #include <queue>
@@ -20,6 +21,8 @@
 #define AVX_PACKED_SP (8)   // single-precision
 #define AVX_PACKED_SI (16)  // short int
 #define AVX_PACKED_CS (8)   // complex short int
+
+static constexpr float kShortMaxFloat = SHRT_MAX;
 
 ssize_t CommsLib::FindBeaconAvx(const std::complex<int16_t>* iq,
                                 const std::vector<std::complex<float>>& seq,
@@ -35,9 +38,9 @@ ssize_t CommsLib::FindBeaconAvx(const std::complex<int16_t>* iq,
 
   // convert entire frame data to complex float for sync detection
   for (size_t i = 0; i < sample_window; i++) {
-    sync_compare.at(i) =
-        (std::complex<float>(static_cast<float>(iq[i].real()) / 32768.0f,
-                             static_cast<float>(iq[i].imag()) / 32768.0f));
+    sync_compare.at(i) = (std::complex<float>(
+        static_cast<float>(iq[i].real()) / kShortMaxFloat,
+        static_cast<float>(iq[i].imag()) / kShortMaxFloat));
   }
   return CommsLib::FindBeaconAvx(sync_compare, seq);
 }

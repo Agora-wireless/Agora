@@ -54,7 +54,7 @@ class RadioDataPlane {
   SoapySDR::Stream* remote_stream_;
 
  private:
-  enum Mode mode_;
+  Mode mode_;
   //Should try to remove cfg_
   const Config* cfg_;
   bool hw_framer_;
