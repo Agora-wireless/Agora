@@ -383,7 +383,8 @@ size_t RadioSocket::UnpackSamples(std::vector<void*>& out_samples,
       //Too many samples, place them in the unpacked holding buffer
       else {
         if (sample_buffer_.size() == 0) {
-          rx_time_unpacked_ = static_cast<long long>(rx_data->header_[1u]);
+          //Set the sample time of the first element
+          rx_time_unpacked_ = rx_time + processed_samples;
         }
         sample_buffer_.emplace_back(new_sample);
       }
