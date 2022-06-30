@@ -235,7 +235,7 @@ int RadioSocket::RxSamples(std::vector<void*>& out_data, long long& rx_time_ns,
   while (try_rx) {
     const size_t udp_rx_size = (rx_buffer_.size() - rx_bytes_);
     //If the requested rec is < the pending udp packet then the remainer will be thrown out without knowledge
-    assert(udp_rx_size > kMaxMTU);
+    RtAssert(udp_rx_size > kMaxMTU, "Requesting more samples than an MTU");
     //This function will return 1 UDP packet of up to the requested size.
     const int rx_return = socket_->Recv(&rx_buffer_.at(rx_bytes_), udp_rx_size);
     try_rx = false;
@@ -619,10 +619,8 @@ size_t RadioSocket::GetUnpackedSamples(std::vector<void*>& out_samples,
       sample_buffer_.erase(sample_buffer_.begin(),
                            sample_buffer_.begin() + transfer_samples);
 
-      //Should we adjust the rx_time by erase_count / output dimensions?
-      //rx_time_unpacked_ =
-      //    (rx_time_unpacked_ & ~0xFFFFll) +
-      //    (((rx_time_unpacked_ & 0xFFFF) + (erase_count & 0xFFFF)) & 0xFFFF);
+      //Adjust the rx_time to account for the transfered samples
+      rx_time_unpacked_ += (transfer_samples / out_samples.size());
     }
   } else {
     loaded_samples_per_channel = 0;
