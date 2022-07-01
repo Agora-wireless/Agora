@@ -11,7 +11,8 @@
 #include "utils.h"
 
 static constexpr size_t kMaxMTU = 9000;
-static constexpr size_t kRxBufferSize = 16384;
+//Could be dependant on the number of samples per frame * bytes per samples.
+static constexpr size_t kRxBufferSize = 524288;
 //This can be kRxBufferSize / 6 safely (1 sample per 6 bytes)
 static constexpr size_t kRxSampleRemBufSize = 4096;
 static constexpr bool kDebugIrisRx = false;
@@ -155,52 +156,6 @@ void RadioSocket::Create(size_t samples_per_symbol,
       socket_->Address().c_str(), socket_->Port().c_str(), ret);
 }
 
-/// returns the number of samples inserted into out_data
-/// out_data unpacked symbol data (complex<int16_t>)
-/// rx_time_ns rx time from symbol header (t0 of symbol)
-int RadioSocket::RxSymbol(std::vector<void*>& out_data, long long& rx_time_ns) {
-  size_t num_samples = 0;
-  bool try_rx = true;
-
-  while (try_rx) {
-    try_rx = false;
-    const int rx_return = socket_->Recv(&rx_buffer_.at(rx_bytes_),
-                                        (rx_buffer_.size() - rx_bytes_));
-
-    if (rx_return > 0) {
-      const size_t new_bytes = static_cast<size_t>(rx_return);
-      DEBUG_OUTPUT("Received %zu bytes in RxSymbol\n", new_bytes);
-      const bool symbol_complete =
-          CheckSymbolComplete(&rx_buffer_.at(rx_bytes_), new_bytes);
-      rx_bytes_ += new_bytes;
-
-      if (symbol_complete) {
-        DEBUG_OUTPUT("Completed Symbol: %zu bytes\n", rx_bytes_);
-        //Could be multiple UDP rx calls, all the udp packets + headers that make up a symbol
-        //exist in the rx_buffer input.
-        const size_t req_samples = std::min(samples_per_symbol_, rx_samples_);
-        num_samples = UnpackSamples(out_data, req_samples, rx_time_ns);
-        if ((rx_bytes_ != 0) || (rx_samples_ != 0)) {
-          std::printf(
-              "Unexpected Bytes %zu and Samples %zu Remaining. Requested %zu "
-              "Actual %zu\n",
-              rx_bytes_, rx_samples_, req_samples, num_samples);
-        }
-        rx_bytes_ = 0;
-        rx_samples_ = 0;
-      } else {
-        //Keep receiving (rx data but not the end of a symbol)
-        try_rx = true;
-      }
-    } else if (rx_return < 0) {
-      if ((errno != EAGAIN) && (errno != EWOULDBLOCK)) {
-        throw std::runtime_error("Error in socket receive call!");
-      }
-    }
-  }  // end while (try_rx)
-  return num_samples;
-}
-
 //Function will return the number of requested samples (rx_samples) placed in out_data,  none,
 // or less samples if the next samples become discontinuous.
 int RadioSocket::RxSamples(std::vector<void*>& out_data, long long& rx_time_ns,
@@ -235,7 +190,9 @@ int RadioSocket::RxSamples(std::vector<void*>& out_data, long long& rx_time_ns,
   while (try_rx) {
     const size_t udp_rx_size = (rx_buffer_.size() - rx_bytes_);
     //If the requested rec is < the pending udp packet then the remainer will be thrown out without knowledge
-    RtAssert(udp_rx_size > kMaxMTU, "Requesting more samples than an MTU");
+    RtAssert(udp_rx_size >= kMaxMTU,
+             "Requesting less samples than an MTU, could cause a truncated "
+             "reception");
     //This function will return 1 UDP packet of up to the requested size.
     const int rx_return = socket_->Recv(&rx_buffer_.at(rx_bytes_), udp_rx_size);
     try_rx = false;

@@ -29,7 +29,6 @@ class RadioSocket {
   inline const std::string& Address() const { return socket_->Address(); }
   inline const std::string& Port() const { return socket_->Port(); };
 
-  int RxSymbol(std::vector<void*>& out_data, long long& rx_time_ns);
   int RxSamples(std::vector<void*>& out_data, long long& rx_time_ns,
                 size_t rx_samples);
   void Flush();
