@@ -11,10 +11,12 @@
 
 #include "logger.h"
 
+static constexpr bool kDebugBeaconChannels = false;
 static constexpr size_t kSyncDetectChannel = 0;
 static constexpr bool kVerifyFirstSync = true;
 static constexpr size_t kReSyncRetryCount = 100u;
 static constexpr float kBeaconDetectWindow = 2.33f;
+static constexpr size_t kBeaconsToStart = 2;
 
 TxRxWorkerClientHw::TxRxWorkerClientHw(
     size_t core_offset, size_t tid, size_t interface_count,
@@ -96,11 +98,7 @@ void TxRxWorkerClientHw::DoTxRx() {
         "TxRxWorkerClientHw does not support multiple interfaces per thread");
   }
   const size_t local_interface = 0;
-
-  // Keep receiving one frame of data until a beacon is found
-  // Perform initial beacon detection every kBeaconDetectInterval frames
   long long rx_time = 0;
-
   ssize_t rx_adjust_samples = 0;
 
   //Probably most efficient to make this a multiple of 64
@@ -110,8 +108,10 @@ void TxRxWorkerClientHw::DoTxRx() {
   RtAssert(beacon_detect_window < samples_per_frame,
            "Frame must be greater than the beacon detect window");
 
-  //Scope the variables
-  {
+  //Turns out detecting more than 1 beacon is helpful for the start
+  size_t beacons_detected = 0;
+  while ((beacons_detected < kBeaconsToStart) &&
+         (Configuration()->Running() == true)) {
     const ssize_t sync_index =
         SyncBeacon(local_interface, beacon_detect_window);
     if (sync_index >= 0) {
@@ -127,6 +127,7 @@ void TxRxWorkerClientHw::DoTxRx() {
 
       AdjustRx(local_interface, alignment_samples + rx_adjust_samples);
       rx_adjust_samples = 0;
+      beacons_detected++;
     } else if (Configuration()->Running()) {
       AGORA_LOG_WARN(
           "TxRxWorkerClientHw [%zu]: Beacon could not be detected on interface "
@@ -235,18 +236,20 @@ void TxRxWorkerClientHw::DoTxRx() {
             resync_success++;
             resync = false;
             //Display all the other channels
-            for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-              if (ch != kSyncDetectChannel) {
-                const ssize_t aux_channel_sync =
-                    FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
-                                       rx_pkts.at(ch)->data_),
-                                   samples_per_symbol);
-                AGORA_LOG_INFO(
-                    "TxRxWorkerClientHw [%zu]: beacon status channel %zu, "
-                    "sync_index: %ld, rx sample offset: %ld\n",
-                    tid_, kSyncDetectChannel, aux_channel_sync,
-                    aux_channel_sync - (Configuration()->BeaconLen() +
-                                        Configuration()->OfdmTxZeroPrefix()));
+            if (kDebugBeaconChannels) {
+              for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+                if (ch != kSyncDetectChannel) {
+                  const ssize_t aux_channel_sync =
+                      FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
+                                         rx_pkts.at(ch)->data_),
+                                     samples_per_symbol);
+                  AGORA_LOG_INFO(
+                      "TxRxWorkerClientHw [%zu]: beacon status channel %zu, "
+                      "sync_index: %ld, rx sample offset: %ld\n",
+                      tid_, ch, aux_channel_sync,
+                      aux_channel_sync - (Configuration()->BeaconLen() +
+                                          Configuration()->OfdmTxZeroPrefix()));
+                }
               }
             }
             //Adjust the transmit time offset
