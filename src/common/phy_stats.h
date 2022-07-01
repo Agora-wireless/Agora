@@ -24,22 +24,24 @@ class PhyStats {
   void UpdateBlockErrors(size_t ue_id, size_t offset, size_t frame_slot,
                          size_t block_error_count);
   void IncrementDecodedBlocks(size_t ue_id, size_t offset, size_t frame_slot);
-  void RecordBerSer(size_t frame_id);
+  void RecordBer(size_t frame_id);
+  void RecordSer(size_t frame_id);
   void UpdateUncodedBitErrors(size_t ue_id, size_t offset, size_t mod_bit_size,
                               uint8_t tx_byte, uint8_t rx_byte);
   void UpdateUncodedBits(size_t ue_id, size_t offset, size_t new_bits_num);
-  void UpdateEvmStats(size_t frame_id, size_t sc_id, const arma::cx_fmat& eq);
+  void UpdateEvm(size_t frame_id, size_t sc_id, const arma::cx_fvec& vec_eq);
+  void UpdateEvm(size_t frame_id, size_t ue_id, size_t sc_id,
+                 const arma::cx_float eq);
   void PrintEvmStats(size_t frame_id);
-  void RecordUlEvmSnr(size_t frame_id);
-  void ClearEvmBuffer(size_t frame_id);
+  void RecordEvm(size_t frame_id);
+  void RecordEvmSnr(size_t frame_id);
   float GetEvmSnr(size_t frame_id, size_t ue_id);
-  void UpdateEvmSnr(size_t frame_id, size_t ue_id, float evmsnr);
-  void RecordDlEvmSnr(size_t frame_id);
-  void UpdatePilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
-                      complex_float* fft_data);
+  void ClearEvmBuffer(size_t frame_id);
+  void UpdateUlPilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
+                        complex_float* fft_data);
   void UpdateDlPilotSnr(size_t frame_id, size_t symbol_id, size_t ant_id,
                         complex_float* fft_data);
-  void PrintSnrStats(size_t frame_id);
+  void PrintUlSnrStats(size_t frame_id);
   void RecordUlPilotSnr(size_t frame_id);
   void PrintDlSnrStats(size_t frame_id);
   void RecordDlPilotSnr(size_t frame_id);
@@ -63,10 +65,9 @@ class PhyStats {
   Table<size_t> uncoded_bits_count_;
   Table<size_t> uncoded_bit_error_count_;
   Table<float> evm_buffer_;
-  Table<float> pilot_snr_;
+  Table<float> ul_pilot_snr_;
   Table<float> dl_pilot_snr_;
   Table<float> calib_pilot_snr_;
-  Table<float> evm_snr_;
   Table<float> csi_cond_;
 
   arma::cx_fmat gt_mat_;

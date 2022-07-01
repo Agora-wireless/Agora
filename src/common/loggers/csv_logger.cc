@@ -24,7 +24,7 @@ CsvLogger::CsvLogger(size_t log_id, const std::string& radio_id,
             : (radio_id.length() > kShortIdLen
                 ? radio_id.substr(radio_id.length() - kShortIdLen)
                 : radio_id);
-    std::string filename = kCsvName.at(log_id)
+    std::string filename = "log-" + kCsvName.at(log_id)
                            + (dir == Direction::kUplink ? "-ul-" : "-dl-")
                            + short_id + ".csv";
     std::remove(filename.c_str());

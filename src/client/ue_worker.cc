@@ -360,6 +360,9 @@ void UeWorker::DoFftData(size_t tag) {
       arma::cx_float y = fft_buffer_ptr[sc_id];
       equ_buffer_ptr[data_sc_id] = (y / csi_buffer_ptr[j]) * phc;
       size_t ant = (kDebugDownlink == true) ? 0 : ant_id;
+      if (kCollectPhyStats) {
+        phy_stats_.UpdateEvm(frame_id, ant, j, equ_buffer_ptr[data_sc_id]);
+      }
       complex_float tx =
           config_.DlIqF()[dl_symbol_id][ant * config_.OfdmCaNum() + sc_id];
       evm +=
@@ -381,9 +384,6 @@ void UeWorker::DoFftData(size_t tag) {
     Utils::PrintVec(equal_vec, std::string("equ") +
                                    std::to_string(total_dl_symbol_id) +
                                    std::string("_") + std::to_string(ant_id));
-  }
-  if (kCollectPhyStats) {
-    phy_stats_.UpdateEvmSnr(frame_id, ant_id, (-10.0f * std::log10(evm)));
   }
   if (kPrintPhyStats) {
     AGORA_LOG_INFO("Frame: %zu, Symbol: %zu, User: %zu, EVM: %f, SNR: %f\n",
