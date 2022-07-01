@@ -50,6 +50,27 @@ class RxStatusTracker {
     Reset(new_packets);
   }
 
+  ///\param new_samples-number of new samples to shift to the beginning
+  ///\param sample_rx_start-start time of the new samples
+  void DiscardOld(size_t new_samples, long long sample_rx_start) {
+    const size_t num_bytes_in_sample = sizeof(std::complex<int16_t>);
+    //rx_loc is the start of the new samples
+    for (auto rx_loc : GetRxPtrs()) {
+      auto* buf_start =
+          reinterpret_cast<std::complex<int16_t>*>(rx_loc) - samples_available_;
+      AGORA_LOG_INFO(
+          "DiscardOld - Shifting %zu samples to start.  Ignoring %zu, Current "
+          "location %ld, Start Location (%ld:%ld)\n",
+          new_samples, samples_available_, reinterpret_cast<intptr_t>(rx_loc),
+          reinterpret_cast<intptr_t>(buf_start),
+          reinterpret_cast<intptr_t>(
+              tracking_.at(0).rx_packet_memory_->RawPacket()->data_));
+      ::memmove(buf_start, rx_loc, new_samples * num_bytes_in_sample);
+    }
+    Reset();
+    Update(new_samples, sample_rx_start);
+  }
+
   const std::vector<RxPacket*> GetRxPackets() const {
     const size_t num_packets = tracking_.size();
     std::vector<RxPacket*> rx_packets;
@@ -68,16 +89,13 @@ class RxStatusTracker {
           "RxStatusTracker::Update - Expected samples start time to be 0\n");
       sample_start_rx_time_ = sample_rx_start;
     } else {
-      //Verify sample time.....
-      const long long expected_start =
-          sample_start_rx_time_ + samples_available_;
+      const bool is_continuous = CheckContinuity(sample_rx_start);
       //New start == 0, means there was frags left from soapy (typically)
-      if ((expected_start != sample_rx_start) && (sample_rx_start != 0)) {
+      if (is_continuous == false) {
         AGORA_LOG_WARN(
             "RxStatusTracker::Update - Available %zu Rx Start %lld, New Start "
-            "%lld, Expected Start %lld\n",
-            samples_available_, sample_start_rx_time_, sample_rx_start,
-            expected_start);
+            "%lld\n",
+            samples_available_, sample_start_rx_time_, sample_rx_start);
         throw std::runtime_error("Unexpected sample rx time");
       }
     }
@@ -89,6 +107,19 @@ class RxStatusTracker {
                "RxStatusTracker::Update - Rx packet memory to be assigned\n");
     }
     samples_available_ += new_samples;
+  }
+
+  bool CheckContinuity(long long sample_rx_start) {
+    bool has_continuity = true;
+    if (samples_available_ > 0 && (sample_rx_start != 0)) {
+      const long long expected_start =
+          sample_start_rx_time_ + samples_available_;
+
+      if (expected_start != sample_rx_start) {
+        has_continuity = false;
+      }
+    }
+    return has_continuity;
   }
 
   inline size_t SamplesAvailable() const { return samples_available_; }

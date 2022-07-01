@@ -542,32 +542,42 @@ ssize_t TxRxWorkerClientHw::SyncBeacon(size_t local_interface,
                       tid_, rx_status, sample_window, rx_time);
     } else if (rx_status > 0) {
       const size_t new_samples = static_cast<size_t>(rx_status);
-      rx_tracker.Update(new_samples, rx_time);
-      if (new_samples == request_samples) {
-        AGORA_LOG_TRACE(
-            "SyncBeacon - Samples %zu:%zu, Window %zu - Check Beacon %ld\n",
-            new_samples, rx_tracker.SamplesAvailable(), sample_window,
-            reinterpret_cast<intptr_t>(
-                rx_pkts_ptrs_.at(kSyncDetectChannel)->RawPacket()->data_));
-
-        sync_index = FindSyncBeacon(
-            reinterpret_cast<std::complex<int16_t>*>(
-                rx_pkts_ptrs_.at(kSyncDetectChannel)->RawPacket()->data_),
-            sample_window);
-        //Throw out samples until we detect the beacon
-        request_samples = sample_window;
-        rx_tracker.Reset(rx_pkts_ptrs_);
-      } else if (new_samples < request_samples) {
-        AGORA_LOG_TRACE("SyncBeacon - Samples %zu:%zu, Window %zu\n",
-                        new_samples, rx_tracker.SamplesAvailable(),
-                        sample_window);
-        request_samples -= new_samples;
+      const bool is_cont = rx_tracker.CheckContinuity(rx_time);
+      if (is_cont == false) {
+        AGORA_LOG_WARN(
+            "SyncBeacon - Received new non-contiguous samples %zu, ignoring "
+            "%zu, %zu \n",
+            new_samples, rx_tracker.SamplesAvailable(), sample_window);
+        //Samples do not align, throw out all old + new samples.
+        rx_tracker.DiscardOld(new_samples, rx_time);
       } else {
-        AGORA_LOG_ERROR(
-            "SycBeacon [%zu]: BAD SYNC Rx more samples then requested "
-            "(%zu/%zu) %lld\n",
-            tid_, new_samples, request_samples, rx_time);
-      }
+        rx_tracker.Update(new_samples, rx_time);
+        if (new_samples == request_samples) {
+          AGORA_LOG_TRACE(
+              "SyncBeacon - Samples %zu:%zu, Window %zu - Check Beacon %ld\n",
+              new_samples, rx_tracker.SamplesAvailable(), sample_window,
+              reinterpret_cast<intptr_t>(
+                  rx_pkts_ptrs_.at(kSyncDetectChannel)->RawPacket()->data_));
+
+          sync_index = FindSyncBeacon(
+              reinterpret_cast<std::complex<int16_t>*>(
+                  rx_pkts_ptrs_.at(kSyncDetectChannel)->RawPacket()->data_),
+              sample_window);
+          //Throw out samples until we detect the beacon
+          request_samples = sample_window;
+          rx_tracker.Reset(rx_pkts_ptrs_);
+        } else if (new_samples < request_samples) {
+          AGORA_LOG_TRACE("SyncBeacon - Samples %zu:%zu, Window %zu\n",
+                          new_samples, rx_tracker.SamplesAvailable(),
+                          sample_window);
+          request_samples -= new_samples;
+        } else {
+          AGORA_LOG_ERROR(
+              "SycBeacon [%zu]: BAD SYNC Rx more samples then requested "
+              "(%zu/%zu) %lld\n",
+              tid_, new_samples, request_samples, rx_time);
+        }
+      }  // is continuous
     }
   }  // end while sync_index < 0
   return sync_index;
