@@ -271,7 +271,7 @@ EventData DoDemul::Launch(size_t tag) {
 
         // Measure EVM from ground truth
         if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
-          phy_stats_->UpdateEvmStats(frame_id, cur_sc_id, mat_equaled);
+          phy_stats_->UpdateEvm(frame_id, cur_sc_id, mat_equaled.col(0));
         }
       }
       size_t start_tsc3 = GetTime::WorkerRdtsc();

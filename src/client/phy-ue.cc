@@ -490,11 +490,15 @@ void PhyUe::Start() {
               demul_counters_.Reset(frame_id);
 
               if (kEnableCsvLog) {
-                this->phy_stats_->RecordDlEvmSnr(frame_id);
+                this->phy_stats_->RecordEvm(frame_id);
+                this->phy_stats_->RecordEvmSnr(frame_id);
                 if (kDownlinkHardDemod) {
-                  this->phy_stats_->RecordBerSer(frame_id);
+                  this->phy_stats_->RecordBer(frame_id);
+                  this->phy_stats_->RecordSer(frame_id);
                 }
               }
+              this->phy_stats_->ClearEvmBuffer(frame_id);
+
               if (kDownlinkHardDemod == true) {
                 bool finished =
                     FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
@@ -540,7 +544,8 @@ void PhyUe::Start() {
               decode_counters_.Reset(frame_id);
 
               if (kEnableCsvLog) {
-                this->phy_stats_->RecordBerSer(frame_id);
+                this->phy_stats_->RecordBer(frame_id);
+                this->phy_stats_->RecordSer(frame_id);
               }
               bool finished =
                   FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
