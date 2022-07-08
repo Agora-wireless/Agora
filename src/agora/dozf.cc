@@ -113,7 +113,7 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
   } else {
     arma::pinv(mat_ul_zf_tmp, mat_csi, 1e-2, "dc");
   }
-
+// helloworld
   if (cfg_->Frame().NumDLSyms() > 0) {
     arma::cx_fmat mat_dl_zf_tmp;
     if (kUseUlZfForDownlink == true) {    
