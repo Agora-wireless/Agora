@@ -206,13 +206,13 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     constexpr size_t N_OFF = 3; // num of OFF antennas among all BS antennas
     arma::fvec vec_eff_gain(cube_dl_zf.n_slices);
     for (size_t i = 0; i < cube_dl_zf.n_slices; i++) {
-      arma::uvec offidx = arma::randperm(cube_dl_zf.n_rows - 1, N_OFF);
+      arma::uvec offidx = arma::randperm(cfg_->BfAntNum(), N_OFF);
       constexpr arma::cx_float kCxZero(0.0f, 0.0f);
       for (size_t j = 0; j < offidx.n_rows; j++) {
         cube_dl_zf.slice(i)(offidx(j), 0) = kCxZero; //update for UE0 only
       }
       arma::fmat eff_gain = arma::abs(
-          mat_dl_csi.st() * cube_dl_zf.slice(i).rows(0, cube_dl_zf.n_rows - 2));
+          mat_dl_csi.st() * cube_dl_zf.slice(i).rows(0, cfg_->BfAntNum() - 1));
       vec_eff_gain(i) = eff_gain(0, 0);
     }
     const float min_eff_gain = arma::min(vec_eff_gain);

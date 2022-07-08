@@ -107,4 +107,15 @@ mismatch:
   std::cout << "this is heff_3 before second scaling:" << heff_3 << std::endl;     // checked
 
 
+  arma::mat calib = arma::randn(1,8);
+  std::cout << "this is calib of 1-by-8:" << calib << std::endl;
+  arma::mat matcsi = arma::randn(9,1);
+  std::cout << "this is calib of 9-by-1:" << matcsi << std::endl;
+  arma::mat diag_calib = arma::diagmat(calib);
+  std::cout << "this is calib after diagonal transform (call it diag_calib): \n" << diag_calib << std::endl;
+  arma::mat inv_diag_calib = arma::inv(diag_calib);
+  std::cout << "this is inversed diag_calib: \n" << inv_diag_calib << std::endl;
+  arma::mat result = inv_diag_calib * matcsi;
+  std::cout << "this is final result: \n" << result << std::endl;
+
 }
