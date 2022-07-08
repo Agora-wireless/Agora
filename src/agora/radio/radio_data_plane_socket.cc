@@ -57,10 +57,10 @@ void RadioDataPlaneSocket::Setup() {
         dynamic_cast<RadioSoapySdr*>(radio_)->IpAddress();
 
     const std::string radio_ip_no_scope =
-        radio_ip.substr(0, radio_ip.find_last_of("%"));
+        radio_ip.substr(0, radio_ip.find_last_of('%'));
 
     const std::string remote_ip_no_scope =
-        remote_address.substr(0, remote_address.find_last_of("%"));
+        remote_address.substr(0, remote_address.find_last_of('%'));
 
     AGORA_LOG_FRAME(
         " STREAM_PROTOCOL  %s\n ETH0_IPv6_ADDR   %s   RADIO IP   %s\n "
@@ -71,7 +71,7 @@ void RadioDataPlaneSocket::Setup() {
     RtAssert(radio_ip_no_scope.compare(remote_ip_no_scope) == 0,
              "Remote Ip address is not that same as expected address");
 
-    const auto scope_pos = radio_ip.find_last_of("%");
+    const auto scope_pos = radio_ip.find_last_of('%');
     const size_t scope_id = std::atoi(radio_ip.substr(scope_pos + 1).c_str());
     auto local_address = agora_comm::GetLocalAddressFromScope(scope_id);
     /// \todo Not sure why we need this???

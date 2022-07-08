@@ -169,7 +169,7 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
           end = driver_version.find(delimiter, start);
         }
         //Last one is divided by a '-'
-        end = driver_version.find("-", start);
+        end = driver_version.find('-', start);
         versions.emplace_back(
             std::stoi(driver_version.substr(start, end - start)));
 
