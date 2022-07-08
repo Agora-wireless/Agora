@@ -15,7 +15,7 @@
 
 class RadioSoapySdr : public Radio {
  public:
-  RadioSoapySdr(RadioDataPlane::DataPlaneType rx_dp_type);
+  explicit RadioSoapySdr(RadioDataPlane::DataPlaneType rx_dp_type);
   ~RadioSoapySdr() final;
 
   void Init(const Config* cfg, size_t id, const std::string& serial,
