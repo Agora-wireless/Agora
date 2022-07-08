@@ -167,7 +167,6 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
 }
 
 void RadioDataPlaneSoapy::Flush() {
-  static constexpr size_t kMaxChannels = 2;
   const long timeout_us(0);
   int flags = 0;
   long long frame_time(0);

@@ -187,9 +187,9 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
             }
 
             //There will be NumChannels "Packets" at this spot
-            auto packets = rx_info.GetRxPackets();
+            auto rx_mem = rx_info.GetRxPackets();
             for (size_t ch = 0; ch < num_channels; ch++) {
-              auto* rx_packet = packets.at(ch);
+              auto* rx_packet = rx_mem.at(ch);
               auto* raw_pkt = rx_packet->RawPacket();
               new (raw_pkt) Packet(frame_id, symbol_id, cell_id,
                                    (radio * num_channels) + ch);
@@ -200,7 +200,7 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
             }
             num_rx_symbols++;
             //Reset stats, reuse the old rx locations
-            rx_info.Reset(packets);
+            rx_info.Reset();
           } else if (new_samples > request_samples) {
             throw std::runtime_error(
                 "RX samples exceeds the requested samples");
@@ -340,9 +340,9 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
             }
 
             //There will be NumChannels "Packets" at this spot
-            auto packets = rx_info.GetRxPackets();
+            auto rx_mem = rx_info.GetRxPackets();
             for (size_t ch = 0; ch < num_channels; ch++) {
-              auto* rx_packet = packets.at(ch);
+              auto* rx_packet = rx_mem.at(ch);
               auto* raw_pkt = rx_packet->RawPacket();
               new (raw_pkt) Packet(frame_id, symbol_id, cell_id,
                                    (radio * num_channels) + ch);
@@ -353,7 +353,7 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
             }
             num_rx_symbols++;
             //Reset stats, reuse the old rx locations
-            rx_info.Reset(packets);
+            rx_info.Reset();
           } else if (new_samples > request_samples) {
             throw std::runtime_error(
                 "RX samples exceeds the requested samples");
