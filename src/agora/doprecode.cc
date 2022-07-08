@@ -275,7 +275,7 @@ void DoPrecode::PrecodingPerSc(size_t frame_id, size_t symbol_idx_dl,
   // mat_precoder_thin1 *= arma::min(heff_vec)/arma::conv_to<float>::from(heff_2); //NEW: second scaling
   // mat_precoder_thin2 *= arma::min(heff_vec)/arma::conv_to<float>::from(heff_3); //NEW: second scaling
 
-  const arma::cx_fmat& mat_precoder = cube_precoder.slice(symbol_idx_dl);
+  const arma::cx_fmat& mat_precoder = cube_precoder.slice(symbol_idx_dl);  // this is where we specify the "page num", the output is still called matprecoder
   if (dlzf_logger_) {
     dlzf_logger_->UpdateMatBuf(frame_id, symbol_idx_dl, sc_id, mat_precoder);
   }

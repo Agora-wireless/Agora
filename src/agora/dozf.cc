@@ -212,12 +212,17 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
         cube_dl_zf.slice(i)(offidx(j), 0) = kCxZero; //update for UE0 only
       }
       arma::fmat eff_gain = arma::abs(
-          mat_dl_csi.t() * cube_dl_zf.slice(i).rows(0, cube_dl_zf.n_rows - 2));
+          mat_dl_csi.st() * cube_dl_zf.slice(i).rows(0, cube_dl_zf.n_rows - 2));
       vec_eff_gain(i) = eff_gain(0, 0);
     }
     const float min_eff_gain = arma::min(vec_eff_gain);
     for (size_t i = 0; i < cube_dl_zf.n_slices; i++) {
       cube_dl_zf.slice(i).col(0) *= min_eff_gain / vec_eff_gain(i);
+      arma::fmat eff_gain = arma::abs(
+          mat_dl_csi.st() * cube_dl_zf.slice(i).rows(0, cube_dl_zf.n_rows - 2));
+      if (frame_id == 100) {
+         AGORA_LOG_INFO("sc=%zu, eff_gain=%f\n", cur_sc_id, eff_gain(0,0));
+      }
     }
     // std::cout << "check default mat_dl_zf:" <<std::endl
     //     << mat_dl_zf << std::endl;
