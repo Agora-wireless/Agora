@@ -126,8 +126,7 @@ static inline size_t ValidateSamples(long long& stream_rx_time,
 RadioSocket::RadioSocket()
     : rx_buffer_(kRxBufferSize, std::byte(0)),
       rx_pkt_byte_count_(),
-      sample_buffer_(kRxSampleRemBufSize, std::complex<int16_t>(0, 0)),
-      rx_time_unpacked_(0) {
+      sample_buffer_(kRxSampleRemBufSize, std::complex<int16_t>(0, 0)) {
   rx_buffer_.reserve(kRxBufferSize);
   sample_buffer_.reserve(kRxSampleRemBufSize);
   sample_buffer_.clear();

@@ -50,11 +50,11 @@ class RadioDataPlane {
   inline const Mode& CheckMode() const { return mode_; }
   inline const bool& HwFramer() const { return hw_framer_; }
 
-  Radio* radio_;
-  SoapySDR::Stream* remote_stream_;
+  Radio* radio_{nullptr};
+  SoapySDR::Stream* remote_stream_{nullptr};
 
  private:
-  Mode mode_;
+  Mode mode_{kModeUninit};
   //Should try to remove cfg_
   const Config* cfg_;
   bool hw_framer_;

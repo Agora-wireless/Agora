@@ -22,9 +22,7 @@ class RxStatusTracker {
   };
 
   explicit RxStatusTracker(size_t number_channels)
-      : samples_available_(0),
-        sample_start_rx_time_(0),
-        tracking_(number_channels) {
+      : tracking_(number_channels) {
     for (auto& tracker : tracking_) {
       tracker.sample_offset_ = 0;
       tracker.rx_packet_memory_ = nullptr;
@@ -55,7 +53,7 @@ class RxStatusTracker {
   void DiscardOld(size_t new_samples, long long sample_rx_start) {
     const size_t num_bytes_in_sample = sizeof(std::complex<int16_t>);
     //rx_loc is the start of the new samples
-    for (auto *rx_loc : GetRxPtrs()) {
+    for (auto* rx_loc : GetRxPtrs()) {
       auto* buf_start =
           reinterpret_cast<std::complex<int16_t>*>(rx_loc) - samples_available_;
       AGORA_LOG_INFO(

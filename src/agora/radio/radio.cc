@@ -23,7 +23,7 @@ std::unique_ptr<Radio> Radio::Create(Radio::RadioType type) {
   }
 }
 
-Radio::Radio() : cfg_(nullptr), id_(0), serial_number_(""), hw_framer_(false) {
+Radio::Radio() : serial_number_("") {
   AGORA_LOG_TRACE("Create Generic Null Radio\n");
 }
 

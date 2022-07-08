@@ -32,8 +32,7 @@ static constexpr int kIrisDriverRelMinAPI = 0;
 static constexpr size_t kUhdInitTimeSec = 3;
 
 RadioSoapySdr::RadioSoapySdr(RadioDataPlane::DataPlaneType rx_dp_type)
-    : 
-      dev_(nullptr),
+    : dev_(nullptr),
       rxp_(RadioDataPlane::Create(rx_dp_type)),
       txs_(nullptr),
       correlator_enabled_(false) {
@@ -899,8 +898,7 @@ void RadioSoapySdr::Correlator(bool enable) {
     if (correlator_enabled_ == false) {
       correlator_enabled_ = true;
       const std::string corr_conf =
-          "{\"corr_enabled\":true,\"corr_threshold\":" + std::to_string(1) +
-          "}";
+          R"({"corr_enabled":true,"corr_threshold":)" + std::to_string(1) + "}";
       dev_->writeSetting("CORR_CONFIG", corr_conf);
       dev_->writeRegisters("CORR_COE", 0, cfg_->Coeffs());
       dev_->writeSetting("CORR_START", (cfg_->UeChannel() == "B") ? "B" : "A");

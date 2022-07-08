@@ -11,7 +11,7 @@
 #include "radio_soapysdr.h"
 #include "utils.h"
 
-RadioDataPlaneSocket::RadioDataPlaneSocket()  {}
+RadioDataPlaneSocket::RadioDataPlaneSocket() = default;
 RadioDataPlaneSocket::~RadioDataPlaneSocket() { Close(); }
 
 void RadioDataPlaneSocket::Init(Radio* radio, const Config* cfg,

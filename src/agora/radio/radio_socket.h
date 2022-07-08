@@ -56,7 +56,7 @@ class RadioSocket {
 
   //Buffer to place "extra" samples that come during a socket read
   std::vector<std::complex<int16_t>> sample_buffer_;
-  long long rx_time_unpacked_;
+  long long rx_time_unpacked_{0};
 
   size_t rx_bytes_{0};
   size_t rx_samples_{0};

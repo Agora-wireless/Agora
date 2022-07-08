@@ -72,13 +72,13 @@ class Radio {
  protected:
   Radio();
   //Should remove this.
-  const Config* cfg_;
+  const Config* cfg_{nullptr};
 
  private:
-  size_t id_;
+  size_t id_{0};
   std::string serial_number_;
   std::vector<size_t> enabled_channels_;
-  bool hw_framer_;
+  bool hw_framer_{false};
 };
 
 #endif  // RADIO_H_
