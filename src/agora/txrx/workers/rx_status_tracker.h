@@ -60,11 +60,9 @@ class RxStatusTracker {
           reinterpret_cast<std::complex<int16_t>*>(rx_loc) - samples_available_;
       AGORA_LOG_INFO(
           "DiscardOld - Shifting %zu samples to start.  Ignoring %zu, Current "
-          "location %ld, Start Location (%ld:%ld)\n",
+          "location %ld, Start Location %ld\n",
           new_samples, samples_available_, reinterpret_cast<intptr_t>(rx_loc),
-          reinterpret_cast<intptr_t>(buf_start),
-          reinterpret_cast<intptr_t>(
-              tracking_.at(0).rx_packet_memory_->RawPacket()->data_));
+          reinterpret_cast<intptr_t>(buf_start));
       ::memmove(buf_start, rx_loc, new_samples * num_bytes_in_sample);
     }
     Reset();
