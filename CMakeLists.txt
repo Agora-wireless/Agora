@@ -72,17 +72,25 @@ message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DPROJECT_DIRECTORY=${SOURCE_DIR})
 
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
-set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "info" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
 set(USE_AVX2_ENCODER False CACHE STRING "Use Agora's AVX2 encoder instead of FlexRAN's AVX512 encoder")
-# TODO: add SoapyUHD check
-set(USE_UHD False CACHE STRING "USE_UHD defaulting to 'False'")
 
-message(STATUS "USE_UHD: ${USE_UHD}")
-message(STATUS "USE_ARGOS: ${USE_ARGOS}")
 message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
+
+set(RADIO_TYPE SIMULATION CACHE STRING "RADIO_TYPE defaulting to 'SIMULATION', valid types are SIMULATION / SOAPY_IRIS / SOAPY_UHD")
+message(STATUS "RADIO_TYPE: ${RADIO_TYPE}")
+
+if(RADIO_TYPE STREQUAL SOAPY_IRIS)
+  message(STATUS "Enabled SOAPY Iris radio type")
+  add_definitions(-DUSE_ARGOS)
+elseif(RADIO_TYPE STREQUAL SOAPY_UHD)
+  message(STATUS "Enabled SOAPY UHD radio type")
+  add_definitions(-DUSE_UHD)
+else()
+  message(STATUS "Enabled SIMULATION radio type")
+endif()
 
 set(FLEXRAN_FEC_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk)
 
@@ -166,16 +174,6 @@ set(MAC_BS_SOURCES
   src/mac/video_receiver.cc
   src/mac/file_receiver.cc
   src/mac/mac_basestation.cc)
-
-# Don't allow both Argos and UHD support
-if(${USE_ARGOS} AND ${USE_UHD})
-  message(FATAL_ERROR "Both USE_ARGOS and USE_UHD cannot be defined.  Please correct arguments and rerun cmake")
-# Argos support
-elseif(${USE_ARGOS})
-  add_definitions(-DUSE_ARGOS)
-elseif(${USE_UHD})
-  add_definitions(-DUSE_UHD)
-endif()
 
 #External Libraries
 find_package(Armadillo "11.0.0" REQUIRED)
@@ -456,7 +454,7 @@ add_executable(macbs
      ${COMMON_SOURCES})
 target_link_libraries(macbs ${COMMON_LIBS})
 
-if (USE_ARGOS)
+if(RADIO_TYPE STREQUAL SOAPY_IRIS)
 add_executable(radio_test
     test/radio_test/main.cc
     $<TARGET_OBJECTS:agora_sources_lib>
