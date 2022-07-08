@@ -176,7 +176,7 @@ int RadioSocket::RxSamples(std::vector<void*>& out_data, long long& rx_time_ns,
 
   long long stream_rx_time;
   //Remove the 16...
-  if (sample_buffer_.size() > 0) {
+  if (sample_buffer_.empty() == false) {
     stream_rx_time = rx_time_unpacked_;
   } else if (rx_bytes_ >= 16) {
     const auto* rx_data =
@@ -339,7 +339,7 @@ size_t RadioSocket::UnpackSamples(std::vector<void*>& out_samples,
       }
       //Too many samples, place them in the unpacked holding buffer
       else {
-        if (sample_buffer_.size() == 0) {
+        if (sample_buffer_.empty()) {
           //Set the sample time of the first element
           rx_time_unpacked_ = rx_time + processed_samples;
         }
@@ -497,7 +497,8 @@ size_t RadioSocket::LoadSamples(std::vector<void*>& out_samples,
 //the sample count returned is the total sample count in the pkt,
 //and not the sample count per channel / output dimension
 size_t RadioSocket::InspectRx(const std::byte* in_data, size_t in_count,
-                              long long& rx_time_ticks, size_t& burst_count) {
+                              long long& rx_time_ticks,
+                              size_t& burst_count) const {
   // unpacker logic for twbw_rx_framer64
   const auto* rx_data = reinterpret_cast<const IrisCommData*>(in_data);
   const size_t header_size = sizeof(rx_data->header_);

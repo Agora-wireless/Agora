@@ -24,7 +24,7 @@ PacketTxRxClientRadio::PacketTxRxClientRadio(
                  tx_producer_tokens, rx_buffer, packet_num_in_buffer,
                  frame_start, tx_buffer) {
   radio_config_ =
-      std::make_unique<ClientRadioConfig>(cfg, Radio::SoapySdrStream);
+      std::make_unique<ClientRadioConfig>(cfg, Radio::kSoapySdrStream);
 }
 
 PacketTxRxClientRadio::~PacketTxRxClientRadio() {

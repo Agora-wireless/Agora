@@ -134,7 +134,7 @@ void TxRxWorkerHw::DoTxRx() {
 
         if (ignore == false) {
           //Publish the symbols to the scheduler
-          for (auto packet : pkts) {
+          for (auto* packet : pkts) {
             EventData rx_message(EventType::kPacketRX, rx_tag_t(packet).tag_);
             NotifyComplete(rx_message);
           }
@@ -202,7 +202,7 @@ std::vector<RxPacket*> TxRxWorkerHw::DoRx(size_t interface_id,
 
     //Check for successful finish
     if ((new_samples == request_samples) ||
-        (out_flags == Radio::RxFlags::EndReceive)) {
+        (out_flags == Radio::RxFlags::kEndReceive)) {
       frame_time = rx_info.StartTime();
       const size_t ant_id = radio_id * channels_per_interface_;
       const size_t cell_id = Configuration()->CellId().at(radio_id);
@@ -591,9 +591,9 @@ Radio::TxFlags TxRxWorkerHw::GetTxFlags(size_t radio_id, size_t tx_symbol_id) {
   //Flags == 2;  // HAS_TIME & END_BURST, name me
   const auto tx_again = IsTxSymbolNext(radio_id, tx_symbol_id);
   if (tx_again) {
-    tx_flags = Radio::TxFlags::TxFlagNone;
+    tx_flags = Radio::TxFlags::kTxFlagNone;
   } else {
-    tx_flags = Radio::TxFlags::EndTransmit;
+    tx_flags = Radio::TxFlags::kEndTransmit;
   }
   return tx_flags;
 }
@@ -723,7 +723,7 @@ void TxRxWorkerHw::PrintRxSymbolTiming(
 long long int TxRxWorkerHw::GetHwTime() {
   long long hw_time = 0;
   if (Configuration()->HwFramer() == false) {
-    constexpr auto kBeacontxFlags = Radio::TxFlags::EndTransmit;  // END BURST
+    constexpr auto kBeacontxFlags = Radio::TxFlags::kEndTransmit;
     // Read some dummy symbols to get the hardware time and then schedule
     // TX/RX accordingly
     const size_t beacon_radio =

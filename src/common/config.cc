@@ -568,7 +568,7 @@ Config::Config(const std::string& jsonfile)
   this->running_.store(true);
   /* 12 bit samples x2 for I + Q */
   static const size_t kBitsPerSample = 12 * 2;
-  const double bit_rate_Mbps = (rate_ * kBitsPerSample) / 1e6;
+  const double bit_rate_mbps = (rate_ * kBitsPerSample) / 1e6;
   //For framer mode, we can ignore the Beacon
   //Double count the UlCal and DLCal to simplify things
   //Peak network traffic is the bit rate for 1 symbol, for non-hardware framer mode
@@ -580,14 +580,14 @@ Config::Config(const std::string& jsonfile)
   const double per_bs_radio_traffic =
       ((static_cast<double>(bs_tx_symbols + bs_rx_symbols)) /
        frame_.NumTotalSyms()) *
-      bit_rate_Mbps;
+      bit_rate_mbps;
 
   const size_t ue_tx_symbols = frame_.NumULSyms() + frame_.NumPilotSyms();
   //Rx all symbols, Tx the tx symbols (ul + pilots)
   const double per_ue_radio_traffic =
-      (bit_rate_Mbps *
+      (bit_rate_mbps *
        (static_cast<double>(ue_tx_symbols) / frame_.NumTotalSyms())) +
-      bit_rate_Mbps;
+      bit_rate_mbps;
 
   AGORA_LOG_INFO(
       "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
@@ -623,9 +623,9 @@ Config::Config(const std::string& jsonfile)
           (this->GetFrameDurationSec() * 1e6),
       (dl_mac_data_bytes_num_perframe_ * 8.0f) /
           (this->GetFrameDurationSec() * 1e6),
-      bit_rate_Mbps, per_bs_radio_traffic, bit_rate_Mbps * bs_ant_num_,
-      per_bs_radio_traffic * bs_ant_num_, 2 * bit_rate_Mbps,
-      per_ue_radio_traffic, 2 * bit_rate_Mbps * ue_ant_num_,
+      bit_rate_mbps, per_bs_radio_traffic, bit_rate_mbps * bs_ant_num_,
+      per_bs_radio_traffic * bs_ant_num_, 2 * bit_rate_mbps,
+      per_ue_radio_traffic, 2 * bit_rate_mbps * ue_ant_num_,
       per_ue_radio_traffic * ue_ant_num_);
 
   if (frame_.IsRecCalEnabled()) {

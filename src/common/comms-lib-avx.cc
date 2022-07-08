@@ -9,8 +9,8 @@
  */
 
 #include <immintrin.h>
-#include <limits.h>
 
+#include<climits>
 #include <iomanip>
 #include <queue>
 

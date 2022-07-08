@@ -15,7 +15,7 @@
 //Abstract class defination for the Radio data plane connection
 class RadioDataPlane {
  public:
-  enum DataPlaneType { SoapyStream, LinuxSocket };
+  enum DataPlaneType { kSoapyStream, kLinuxSocket };
   static std::unique_ptr<RadioDataPlane> Create(DataPlaneType type);
 
   enum Mode { kModeUninit, kModeShutdown, kModeDeactive, kModeActive };

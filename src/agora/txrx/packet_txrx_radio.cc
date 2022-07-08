@@ -23,8 +23,8 @@ PacketTxRxRadio::PacketTxRxRadio(
                  event_notify_q, tx_pending_q, notify_producer_tokens,
                  tx_producer_tokens, rx_buffer, packet_num_in_buffer,
                  frame_start, tx_buffer) {
-  //radio_config_ = std::make_unique<RadioConfig>(cfg, Radio::SoapySdrSocket);
-  radio_config_ = std::make_unique<RadioConfig>(cfg, Radio::SoapySdrStream);
+  //radio_config_ = std::make_unique<RadioConfig>(cfg, Radio::kSoapySdrSocket);
+  radio_config_ = std::make_unique<RadioConfig>(cfg, Radio::kSoapySdrStream);
 }
 
 PacketTxRxRadio::~PacketTxRxRadio() {

@@ -53,10 +53,10 @@ int main(int argc, char* argv[]) {
 
     PinToCoreWithOffset(ThreadType::kMasterTX, 0, 0);
     agora_comm::ListLocalInterfaces();
-    TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
-    TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrSocket);
-    TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
-    TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrSocket);
+    TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::kSoapySdrStream);
+    TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::kSoapySdrSocket);
+    TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::kSoapySdrStream);
+    TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::kSoapySdrSocket);
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {
     std::cerr << "SignalException: " << e.what() << std::endl;
@@ -73,7 +73,7 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
   constexpr size_t kRxPerSymbol = 1;
   const size_t total_radios = cfg->NumRadios();
   const size_t num_channels = cfg->NumChannels();
-  const size_t hw_framer = cfg->HwFramer();
+  const bool hw_framer = cfg->HwFramer();
   const size_t radio_lo = 0;
   const size_t radio_hi = total_radios;
   const size_t cell_id = 0;
@@ -82,7 +82,7 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
       (cfg->SampsPerSymbol() % kRxPerSymbol) == 0,
       "Target must be a multiple of samples per symbol for hw framer mode!");
   // Radio::RxFlags::RxFlagNone | RxFlagNone
-  auto rx_flag = Radio::RxFlags::RxFlagNone;
+  auto rx_flag = Radio::RxFlags::kRxFlagNone;
   // Using RxFlagNone with a soapy radio will sometimes return sub symbol packets
 
   std::cout << "Testing " << total_radios << " radios with " << num_channels
@@ -157,7 +157,7 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
 
           rx_info.Update(new_samples, rx_time);
           if (new_samples < request_samples) {
-            if (rx_flag == Radio::RxFlags::EndReceive) {
+            if (rx_flag == Radio::RxFlags::kEndReceive) {
               AGORA_LOG_WARN(
                   "Radio[%zu] : Received less than symbol amount of samples "
                   "%zu:%zu:%zu rx time %lld (Frame %zu, Symbol %zu)\n",
@@ -226,13 +226,13 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
   constexpr size_t kRxPerSymbol = 1;
   const size_t total_radios = cfg->UeNum();
   const size_t num_channels = cfg->NumUeChannels();
-  const size_t hw_framer = cfg->UeHwFramer();
+  const bool hw_framer = cfg->UeHwFramer();
   const size_t radio_lo = 0;
   const size_t radio_hi = total_radios;
   const size_t cell_id = 0;
   const size_t target_samples = cfg->SampsPerSymbol();
   // Radio::RxFlags::RxFlagNone | EndReceive
-  auto rx_flag = Radio::RxFlags::RxFlagNone;
+  auto rx_flag = Radio::RxFlags::kRxFlagNone;
 
   RtAssert(
       (cfg->SampsPerSymbol() % kRxPerSymbol) == 0,
@@ -312,7 +312,7 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
 
           rx_info.Update(new_samples, rx_time);
           if (new_samples < request_samples) {
-            if (rx_flag == Radio::RxFlags::EndReceive) {
+            if (rx_flag == Radio::RxFlags::kEndReceive) {
               AGORA_LOG_WARN(
                   "Received less than symbol amount of samples %zu:%zu:%zu rx "
                   "time %lld (Frame %zu, Symbol %zu)\n",

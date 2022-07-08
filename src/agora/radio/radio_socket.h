@@ -30,13 +30,13 @@ class RadioSocket {
   inline const std::string& Port() const { return socket_->Port(); };
 
   int RxSamples(std::vector<void*>& out_data, long long& rx_time_ns,
-                size_t rx_samples);
+                size_t req_samples_per_channel);
   void Flush();
 
  private:
   bool CheckSymbolComplete(const std::byte* in_data, const int& in_count);
   size_t InspectRx(const std::byte* in_data, size_t in_count,
-                   long long& rx_time_ticks, size_t& burst_count);
+                   long long& rx_time_ticks, size_t& burst_count) const;
   size_t UnpackSamples(std::vector<void*>& out_samples, size_t req_samples,
                        long long& rx_time);
 
@@ -45,7 +45,7 @@ class RadioSocket {
                      size_t num_in_samples);
 
   size_t GetUnpackedSamples(std::vector<void*>& out_samples, long long& rx_time,
-                            size_t req_samples);
+                            size_t req_total_samples);
 
   size_t GetPackedSamples(std::vector<void*>& out_samples, long long& rx_time,
                           size_t sample_offset, size_t req_samples);

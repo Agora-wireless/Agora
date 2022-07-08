@@ -618,7 +618,7 @@ void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
   const size_t samples_per_frame =
       samples_per_symbol * Configuration()->Frame().NumTotalSyms();
   long long tx_time;
-  Radio::TxFlags flags_tx = Radio::TxFlags::TxFlagNone;
+  Radio::TxFlags flags_tx = Radio::TxFlags::kTxFlagNone;
 
   std::vector<void*> tx_data(channels_per_interface_);
   for (size_t ul_symbol_idx = 0;
@@ -641,7 +641,7 @@ void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
     }
 
     if (tx_symbol_id == Configuration()->Frame().GetULSymbolLast()) {
-      flags_tx = Radio::TxFlags::EndTransmit;
+      flags_tx = Radio::TxFlags::kEndTransmit;
     }
     const int tx_status = radio_.RadioTx(radio_id, tx_data.data(),
                                          samples_per_symbol, flags_tx, tx_time);
@@ -681,18 +681,18 @@ void TxRxWorkerClientHw::TxPilot(size_t pilot_ant, size_t frame_id,
   const size_t pilot_symbol_id =
       Configuration()->Frame().GetPilotSymbol(pilot_ant);
 
-  Radio::TxFlags flags_tx = Radio::TxFlags::EndTransmit;
+  Radio::TxFlags flags_tx = Radio::TxFlags::kEndTransmit;
   //See if we need to set end burst for the last channel
   // (see if the next symbol is an uplink symbol)
   if ((pilot_channel + 1) == channels_per_interface_) {
     if (Configuration()->Frame().NumULSyms() > 0) {
       const size_t first_ul_symbol = Configuration()->Frame().GetULSymbol(0);
       if ((pilot_symbol_id + 1) == (first_ul_symbol)) {
-        flags_tx = Radio::TxFlags::TxFlagNone;
+        flags_tx = Radio::TxFlags::kTxFlagNone;
       }
     }
   } else {
-    flags_tx = Radio::TxFlags::TxFlagNone;
+    flags_tx = Radio::TxFlags::kTxFlagNone;
   }
 
   if (Configuration()->UeHwFramer()) {

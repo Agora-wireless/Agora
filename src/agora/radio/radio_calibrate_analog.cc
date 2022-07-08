@@ -124,7 +124,7 @@ void RadioConfig::AdjustCalibrationGains(std::vector<Radio*>& rx_devs,
   const double max_tx_gain = -6.0f;
   const size_t rx_devs_size = rx_devs.size();
 
-  auto tx_radio = dynamic_cast<RadioSoapySdr*>(tx_dev);
+  auto* tx_radio = dynamic_cast<RadioSoapySdr*>(tx_dev);
 
   tx_radio->ResetTxGains();
   for (size_t r = 0; r < rx_devs_size; r++) {
@@ -191,8 +191,8 @@ void RadioConfig::DciqMinimize(Radio* target_dev, Radio* ref_dev, int direction,
   const size_t n = 1024;
   std::vector<float> win = CommsLib::HannWindowFunction(n);
   const auto window_gain = CommsLib::WindowFunctionPower(win);
-  auto target_radio = dynamic_cast<RadioSoapySdr*>(target_dev);
-  auto ref_radio = dynamic_cast<RadioSoapySdr*>(ref_dev);
+  auto* target_radio = dynamic_cast<RadioSoapySdr*>(target_dev);
+  auto* ref_radio = dynamic_cast<RadioSoapySdr*>(ref_dev);
 
   target_radio->SetIQBalance(direction, channel, 0.0);
   target_radio->SetDcOffset(direction, channel, {0.0f, 0.0f});
@@ -207,7 +207,7 @@ void RadioConfig::DciqMinimize(Radio* target_dev, Radio* ref_dev, int direction,
   // look through each correction arm twice
   float min_dc_level = 0.0f;
   std::complex<double> best_dc_corr(0.0, 0.0);
-  const size_t kMaxIterations = 4;
+  constexpr size_t kMaxIterations = 4;
   for (size_t i = 0; i < kMaxIterations; i++) {
     int start = -fixed_scale;
     int stop = +fixed_scale;
@@ -335,7 +335,7 @@ void RadioConfig::DciqCalibrationProc(size_t channel) {
   const size_t total_radios = cfg_->NumRadios();
 
   size_t reference_radio = cfg_->RefRadio(0);
-  auto ref_dev =
+  auto* ref_dev =
       dynamic_cast<RadioSoapySdr*>(radios_.at(reference_radio).get());
 
   /*
@@ -347,7 +347,7 @@ void RadioConfig::DciqCalibrationProc(size_t channel) {
   std::vector<Radio*> all_but_ref_devs;
   for (size_t r = 0; r < total_radios; r++) {
     if (r != reference_radio) {
-      auto cal_radio = dynamic_cast<RadioSoapySdr*>(radios_.at(r).get());
+      auto* cal_radio = dynamic_cast<RadioSoapySdr*>(radios_.at(r).get());
       cal_radio->InitCalRx(channel, center_rf_freq);
       all_but_ref_devs.push_back(radios_.at(r).get());
     }
@@ -375,7 +375,7 @@ void RadioConfig::DciqCalibrationProc(size_t channel) {
   std::cout << "Calibrating Rx Channel of the Reference Radio\n";
   std::vector<Radio*> ref_dev_container;
   ref_dev_container.push_back(ref_dev);
-  auto ref_ref_dev =
+  auto* ref_ref_dev =
       dynamic_cast<RadioSoapySdr*>(all_but_ref_devs[reference_radio - 1]);
 
   ref_ref_dev->InitRefTx(channel, center_rf_freq + tone_bb_freq);
@@ -436,7 +436,7 @@ void RadioConfig::DciqCalibrationProc(size_t channel) {
   ref_dev->SetFreqBb(channel, -tone_bb_freq);
 
   for (size_t r = 0; r < total_radios - 1; r++) {
-    auto radio = dynamic_cast<RadioSoapySdr*>(all_but_ref_devs.at(r));
+    auto* radio = dynamic_cast<RadioSoapySdr*>(all_but_ref_devs.at(r));
     radio->SetFreqRf(channel, center_rf_freq);
     radio->SetFreqBb(channel, tx_tone_bb_freq);
     radio->StartRefTx(channel);

@@ -55,7 +55,7 @@ class RxStatusTracker {
   void DiscardOld(size_t new_samples, long long sample_rx_start) {
     const size_t num_bytes_in_sample = sizeof(std::complex<int16_t>);
     //rx_loc is the start of the new samples
-    for (auto rx_loc : GetRxPtrs()) {
+    for (auto *rx_loc : GetRxPtrs()) {
       auto* buf_start =
           reinterpret_cast<std::complex<int16_t>*>(rx_loc) - samples_available_;
       AGORA_LOG_INFO(
@@ -69,7 +69,7 @@ class RxStatusTracker {
     Update(new_samples, sample_rx_start);
   }
 
-  const std::vector<RxPacket*> GetRxPackets() const {
+  std::vector<RxPacket*> GetRxPackets() const {
     const size_t num_packets = tracking_.size();
     std::vector<RxPacket*> rx_packets;
     rx_packets.reserve(num_packets);
@@ -107,7 +107,7 @@ class RxStatusTracker {
     samples_available_ += new_samples;
   }
 
-  bool CheckContinuity(long long sample_rx_start) {
+  bool CheckContinuity(long long sample_rx_start) const {
     bool has_continuity = true;
     if (samples_available_ > 0 && (sample_rx_start != 0)) {
       const long long expected_start =
@@ -124,7 +124,7 @@ class RxStatusTracker {
   inline size_t NumChannels() const { return tracking_.size(); }
   inline long long StartTime() const { return sample_start_rx_time_; }
   //Get memory locations for Rx calls
-  inline const std::vector<void*> GetRxPtrs() const {
+  inline std::vector<void*> GetRxPtrs() const {
     const size_t num_locations = tracking_.size();
     std::vector<void*> rx_locations;
     rx_locations.reserve(num_locations);

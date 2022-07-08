@@ -11,7 +11,7 @@
 #include "radio_soapysdr.h"
 #include "utils.h"
 
-RadioDataPlaneSocket::RadioDataPlaneSocket() : RadioDataPlane() {}
+RadioDataPlaneSocket::RadioDataPlaneSocket()  {}
 RadioDataPlaneSocket::~RadioDataPlaneSocket() { Close(); }
 
 void RadioDataPlaneSocket::Init(Radio* radio, const Config* cfg,
@@ -136,9 +136,9 @@ int RadioDataPlaneSocket::Rx(std::vector<void*>& rx_locations, size_t rx_size,
   if (rx_return > 0) {
     const size_t rx_samples = static_cast<size_t>(rx_return);
     if (rx_samples != rx_size) {
-      out_flags = Radio::RxFlags::EndReceive;
+      out_flags = Radio::RxFlags::kEndReceive;
     } else {
-      out_flags = Radio::RxFlags::RxFlagNone;
+      out_flags = Radio::RxFlags::kRxFlagNone;
     }
     AGORA_LOG_TRACE("Rx'd sample count %d\n", rx_return);
   } else if (rx_return < 0) {

@@ -374,7 +374,7 @@ RadioConfig::~RadioConfig() {
     join_thread.join();
   }
 
-  for (auto hub : hubs_) {
+  for (auto *hub : hubs_) {
     SoapySDR::Device::unmake(hub);
   }
   hubs_.clear();

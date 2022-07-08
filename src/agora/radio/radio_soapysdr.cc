@@ -32,7 +32,7 @@ static constexpr int kIrisDriverRelMinAPI = 0;
 static constexpr size_t kUhdInitTimeSec = 3;
 
 RadioSoapySdr::RadioSoapySdr(RadioDataPlane::DataPlaneType rx_dp_type)
-    : Radio(),
+    : 
       dev_(nullptr),
       rxp_(RadioDataPlane::Create(rx_dp_type)),
       txs_(nullptr),
@@ -205,7 +205,7 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
       }
     }
 
-    if (ip_address_ == "") {
+    if (ip_address_.empty()) {
       AGORA_LOG_ERROR("Iris Device IP address not found");
       throw std::runtime_error("Device IP address not found");
     }
@@ -228,7 +228,7 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
 
       //Another way to get the Ip address.  But it will redo discovery...
       const std::string new_device = "serial=" + SerialNumber();
-      auto enum_info = dev_->enumerate(new_device);
+      auto enum_info = SoapySDR::Device::enumerate(new_device);
       for (size_t i = 0; i < enum_info.size(); i++) {
         device_info << "Found device " << i << std::endl;
         for (const auto& it : enum_info.at(i)) {
@@ -469,9 +469,9 @@ int RadioSoapySdr::Tx(const void* const* tx_buffs, size_t tx_size,
   constexpr size_t kTxTimeoutUs = 1000000;
 
   int soapy_flags;
-  if (flags == Radio::TxFlags::TxFlagNone) {
+  if (flags == Radio::TxFlags::kTxFlagNone) {
     soapy_flags = SOAPY_SDR_HAS_TIME;
-  } else if (flags == Radio::TxFlags::EndTransmit) {
+  } else if (flags == Radio::TxFlags::kEndTransmit) {
     soapy_flags = (SOAPY_SDR_HAS_TIME | SOAPY_SDR_END_BURST);
   } else {
     AGORA_LOG_ERROR("Unsupported radio tx flag %d\n", static_cast<int>(flags));
@@ -889,9 +889,9 @@ void RadioSoapySdr::InitAgc(bool enabled, size_t setting) {
   agc_conf["agc_enabled"] = enabled;
   // 0 to 108
   agc_conf["agc_gain_init"] = setting;
-  const std::string agc_confStr = agc_conf.dump();
+  const std::string agc_conf_str = agc_conf.dump();
 
-  dev_->writeSetting("AGC_CONFIG", agc_confStr);
+  dev_->writeSetting("AGC_CONFIG", agc_conf_str);
 }
 
 void RadioSoapySdr::Correlator(bool enable) {

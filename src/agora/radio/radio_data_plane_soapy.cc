@@ -11,7 +11,7 @@
 
 static constexpr bool kDebugPrintRx = false;
 
-RadioDataPlaneSoapy::RadioDataPlaneSoapy() : RadioDataPlane() {}
+RadioDataPlaneSoapy::RadioDataPlaneSoapy()  {}
 
 void RadioDataPlaneSoapy::Init(Radio* radio, const Config* cfg,
                                bool hw_framer) {
@@ -60,14 +60,14 @@ int RadioDataPlaneSoapy::Rx(
 int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
                             Radio::RxFlags& out_flags, long long& rx_time_ns) {
   static constexpr long kRxTimeout = 1;  // 1uS
-  out_flags = Radio::RxFlags::RxFlagNone;
+  out_flags = Radio::RxFlags::kRxFlagNone;
   // SOAPY_SDR_ONE_PACKET; SOAPY_SDR_END_BURST
   //Magic number for soapy driver code to ignore tdd framing logic
   int soapy_rx_flags = (1 << 29);
 
   int rx_status = 0;
   long long frame_time_ns(0);
-  auto device = dynamic_cast<RadioSoapySdr*>(radio_)->SoapyDevice();
+  auto *device = dynamic_cast<RadioSoapySdr*>(radio_)->SoapyDevice();
 
   rx_status = device->readStream(remote_stream_, rx_locations.data(), rx_size,
                                  soapy_rx_flags, frame_time_ns, kRxTimeout);
@@ -92,7 +92,7 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
               "the receive data status %d\n",
               radio_->SerialNumber().c_str(), radio_->Id(), rx_samples, rx_size,
               soapy_rx_flags);
-          out_flags = Radio::RxFlags::EndReceive;
+          out_flags = Radio::RxFlags::kEndReceive;
         } else if (((frame_time_ns & 0xFFFF) + rx_samples) >=
                    Configuration()->SampsPerSymbol()) {
           //Hackish way to determine if we should proceed
@@ -103,7 +103,7 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
               radio_->SerialNumber().c_str(), radio_->Id(), rx_samples, rx_size,
               ((frame_time_ns & 0xFFFF) + rx_samples),
               Configuration()->SampsPerSymbol(), soapy_rx_flags);
-          out_flags = Radio::RxFlags::EndReceive;
+          out_flags = Radio::RxFlags::kEndReceive;
         }
       } else {
         /// rx_samples == rx_size
@@ -138,11 +138,11 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
           "FRAGS: %d | SINGLE PKT: %d\n",
           radio_->SerialNumber().c_str(), radio_->Id(), rx_status, rx_size,
           soapy_rx_flags,
-          (soapy_rx_flags & SOAPY_SDR_HAS_TIME) == SOAPY_SDR_HAS_TIME,
-          (soapy_rx_flags & SOAPY_SDR_END_BURST) == SOAPY_SDR_END_BURST,
-          (soapy_rx_flags & SOAPY_SDR_MORE_FRAGMENTS) ==
-              SOAPY_SDR_MORE_FRAGMENTS,
-          (soapy_rx_flags & SOAPY_SDR_ONE_PACKET) == SOAPY_SDR_ONE_PACKET);
+          static_cast<int>((soapy_rx_flags & SOAPY_SDR_HAS_TIME) == SOAPY_SDR_HAS_TIME),
+          static_cast<int>((soapy_rx_flags & SOAPY_SDR_END_BURST) == SOAPY_SDR_END_BURST),
+          static_cast<int>((soapy_rx_flags & SOAPY_SDR_MORE_FRAGMENTS) ==
+              SOAPY_SDR_MORE_FRAGMENTS),
+          static_cast<int>((soapy_rx_flags & SOAPY_SDR_ONE_PACKET) == SOAPY_SDR_ONE_PACKET));
     }
 
     if (kDebugRadioRX) {
@@ -171,7 +171,7 @@ void RadioDataPlaneSoapy::Flush() {
   int flags = 0;
   long long frame_time(0);
   int r = 0;
-  auto device = dynamic_cast<RadioSoapySdr*>(radio_)->SoapyDevice();
+  auto *device = dynamic_cast<RadioSoapySdr*>(radio_)->SoapyDevice();
 
   std::vector<std::vector<std::complex<int16_t>>> samples(
       kMaxChannels,
