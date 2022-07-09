@@ -24,8 +24,8 @@ static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDownlinkPilotStats = false;
 static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr bool kRecordDownlinkFrame = true;
-static constexpr size_t kRecordFrameIndex = 100;
-static constexpr size_t kShortIdLen = 3;
+static constexpr size_t kRecordFrameInterval = 100;
+static constexpr size_t kShortSerialLen = 3;
 static constexpr bool kDebugTxMemory = false;
 
 UeWorker::UeWorker(
@@ -184,19 +184,21 @@ void UeWorker::DoFftPilot(size_t tag) {
   }
 
   if (kRecordDownlinkFrame) {
-    if (frame_id == kRecordFrameIndex) {
-      const std::string short_id =
+    if (frame_id > 0 && frame_id % kRecordFrameInterval == 0) {
+      const std::string short_serial =
           config_.UeRadioId().empty()
-              ? ""
-              : "_" + config_.UeRadioId().at(0).substr(
-                          config_.UeRadioId().at(0).length() - kShortIdLen);
-      std::string fname = "rxpilot" + std::to_string(dl_symbol_id) + short_id +
-                          "_" + std::to_string(ant_id) + ".bin";
+              ? "UE"
+              : config_.UeRadioId().at(ant_id).substr(
+                    config_.UeRadioId().at(ant_id).length() - kShortSerialLen);
+      const std::string fname_ext = std::to_string(frame_id) + "_" +
+                                    std::to_string(dl_symbol_id) + "_" +
+                                    std::to_string(ant_id) + "_" +
+                                    short_serial + ".bin";
+      std::string fname = "rxpilot_" + fname_ext;
       FILE* f = std::fopen(fname.c_str(), "wb");
       std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
       std::fclose(f);
-      fname = "txpilot_f_" + std::to_string(dl_symbol_id) + short_id + "_" +
-              std::to_string(ant_id) + ".bin";
+      fname = "txpilot_" + fname_ext;
       f = std::fopen(fname.c_str(), "wb");
       std::fwrite(config_.UeSpecificPilot()[ant_id], 2 * sizeof(float),
                   config_.OfdmDataNum(), f);
@@ -285,19 +287,21 @@ void UeWorker::DoFftData(size_t tag) {
                                    config_.Frame().ClientDlPilotSymbols();
 
   if (kRecordDownlinkFrame) {
-    if (frame_id == kRecordFrameIndex) {
-      const std::string short_id =
+    if (frame_id > 0 && frame_id % kRecordFrameInterval == 0) {
+      const std::string short_serial =
           config_.UeRadioId().empty()
-              ? ""
-              : "_" + config_.UeRadioId().at(0).substr(
-                          config_.UeRadioId().at(0).length() - kShortIdLen);
-      std::string fname = "rxdata" + std::to_string(dl_symbol_id) + short_id +
-                          "_" + std::to_string(ant_id) + ".bin";
+              ? "UE"
+              : config_.UeRadioId().at(ant_id).substr(
+                    config_.UeRadioId().at(ant_id).length() - kShortSerialLen);
+      const std::string fname_ext = std::to_string(frame_id) + "_" +
+                                    std::to_string(dl_symbol_id) + "_" +
+                                    std::to_string(ant_id) + "_" +
+                                    short_serial + ".bin";
+      std::string fname = "rxdata_" + fname_ext;
       FILE* f = std::fopen(fname.c_str(), "wb");
       std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
       std::fclose(f);
-      fname = "txdata" + std::to_string(dl_symbol_id) + short_id + "_" +
-              std::to_string(ant_id) + ".bin";
+      fname = "txdata_" + fname_ext;
       f = std::fopen(fname.c_str(), "wb");
       std::fwrite(config_.DlIqF()[dl_symbol_id] + ant_id * config_.OfdmCaNum(),
                   2 * sizeof(float), config_.OfdmCaNum(), f);
