@@ -172,15 +172,15 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
 
     // ============== ORIGINAL NORMALIZATION ===========================
-     //const float scale = 1 / (abs(mat_dl_zf_tmp).max());
-     //mat_dl_zf_tmp = mat_dl_zf_tmp * scale;  // at least one radio is transmit at the maximum (<=1)
+      const float scale = 1 / (abs(mat_dl_zf_tmp).max());
+      mat_dl_zf_tmp = mat_dl_zf_tmp * scale;  // at least one radio is transmit at the maximum (<=1)
     // ==================================================================
 
     // ======A LOCAL NORMALIZATION:========================================
-    mat_dl_zf_tmp /= arma::square(arma::conv_to<arma::cx_fmat>::from(arma::abs(mat_dl_zf_tmp)));
-      //COMMENT OUT below for loc + glb norm.
-    const float scale = 1 / (abs(mat_dl_zf_tmp).max());
-    mat_dl_zf_tmp = mat_dl_zf_tmp * scale;
+  // mat_dl_zf_tmp /= arma::square(arma::conv_to<arma::cx_fmat>::from(arma::abs(mat_dl_zf_tmp)));
+    // *****comment OUT below for loc + glb norm*********
+    //  const float scale = 1 / (abs(mat_dl_zf_tmp).max());
+    //  mat_dl_zf_tmp = mat_dl_zf_tmp * scale;
     // ====================================================================
 
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
