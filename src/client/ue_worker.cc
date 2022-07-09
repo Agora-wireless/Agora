@@ -281,6 +281,8 @@ void UeWorker::DoFftData(size_t tag) {
 
   const size_t sig_offset = config_.OfdmRxZeroPrefixClient();
   const size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
+  const size_t dl_data_symbol_id = dl_symbol_id -
+                                   config_.Frame().ClientDlPilotSymbols();
 
   if (kRecordDownlinkFrame) {
     if (frame_id == kRecordFrameIndex) {
@@ -361,7 +363,8 @@ void UeWorker::DoFftData(size_t tag) {
       equ_buffer_ptr[data_sc_id] = (y / csi_buffer_ptr[j]) * phc;
       size_t ant = (kDebugDownlink == true) ? 0 : ant_id;
       if (kCollectPhyStats) {
-        phy_stats_.UpdateEvm(frame_id, ant, j, equ_buffer_ptr[data_sc_id]);
+        phy_stats_.UpdateEvm(frame_id, dl_data_symbol_id, ant, j,
+                             equ_buffer_ptr[data_sc_id]);
       }
       complex_float tx =
           config_.DlIqF()[dl_symbol_id][ant * config_.OfdmCaNum() + sc_id];

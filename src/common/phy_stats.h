@@ -29,9 +29,10 @@ class PhyStats {
   void UpdateUncodedBitErrors(size_t ue_id, size_t offset, size_t mod_bit_size,
                               uint8_t tx_byte, uint8_t rx_byte);
   void UpdateUncodedBits(size_t ue_id, size_t offset, size_t new_bits_num);
-  void UpdateEvm(size_t frame_id, size_t sc_id, const arma::cx_fvec& vec_eq);
-  void UpdateEvm(size_t frame_id, size_t ue_id, size_t sc_id,
-                 const arma::cx_float eq);
+  void UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t sc_id,
+                 const arma::cx_fvec& eq_vec);
+  void UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t ue_id,
+                 size_t sc_id, const arma::cx_float eq);
   void PrintEvmStats(size_t frame_id);
   void RecordEvm(size_t frame_id);
   void RecordEvmSnr(size_t frame_id);
@@ -70,9 +71,9 @@ class PhyStats {
   Table<float> calib_pilot_snr_;
   Table<float> csi_cond_;
 
-  arma::cx_fmat gt_mat_;
+  arma::cx_fcube gt_cube_;
   size_t num_rx_symbols_;
-  size_t num_data_symbols_;
+  size_t num_rxdata_symbols_;
 
   std::array<std::shared_ptr<CsvLog::CsvLogger>, CsvLog::kCsvLogs> csv_loggers_;
 };

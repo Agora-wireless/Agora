@@ -82,6 +82,8 @@ EventData DoDemul::Launch(size_t tag) {
   const size_t base_sc_id = gen_tag_t(tag).sc_id_;
 
   const size_t symbol_idx_ul = this->cfg_->Frame().GetULSymbolIdx(symbol_id);
+  const size_t data_symbol_idx_ul = symbol_idx_ul -
+                                    this->cfg_->Frame().ClientUlPilotSymbols();
   const size_t total_data_symbol_idx_ul =
       cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
   const complex_float* data_buf = data_buffer_[total_data_symbol_idx_ul];
@@ -271,7 +273,8 @@ EventData DoDemul::Launch(size_t tag) {
 
         // Measure EVM from ground truth
         if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
-          phy_stats_->UpdateEvm(frame_id, cur_sc_id, mat_equaled.col(0));
+          phy_stats_->UpdateEvm(frame_id, data_symbol_idx_ul, cur_sc_id,
+                                mat_equaled.col(0));
         }
       }
       size_t start_tsc3 = GetTime::WorkerRdtsc();
