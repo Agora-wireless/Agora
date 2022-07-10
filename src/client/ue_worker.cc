@@ -367,7 +367,7 @@ void UeWorker::DoFftData(size_t tag) {
       equ_buffer_ptr[data_sc_id] = (y / csi_buffer_ptr[j]) * phc;
       size_t ant = (kDebugDownlink == true) ? 0 : ant_id;
       if (kCollectPhyStats) {
-        phy_stats_.UpdateEvm(frame_id, dl_data_symbol_id, ant, j,
+        phy_stats_.UpdateEvm(frame_id, dl_data_symbol_id, j, ant, ant_id,
                              equ_buffer_ptr[data_sc_id]);
       }
       complex_float tx =
