@@ -436,10 +436,10 @@ void PhyStats::UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t sc_id,
   evm_buf += evm_vec;
 }
 
-void PhyStats::UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t ue_id,
-                         size_t sc_id, const arma::cx_float eq) {
-  evm_buffer_[frame_id % kFrameWnd][ue_id] +=
-      std::norm(eq - gt_cube_.slice(data_symbol_id)(ue_id, sc_id));
+void PhyStats::UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t sc_id,
+                         size_t tx_ue_id, size_t rx_ue_id, arma::cx_float eq) {
+  evm_buffer_[frame_id % kFrameWnd][rx_ue_id] +=
+      std::norm(eq - gt_cube_.slice(data_symbol_id)(tx_ue_id, sc_id));
 }
 
 void PhyStats::UpdateBitErrors(size_t ue_id, size_t offset, size_t frame_slot,

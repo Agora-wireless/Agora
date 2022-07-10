@@ -31,8 +31,8 @@ class PhyStats {
   void UpdateUncodedBits(size_t ue_id, size_t offset, size_t new_bits_num);
   void UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t sc_id,
                  const arma::cx_fvec& eq_vec);
-  void UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t ue_id,
-                 size_t sc_id, const arma::cx_float eq);
+  void UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t sc_id,
+                 size_t tx_ue_id, size_t rx_ue_id, arma::cx_float eq);
   void PrintEvmStats(size_t frame_id);
   void RecordEvm(size_t frame_id);
   void RecordEvmSnr(size_t frame_id);
