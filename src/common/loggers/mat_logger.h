@@ -7,7 +7,6 @@
 #ifndef MAT_LOGGER_H_
 #define MAT_LOGGER_H_
 
-#include <array>
 #include <cstdint>
 #include <string>
 
