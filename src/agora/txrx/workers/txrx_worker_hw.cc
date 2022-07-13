@@ -208,9 +208,17 @@ std::vector<RxPacket*> TxRxWorkerHw::DoRx(size_t interface_id,
       const size_t cell_id = Configuration()->CellId().at(radio_id);
 
       //Finished successfully
+      bool invalid_rx_symbol = false;
       if (Configuration()->HwFramer() == true) {
         global_frame_id = static_cast<size_t>(frame_time >> 32);
-        global_symbol_id = static_cast<size_t>((frame_time >> 16) & 0xFFFF);
+        const size_t rx_symbol_id =
+            static_cast<size_t>((frame_time >> 16) & 0xFFFF);
+
+        if (rx_symbol_id > Configuration()->Frame().NumTotalSyms()) {
+          invalid_rx_symbol = true;
+        } else {
+          global_symbol_id = rx_symbol_id;
+        }
       }
 
       const size_t frame_id = global_frame_id;
@@ -242,10 +250,11 @@ std::vector<RxPacket*> TxRxWorkerHw::DoRx(size_t interface_id,
           (radio_id == Configuration()->RefRadio(cell_id) &&
            Configuration()->IsCalDlPilot(global_frame_id, global_symbol_id));
       const bool ignore_rx_data =
-          (Configuration()->HwFramer() == false) &&
-          (!Configuration()->IsPilot(global_frame_id, global_symbol_id) &&
-           !Configuration()->IsUplink(global_frame_id, global_symbol_id) &&
-           !cal_rx);
+          (invalid_rx_symbol == true) ||
+          ((Configuration()->HwFramer() == false) &&
+           (!Configuration()->IsPilot(global_frame_id, global_symbol_id) &&
+            !Configuration()->IsUplink(global_frame_id, global_symbol_id) &&
+            !cal_rx));
 
       // Update global frame_id and symbol_id
       global_symbol_id++;
