@@ -23,12 +23,14 @@ namespace CsvLog {
 
 constexpr size_t kCsvIdStart = 0;
 constexpr size_t kSNR = 0;
-constexpr size_t kEVM = 1;
-constexpr size_t kEVMSNR = 2;
-constexpr size_t kBER = 3;
-constexpr size_t kSER = 4;
-constexpr size_t kCSI = 5;
-constexpr size_t kCsvLogs = 6;
+constexpr size_t kRSSI = 1;
+constexpr size_t kNOISE = 2;
+constexpr size_t kEVM = 3;
+constexpr size_t kEVMSNR = 4;
+constexpr size_t kBER = 5;
+constexpr size_t kSER = 6;
+constexpr size_t kCSI = 7;
+constexpr size_t kCsvLogs = 8;
 constexpr size_t kMatIdStart = kCsvLogs;
 constexpr size_t kDLCSI = 0;
 constexpr size_t kDLZF = 1;
@@ -37,7 +39,8 @@ constexpr size_t kAllLogs = kCsvLogs + kMatLogs;
 
 #if defined(ENABLE_CSV_LOG)
 const std::array<std::string, kAllLogs> kCsvName = {
-    "snr", "evm", "evmsnr", "ber", "ser", "csi", "dlcsi", "dlzf"};
+    "snr", "rssi", "noise", "evm", "evmsnr", "ber", "ser", "csi",
+    "dlcsi", "dlzf"};
 const std::array<std::string, kAllLogs> kMatHeader = {
     "Frame,Subcarrier,BS-Ant,UE-Ant,Real,Imag",
     "Frame,Subcarrier,BS-Ant,UE-Ant,Real,Imag"};

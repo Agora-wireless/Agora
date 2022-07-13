@@ -69,6 +69,8 @@ class PhyStats {
   Table<float> evm_buffer_;
   Table<float> ul_pilot_snr_;
   Table<float> dl_pilot_snr_;
+  Table<float> dl_pilot_rssi_;
+  Table<float> dl_pilot_noise_;
   Table<float> calib_pilot_snr_;
   Table<float> csi_cond_;
 

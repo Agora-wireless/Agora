@@ -62,6 +62,12 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
   dl_pilot_snr_.Calloc(kFrameWnd,
                        cfg->UeAntNum() * cfg->Frame().ClientDlPilotSymbols(),
                        Agora_memory::Alignment_t::kAlign64);
+  dl_pilot_rssi_.Calloc(kFrameWnd,
+                        cfg->UeAntNum() * cfg->Frame().ClientDlPilotSymbols(),
+                        Agora_memory::Alignment_t::kAlign64);
+  dl_pilot_noise_.Calloc(kFrameWnd,
+                         cfg->UeAntNum() * cfg->Frame().ClientDlPilotSymbols(),
+                         Agora_memory::Alignment_t::kAlign64);
   ul_pilot_snr_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
                     Agora_memory::Alignment_t::kAlign64);
   calib_pilot_snr_.Calloc(kFrameWnd, 2 * cfg->BsAntNum(),
@@ -299,15 +305,24 @@ void PhyStats::RecordDlPilotSnr(size_t frame_id) {
   if (kEnableCsvLog) {
     const size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
     if (dl_pilots_num > 0) {
-      std::stringstream ss;
-      ss << frame_id;
+      std::stringstream ss_snr;
+      std::stringstream ss_rssi;
+      std::stringstream ss_noise;
+      ss_snr << frame_id;
+      ss_rssi << frame_id;
+      ss_noise << frame_id;
+      const size_t frame_slot = frame_id % kFrameWnd;
       for (size_t i = 0; i < config_->UeAntNum(); i++) {
         for (size_t j = 0; j < dl_pilots_num; j++) {
-          ss << ","
-             << dl_pilot_snr_[frame_id % kFrameWnd][i * dl_pilots_num + j];
+          const size_t idx_offset = i * dl_pilots_num + j;
+          ss_snr << "," << dl_pilot_snr_[frame_slot][idx_offset];
+          ss_rssi << "," << dl_pilot_rssi_[frame_slot][idx_offset];
+          ss_noise << "," << dl_pilot_noise_[frame_slot][idx_offset];
         }
       }
-      csv_loggers_.at(CsvLog::kSNR)->Write(ss.str());
+      csv_loggers_.at(CsvLog::kSNR)->Write(ss_snr.str());
+      csv_loggers_.at(CsvLog::kRSSI)->Write(ss_rssi.str());
+      csv_loggers_.at(CsvLog::kNOISE)->Write(ss_noise.str());
     }
   }
 }
@@ -407,8 +422,12 @@ void PhyStats::UpdateDlPilotSnr(size_t frame_id, size_t symbol_id,
   float noise = config_->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
   float snr = (rssi - noise) / noise;
   size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
-  dl_pilot_snr_[frame_id % kFrameWnd][ant_id * dl_pilots_num + symbol_id] =
-      10.0f * std::log10(snr);
+
+  const size_t frame_slot = frame_id % kFrameWnd;
+  const size_t idx_offset = ant_id * dl_pilots_num + symbol_id;
+  dl_pilot_snr_[frame_slot][idx_offset] = 10.0f * std::log10(snr);
+  dl_pilot_rssi_[frame_slot][idx_offset] = rssi;
+  dl_pilot_noise_[frame_slot][idx_offset] = noise;
 }
 
 void PhyStats::PrintZfStats(size_t frame_id) {

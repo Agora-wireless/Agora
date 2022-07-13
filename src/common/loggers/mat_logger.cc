@@ -12,7 +12,8 @@
 namespace CsvLog {
 
 MatLogger::MatLogger(size_t mat_log_id,
-                     const std::vector<std::string>& serial_vec, Direction dir)
+                     const std::vector<std::string>& serial_vec,
+                     Direction dir)
          : CsvLogger(mat_log_id + kMatIdStart, serial_vec, dir) {
 #if defined(ENABLE_MAT_LOG)
   logger_->info(kMatHeader.at(mat_log_id));

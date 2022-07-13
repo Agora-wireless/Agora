@@ -14,7 +14,6 @@ namespace CsvLog {
 CsvLogger::CsvLogger(size_t log_id, const std::vector<std::string>& serial_vec,
                      Direction dir) {
 #if defined(ENABLE_CSV_LOG)
-
   if (log_id >= kAllLogs) {
     AGORA_LOG_ERROR("Invalid log id %zu in CsvLogger\n", log_id);
   } else {
@@ -36,9 +35,10 @@ CsvLogger::CsvLogger(size_t log_id, const std::vector<std::string>& serial_vec,
     logger_->set_pattern("%v");
   }
 #else
-  unused(radio_id);
   unused(log_id);
+  unused(serial_vec);
   unused(dir);
 #endif  //ENABLE_CSV_LOG
 }
+
 }  //namespace CsvLog
