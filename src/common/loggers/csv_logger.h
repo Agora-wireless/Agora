@@ -9,6 +9,7 @@
 
 #include <array>
 #include <memory>
+#include <vector>
 #include "symbols.h"
 
 #if defined(ENABLE_CSV_LOG)
