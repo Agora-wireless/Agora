@@ -26,7 +26,8 @@ constexpr size_t kEVM = 1;
 constexpr size_t kEVMSNR = 2;
 constexpr size_t kBER = 3;
 constexpr size_t kSER = 4;
-constexpr size_t kCsvLogs = 5;
+constexpr size_t kCSI = 5;
+constexpr size_t kCsvLogs = 6;
 constexpr size_t kMatIdStart = kCsvLogs;
 constexpr size_t kDLCSI = 0;
 constexpr size_t kDLZF = 1;
@@ -35,7 +36,7 @@ constexpr size_t kAllLogs = kCsvLogs + kMatLogs;
 
 #if defined(ENABLE_CSV_LOG)
 const std::array<std::string, kAllLogs> kCsvName = {
-    "snr", "evm", "evmsnr", "ber", "ser", "dlcsi", "dlzf"};
+    "snr", "evm", "evmsnr", "ber", "ser", "csi", "dlcsi", "dlzf"};
 const std::array<std::string, kAllLogs> kMatHeader = {
     "Frame,Subcarrier,BS-Ant,UE-Ant,Real,Imag",
     "Frame,Subcarrier,BS-Ant,UE-Ant,Real,Imag"};
@@ -43,7 +44,8 @@ const std::array<std::string, kAllLogs> kMatHeader = {
 
 class CsvLogger {
  public:
-  CsvLogger(size_t log_id, const std::string& radio_id, Direction dir);
+  CsvLogger(size_t log_id, const std::vector<std::string>& serial_vec,
+            Direction dir);
 
 #if defined(ENABLE_CSV_LOG)
   inline void Write(size_t u1, size_t u2, size_t u3, size_t u4, float f1,

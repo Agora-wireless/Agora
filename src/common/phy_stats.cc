@@ -70,13 +70,13 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
                    Agora_memory::Alignment_t::kAlign64);
 
   if (kEnableCsvLog) {
-    const std::string radio_id =
-        dir_ == Direction::kUplink
-            ? (config_->RadioId().empty() ? "" : config_->RadioId().at(0))
-            : (config_->UeRadioId().empty() ? "" : config_->UeRadioId().at(0));
     for (size_t i = 0; i < csv_loggers_.size(); i++) {
       csv_loggers_.at(i) = std::make_shared<CsvLog::CsvLogger>(
-          i, radio_id, dir_);
+          i,
+          dir_ == Direction::kUplink
+              ? config_->RadioId()    //BS side
+              : config_->UeRadioId(), //UE side
+          dir_);
     }
   }
 }
@@ -309,6 +309,17 @@ void PhyStats::RecordDlPilotSnr(size_t frame_id) {
       }
       csv_loggers_.at(CsvLog::kSNR)->Write(ss.str());
     }
+  }
+}
+
+void PhyStats::RecordDlCsi(size_t frame_id, const std::vector<float>& csi_vec) {
+  if (kEnableCsvLog) {
+    std::stringstream ss;
+    ss << frame_id;
+    for (size_t i = 0; i < csi_vec.size(); i++) {
+      ss << "," << csi_vec.at(i);
+    }
+    csv_loggers_.at(CsvLog::kCSI)->Write(ss.str());
   }
 }
 
