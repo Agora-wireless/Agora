@@ -327,12 +327,14 @@ void PhyStats::RecordDlPilotSnr(size_t frame_id) {
   }
 }
 
-void PhyStats::RecordDlCsi(size_t frame_id, const std::vector<float>& csi_vec) {
+void PhyStats::RecordDlCsi(size_t frame_id, const arma::fmat& csi_rec) {
   if (kEnableCsvLog) {
     std::stringstream ss;
     ss << frame_id;
-    for (size_t i = 0; i < csi_vec.size(); i++) {
-      ss << "," << csi_vec.at(i);
+    for (size_t i = 0; i < csi_rec.n_rows; i++) {
+      for (size_t j = 0; j < csi_rec.n_cols; j++) {
+        ss << "," << csi_rec(i, j);
+      }
     }
     csv_loggers_.at(CsvLog::kCSI)->Write(ss.str());
   }

@@ -433,17 +433,19 @@ void PhyUe::Start() {
                 this->phy_stats_->PrintDlSnrStats(frame_id);
               }
               if (kEnableCsvLog) {
-                constexpr size_t kRecordCsiIdx = 146;
+                const arma::uvec csi_rec_sc({20, 140, 280});
                 const size_t csi_offset_base = (frame_id % kFrameWnd)
                                                * config_->UeAntNum();
-                std::vector<float> csi_vec(config_->UeAntNum());
-                for (size_t i = 0; i < csi_vec.size(); i++) {
+                arma::fmat csi_rec(config_->UeAntNum(), csi_rec_sc.n_elem);
+                for (size_t i = 0; i < csi_rec.n_rows; i++) {
                   auto* csi_buffer_ptr = reinterpret_cast<arma::cx_float*>(
                       csi_buffer_.at(csi_offset_base + i).data());
-                  csi_vec.at(i) = std::abs(csi_buffer_ptr[kRecordCsiIdx]);
+                  for (size_t j = 0; j < csi_rec.n_cols; j++) {
+                    csi_rec(i, j) = std::abs(csi_buffer_ptr[csi_rec_sc(j)]);
+                  }
                 }
                 this->phy_stats_->RecordDlPilotSnr(frame_id);
-                this->phy_stats_->RecordDlCsi(frame_id, csi_vec);
+                this->phy_stats_->RecordDlCsi(frame_id, csi_rec);
               }
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
               PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
