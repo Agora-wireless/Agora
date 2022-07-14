@@ -22,8 +22,8 @@ class RadioSoapySdr : public Radio {
             const std::vector<size_t>& enabled_channels, bool hw_framer) final;
   void Setup(const std::vector<double>& tx_gains,
              const std::vector<double>& rx_gains) final;
-  void Activate(
-      Radio::ActivationTypes type = Radio::ActivationTypes::kActivate) final;
+  void Activate(Radio::ActivationTypes type = Radio::ActivationTypes::kActivate,
+                long long act_time_ns = 0, size_t samples = 0) final;
   void Deactivate() final;
   void Close() final;
   void Flush() final;
@@ -39,6 +39,9 @@ class RadioSoapySdr : public Radio {
 
   int Rx(std::vector<void*>& rx_locs, size_t rx_size, RxFlags& out_flags,
          long long& rx_time_ns) final;
+
+  void SetTimeAtTrigger(long long time_ns = 0) final;
+  long long GetTimeNs() final;
   //End of generic interface
 
   void ConfigureTddModeBs(bool is_ref_radio, size_t beacon_radio_id) final;

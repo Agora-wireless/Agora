@@ -27,7 +27,8 @@ class RadioDataPlane {
   virtual void Init(Radio* radio, const Config* cfg, bool hw_framer) = 0;
   virtual void Setup() = 0;
   virtual void Activate(
-      Radio::ActivationTypes type = Radio::ActivationTypes::kActivate) = 0;
+      Radio::ActivationTypes type = Radio::ActivationTypes::kActivate,
+      long long act_time_ns = 0, size_t samples = 0) = 0;
   virtual void Deactivate() = 0;
   virtual void Close() = 0;
 

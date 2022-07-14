@@ -152,8 +152,9 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
           const auto new_samples = static_cast<size_t>(rx_return);
           AGORA_LOG_TRACE(
               "Called radiorx for %zu samples and received %zu with %zu "
-              "already loaded\n",
-              request_samples, new_samples, rx_info.SamplesAvailable());
+              "already loaded at time %lld\n",
+              request_samples, new_samples, rx_info.SamplesAvailable(),
+              rx_time);
 
           rx_info.Update(new_samples, rx_time);
           if (new_samples < request_samples) {

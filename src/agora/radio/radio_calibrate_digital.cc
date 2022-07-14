@@ -11,116 +11,160 @@ namespace plt = matplotlibcpp;
 static constexpr size_t kMaxArraySampleOffset = 10;
 static constexpr bool kReciprocalCalibPlot = false;
 static constexpr bool kVerboseCalibration = false;
+static constexpr size_t kRefChannel = 0;
 
 auto RadioConfig::TxArrayToRef(
     const std::vector<std::complex<int16_t>>& tx_vec) {
   const size_t ref = cfg_->RefRadio(0);
-  long long tx_time(0);
-  long long rx_time(0);
-  const int read_len = tx_vec.size();
-  std::vector<std::vector<std::complex<int16_t>>> dl_buff(cfg_->BfAntNum());
-  std::vector<std::complex<int16_t>> dummybuff(read_len);
-  const std::vector<std::complex<int16_t>> zeros(read_len,
+  const size_t tx_antennas = cfg_->BfAntNum();
+  const size_t read_samples = tx_vec.size();
+  std::vector<std::vector<std::complex<int16_t>>> dl_buff(
+      tx_antennas, std::vector<std::complex<int16_t>>(
+                       read_samples, std::complex<int16_t>(0, 0)));
+  std::vector<std::vector<std::complex<int16_t>>> dummybuffs(
+      cfg_->NumChannels(), std::vector<std::complex<int16_t>>(read_samples));
+  const std::vector<std::complex<int16_t>> zeros(read_samples,
                                                  std::complex<int16_t>(0, 0));
 
-  std::vector<const void*> txbuff(cfg_->NumChannels(), nullptr);
-  std::vector<std::vector<std::complex<int16_t>>*> rx_buffs(cfg_->NumChannels(),
-                                                            &dummybuff);
+  std::vector<const void*> txbuff(cfg_->NumChannels(), zeros.data());
+  std::vector<std::vector<std::complex<int16_t>>*> rx_buffs(
+      cfg_->NumChannels());
+  //Set the rx to scratch memory
+  for (size_t i = 0; i < rx_buffs.size(); i++) {
+    rx_buffs.at(i) = &dummybuffs.at(i);
+  }
 
-  for (size_t ant_i = 0; ant_i < cfg_->BfAntNum(); ant_i++) {
+  long long tx_time(0);
+  long long rx_time(0);
+
+  // Send a separate pilot from each antenna (each loop)
+  for (size_t ant_i = 0; ant_i < tx_antennas; ant_i++) {
+    const size_t radio_i = ant_i / cfg_->NumChannels();
+    const size_t current_channel = ant_i % cfg_->NumChannels();
     // set up tx/rx buffers
-    size_t radio_i = ant_i / cfg_->NumChannels();
-    dl_buff.at(ant_i).resize(read_len);
-    // ref always txrx on channel 0
-    rx_buffs.at(0) = &dl_buff.at(ant_i);
+    // ref use fixed channel
+    rx_buffs.at(kRefChannel) = &dl_buff.at(ant_i);
+    txbuff.at(current_channel) = tx_vec.data();
 
-    txbuff.at(ant_i % cfg_->NumChannels()) = tx_vec.data();
-    if (cfg_->NumChannels() == 2) {
-      txbuff.at(1 - (ant_i % 2)) = zeros.data();
-    }
-    //for (size_t i = 1; i < cfg_->NumChannels(); i++) {
-    //  txbuff.at(i) = zeros.data();
-    //}
+    radios_.at(radio_i)->Activate(Radio::kActivateWaitTrigger, tx_time,
+                                  read_samples);
+    radios_.at(ref)->Activate(Radio::kActivateWaitTrigger, tx_time,
+                              read_samples);
 
-    // Send a separate pilot from each antenna
-    const auto tx_flags = Radio::TxFlags::kEndTransmit;
+    const auto tx_flags = Radio::TxFlags::kTxWaitTrigger;
     const auto ret_tx =
-        radios_.at(radio_i)->Tx(txbuff.data(), read_len, tx_flags, tx_time);
-    if (ret_tx < read_len) {
-      AGORA_LOG_WARN("Radio %zu Tx Failure with status %d:%d\n", radio_i,
-                     ret_tx, read_len);
+        radios_.at(radio_i)->Tx(txbuff.data(), read_samples, tx_flags, tx_time);
+    if (ret_tx < static_cast<int>(read_samples)) {
+      AGORA_LOG_WARN("Radio %zu Tx Failure with status %d:%zu\n", radio_i,
+                     ret_tx, read_samples);
     }
 
-    radios_.at(ref)->Activate();
-    Go();  // trigger
+    //TRIGGER
+    Go();
 
     auto rx_flags = Radio::RxFlags::kRxFlagNone;
-    const auto ret_rx =
-        radios_.at(ref)->Rx(rx_buffs, read_len, rx_flags, rx_time);
-    if (ret_rx < read_len) {
-      AGORA_LOG_WARN(
-          "Radio %zu Rx Failure with status %d:%d from antenna %zu\n", ref,
-          ret_rx, read_len, ant_i);
-    }
+    int rx_status;
+    do {
+      rx_status =
+          radios_.at(ref)->Rx(rx_buffs, read_samples, rx_flags, rx_time);
+
+      if (rx_status > 0) {
+        auto rx_samples = static_cast<size_t>(rx_status);
+        if (rx_samples < read_samples) {
+          AGORA_LOG_WARN("Radio %zu Rx less than requested samples %zu:%zu\n",
+                         radio_i, rx_samples, read_samples);
+        }
+      } else if (rx_status < 0) {
+        AGORA_LOG_ERROR(
+            "Radio %zu Rx Failure with status %d:%zu from ref node %zu\n",
+            radio_i, rx_status, read_samples, ref);
+      }
+    } while (rx_status == 0);
+
+    radios_.at(radio_i)->Deactivate();
+    radios_.at(ref)->Deactivate();
+    //Reset rx / tx buffers to zeros / dummies
+    rx_buffs.at(kRefChannel) = &dummybuffs.at(current_channel);
+    txbuff.at(current_channel) = zeros.data();
   }
   return dl_buff;
 }
 
 auto RadioConfig::TxRefToArray(
     const std::vector<std::complex<int16_t>>& tx_vec) {
-  size_t num_radios = cfg_->NumRadios() - 1;  // minus ref. node
-  size_t ref = cfg_->RefRadio(0);
-  long long tx_time(0);
-  long long rx_time(0);
+  const size_t num_radios = cfg_->NumRadios();
+  // minus ref. node (last in radio list assumed)
+  const size_t rx_radios = num_radios - 1;
+  const size_t ref = cfg_->RefRadio(0);
+  long long rx_time;
+  long long tx_time{0};
 
-  // Transmitting from only one chain, create a null vector for chainB
-  const size_t read_len = tx_vec.size();
+  RtAssert(ref == rx_radios, "Ref radio must be last");
+
+  // Transmitting from only one channel, create a null vector for all others channel
+  const size_t read_samples = tx_vec.size();
   const size_t num_channels = cfg_->NumChannels();
 
-  std::vector<std::complex<int16_t>> zeros(read_len,
+  std::vector<std::complex<int16_t>> zeros(read_samples,
                                            std::complex<int16_t>(0, 0));
 
-  std::vector<const void*> txbuff(cfg_->NumChannels());
-  txbuff.at(0) = tx_vec.data();
-  for (size_t i = 1; i < num_channels; i++) {
-    txbuff.at(i) = zeros.data();
-  }
+  std::vector<const void*> txbuff(cfg_->NumChannels(), zeros.data());
+  txbuff.at(kRefChannel) = tx_vec.data();
+
+  // Allocate buffers for uplink directions
+  std::vector<std::vector<std::complex<int16_t>>> ul_buff(
+      cfg_->BfAntNum(), std::vector<std::complex<int16_t>>(
+                            read_samples, std::complex<int16_t>(0, 0)));
   std::vector<std::vector<std::complex<int16_t>>*> rx_buffs(num_channels,
                                                             nullptr);
 
-  // Allocate buffers for uplink directions
-  std::vector<std::vector<std::complex<int16_t>>> ul_buff(cfg_->BfAntNum());
-  std::vector<std::complex<int16_t>> dummybuff(read_len);
-  const auto tx_flags = Radio::TxFlags::kEndTransmit;
-  const int tx_status =
-      radios_.at(ref)->Tx(txbuff.data(), read_len, tx_flags, tx_time);
-  if (tx_status < static_cast<int>(read_len)) {
-    AGORA_LOG_WARN("Radio %zu Tx Ref Failure with status %d:%zu\n", ref,
-                   tx_status, read_len);
+  for (size_t i = 0; i < num_radios; i++) {
+    radios_.at(i)->Activate(Radio::kActivateWaitTrigger, tx_time, read_samples);
   }
 
-  //Assumes the ref node is the last radio in the list?
-  for (size_t i = 0; i < num_radios; i++) {
-    radios_.at(i)->Activate();
+  const auto tx_flags = Radio::TxFlags::kTxWaitTrigger;
+  const int tx_status =
+      radios_.at(ref)->Tx(txbuff.data(), read_samples, tx_flags, tx_time);
+  if (tx_status < static_cast<int>(read_samples)) {
+    AGORA_LOG_WARN("Radio %zu Tx Ref Failure with status %d:%zu\n", ref,
+                   tx_status, read_samples);
   }
-  Go();  // Trigger
+
+  //TRIGGER
+  Go();
 
   auto rx_flags = Radio::RxFlags::kRxFlagNone;
-  for (size_t radio_i = 0; radio_i < num_radios; radio_i++) {
-    const size_t ant_i = radio_i * cfg_->NumChannels();
-    for (size_t i = 0; i < cfg_->NumChannels(); i++) {
-      ul_buff.at(ant_i + i).resize(read_len);
-      rx_buffs.at(i) = &ul_buff.at(ant_i + i);
+  for (size_t radio_i = 0; radio_i < rx_radios; radio_i++) {
+    const size_t base_ant = radio_i * num_channels;
+    for (size_t ch = 0; ch < num_channels; ch++) {
+      rx_buffs.at(ch) = &ul_buff.at(base_ant + ch);
     }
-    const int rx_status =
-        radios_.at(radio_i)->Rx(rx_buffs, read_len, rx_flags, rx_time);
 
-    if (rx_status < static_cast<int>(read_len)) {
-      AGORA_LOG_WARN(
-          "Radio %zu Rx Failure with status %d:%zu from ref node %zu\n",
-          radio_i, rx_status, read_len, ref);
-    }
+    int rx_status;
+    do {
+      rx_status =
+          radios_.at(radio_i)->Rx(rx_buffs, read_samples, rx_flags, rx_time);
+
+      if (rx_status > 0) {
+        auto rx_samples = static_cast<size_t>(rx_status);
+        if (rx_samples < read_samples) {
+          AGORA_LOG_WARN("Radio %zu Rx less than requested samples %zu:%zu\n",
+                         radio_i, rx_samples, read_samples);
+        }
+      } else if (rx_status < 0) {
+        AGORA_LOG_ERROR(
+            "Radio %zu Rx Failure with status %d:%zu from ref node %zu\n",
+            radio_i, rx_status, read_samples, ref);
+      }
+    } while (rx_status == 0);
+    AGORA_LOG_WARN(
+        "Radio %zu Rx Success with %d:%zu from ref node %zu at time %lld\n",
+        radio_i, rx_status, read_samples, ref, rx_time);
+    radios_.at(radio_i)->Deactivate();
   }
+
+  //All rx done, deactivate the tx
+  radios_.at(ref)->Deactivate();
   return ul_buff;
 }
 
@@ -189,8 +233,11 @@ void RadioConfig::CalibrateSampleOffset() {
     const bool bad_data = this->FindTimeOffset(ul_buff, ul_offset);
     if (bad_data) {
       n++;
+      std::cout << "Time offset returned bad data = " << bad_data << " count "
+                << n << std::endl;
       continue;
     }
+
     std::vector<int> ul_offset_a;
     std::vector<int> ul_offset_b;
     int max_ab_diff = 0;
@@ -268,7 +315,7 @@ void RadioConfig::CalibrateSampleOffset() {
 
   // Transmit from Array to Ref and ensure they are all synced
   n = 0;
-  std::cout << "Calibrating with downlink " << std::endl;
+  AGORA_LOG_INFO("Calibrating with downlink\n");
   while (n < max_retries) {
     auto dl_buff = TxArrayToRef(cfg_->PilotCi16());
     std::vector<int> dl_offset(cfg_->BfAntNum(), 0);
@@ -321,8 +368,8 @@ void RadioConfig::CalibrateSampleOffset() {
                 << std::endl;
       std::cout << "Received SNR from the Reference Node At the Array"
                 << std::endl;
-      size_t pilot_start = min_offset + cfg_->CpLen();
-      size_t pilot_stop = min_offset + cfg_->CpLen() + cfg_->OfdmCaNum();
+      const size_t pilot_start = min_offset + cfg_->CpLen();
+      const size_t pilot_stop = min_offset + cfg_->CpLen() + cfg_->OfdmCaNum();
       RtAssert(pilot_stop < cfg_->SampsPerSymbol(),
                "Received pilot exceeds symbol boundary. Consider extending "
                "ofdm_tx_zero_postfix parameter!");

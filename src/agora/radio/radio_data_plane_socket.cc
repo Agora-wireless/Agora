@@ -19,9 +19,11 @@ void RadioDataPlaneSocket::Init(Radio* radio, const Config* cfg,
   RadioDataPlane::Init(radio, cfg, hw_framer);
 }
 
-inline void RadioDataPlaneSocket::Activate(Radio::ActivationTypes type) {
+inline void RadioDataPlaneSocket::Activate(Radio::ActivationTypes type,
+                                           long long act_time_ns,
+                                           size_t samples) {
   socket_.Flush();
-  RadioDataPlane::Activate(type);
+  RadioDataPlane::Activate(type, act_time_ns, samples);
 }
 
 inline void RadioDataPlaneSocket::Deactivate() { RadioDataPlane::Deactivate(); }

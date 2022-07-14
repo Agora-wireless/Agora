@@ -17,7 +17,7 @@ class Radio {
   enum RadioType { kSoapySdrStream, kSoapySdrSocket };
   //EndReceive is set when the samples returned are the last of a contiguous set
   enum RxFlags { kRxFlagNone = 0, kEndReceive = 1 };
-  enum TxFlags { kTxFlagNone = 0, kEndTransmit = 1 };
+  enum TxFlags { kTxFlagNone = 0, kEndTransmit = 1, kTxWaitTrigger = 2 };
   static std::unique_ptr<Radio> Create(RadioType type);
 
   enum ActivationTypes { kActivate, kActivateWaitTrigger };
@@ -36,7 +36,8 @@ class Radio {
 
   // Start?
   virtual void Activate(
-      Radio::ActivationTypes type = Radio::ActivationTypes::kActivate) = 0;
+      Radio::ActivationTypes type = Radio::ActivationTypes::kActivate,
+      long long act_time_ns = 0, size_t samples = 0) = 0;
   // Stop?
   virtual void Deactivate() = 0;
   virtual void Close() = 0;
@@ -62,6 +63,10 @@ class Radio {
   inline virtual void PrintSettings() const {}
   inline virtual void Trigger() {}
   inline virtual void ReadSensor() const {}
+
+  inline virtual void SetTimeAtTrigger(long long time_ns = 0) { (void)time_ns; }
+  inline virtual long long GetTimeNs() { return 0; }
+
   //For digital cal
   inline virtual void AdjustDelay([[maybe_unused]] const std::string& delay) {}
 

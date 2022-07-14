@@ -54,7 +54,8 @@ void RadioDataPlane::Init(Radio *radio, const Config *cfg, bool hw_framer) {
   }
 }
 
-void RadioDataPlane::Activate(Radio::ActivationTypes type) {
+void RadioDataPlane::Activate(Radio::ActivationTypes type,
+                              long long act_time_ns, size_t samples) {
   if (mode_ == kModeDeactive) {
     if ((radio_ == nullptr) || (remote_stream_ == nullptr)) {
       AGORA_LOG_ERROR(
@@ -64,10 +65,17 @@ void RadioDataPlane::Activate(Radio::ActivationTypes type) {
       auto *device = dynamic_cast<RadioSoapySdr *>(radio_)->SoapyDevice();
       int soapy_flags = 0;
       if (type == Radio::ActivationTypes::kActivateWaitTrigger) {
-        soapy_flags = SOAPY_SDR_WAIT_TRIGGER;
+        soapy_flags |= SOAPY_SDR_WAIT_TRIGGER;
+      } else if (act_time_ns != 0) {
+        soapy_flags |= SOAPY_SDR_HAS_TIME;
       }
-      const auto status = device->activateStream(remote_stream_, soapy_flags);
-      //SOAPY_SDR_STREAM_ERROR (-2) ?????
+
+      // End burst if passing a number of samples
+      if (samples > 0) {
+        soapy_flags |= SOAPY_SDR_END_BURST;
+      }
+      const auto status = device->activateStream(remote_stream_, soapy_flags,
+                                                 act_time_ns, samples);
       if (status < 0) {
         AGORA_LOG_WARN("Activate soapy stream with error status %d %s\n",
                        status, SoapySDR_errToStr(status));

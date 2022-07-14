@@ -97,6 +97,7 @@ void RadioSoapySdr::Close() {
       dev_->closeStream(txs_);
       txs_ = nullptr;
     }
+    dev_->writeSetting("RESET_DATA_LOGIC", "");
     SoapySDR::Device::unmake(dev_);
     dev_ = nullptr;
     Radio::Close();
@@ -397,25 +398,31 @@ void RadioSoapySdr::Setup(const std::vector<double>& tx_gains,
   }
 }
 
-void RadioSoapySdr::Activate(Radio::ActivationTypes type) {
-  AGORA_LOG_TRACE("Activate RadioSoapySdr %s(%zu)\n", SerialNumber().c_str(),
-                  Id());
+void RadioSoapySdr::Activate(Radio::ActivationTypes type, long long act_time_ns,
+                             size_t samples) {
+  AGORA_LOG_TRACE(
+      "Activate RadioSoapySdr %s(%zu) at time %lld with samples %zu and type "
+      "%d\n",
+      SerialNumber().c_str(), Id(), act_time_ns, samples,
+      static_cast<int>(type));
   const bool is_ue = false;
   if (kUseUHD == false) {
-    dev_->setHardwareTime(0, "TRIGGER");
-    //SOAPY_SDR_WAIT_TRIGGER for UE
-    //**********************************************************
-    //dev_->activateStream(rxs_, SOAPY_SDR_WAIT_TRIGGER);
-    //dev_->activateStream(txs_, SOAPY_SDR_WAIT_TRIGGER);
-    //**********************************************************
-    rxp_->Activate(type);
+    rxp_->Activate(type, act_time_ns, samples);
     int soapy_flags = 0;
     if (type == Radio::ActivationTypes::kActivateWaitTrigger) {
       soapy_flags = SOAPY_SDR_WAIT_TRIGGER;
+    } else if (act_time_ns != 0) {
+      soapy_flags |= SOAPY_SDR_HAS_TIME;
     }
-    const auto status = dev_->activateStream(txs_, soapy_flags);
-    if (status < 0) {
-      AGORA_LOG_WARN("Activate soapy tx stream with status % d %s\n", status,
+
+    if (samples > 0) {
+      soapy_flags |= SOAPY_SDR_END_BURST;
+    }
+
+    const auto status =
+        dev_->activateStream(txs_, soapy_flags, act_time_ns, samples);
+    if (status != 0) {
+      AGORA_LOG_WARN("Activate soapy tx stream with status %d %s\n", status,
                      SoapySDR_errToStr(status));
     }
   } else {
@@ -453,7 +460,7 @@ void RadioSoapySdr::Deactivate() {
   }
 
   //This stops the data flow to the socket
-  dev_->writeSetting("RESET_DATA_LOGIC", "");
+  //dev_->writeSetting("RESET_DATA_LOGIC", "");
   //If this flush is not here before setting TDD_MODE to false.  This will sometimes
   //cause errors with the next rx sequence
   rxp_->Flush();
@@ -472,6 +479,8 @@ int RadioSoapySdr::Tx(const void* const* tx_buffs, size_t tx_size,
     soapy_flags = SOAPY_SDR_HAS_TIME;
   } else if (flags == Radio::TxFlags::kEndTransmit) {
     soapy_flags = (SOAPY_SDR_HAS_TIME | SOAPY_SDR_END_BURST);
+  } else if (flags == Radio::TxFlags::kTxWaitTrigger) {
+    soapy_flags = SOAPY_SDR_END_BURST | SOAPY_SDR_WAIT_TRIGGER;
   } else {
     AGORA_LOG_ERROR("Unsupported radio tx flag %d\n", static_cast<int>(flags));
     soapy_flags = 0;
@@ -552,6 +561,36 @@ void RadioSoapySdr::ReadSensor() const {
   print_message << "RX1 TEMP  : " << dev_->readSensor(SOAPY_SDR_RX, 1, "TEMP")
                 << std::endl;
   AGORA_LOG_INFO("%s\n", print_message.str().c_str());
+}
+
+void RadioSoapySdr::SetTimeAtTrigger(long long time_ns) {
+  dev_->setHardwareTime(0, "TRIGGER");
+
+  auto time_dev = dev_->getHardwareTime("TRIGGER");
+  if (time_dev != time_ns) {
+    AGORA_LOG_WARN(
+        "RadioSoapySdr::SetTimeAtTrigger[%zu] the hardware trigger time is "
+        "not the expected value %lld : %lld\n",
+        Id(), time_dev, time_ns);
+  }
+  auto clk_status = dev_->readSensor("CLKBUFF_LOCKED");
+  if (clk_status.compare("false") == 0) {
+    AGORA_LOG_WARN("RadioSoapySdr::Activate[%zu] clk_status %s\n", Id(),
+                   clk_status.c_str());
+  }
+}
+
+long long RadioSoapySdr::GetTimeNs() {
+  auto clk_status = dev_->readSensor("CLKBUFF_LOCKED");
+  if (clk_status.compare("false") == 0) {
+    AGORA_LOG_WARN("RadioSoapySdr::Activate[%zu] clk_status %s\n", Id(),
+                   clk_status.c_str());
+  }
+
+  auto time_dev = dev_->getHardwareTime();
+  AGORA_LOG_TRACE("RadioSoapySdr::GetTimeNs[%zu] the hardware time is %lld\n",
+                  Id(), time_dev);
+  return time_dev;
 }
 
 void RadioSoapySdr::PrintSettings() const {
@@ -911,6 +950,6 @@ void RadioSoapySdr::Correlator(bool enable) {
 }
 
 void RadioSoapySdr::Flush() {
-  AGORA_LOG_INFO("Flushing radio rx data plane%zu\n", Id());
+  AGORA_LOG_INFO("Flushing radio %zu rx data plane\n", Id());
   rxp_->Flush();
 }

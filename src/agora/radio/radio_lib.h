@@ -51,8 +51,10 @@ class RadioConfig {
   void ConfigureBsRadio(size_t radio_id);
 
  private:
+  long long SyncArrayTime();
+
   void CalibrateSampleOffset();
-  /* Transmit from each array atenna to ref antenna,
+  /* Transmit from each array antenna to ref antenna,
    * return the received signal vector at the ref antenna
   */
   auto TxArrayToRef(const std::vector<std::complex<int16_t>>& tx_vec);

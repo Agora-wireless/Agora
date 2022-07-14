@@ -59,9 +59,13 @@ void Radio::Setup([[maybe_unused]] const std::vector<double>& tx_gains,
   AGORA_LOG_TRACE("Setup Radio %s(%zu)\n", serial_number_.c_str(), id_);
 }
 
-void Radio::Activate([[maybe_unused]] Radio::ActivationTypes type) {
-  AGORA_LOG_TRACE("Activate Radio %s(%zu) with type %d\n",
-                  serial_number_.c_str(), id_, static_cast<int>(type));
+void Radio::Activate([[maybe_unused]] Radio::ActivationTypes type,
+                     [[maybe_unused]] long long act_time_ns,
+                     [[maybe_unused]] size_t samples) {
+  AGORA_LOG_TRACE(
+      "Activate Radio %s(%zu) with type %d at time %lld for %zu samples\n",
+      serial_number_.c_str(), id_, static_cast<int>(type), act_time_ns,
+      samples);
 }
 
 void Radio::Deactivate() {

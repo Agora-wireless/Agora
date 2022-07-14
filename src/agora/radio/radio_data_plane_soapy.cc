@@ -18,8 +18,10 @@ void RadioDataPlaneSoapy::Init(Radio* radio, const Config* cfg,
   return RadioDataPlane::Init(radio, cfg, hw_framer);
 }
 
-inline void RadioDataPlaneSoapy::Activate(Radio::ActivationTypes type) {
-  return RadioDataPlane::Activate(type);
+inline void RadioDataPlaneSoapy::Activate(Radio::ActivationTypes type,
+                                          long long act_time_ns,
+                                          size_t samples) {
+  return RadioDataPlane::Activate(type, act_time_ns, samples);
 }
 
 inline void RadioDataPlaneSoapy::Deactivate() {
@@ -30,6 +32,8 @@ inline void RadioDataPlaneSoapy::Close() { return RadioDataPlane::Close(); }
 
 inline void RadioDataPlaneSoapy::Setup() {
   SoapySDR::Kwargs sargs;
+  //Helps with the disable stream, errors (-2)
+  //sargs["SYNC_ACTIVATE"] = "false";
   return RadioDataPlane::Setup(sargs);
 }
 
@@ -75,6 +79,10 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
   if (rx_status > 0) {
     const size_t rx_samples = static_cast<size_t>(rx_status);
 
+    if ((soapy_rx_flags & SOAPY_SDR_HAS_TIME) == 0) {
+      AGORA_LOG_WARN("RadioDataPlaneSoapy::Rx %s(%zu) - does not have time",
+                     radio_->SerialNumber().c_str(), radio_->Id());
+    }
     //if end burst flag is not set, then we have partial data (hw_framer mode only)
     if (HwFramer()) {
       if (rx_samples != rx_size) {
@@ -88,8 +96,8 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
         } else if ((soapy_rx_flags & SOAPY_SDR_END_BURST) ==
                    SOAPY_SDR_END_BURST) {
           AGORA_LOG_WARN(
-              "RadioDataPlaneSoapy::Rx %s(%zu) - short rx call %zu:%zu end of "
-              "the receive data status %d\n",
+              "RadioDataPlaneSoapy::Rx %s(%zu) - short rx call %zu:%zu end "
+              "of the receive data status %d\n",
               radio_->SerialNumber().c_str(), radio_->Id(), rx_samples, rx_size,
               soapy_rx_flags);
           out_flags = Radio::RxFlags::kEndReceive;
@@ -98,8 +106,9 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
           //Hackish way to determine if we should proceed
           //The first symbol bug appears to periodically cut off a few samples from the first symbol
           AGORA_LOG_WARN(
-              "RadioDataPlaneSoapy::Rx %s(%zu) - short rx call %zu:%zu samples "
-              "contained are the last of a symbol %lld:%zu with flags %d\n",
+              "RadioDataPlaneSoapy::Rx %s(%zu) - short rx call %zu:%zu "
+              "samples contained are the last of a symbol %lld:%zu with flags "
+              "%d\n",
               radio_->SerialNumber().c_str(), radio_->Id(), rx_samples, rx_size,
               ((frame_time_ns & 0xFFFF) + rx_samples),
               Configuration()->SampsPerSymbol(), soapy_rx_flags);

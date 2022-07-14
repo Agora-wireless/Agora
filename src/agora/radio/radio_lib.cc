@@ -277,8 +277,10 @@ bool RadioConfig::RadioStart() {
       const bool is_ref_radio = (i == cfg_->RefRadio(cell_id));
       radios_.at(i)->ConfigureTddModeBs(is_ref_radio, beacon_radio);
     }
+    radios_.at(i)->SetTimeAtTrigger(0);
     activate_radio_threads.emplace_back(&Radio::Activate, radios_.at(i).get(),
-                                        Radio::ActivationTypes::kActivate);
+                                        Radio::ActivationTypes::kActivate, 0,
+                                        0);
   }
 
   AGORA_LOG_INFO("RadioStart waiting for activation\n");
@@ -358,6 +360,43 @@ void RadioConfig::RadioStop() {
     join_thread.join();
   }
   AGORA_LOG_INFO("RadioStop deactivated\n");
+}
+
+long long RadioConfig::SyncArrayTime() {
+  //1ms
+  constexpr long long kTimeSyncMaxLimit = 1000000;
+  //Use the trigger to sync the array
+  AGORA_LOG_TRACE("SyncArrayTime: Setting trigger time\n");
+  for (size_t i = 0; i < radios_.size(); i++) {
+    auto& radio = radios_.at(i);
+    radio->SetTimeAtTrigger();
+  }
+
+  AGORA_LOG_TRACE("SyncArrayTime: Triggering!\n");
+  Go();
+
+  ///Wait for enough time for the boards to update
+  auto wait_time = std::chrono::milliseconds(500);
+  AGORA_LOG_TRACE("SyncArrayTime: Waiting for %ld ms\n", wait_time.count());
+  std::this_thread::sleep_for(wait_time);
+  AGORA_LOG_TRACE("SyncArrayTime: Time Check!\n");
+
+  //Get first time
+  auto radio_time = radios_.at(0)->GetTimeNs();
+  //Verify all times are within 1ms (typical .35ms - .85 between calls)
+  for (size_t i = 1; i < radios_.size(); i++) {
+    auto time_now = radios_.at(i)->GetTimeNs();
+    auto time_diff_ns = time_now - radio_time;
+    if (time_diff_ns > kTimeSyncMaxLimit) {
+      AGORA_LOG_WARN(
+          "SyncArrayTime: Radio time out of bounds during alignment.  Radio "
+          "%zu, time %lld, reference %lld, difference %lld, tolerance %lld\n",
+          i, time_now, radio_time, time_diff_ns, kTimeSyncMaxLimit);
+    }
+    //Update the check time with the current time
+    radio_time = time_now;
+  }
+  return radio_time;
 }
 
 RadioConfig::~RadioConfig() {
