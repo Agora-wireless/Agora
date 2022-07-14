@@ -392,7 +392,7 @@ std::vector<std::string> Utils::Split(const std::string& s, char delimiter) {
 }
 
 void Utils::PrintVector(const std::vector<std::complex<int16_t>>& data) {
-  for (auto& i : data) {
+  for (const auto& i : data) {
     std::cout << real(i) << " " << imag(i) << std::endl;
   }
 }

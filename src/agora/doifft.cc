@@ -95,7 +95,9 @@ EventData DoIFFT::Launch(size_t tag) {
       clipping = true;
       break;
     }
-    if (std::abs(sample_val) > max_abs) max_abs = std::abs(sample_val);
+    if (std::abs(sample_val) > max_abs) {
+      max_abs = std::abs(sample_val);
+    }
   }
   if (clipping) {
     AGORA_LOG_WARN("Clipping occured in Frame %zu, Symbol %zu, Antenna %zu\n",

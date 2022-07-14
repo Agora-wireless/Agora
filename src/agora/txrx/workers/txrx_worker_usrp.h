@@ -25,13 +25,12 @@ class TxRxWorkerUsrp : public TxRxWorker {
                  std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
                  std::mutex& sync_mutex, std::condition_variable& sync_cond,
                  std::atomic<bool>& can_proceed, RadioConfig& radio_config);
-
+  TxRxWorkerUsrp() = delete;
   ~TxRxWorkerUsrp() final;
 
   void DoTxRx() final;
 
  private:
-  TxRxWorkerUsrp() = delete;
   int DequeueSend();
   int DequeueSend(int frame_id, int symbol_id);
   std::vector<Packet*> RecvEnqueue(size_t radio_id, size_t frame_id,
