@@ -290,7 +290,8 @@ void RadioConfig::ConfigureBsRadio(size_t tid) {
 
     if (kUseUHD == false) {
       // Unified gains for both lime and frontend
-      if (cfg_->SingleGain()) {
+      if (cfg_->SingleGain()
+          && info["frontend"].find("CBRS") != std::string::npos) {
         // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:108]
         ba_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch,
                                  ch != 0u ? cfg_->RxGainB() : cfg_->RxGainA());
@@ -308,6 +309,10 @@ void RadioConfig::ConfigureBsRadio(size_t tid) {
           }
           ba_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "LNA2", 17);  //[0,17]
         }
+        else if (info["frontend"].find("UHF") != std::string::npos) {
+          ba_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "ATTN1", -6);  //[-18,0]
+          ba_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "ATTN2", -6);  //[-18,0]
+	      }
 
         ba_stn_.at(tid)->setGain(
             SOAPY_SDR_RX, ch, "LNA",
@@ -320,7 +325,11 @@ void RadioConfig::ConfigureBsRadio(size_t tid) {
                                    -6);                          //[-18,0] by 3
           ba_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "PA2", 0);  //[0|15]
         }
-        ba_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);  //[-12,12]
+        if (info["frontend"].find("DEV") != std::string::npos) {
+          ba_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "IAMP", 12);  //[-12,12]
+        } else {
+          ba_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);  //[-12,12]
+        }
         ba_stn_.at(tid)->setGain(
             SOAPY_SDR_TX, ch, "PAD",
             ch != 0u ? cfg_->TxGainB() : cfg_->TxGainA());  //[0,30]
