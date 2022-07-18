@@ -255,7 +255,7 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
                                      -6);  //[-18,0] by 3
             cl_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "PA2", 0);  //[0|15]
           }
-          cl_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);  //[0,12]
+          cl_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "IAMP", 12);  //[0,12]
           cl_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "PAD",
                                    ch != 0u
                                        ? cfg_->ClientTxGainB(tid)
