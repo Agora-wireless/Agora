@@ -315,9 +315,11 @@ include_directories(
 include_directories(SYSTEM src/third_party src/third_party/spdlog/include src/third_party/nlohmann/single_include)
 
 set(RECORDER_SOURCES
+  src/recorder/hdf5_lib.cc
   src/recorder/recorder.cc
   src/recorder/recorder_thread.cc
-  src/recorder/recorder_worker_multifile.cc)
+  src/recorder/recorder_worker_multifile.cc
+  src/recorder/recorder_worker_hdf5.cc)
 add_library(recorder_sources_lib OBJECT ${RECORDER_SOURCES})
 
 set(COMMON_SOURCES

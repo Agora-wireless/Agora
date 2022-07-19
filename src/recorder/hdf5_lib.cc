@@ -21,7 +21,7 @@ namespace Agora_recorder {
 Hdf5Lib::Hdf5Lib(H5std_string hdf5_name, H5std_string group_name)
     : hdf5_name_(hdf5_name), group_name_(group_name) {
   AGORA_LOG_INFO("Creating output HD5F file: %s\n", hdf5_name_.c_str());
-  file_ = new H5::H5File(hdf5_name_, H5F_ACC_TRUNC);
+  file_ = std::make_unique<H5::H5File>(hdf5_name_, H5F_ACC_TRUNC);
   group_ = file_->createGroup("/" + group_name_);
 }
 
@@ -34,10 +34,9 @@ Hdf5Lib::~Hdf5Lib() {
 
 void Hdf5Lib::closeFile() {
   if (file_ != nullptr) {
-    AGORA_LOG_TRACE("File exists exists during garbage collection\n");
+    AGORA_LOG_INFO("File exists exists during garbage collection\n");
     file_->close();
-    delete file_;
-    file_ = nullptr;
+    file_.release();
   }
 }
 int Hdf5Lib::createDataset(H5std_string dataset_name,
@@ -78,8 +77,8 @@ int Hdf5Lib::createDataset(H5std_string dataset_name,
   dataspace_.push_back(ds_dataspace);
   dims_.push_back(tot_dims);
   datasets_.push_back(nullptr);
-  size_t map_size = ds_name_id.size();
-  ds_name_id[dataset_name] = map_size;
+  const size_t map_size = ds_name_id_.size();
+  ds_name_id_[dataset_name] = map_size;
   return 0;
 }
 
@@ -116,8 +115,8 @@ void Hdf5Lib::openDataset() {
 }
 
 void Hdf5Lib::removeDataset(std::string dataset_name) {
-  std::string ds_name("/" + group_name_ + "/" + dataset_name);
-  size_t ds_id = ds_name_id[dataset_name];
+  const std::string ds_name("/" + group_name_ + "/" + dataset_name);
+  const size_t ds_id = ds_name_id_[dataset_name];
   AGORA_LOG_TRACE("%s Dataset exists during garbage collection\n",
                   dataset_str_.at(ds_id).c_str());
   datasets_.at(ds_id)->close();
@@ -126,17 +125,16 @@ void Hdf5Lib::removeDataset(std::string dataset_name) {
 }
 
 void Hdf5Lib::closeDataset() {
-  AGORA_LOG_TRACE("Close HD5F file: %s\n", hdf5_name_.c_str());
+  AGORA_LOG_INFO("Close HD5F file: %s\n", hdf5_name_.c_str());
 
   if (file_ != nullptr) {
     for (size_t i = 0; i < dataset_str_.size(); i++) {
       //assert(datasets_.at(i) != nullptr);
       try {
         H5::Exception::dontPrint();
-        extendDataset(dataset_str_.at(i), target_prim_dim_size);
+        extendDataset(dataset_str_.at(i), target_prim_dim_size_);
         prop_list_.at(i).close();
         datasets_.at(i)->close();
-        //delete pilot_dataset_;
       }
       // catch failure caused by the H5File operations
       catch (H5::FileIException& error) {
@@ -148,17 +146,17 @@ void Hdf5Lib::closeDataset() {
     }
     file_->close();
     AGORA_LOG_INFO("Saving HD5F: %llu frames saved on CPU %d\n",
-                   target_prim_dim_size, sched_getcpu());
+                   target_prim_dim_size_, sched_getcpu());
   }
 }
 
 bool Hdf5Lib::extendDataset(std::string dataset_name, size_t prim_dim_size) {
-  std::string ds_name("/" + group_name_ + "/" + dataset_name);
-  size_t ds_id = ds_name_id[dataset_name];
+  const std::string ds_name("/" + group_name_ + "/" + dataset_name);
+  const size_t ds_id = ds_name_id_[dataset_name];
   if (dims_.at(ds_id).at(0) <= prim_dim_size) {
     hsize_t new_dim_size = dims_.at(ds_id).at(0) + kDsExtendStep;
-    if (max_prim_dim_size != 0) {
-      new_dim_size = std::min(new_dim_size, max_prim_dim_size + 1);
+    if (max_prim_dim_size_ != 0) {
+      new_dim_size = std::min(new_dim_size, max_prim_dim_size_ + 1);
     }
     dims_.at(ds_id).at(0) = new_dim_size;
     datasets_.at(ds_id)->extend(dims_.at(ds_id).data());
@@ -175,9 +173,9 @@ bool Hdf5Lib::extendDataset(std::string dataset_name, size_t prim_dim_size) {
 herr_t Hdf5Lib::writeDataset(std::string dataset_name,
                              std::array<hsize_t, kDsDimsNum> target_id,
                              std::array<hsize_t, kDsDimsNum> wrt_dim,
-                             short* wrt_data) {
-  std::string ds_name("/" + group_name_ + "/" + dataset_name);
-  size_t ds_id = ds_name_id[dataset_name];
+                             const short* wrt_data) {
+  const std::string ds_name("/" + group_name_ + "/" + dataset_name);
+  const size_t ds_id = ds_name_id_[dataset_name];
   herr_t ret = 0;
   // Select a hyperslab in extended portion of the dataset
   try {
@@ -229,8 +227,8 @@ std::vector<short> Hdf5Lib::readDataset(
     std::string dataset_name, std::array<hsize_t, kDsDimsNum> target_id,
     std::array<hsize_t, kDsDimsNum> read_dim) {
   std::vector<short> read_data;
-  std::string ds_name("/" + group_name_ + "/" + dataset_name);
-  size_t ds_id = ds_name_id[dataset_name];
+  const std::string ds_name("/" + group_name_ + "/" + dataset_name);
+  const size_t ds_id = ds_name_id_[dataset_name];
   // Select a hyperslab in extended portion of the dataset
   try {
     H5::Exception::dontPrint();
@@ -252,7 +250,7 @@ std::vector<short> Hdf5Lib::readDataset(
         "DataSet: Failed to write to dataset at primary dim index: %llu",
         target_id.at(0));
 
-    int ndims = datasets_.at(ds_id)->getSpace().getSimpleExtentNdims();
+    const int ndims = datasets_.at(ds_id)->getSpace().getSimpleExtentNdims();
 
     std::stringstream ss;
     ss.str(std::string());
@@ -276,6 +274,7 @@ std::vector<short> Hdf5Lib::readDataset(
   }
   return read_data;
 }
+
 void Hdf5Lib::write_attribute(const char name[], double val) {
   hsize_t dims[] = {1};
   H5::DataSpace attr_ds = H5::DataSpace(1, dims);
