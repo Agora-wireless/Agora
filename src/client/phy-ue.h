@@ -22,6 +22,7 @@
 #include "modulation.h"
 #include "packet_txrx.h"
 #include "phy_stats.h"
+#include "recorder_thread.h"
 #include "stats.h"
 #include "ue_worker.h"
 
@@ -235,5 +236,6 @@ class PhyUe {
 
   size_t max_equaled_frame_ = 0;
   std::array<std::shared_ptr<CsvLog::CsvLogger>, CsvLog::kCsvLogs> csv_loggers_;
+  std::vector<std::unique_ptr<Agora_recorder::RecorderThread>> recorders_;
 };
 #endif  // PHY_UE_H_
