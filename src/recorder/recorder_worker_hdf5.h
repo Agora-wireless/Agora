@@ -2,18 +2,22 @@
  * @file recorder_worker_multifile.h
  * @brief Recorder worker to write to multiple bin files per rx symbol
  */
-#ifndef AGORA_RECORDER_WORKER_MULTIFILE_H_
-#define AGORA_RECORDER_WORKER_MULTIFILE_H_
+#ifndef AGORA_RECORDER_WORKER_HDF5_H_
+#define AGORA_RECORDER_WORKER_HDF5_H_
 
+#include <memory>
+#include <string>
+
+#include "hdf5_lib.h"
 #include "recorder_worker.h"
 
 namespace Agora_recorder {
 
-class RecorderWorkerMultiFIle : public RecorderWorker {
+class RecorderWorkerHDF5 : public RecorderWorker {
  public:
-  explicit RecorderWorkerMultiFIle(const Config* in_cfg, size_t antenna_offset,
-                                   size_t num_antennas);
-  virtual ~RecorderWorkerMultiFIle();
+  explicit RecorderWorkerHDF5(const Config* in_cfg, size_t antenna_offset,
+                              size_t num_antennas);
+  virtual ~RecorderWorkerHDF5();
 
   void Init() final;
   void Finalize() final;
@@ -31,7 +35,11 @@ class RecorderWorkerMultiFIle : public RecorderWorker {
 
   size_t antenna_offset_;
   size_t num_antennas_;
+
+  std::unique_ptr<Hdf5Lib> hdf5_;
+  size_t max_frame_number_;
+  std::vector<std::string> datasets_;
 };
 }; /* End namespace Agora_recorder */
 
-#endif /* AGORA_RECORDER_WORKER_MULTIFILE_H_ */
+#endif /* AGORA_RECORDER_WORKER_HDF5_H_ */

@@ -14,11 +14,13 @@ Copyright (c) 2018-2022
 #include <array>
 #include <complex>
 #include <map>
+#include <memory>
 
 #include "H5Cpp.h"
 
 namespace Agora_recorder {
 static constexpr size_t kDsDimsNum = 5;
+
 class Hdf5Lib {
  public:
   Hdf5Lib(H5std_string file_name, H5std_string group_name);
@@ -33,16 +35,17 @@ class Hdf5Lib {
   bool extendDataset(std::string dataset_name, size_t prim_dim_size);
   herr_t writeDataset(std::string dataset_name,
                       std::array<hsize_t, kDsDimsNum> target_id,
-                      std::array<hsize_t, kDsDimsNum> wrt_dim, short* wrt_data);
+                      std::array<hsize_t, kDsDimsNum> wrt_dim,
+                      const short* wrt_data);
   std::vector<short> readDataset(std::string dataset_name,
                                  std::array<hsize_t, kDsDimsNum> target_id,
                                  std::array<hsize_t, kDsDimsNum> read_dim);
   void setTargetPrimaryDimSize(hsize_t dim_size) {
-    target_prim_dim_size = dim_size;
+    target_prim_dim_size_ = dim_size;
   }
-  hsize_t getTargetPrimaryDimSize() { return target_prim_dim_size; }
-  void setMaxPrimaryDimSize(hsize_t dim_size) { max_prim_dim_size = dim_size; }
-  hsize_t getMaxPrimaryDimSize() { return max_prim_dim_size; }
+  hsize_t getTargetPrimaryDimSize() { return target_prim_dim_size_; }
+  void setMaxPrimaryDimSize(hsize_t dim_size) { max_prim_dim_size_ = dim_size; }
+  hsize_t getMaxPrimaryDimSize() { return max_prim_dim_size_; }
   void write_attribute(const char name[], double val);
   void write_attribute(const char name[], const std::vector<double>& val);
   void write_attribute(const char name[],
@@ -58,7 +61,7 @@ class Hdf5Lib {
  private:
   H5std_string hdf5_name_;
   H5std_string group_name_;
-  H5::H5File* file_;
+  std::unique_ptr<H5::H5File> file_;
   H5::Group group_;
 
   std::vector<std::string> dataset_str_;
@@ -66,10 +69,10 @@ class Hdf5Lib {
   std::vector<H5::DataSpace> dataspace_;
   std::vector<H5::DataSet*> datasets_;
   std::vector<std::array<hsize_t, kDsDimsNum>> dims_;
-  hsize_t target_prim_dim_size;
-  hsize_t max_prim_dim_size;
+  hsize_t target_prim_dim_size_;
+  hsize_t max_prim_dim_size_;
 
-  std::map<std::string, size_t> ds_name_id;
+  std::map<std::string, size_t> ds_name_id_;
 };
 };      // namespace Agora_recorder
 #endif  // AGORA_HDF5LIB_H_

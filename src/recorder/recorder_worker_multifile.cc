@@ -33,7 +33,7 @@ void RecorderWorkerMultiFIle::Finalize() {}
 
 int RecorderWorkerMultiFIle::Record(const Packet* pkt) {
   /* TODO: remove TEMP check */
-  size_t end_antenna = (antenna_offset_ + num_antennas_) - 1;
+  const size_t end_antenna = (antenna_offset_ + num_antennas_) - 1;
 
   if ((pkt->ant_id_ < antenna_offset_) || (pkt->ant_id_ > end_antenna)) {
     AGORA_LOG_ERROR(
