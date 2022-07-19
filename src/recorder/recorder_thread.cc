@@ -11,6 +11,7 @@
 
 #include "buffer.h"
 #include "logger.h"
+#include "recorder_worker_multifile.h"
 #include "utils.h"
 
 namespace Agora_recorder {
@@ -19,12 +20,13 @@ RecorderThread::RecorderThread(const Config* in_cfg, size_t thread_id, int core,
                                size_t num_antennas, bool wait_signal)
     : event_queue_(queue_size),
       producer_token_(event_queue_),
-      worker_(in_cfg, antenna_offset, num_antennas),
       thread_(),
       id_(thread_id),
       core_alloc_(core),
       wait_signal_(wait_signal) {
-  worker_.Init();
+  worker_ = std::make_unique<RecorderWorkerMultiFIle>(in_cfg, antenna_offset,
+                                                      num_antennas);
+  worker_->Init();
   running_ = false;
 }
 
@@ -96,7 +98,7 @@ void RecorderThread::DoRecording() {
 
   moodycamel::ConsumerToken ctok(event_queue_);
   AGORA_LOG_INFO("Recording thread %zu has %zu antennas starting at %zu\n", id_,
-                 worker_.NumAntennas(), worker_.AntennaOffset());
+                 worker_->NumAntennas(), worker_->AntennaOffset());
 
   EventData event;
   while (running_) {
@@ -119,7 +121,7 @@ void RecorderThread::DoRecording() {
       HandleEvent(event);
     }
   }
-  worker_.Finalize();
+  worker_->Finalize();
 }
 
 void RecorderThread::HandleEvent(const EventData& event) {
@@ -128,7 +130,7 @@ void RecorderThread::HandleEvent(const EventData& event) {
   } else {
     auto* RxPacket = rx_tag_t(event.tags_[0u]).rx_packet_;
     if (event.event_type_ == EventType::kPacketRX) {
-      worker_.Record(RxPacket->RawPacket());
+      worker_->Record(RxPacket->RawPacket());
     }
     RxPacket->Free();
   }

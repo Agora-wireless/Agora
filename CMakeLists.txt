@@ -317,7 +317,7 @@ include_directories(SYSTEM src/third_party src/third_party/spdlog/include src/th
 set(RECORDER_SOURCES
   src/recorder/recorder.cc
   src/recorder/recorder_thread.cc
-  src/recorder/recorder_worker.cc)
+  src/recorder/recorder_worker_multifile.cc)
 add_library(recorder_sources_lib OBJECT ${RECORDER_SOURCES})
 
 set(COMMON_SOURCES

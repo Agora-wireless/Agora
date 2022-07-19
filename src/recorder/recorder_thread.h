@@ -37,7 +37,7 @@ class RecorderThread {
   // 1 - Producer (dispatcher), 1 - Consumer
   moodycamel::ConcurrentQueue<EventData> event_queue_;
   moodycamel::ProducerToken producer_token_;
-  RecorderWorker worker_;
+  std::unique_ptr<RecorderWorker> worker_;
   std::thread thread_;
 
   size_t id_;

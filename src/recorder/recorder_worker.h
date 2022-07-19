@@ -1,40 +1,28 @@
-/*
- Copyright (c) 2018-2020
- RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
-
-----------------------------------------------------------------------
- Class to handle writting data to an hdf5 file
----------------------------------------------------------------------
-*/
+/**
+ * @file recorder_worker.h
+ * @brief Recorder worker interface definition
+ */
 #ifndef AGORA_RECORDER_WORKER_H_
 #define AGORA_RECORDER_WORKER_H_
 
+#include "buffer.h"
 #include "config.h"
 
 namespace Agora_recorder {
 
 class RecorderWorker {
  public:
-  RecorderWorker(const Config* in_cfg, size_t antenna_offset,
-                 size_t num_antennas);
-  ~RecorderWorker();
+  RecorderWorker([[maybe_unused]] const Config* in_cfg,
+                 [[maybe_unused]] size_t antenna_offset,
+                 [[maybe_unused]] size_t num_antennas){};
+  virtual ~RecorderWorker() = default;
 
-  void Init();
-  void Finalize();
-  int Record(Packet* pkg);
+  virtual void Init() = 0;
+  virtual int Record(const Packet* pkg) = 0;
+  virtual void Finalize() = 0;
 
-  inline size_t NumAntennas() const { return num_antennas_; }
-  inline size_t AntennaOffset() const { return antenna_offset_; }
-
- private:
-  void Open();
-  void Close();
-  void Gc();
-
-  const Config* cfg_;
-
-  size_t antenna_offset_;
-  size_t num_antennas_;
+  virtual size_t NumAntennas() const { return 0; }
+  virtual size_t AntennaOffset() const { return 0; }
 };
 }; /* End namespace Agora_recorder */
 

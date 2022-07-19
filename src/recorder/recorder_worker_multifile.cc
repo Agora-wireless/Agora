@@ -1,4 +1,9 @@
-#include "recorder_worker.h"
+/**
+ * @file recorder_worker_multifile.cc
+ * @brief Recorder worker to write to multiple bin files per rx symbol
+ */
+
+#include "recorder_worker_multifile.h"
 
 #include "logger.h"
 #include "utils.h"
@@ -9,20 +14,24 @@ static constexpr bool kDebugPrint = true;
 static constexpr size_t kRecordFrameInterval = 1;
 static constexpr size_t kShortSerialLen = 3;
 
-RecorderWorker::RecorderWorker(const Config* in_cfg, size_t antenna_offset,
-                               size_t num_antennas)
-    : cfg_(in_cfg),
+RecorderWorkerMultiFIle::RecorderWorkerMultiFIle(const Config* in_cfg,
+                                                 size_t antenna_offset,
+                                                 size_t num_antennas)
+    : RecorderWorker(in_cfg, antenna_offset, num_antennas),
+      cfg_(in_cfg),
       antenna_offset_(antenna_offset),
       num_antennas_(num_antennas) {}
 
-RecorderWorker::~RecorderWorker() { Gc(); }
+RecorderWorkerMultiFIle::~RecorderWorkerMultiFIle() { Gc(); }
 
-void RecorderWorker::Gc() { AGORA_LOG_INFO("Worker Garbage collect\n"); }
+void RecorderWorkerMultiFIle::Gc() {
+  AGORA_LOG_INFO("RecorderWorkerMultiFIle::Garbage collect\n");
+}
 
-void RecorderWorker::Init() {}
-void RecorderWorker::Finalize() {}
+void RecorderWorkerMultiFIle::Init() {}
+void RecorderWorkerMultiFIle::Finalize() {}
 
-int RecorderWorker::Record(Packet* pkt) {
+int RecorderWorkerMultiFIle::Record(const Packet* pkt) {
   /* TODO: remove TEMP check */
   size_t end_antenna = (antenna_offset_ + num_antennas_) - 1;
 
@@ -45,8 +54,8 @@ int RecorderWorker::Record(Packet* pkt) {
     if (dl_symbol_id != SIZE_MAX) {
       if (kDebugPrint) {
         std::printf(
-            "RecorderWorker::record [frame %d, symbol %d, cell %d, ant %d] "
-            "dl_id: %zu - samples: %d %d %d %d %d %d %d %d ....\n",
+            "RecorderWorkerMultiFIle::record [frame %d, symbol %d, cell %d, "
+            "ant %d] dl_id: %zu - samples: %d %d %d %d %d %d %d %d ....\n",
             pkt->frame_id_, pkt->symbol_id_, pkt->cell_id_, pkt->ant_id_,
             dl_symbol_id, pkt->data_[0u], pkt->data_[1u], pkt->data_[2u],
             pkt->data_[3u], pkt->data_[4u], pkt->data_[5u], pkt->data_[6u],
