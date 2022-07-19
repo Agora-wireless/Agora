@@ -5,7 +5,7 @@
 #ifndef MAC_DATA_RECEIVER_H_
 #define MAC_DATA_RECEIVER_H_
 
-#include <cstdint>
+#include <cstddef>
 
 /**
  * @brief The MacDataReceiver interface class

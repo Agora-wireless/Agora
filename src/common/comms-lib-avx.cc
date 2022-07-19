@@ -10,16 +10,40 @@
 
 #include <immintrin.h>
 
+#include <climits>
 #include <iomanip>
 #include <queue>
 
 #include "comms-lib.h"
 
 #define USE_AVX
-#define ALIGNMENT 32
-#define AVX_PACKED_SP 8   // single-precision
-#define AVX_PACKED_SI 16  // short int
-#define AVX_PACKED_CS 8   // complex short int
+#define ALIGNMENT (32)
+#define AVX_PACKED_SP (8)   // single-precision
+#define AVX_PACKED_SI (16)  // short int
+#define AVX_PACKED_CS (8)   // complex short int
+
+static constexpr float kShortMaxFloat = SHRT_MAX;
+
+ssize_t CommsLib::FindBeaconAvx(const std::complex<int16_t>* iq,
+                                const std::vector<std::complex<float>>& seq,
+                                size_t sample_window) {
+  //Sample window must be multiple of 64Bytes (for avx 512)
+  static constexpr size_t kWindowAlignment = 64;
+  const size_t padded_window =
+      (((sample_window / kWindowAlignment) + 1) * kWindowAlignment);
+
+  //Allocate memory, only used for beacon detection
+  std::vector<std::complex<float>> sync_compare(
+      padded_window, std::complex<float>(0.0f, 0.0f));
+
+  // convert entire frame data to complex float for sync detection
+  for (size_t i = 0; i < sample_window; i++) {
+    sync_compare.at(i) = (std::complex<float>(
+        static_cast<float>(iq[i].real()) / kShortMaxFloat,
+        static_cast<float>(iq[i].imag()) / kShortMaxFloat));
+  }
+  return CommsLib::FindBeaconAvx(sync_compare, seq);
+}
 
 /// Correlation and Peak detection of a beacon with Gold code  (2 repetitions)
 int CommsLib::FindBeaconAvx(const std::vector<std::complex<float>>& iq,

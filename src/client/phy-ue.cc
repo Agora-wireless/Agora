@@ -47,9 +47,9 @@ PhyUe::PhyUe(Config* config)
          j < config_->SampsPerSymbol() - config->OfdmTxZeroPostfix(); j++) {
       ue_pilot_vec_.at(i).push_back(std::complex<float>(
           static_cast<float>(config_->UeSpecificPilotT()[i][j].real()) /
-              32768.0f,
+              SHRT_MAX,
           static_cast<float>(config_->UeSpecificPilotT()[i][j].imag()) /
-              32768.0f));
+              SHRT_MAX));
     }
   }
 

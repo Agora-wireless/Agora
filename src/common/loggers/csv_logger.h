@@ -61,8 +61,9 @@ class CsvLogger {
  protected:
   std::shared_ptr<spdlog::logger> logger_;
 #else
-  inline void Write(size_t, size_t, size_t, size_t, float, float) {}
-  inline void Write(const std::string&) {}
+  inline void Write(size_t /*unused*/, size_t /*unused*/, size_t /*unused*/,
+                    size_t /*unused*/, float /*unused*/, float /*unused*/) {}
+  inline void Write(const std::string& /*unused*/) {}
 #endif
 };  // CsvLogger
 

@@ -48,26 +48,30 @@ void TxRxWorkerUsrp::DoTxRx() {
       Configuration()->SampsPerSymbol() * 14, 0);
   std::vector<std::complex<int16_t>> samp_buffer1(
       Configuration()->SampsPerSymbol() * 14, 0);
-  std::vector<void*> samp_buffer(2);
-  samp_buffer[0] = samp_buffer0.data();
+  std::vector<std::vector<std::complex<int16_t>>*> samp_buffer(2);
+  samp_buffer.at(0) = &samp_buffer0;
   if (true) {
-    samp_buffer[1] = samp_buffer1.data();
+    samp_buffer.at(1) = &samp_buffer1;
   }
 
   rx_time_bs_ = 0;
   tx_time_bs_ = 0;
 
+  Radio::RxFlags rx_flags;
   std::cout << "Sync BS host and FGPA timestamp..." << std::endl;
-  radio_config_.RadioRx(0, samp_buffer.data(), rx_time_bs_);
+  radio_config_.RadioRx(0, samp_buffer, Configuration()->SampsPerSymbol(),
+                        rx_flags, rx_time_bs_);
   // Schedule the first beacon in the future
   tx_time_bs_ = rx_time_bs_ + Configuration()->SampsPerSymbol() *
                                   Configuration()->Frame().NumTotalSyms() * 40;
-  radio_config_.RadioTx(0, beaconbuff.data(), 2, tx_time_bs_);
+  radio_config_.RadioTx(0, beaconbuff.data(), Radio::TxFlags::kEndTransmit,
+                        tx_time_bs_);
   long long bs_init_rx_offset = tx_time_bs_ - rx_time_bs_;
   for (int it = 0;
        it < std::floor(bs_init_rx_offset / Configuration()->SampsPerSymbol());
        it++) {
-    radio_config_.RadioRx(0, samp_buffer.data(), rx_time_bs_);
+    radio_config_.RadioRx(0, samp_buffer, Configuration()->SampsPerSymbol(),
+                          rx_flags, rx_time_bs_);
   }
 
   std::cout << std::endl;
@@ -96,7 +100,8 @@ void TxRxWorkerUsrp::DoTxRx() {
       tx_time_bs_ = rx_time_bs_ + Configuration()->SampsPerSymbol() *
                                       Configuration()->Frame().NumTotalSyms() *
                                       20;
-      int tx_ret = radio_config_.RadioTx(0, beaconbuff.data(), 2, tx_time_bs_);
+      int tx_ret = radio_config_.RadioTx(
+          0, beaconbuff.data(), Radio::TxFlags::kEndTransmit, tx_time_bs_);
       if (tx_ret != (int)Configuration()->SampsPerSymbol()) {
         std::cerr << "BAD Transmit(" << tx_ret << "/"
                   << Configuration()->SampsPerSymbol() << ") at Time "
@@ -153,7 +158,10 @@ std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(size_t radio_id,
       (Configuration()->IsUplink(frame_id, symbol_id) == false)) {
     dummy_read = true;
   }
-  const int tmp_ret = radio_config_.RadioRx(radio_id, samp.data(), rx_time_bs_);
+
+  Radio::RxFlags rx_flags;
+  const int tmp_ret = radio_config_.RadioRx(
+      radio_id, samp, Configuration()->SampsPerSymbol(), rx_flags, rx_time_bs_);
 
   if ((tmp_ret > 0) && (dummy_read == false)) {
     const size_t ant_id = radio_id * n_channels;
@@ -234,8 +242,8 @@ int TxRxWorkerUsrp::DequeueSend() {
   }
 
   size_t last = Configuration()->Frame().GetDLSymbolLast();
-  int flags = (symbol_id != last) ? 1   // HAS_TIME
-                                  : 2;  // HAS_TIME & END_BURST, fixme
+  Radio::TxFlags flags = (symbol_id != last) ? Radio::TxFlags::kTxFlagNone
+                                             : Radio::TxFlags::kEndTransmit;
   long long frame_time = ((long long)frame_id << 32) | (symbol_id << 16);
   radio_config_.RadioTx(radio_id, txbuffs.data(), flags, frame_time);
 
@@ -306,9 +314,9 @@ int TxRxWorkerUsrp::DequeueSend(int frame_id, int symbol_id) {
   }
 
   const size_t last = Configuration()->Frame().GetDLSymbolLast();
-  int flags = (symbol_id != static_cast<int>(last))
-                  ? 1   // HAS_TIME
-                  : 2;  // HAS_TIME & END_BURST, fixme
+  Radio::TxFlags flags = (symbol_id != static_cast<int>(last))
+                             ? Radio::TxFlags::kTxFlagNone
+                             : Radio::TxFlags::kEndTransmit;
   long long frame_time = ((long long)frame_id << 32) | (symbol_id << 16);
   radio_config_.RadioTx(radio_id, txbuffs.data(), flags, frame_time);
 
