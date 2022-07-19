@@ -2,61 +2,47 @@
  * @file client_radio.h
  * @brief Declaration file for the client radio config class
  */
-
 #ifndef CLIENT_RADIO_LIB_H_
 #define CLIENT_RADIO_LIB_H_
 
-#include <SoapySDR/Device.hpp>
-#include <SoapySDR/Errors.hpp>
-#include <SoapySDR/Formats.hpp>
-#include <SoapySDR/Time.hpp>
-#include <chrono>
-#include <csignal>
-#include <cstddef>
-#include <cstdint>
+#include <atomic>
 #include <cstdlib>
-#include <iostream>
-#include <string>
-#include <thread>
 #include <vector>
 
 #include "config.h"
+#include "radio.h"
 
 class ClientRadioConfig {
  public:
-  explicit ClientRadioConfig(const Config* const cfg);
+  ClientRadioConfig(const Config* const cfg, Radio::RadioType radio_type);
+  ~ClientRadioConfig();
+
   bool RadioStart();
   void RadioStop();
   void ReadSensors();
-  int RadioTx(size_t /*r*/, void** buffs, size_t num_samps, int flags,
-              long long& frameTime);
-  int RadioRx(size_t /*r*/, void** buffs, size_t num_samps,
-              long long& frameTime);
-  static void DrainRxBuffer(SoapySDR::Device* dev, SoapySDR::Stream* istream,
-                            std::vector<void*> buffs, size_t symSamp);
-  void DrainBuffers();
+  int RadioTx(size_t radio_id, void** buffs, size_t num_samps,
+              Radio::TxFlags flags, long long& tx_time);
+
+  int RadioRx(size_t radio_id,
+              std::vector<std::vector<std::complex<int16_t>>>& rx_data,
+              size_t rx_size, Radio::RxFlags& out_flags, long long& rx_time_ns);
+
+  int RadioRx(size_t radio_id,
+              std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
+              size_t rx_size, Radio::RxFlags& out_flags, long long& rx_time_ns);
+
+  int RadioRx(size_t radio_id, std::vector<void*>& rx_locs, size_t rx_size,
+              Radio::RxFlags& out_flags, long long& rx_time_ns);
+
   void Go();
-  int Triggers(int i);
-  // static void dciqMinimize(SoapySDR::Device*, SoapySDR::Device*, int,
-  // size_t, double, double); static void setIQBalance(SoapySDR::Device*, int,
-  // size_t, int, int); static void
-  // adjustCalibrationGains(std::vector<SoapySDR::Device*>, SoapySDR::Device*,
-  // size_t, double, bool plot = false); static
-  // std::vector<std::complex<float>> snoopSamples(SoapySDR::Device*, size_t,
-  // size_t); void dciqCalibrationProc(size_t);
-  ~ClientRadioConfig();
 
  private:
-  void InitClientRadio(size_t tid);
+  void InitClientRadio(size_t radio_id);
 
   const Config* const cfg_;
-  std::vector<SoapySDR::Device*> cl_stn_;
-  SoapySDR::Device* ref_;
-  SoapySDR::Stream* ref_rx_stream_;
-  std::vector<SoapySDR::Stream*> tx_streams_;
-  std::vector<SoapySDR::Stream*> rx_streams_;
-  size_t radio_num_;
-  size_t antenna_num_;
+  std::vector<std::unique_ptr<Radio>> radios_;
+  size_t total_radios_;
+  size_t total_antennas_;
 
   std::atomic<size_t> num_client_radios_initialized_;
 };

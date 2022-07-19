@@ -177,8 +177,8 @@ Agora supports both uplink and downlink with real RRU and UEs. For downlink, a r
 
 We describe how to get the uplink and downlink demos working. Below XX can be replaced with either `ul` and `dl`.
  * Rebuild the code on both servers for RRU side the UE side.
-    * For Faros RRU and Iris UEs, pass `-DUSE_ARGOS=on -DUSE_UHD=off` to cmake
-    * For USRP-based RRU and UEs, pass `-DUSE_ARGOS=off -DUSE_UHD=on` to cmake
+    * For Faros RRU and Iris UEs, pass `-DRADIO_TYPE=SOAPY_IRIS` to cmake
+    * For USRP-based RRU and UEs, pass `-DRADIO_TYPE=SOAPY_UHD` to cmake
     * Run `make -j` to recompile the code.
  * Run the UE code on the server connected to the Iris UEs
    * For Iris UEs, run the pyfaros tool in the `data` directory as follows:

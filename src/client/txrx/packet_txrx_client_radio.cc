@@ -23,7 +23,8 @@ PacketTxRxClientRadio::PacketTxRxClientRadio(
                  event_notify_q, tx_pending_q, notify_producer_tokens,
                  tx_producer_tokens, rx_buffer, packet_num_in_buffer,
                  frame_start, tx_buffer) {
-  radio_config_ = std::make_unique<ClientRadioConfig>(cfg);
+  radio_config_ =
+      std::make_unique<ClientRadioConfig>(cfg, Radio::kSoapySdrStream);
 }
 
 PacketTxRxClientRadio::~PacketTxRxClientRadio() {
@@ -39,7 +40,7 @@ PacketTxRxClientRadio::~PacketTxRxClientRadio() {
 bool PacketTxRxClientRadio::StartTxRx(Table<complex_float>& calib_dl_buffer,
                                       Table<complex_float>& calib_ul_buffer) {
   AGORA_LOG_FRAME("PacketTxRxClientRadio: StartTxRx threads %zu\n",
-             worker_threads_.size());
+                  worker_threads_.size());
   const bool status = radio_config_->RadioStart();
 
   if (status == false) {
@@ -66,12 +67,6 @@ bool PacketTxRxClientRadio::CreateWorker(size_t tid, size_t interface_count,
       tid, interface_count, interface_offset, interface_offset * num_channels,
       ((interface_offset * num_channels) + (interface_count * num_channels) -
        1));
-
-  //if ((kUseArgos == true) && (config_->UeHwFramer() == true)) {
-  //  txrx_threads_.at(i) = std::thread(&RadioTxRx::LoopTxRxArgos, this, i);
-  //} else if (kUseArgos || kUseUHD) {
-  //  txrx_threads_.at(i) = std::thread(&RadioTxRx::LoopTxRxArgosSync, this, i);
-  //}
 
   //This is the spot to choose what type of TxRxWorker you want....
   if (kUseArgos) {

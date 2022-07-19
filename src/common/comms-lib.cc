@@ -38,7 +38,7 @@ size_t CommsLib::FindPilotSeq(const std::vector<std::complex<float>>& iq,
   }
 
   // Equivalent to numpy's sign function
-  auto iq_sign = CommsLib::Csign(std::move(iq));
+  auto iq_sign = CommsLib::Csign(iq);
 
   // Convolution
   auto pilot_corr = CommsLib::Convolve(iq_sign, pilot_conj);
@@ -79,7 +79,7 @@ int CommsLib::FindLts(const std::vector<std::complex<double>>& iq, int seqLen) {
   }
 
   // Equivalent to numpy's sign function
-  auto iq_sign = CommsLib::Csign(std::move(iq));
+  auto iq_sign = CommsLib::Csign(iq);
 
   // Convolution
   auto lts_corr = CommsLib::Convolve(iq_sign, lts_sym_conj);

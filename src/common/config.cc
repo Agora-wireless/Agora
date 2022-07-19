@@ -210,6 +210,11 @@ Config::Config(const std::string& jsonfile)
   imbalance_cal_en_ = tdd_conf.value("calibrate_analog", false);
   init_calib_repeat_ = tdd_conf.value("init_calib_repeat", 0);
 
+  RtAssert(sample_cal_en_ == false,
+           "Digital / Sample offset calibration is not supported at this time");
+  RtAssert(imbalance_cal_en_ == false,
+           "Analog / imbalance calibration is not supported at this time");
+
   bs_server_addr_ = tdd_conf.value("bs_server_addr", "127.0.0.1");
   bs_rru_addr_ = tdd_conf.value("bs_rru_addr", "127.0.0.1");
   ue_server_addr_ = tdd_conf.value("ue_server_addr", "127.0.0.1");
@@ -566,19 +571,52 @@ Config::Config(const std::string& jsonfile)
   dl_mac_bytes_num_perframe_ = dl_mac_packet_length_ * dl_mac_packets_perframe_;
 
   this->running_.store(true);
+  /* 12 bit samples x2 for I + Q */
+  static const size_t kBitsPerSample = 12 * 2;
+  const double bit_rate_mbps = (rate_ * kBitsPerSample) / 1e6;
+  //For framer mode, we can ignore the Beacon
+  //Double count the UlCal and DLCal to simplify things
+  //Peak network traffic is the bit rate for 1 symbol, for non-hardware framer mode
+  //the device can generate 2*rate_ traffic (for each tx symbol)
+  const size_t bs_tx_symbols =
+      frame_.NumDLSyms() + frame_.NumDLCalSyms() + frame_.NumULCalSyms();
+  const size_t bs_rx_symbols = frame_.NumPilotSyms() + frame_.NumULSyms() +
+                               frame_.NumDLCalSyms() + frame_.NumULCalSyms();
+  const double per_bs_radio_traffic =
+      ((static_cast<double>(bs_tx_symbols + bs_rx_symbols)) /
+       frame_.NumTotalSyms()) *
+      bit_rate_mbps;
+
+  const size_t ue_tx_symbols = frame_.NumULSyms() + frame_.NumPilotSyms();
+  //Rx all symbols, Tx the tx symbols (ul + pilots)
+  const double per_ue_radio_traffic =
+      (bit_rate_mbps *
+       (static_cast<double>(ue_tx_symbols) / frame_.NumTotalSyms())) +
+      bit_rate_mbps;
+
   AGORA_LOG_INFO(
-      "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per frame,\n"
-      "\t%zu uplink data symbols per frame, %zu downlink data symbols per "
+      "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
       "frame,\n"
+      "\t%zu uplink data symbols per frame, %zu downlink data symbols "
+      "per frame,\n"
       "\t%zu OFDM subcarriers (%zu data subcarriers),\n"
-      "\tUL modulation %s, DL modulation %s,\n\t%zu UL codeblocks per symbol, "
+      "\tUL modulation %s, DL modulation %s,\n\t%zu UL codeblocks per "
+      "symbol, "
       "%zu UL bytes per code block,\n"
       "\t%zu DL codeblocks per symbol, %zu DL bytes per code block,\n"
       "\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame,\n"
       "\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame,\n"
       "\tFrame time %.3f usec\n"
       "Uplink Max Mac data per-user tp (Mbps) %.3f\n"
-      "Downlink Max Mac data per-user tp (Mbps) %.3f \n",
+      "Downlink Max Mac data per-user tp (Mbps) %.3f\n"
+      "Radio Network Traffic Peak (Mbps): %.3f\n"
+      "Radio Network Traffic Avg  (Mbps): %.3f\n"
+      "Basestation Network Traffic Peak (Mbps): %.3f\n"
+      "Basestation Network Traffic Avg  (Mbps): %.3f\n"
+      "UE Network Traffic Peak (Mbps): %.3f\n"
+      "UE Network Traffic Avg  (Mbps): %.3f\n"
+      "All UEs Network Traffic Avg (Mbps): %.3f\n"
+      "All UEs Network Traffic Avg (Mbps): %.3f\n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, ul_modulation_.c_str(),
       dl_modulation_.c_str(), ul_ldpc_config_.NumBlocksInSymbol(),
@@ -589,7 +627,11 @@ Config::Config(const std::string& jsonfile)
       (ul_mac_data_bytes_num_perframe_ * 8.0f) /
           (this->GetFrameDurationSec() * 1e6),
       (dl_mac_data_bytes_num_perframe_ * 8.0f) /
-          (this->GetFrameDurationSec() * 1e6));
+          (this->GetFrameDurationSec() * 1e6),
+      bit_rate_mbps, per_bs_radio_traffic, bit_rate_mbps * bs_ant_num_,
+      per_bs_radio_traffic * bs_ant_num_, 2 * bit_rate_mbps,
+      per_ue_radio_traffic, 2 * bit_rate_mbps * ue_ant_num_,
+      per_ue_radio_traffic * ue_ant_num_);
 
   if (frame_.IsRecCalEnabled()) {
     AGORA_LOG_INFO(
