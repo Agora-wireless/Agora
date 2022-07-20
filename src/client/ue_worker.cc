@@ -476,9 +476,12 @@ void UeWorker::DoDemul(size_t tag) {
 
   if (kDownlinkHardDemod && (kPrintPhyStats || kEnableCsvLog) &&
       (dl_symbol_id >= config_.Frame().ClientDlPilotSymbols())) {
+    constexpr bool kSingleScBer = true; // true for single SC BER; false for all SC BER
+    constexpr size_t kSingleScIdx = 10; // SC index for single SC BER
     phy_stats_.UpdateDecodedBits(
         ant_id, total_dl_symbol_id,
-        config_.GetOFDMDataNum() * config_.ModOrderBits(Direction::kDownlink));
+        (kSingleScBer ? 1 : config_.GetOFDMDataNum())
+            * config_.ModOrderBits(Direction::kDownlink));
     phy_stats_.IncrementDecodedBlocks(ant_id, total_dl_symbol_id);
     int8_t* tx_bytes = config_.GetModBitsBuf(
         config_.DlModBits(), Direction::kDownlink, 0, dl_symbol_id,
@@ -487,7 +490,9 @@ void UeWorker::DoDemul(size_t tag) {
     for (size_t i = 0; i < config_.GetOFDMDataNum(); i++) {
       uint8_t rx_byte = static_cast<uint8_t>(demod_ptr[i]);
       uint8_t tx_byte = static_cast<uint8_t>(tx_bytes[i]);
-      phy_stats_.UpdateBitErrors(ant_id, total_dl_symbol_id, tx_byte, rx_byte);
+      if (kSingleScBer == false || i == kSingleScIdx) {
+        phy_stats_.UpdateBitErrors(ant_id, total_dl_symbol_id, tx_byte, rx_byte);
+      }
       if (rx_byte != tx_byte) {
         block_error++;
       }
