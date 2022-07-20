@@ -78,11 +78,7 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
   if (kEnableCsvLog) {
     for (size_t i = 0; i < csv_loggers_.size(); i++) {
       csv_loggers_.at(i) = std::make_shared<CsvLog::CsvLogger>(
-          i,
-          dir_ == Direction::kUplink
-              ? config_->RadioId()    //BS side
-              : config_->UeRadioId(), //UE side
-          dir_);
+          i, dir_ == Direction::kUplink ? "BS" : config_->UeRadioName().at(0));
     }
   }
 }

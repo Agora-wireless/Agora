@@ -11,23 +11,13 @@
 
 namespace CsvLog {
 
-CsvLogger::CsvLogger(size_t log_id, const std::vector<std::string>& serial_vec,
-                     Direction dir) {
+CsvLogger::CsvLogger(size_t log_id, const std::string& radio_name) {
 #if defined(ENABLE_CSV_LOG)
   if (log_id >= kAllLogs) {
     AGORA_LOG_ERROR("Invalid log id %zu in CsvLogger\n", log_id);
   } else {
-    constexpr size_t kShortSerialLen = 3;
-    const std::string short_serial =
-        serial_vec.empty()
-            ? (dir == Direction::kUplink ? "BS" : "UE")
-            : (serial_vec.at(0).length() > kShortSerialLen
-                  ? serial_vec.at(0).substr(serial_vec.at(0).length()
-                                            - kShortSerialLen)
-                  : serial_vec.at(0));
-    std::string filename = "log-" + kCsvName.at(log_id)
-                           + (dir == Direction::kUplink ? "-bs-" : "-ue-")
-                           + short_serial + ".csv";
+    std::string filename = "log/log-" + kCsvName.at(log_id) + "-" + radio_name
+                           + ".csv";
     std::remove(filename.c_str());
     logger_ = spdlog::create_async_nb<spdlog::sinks::basic_file_sink_mt>(
         kCsvName.at(log_id), filename);
@@ -36,8 +26,7 @@ CsvLogger::CsvLogger(size_t log_id, const std::vector<std::string>& serial_vec,
   }
 #else
   unused(log_id);
-  unused(serial_vec);
-  unused(dir);
+  unused(radio_name);
 #endif  //ENABLE_CSV_LOG
 }
 

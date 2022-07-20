@@ -23,8 +23,8 @@ DoZF::DoZF(Config* config, int tid,
            PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
            PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
            PhyStats* in_phy_stats, Stats* stats_manager,
-           std::shared_ptr<CsvLog::MatLogger> dlcsi_logger,
-           std::shared_ptr<CsvLog::MatLogger> dlzf_logger)
+           std::shared_ptr<CsvLog::MatLogger> dl_csi_logger,
+           std::shared_ptr<CsvLog::MatLogger> dl_zf_logger)
     : Doer(config, tid),
       csi_buffers_(csi_buffers),
       calib_dl_buffer_(calib_dl_buffer),
@@ -34,8 +34,8 @@ DoZF::DoZF(Config* config, int tid,
       ul_zf_matrices_(ul_zf_matrices),
       dl_zf_matrices_(dl_zf_matrices),
       phy_stats_(in_phy_stats),
-      dlcsi_logger_(std::move(dlcsi_logger)),
-      dlzf_logger_(std::move(dlzf_logger)) {
+      dl_csi_logger_(std::move(dl_csi_logger)),
+      dl_zf_logger_(std::move(dl_zf_logger)) {
   duration_stat_ = stats_manager->GetDurationStat(DoerType::kZF, tid);
   pred_csi_buffer_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
@@ -126,8 +126,8 @@ float DoZF::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
       mat_dl_zf_tmp = mat_ul_zf_tmp * inv_calib_mat;
     } else {
       arma::cx_fmat mat_dl_csi = arma::diagmat(calib_sc_vec) * mat_csi;
-      if (kEnableMatLog && dlcsi_logger_) {
-        dlcsi_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_csi);
+      if (kEnableMatLog && dl_csi_logger_) {
+        dl_csi_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_csi);
       }
       if (kUseInverseForZF) {
         try {
@@ -158,8 +158,8 @@ float DoZF::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(dl_zf_mem),
                             cfg_->BsAntNum(), cfg_->UeAntNum(), false);
     mat_dl_zf = mat_dl_zf_tmp.st();
-    if (kEnableMatLog && dlzf_logger_) {
-      dlzf_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_zf);
+    if (kEnableMatLog && dl_zf_logger_) {
+      dl_zf_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_zf);
     }
   }
   for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {

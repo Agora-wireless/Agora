@@ -17,9 +17,10 @@
 
 using json = nlohmann::json;
 
-static const size_t kMacAlignmentBytes = 64u;
+static constexpr size_t kMacAlignmentBytes = 64u;
 static constexpr bool kDebugPrintConfiguration = false;
-static const size_t kMaxSupportedZc = 256;
+static constexpr size_t kMaxSupportedZc = 256;
+static constexpr size_t kShortIdLen = 3;
 
 Config::Config(const std::string& jsonfile)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -129,8 +130,18 @@ Config::Config(const std::string& jsonfile)
 
   if (ue_radio_id_.empty() == false) {
     ue_num_ = ue_radio_id_.size();
+    for (size_t i = 0; i < ue_num_; i++) {
+      ue_radio_name_.push_back("UE" +
+          (ue_radio_id_.at(i).length() > kShortIdLen
+              ? ue_radio_id_.at(i).substr(ue_radio_id_.at(i).length()
+                                          - kShortIdLen)
+              : ue_radio_id_.at(i)));
+    }
   } else {
     ue_num_ = tdd_conf.value("ue_radio_num", 8);
+    for (size_t i = 0; i < ue_num_; i++) {
+      ue_radio_name_.push_back("UE" + std::to_string(i));
+    }
   }
 
   channel_ = tdd_conf.value("channel", "A");
