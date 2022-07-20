@@ -67,7 +67,7 @@ class Hdf5Lib {
   std::vector<std::string> dataset_str_;
   std::vector<H5::DSetCreatPropList> prop_list_;
   std::vector<H5::DataSpace> dataspace_;
-  std::vector<H5::DataSet*> datasets_;
+  std::vector<std::unique_ptr<H5::DataSet>> datasets_;
   std::vector<std::array<hsize_t, kDsDimsNum>> dims_;
   hsize_t target_prim_dim_size_;
   hsize_t max_prim_dim_size_;

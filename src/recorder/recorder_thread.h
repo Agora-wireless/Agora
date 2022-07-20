@@ -11,6 +11,7 @@ Event based message queue thread class for the recorder worker
 
 #include <condition_variable>
 #include <mutex>
+#include <vector>
 
 #include "concurrentqueue.h"
 #include "recorder_worker.h"
@@ -37,7 +38,7 @@ class RecorderThread {
   // 1 - Producer (dispatcher), 1 - Consumer
   moodycamel::ConcurrentQueue<EventData> event_queue_;
   moodycamel::ProducerToken producer_token_;
-  std::unique_ptr<RecorderWorker> worker_;
+  std::vector<std::unique_ptr<RecorderWorker>> workers_;
   std::thread thread_;
 
   size_t id_;

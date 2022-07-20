@@ -10,10 +10,7 @@
 
 namespace Agora_recorder {
 
-static constexpr bool kDebugPrint = true;
-static constexpr size_t kRecordFrameInterval = 1;
-static constexpr size_t kShortSerialLen = 3;
-
+static constexpr bool kDebugPrint = false;
 static const std::string hdf5_filename = "TestOutput.h5";
 static constexpr size_t kMaxFrameInc = 2000;
 static constexpr size_t kDsDimSymbol = 2;
@@ -228,7 +225,7 @@ int RecorderWorkerHDF5::Record(const Packet* pkt) {
 
   if (kDebugPrint) {
     std::printf(
-        "RecorderWorkerMultiFIle::record [frame %zu, symbol %zu, cell %d, "
+        "RecorderWorkerHDF5::record [frame %zu, symbol %zu, cell %d, "
         "ant %zu] samples: %d %d %d %d %d %d %d %d ....\n",
         frame_id, symbol_id, pkt->cell_id_, ant_id, pkt->data_[0u],
         pkt->data_[1u], pkt->data_[2u], pkt->data_[3u], pkt->data_[4u],

@@ -9,11 +9,11 @@
 
 namespace Agora_recorder {
 
-class RecorderWorkerMultiFIle : public RecorderWorker {
+class RecorderWorkerMultiFile : public RecorderWorker {
  public:
-  explicit RecorderWorkerMultiFIle(const Config* in_cfg, size_t antenna_offset,
+  explicit RecorderWorkerMultiFile(const Config* in_cfg, size_t antenna_offset,
                                    size_t num_antennas);
-  virtual ~RecorderWorkerMultiFIle();
+  virtual ~RecorderWorkerMultiFile();
 
   void Init() final;
   void Finalize() final;
