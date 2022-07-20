@@ -10,6 +10,7 @@
 #include <array>
 #include <memory>
 #include <vector>
+
 #include "symbols.h"
 
 #if defined(ENABLE_CSV_LOG)
@@ -39,8 +40,8 @@ constexpr size_t kAllLogs = kCsvLogs + kMatLogs;
 
 #if defined(ENABLE_CSV_LOG)
 const std::array<std::string, kAllLogs> kCsvName = {
-    "snr", "rssi", "noise", "evm", "evmsnr", "ber", "ser", "csi",
-    "dlcsi", "dlzf"};
+    "snr", "rssi", "noise", "evm",   "evmsnr",
+    "ber", "ser",  "csi",   "dlcsi", "dlzf"};
 const std::array<std::string, kAllLogs> kMatHeader = {
     "Frame,Subcarrier,BS-Ant,UE-Ant,Real,Imag",
     "Frame,Subcarrier,BS-Ant,UE-Ant,Real,Imag"};

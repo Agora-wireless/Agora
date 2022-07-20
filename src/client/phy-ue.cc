@@ -4,8 +4,9 @@
  */
 #include "phy-ue.h"
 
-#include <memory>
 #include <sys/stat.h>
+
+#include <memory>
 
 #include "packet_txrx_client_radio.h"
 #include "packet_txrx_client_sim.h"
@@ -439,10 +440,10 @@ void PhyUe::Start() {
               if (kEnableCsvLog) {
                 constexpr size_t kRecScNum = 3;
                 //set subcarriers to record DL CSI
-                constexpr std::array<size_t, kRecScNum> csi_rec_sc =
-                    {20, 140, 280};
-                const size_t csi_offset_base = (frame_id % kFrameWnd)
-                                               * config_->UeAntNum();
+                constexpr std::array<size_t, kRecScNum> csi_rec_sc = {20, 140,
+                                                                      280};
+                const size_t csi_offset_base =
+                    (frame_id % kFrameWnd) * config_->UeAntNum();
                 arma::fmat csi_rec(config_->UeAntNum(), csi_rec_sc.size());
                 for (size_t i = 0; i < csi_rec.n_rows; i++) {
                   auto* csi_buffer_ptr = reinterpret_cast<arma::cx_float*>(
