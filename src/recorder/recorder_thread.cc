@@ -11,6 +11,7 @@
 
 #include "buffer.h"
 #include "logger.h"
+#include "recorder_worker_hdf5.h"
 #include "recorder_worker_multifile.h"
 #include "utils.h"
 
@@ -24,9 +25,15 @@ RecorderThread::RecorderThread(const Config* in_cfg, size_t thread_id, int core,
       id_(thread_id),
       core_alloc_(core),
       wait_signal_(wait_signal) {
-  worker_ = std::make_unique<RecorderWorkerMultiFIle>(in_cfg, antenna_offset,
-                                                      num_antennas);
-  worker_->Init();
+  workers_.emplace_back(std::make_unique<RecorderWorkerMultiFile>(
+      in_cfg, antenna_offset, num_antennas));
+
+  workers_.emplace_back(std::make_unique<RecorderWorkerHDF5>(
+      in_cfg, antenna_offset, num_antennas));
+
+  for (size_t i = 0; i < workers_.size(); i++) {
+    workers_.at(i)->Init();
+  }
   running_ = false;
 }
 
@@ -97,8 +104,11 @@ void RecorderThread::DoRecording() {
   }
 
   moodycamel::ConsumerToken ctok(event_queue_);
-  AGORA_LOG_INFO("Recording thread %zu has %zu antennas starting at %zu\n", id_,
-                 worker_->NumAntennas(), worker_->AntennaOffset());
+  AGORA_LOG_INFO(
+      "Recording thread[%zu], writter count %zu, has %zu antennas starting at "
+      "%zu\n",
+      id_, workers_.size(), workers_.at(0)->NumAntennas(),
+      workers_.at(0)->AntennaOffset());
 
   EventData event;
   while (running_) {
@@ -121,7 +131,10 @@ void RecorderThread::DoRecording() {
       HandleEvent(event);
     }
   }
-  worker_->Finalize();
+
+  for (size_t i = 0; i < workers_.size(); i++) {
+    workers_.at(i)->Finalize();
+  }
 }
 
 void RecorderThread::HandleEvent(const EventData& event) {
@@ -130,7 +143,9 @@ void RecorderThread::HandleEvent(const EventData& event) {
   } else {
     auto* RxPacket = rx_tag_t(event.tags_[0u]).rx_packet_;
     if (event.event_type_ == EventType::kPacketRX) {
-      worker_->Record(RxPacket->RawPacket());
+      for (size_t i = 0; i < workers_.size(); i++) {
+        workers_.at(i)->Record(RxPacket->RawPacket());
+      }
     }
     RxPacket->Free();
   }

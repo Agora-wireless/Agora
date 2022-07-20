@@ -36,7 +36,7 @@ void Hdf5Lib::closeFile() {
   if (file_ != nullptr) {
     AGORA_LOG_INFO("File exists exists during garbage collection\n");
     file_->close();
-    file_.release();
+    file_.reset();
   }
 }
 int Hdf5Lib::createDataset(H5std_string dataset_name,
@@ -76,19 +76,19 @@ int Hdf5Lib::createDataset(H5std_string dataset_name,
   prop_list_.push_back(ds_prop);
   dataspace_.push_back(ds_dataspace);
   dims_.push_back(tot_dims);
-  datasets_.push_back(nullptr);
   const size_t map_size = ds_name_id_.size();
   ds_name_id_[dataset_name] = map_size;
   return 0;
 }
 
 void Hdf5Lib::openDataset() {
-  AGORA_LOG_TRACE("Open HDF5 file: %s\n", hdf5_name_.c_str());
+  AGORA_LOG_INFO("Open HDF5 file Dataset: %s\n", hdf5_name_.c_str());
   file_->openFile(hdf5_name_, H5F_ACC_RDWR);
   for (size_t i = 0; i < dataset_str_.size(); i++) {
-    std::string ds_name("/" + group_name_ + "/" + dataset_str_.at(i));
+    const std::string ds_name("/" + group_name_ + "/" + dataset_str_.at(i));
     try {
-      datasets_.at(i) = new H5::DataSet(file_->openDataSet(ds_name));
+      datasets_.emplace_back(
+          std::make_unique<H5::DataSet>(file_->openDataSet(ds_name)));
       H5::DataSpace filespace(datasets_.at(i)->getSpace());
       prop_list_.at(i).copy(datasets_.at(i)->getCreatePlist());
       if (kPrintDataSetInfo == true) {
@@ -117,15 +117,16 @@ void Hdf5Lib::openDataset() {
 void Hdf5Lib::removeDataset(std::string dataset_name) {
   const std::string ds_name("/" + group_name_ + "/" + dataset_name);
   const size_t ds_id = ds_name_id_[dataset_name];
-  AGORA_LOG_TRACE("%s Dataset exists during garbage collection\n",
-                  dataset_str_.at(ds_id).c_str());
-  datasets_.at(ds_id)->close();
-  datasets_.at(ds_id) = nullptr;
-  delete datasets_.at(ds_id);
+  if (datasets_.at(ds_id) != nullptr) {
+    AGORA_LOG_INFO("%s Dataset exists during garbage collection\n",
+                   dataset_str_.at(ds_id).c_str());
+    datasets_.at(ds_id)->close();
+    datasets_.at(ds_id).reset();
+  }
 }
 
 void Hdf5Lib::closeDataset() {
-  AGORA_LOG_INFO("Close HD5F file: %s\n", hdf5_name_.c_str());
+  AGORA_LOG_INFO("Close HD5F file dataset: %s\n", hdf5_name_.c_str());
 
   if (file_ != nullptr) {
     for (size_t i = 0; i < dataset_str_.size(); i++) {
@@ -141,10 +142,10 @@ void Hdf5Lib::closeDataset() {
         error.printErrorStack();
         throw;
       }
-      datasets_.at(i) = nullptr;
-      delete datasets_.at(i);
+      datasets_.at(i).reset();
     }
     file_->close();
+    file_.reset();
     AGORA_LOG_INFO("Saving HD5F: %llu frames saved on CPU %d\n",
                    target_prim_dim_size_, sched_getcpu());
   }
