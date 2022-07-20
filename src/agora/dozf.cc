@@ -385,8 +385,7 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
     double start_tsc3 = GetTime::WorkerRdtsc();
     duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
 
-    auto rcond = ComputePrecoder(frame_id, cur_sc_id,
-                                 mat_csi, cal_sc_vec,
+    auto rcond = ComputePrecoder(frame_id, cur_sc_id, mat_csi, cal_sc_vec,
                                  ul_zf_matrices_[frame_slot][cur_sc_id],
                                  dl_zf_matrices_[frame_slot][cur_sc_id]);
     if (kPrintZfStats) {
@@ -466,8 +465,7 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
   arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer_),
                         cfg_->BsAntNum(), cfg_->UeAntNum(), false);
 
-  ComputePrecoder(frame_id, base_sc_id,
-                  mat_csi, cal_sc_vec,
+  ComputePrecoder(frame_id, base_sc_id, mat_csi, cal_sc_vec,
                   ul_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)],
                   dl_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)]);
 

@@ -12,7 +12,7 @@
 namespace CsvLog {
 
 MatLogger::MatLogger(size_t mat_log_id, const std::string& radio_name)
-         : CsvLogger(mat_log_id + kMatIdStart, radio_name) {
+    : CsvLogger(mat_log_id + kMatIdStart, radio_name) {
 #if defined(ENABLE_MAT_LOG)
   logger_->info(kMatHeader.at(mat_log_id));
 #endif
@@ -26,11 +26,11 @@ bool MatLogger::UpdateMatBuf(const size_t frame_id, const size_t sc_id,
 #if defined(ENABLE_MAT_LOG)
   if (frame_id >= kFrameStart && frame_id < kFrameStart + kFrames &&
       sc_id < kSCs) {
-    const auto mat_copy_size = arma::size(
-        mat_in.n_rows < kBSAnts ? mat_in.n_rows : kBSAnts,
-        mat_in.n_cols < kUEAnts ? mat_in.n_cols : kUEAnts);
-    mat_buffer_.at(frame_id - kFrameStart).at(sc_id)(0, 0, mat_copy_size)
-        = mat_in(0, 0, mat_copy_size);
+    const auto mat_copy_size =
+        arma::size(mat_in.n_rows < kBSAnts ? mat_in.n_rows : kBSAnts,
+                   mat_in.n_cols < kUEAnts ? mat_in.n_cols : kUEAnts);
+    mat_buffer_.at(frame_id - kFrameStart).at(sc_id)(0, 0, mat_copy_size) =
+        mat_in(0, 0, mat_copy_size);
     status = true;
   }
 #else

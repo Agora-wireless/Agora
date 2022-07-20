@@ -25,7 +25,6 @@ static constexpr bool kPrintDownlinkPilotStats = false;
 static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr bool kRecordDownlinkFrame = true;
 static constexpr size_t kRecordFrameInterval = 100;
-static constexpr size_t kShortSerialLen = 3;
 static constexpr bool kDebugTxMemory = false;
 
 UeWorker::UeWorker(
@@ -278,8 +277,8 @@ void UeWorker::DoFftData(size_t tag) {
 
   const size_t sig_offset = config_.OfdmRxZeroPrefixClient();
   const size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
-  const size_t dl_data_symbol_id = dl_symbol_id -
-                                   config_.Frame().ClientDlPilotSymbols();
+  const size_t dl_data_symbol_id =
+      dl_symbol_id - config_.Frame().ClientDlPilotSymbols();
 
   if (kRecordDownlinkFrame) {
     if (frame_id > 0 && frame_id % kRecordFrameInterval == 0) {

@@ -460,7 +460,7 @@ void Agora::Start() {
                 }
               }
               this->phy_stats_->ClearEvmBuffer(frame_id);
-              
+
               // skip Decode when hard demod is enabled
               if (kUplinkHardDemod == true) {
                 assert(this->cur_proc_frame_id_ == frame_id);

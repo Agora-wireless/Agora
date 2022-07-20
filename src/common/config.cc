@@ -131,11 +131,11 @@ Config::Config(const std::string& jsonfile)
   if (ue_radio_id_.empty() == false) {
     ue_num_ = ue_radio_id_.size();
     for (size_t i = 0; i < ue_num_; i++) {
-      ue_radio_name_.push_back("UE" +
-          (ue_radio_id_.at(i).length() > kShortIdLen
-              ? ue_radio_id_.at(i).substr(ue_radio_id_.at(i).length()
-                                          - kShortIdLen)
-              : ue_radio_id_.at(i)));
+      ue_radio_name_.push_back(
+          "UE" + (ue_radio_id_.at(i).length() > kShortIdLen
+                      ? ue_radio_id_.at(i).substr(ue_radio_id_.at(i).length() -
+                                                  kShortIdLen)
+                      : ue_radio_id_.at(i)));
     }
   } else {
     ue_num_ = tdd_conf.value("ue_radio_num", 8);
