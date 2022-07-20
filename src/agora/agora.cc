@@ -89,10 +89,8 @@ Agora::Agora(Config* const cfg)
   }
 
   if (kEnableMatLog) {
-    constexpr Direction kMatLogDir = Direction::kUplink; //BS side
     for (size_t i = 0; i < mat_loggers_.size(); i++) {
-      mat_loggers_.at(i) = std::make_shared<CsvLog::MatLogger>(
-          i, cfg->RadioId(), kMatLogDir);
+      mat_loggers_.at(i) = std::make_shared<CsvLog::MatLogger>(i, "BS");
     }
   }
 
