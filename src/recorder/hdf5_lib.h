@@ -28,7 +28,8 @@ class Hdf5Lib {
   void closeFile();
   int createDataset(std::string dataset_name,
                     std::array<hsize_t, kDsDimsNum> tot_dims,
-                    std::array<hsize_t, kDsDimsNum> chunk_dims);
+                    std::array<hsize_t, kDsDimsNum> chunk_dims,
+                    H5::PredType type = H5::PredType::STD_I16BE);
   void removeDataset(std::string dataset_name);
   void openDataset();
   void closeDataset();
@@ -37,6 +38,12 @@ class Hdf5Lib {
                       std::array<hsize_t, kDsDimsNum> target_id,
                       std::array<hsize_t, kDsDimsNum> wrt_dim,
                       const short* wrt_data);
+
+  herr_t writeDataset(std::string dataset_name,
+                      std::array<hsize_t, kDsDimsNum> target_id,
+                      std::array<hsize_t, kDsDimsNum> wrt_dim,
+                      const float* wrt_data);
+
   std::vector<short> readDataset(std::string dataset_name,
                                  std::array<hsize_t, kDsDimsNum> target_id,
                                  std::array<hsize_t, kDsDimsNum> read_dim);

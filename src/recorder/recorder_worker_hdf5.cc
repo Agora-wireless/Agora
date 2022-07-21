@@ -5,13 +5,16 @@
 
 #include "recorder_worker_hdf5.h"
 
+#include <ctime>
+
 #include "logger.h"
 #include "utils.h"
+#include "version_config.h"
 
 namespace Agora_recorder {
 
 static constexpr bool kDebugPrint = false;
-static const std::string hdf5_filename = "TestOutput.h5";
+static const std::string hdf5_filename = "TestOutputWithTx.h5";
 static constexpr size_t kMaxFrameInc = 2000;
 static constexpr size_t kDsDimSymbol = 2;
 
@@ -34,6 +37,17 @@ void RecorderWorkerHDF5::Init() {
   AGORA_LOG_INFO("RecorderWorkerHDF5::Creating output HD5F file: %s\n",
                  hdf5_filename.c_str());
   hdf5_ = std::make_unique<Hdf5Lib>(hdf5_filename, "Data");
+
+  hdf5_->write_attribute("SOFTWARE", "AGORA");
+  hdf5_->write_attribute("SOFTWARE_VERSION", GetAgoraProjectVersion());
+
+  auto time = std::time(nullptr);
+  auto local_time = *std::localtime(&time);
+
+  std::ostringstream oss;
+  oss << std::put_time(&local_time, "%d-%m-%Y %H-%M-%S");
+  hdf5_->write_attribute("TIME", oss.str());
+
   // Write Atrributes
   // ******* COMMON ******** //
   // TX/RX Frequencyfile
@@ -52,10 +66,16 @@ void RecorderWorkerHDF5::Init() {
   hdf5_->write_attribute("SLOT_SAMP_LEN", cfg_->SampsPerSymbol());
 
   // Size of FFT
-  hdf5_->write_attribute("FFT_SIZE", cfg_->FftBlockSize());
+  //hdf5_->write_attribute("FFT_SIZE", cfg_->OfdmCaNum());
 
   // Length of cyclic prefix
   hdf5_->write_attribute("CP_LEN", cfg_->CpLen());
+
+  hdf5_->write_attribute("OFDM_DATA_NUM", cfg_->OfdmDataNum());
+  hdf5_->write_attribute("OFDM_DATA_START", cfg_->OfdmDataStart());
+  hdf5_->write_attribute("OFDM_DATA_STOP", cfg_->OfdmDataStop());
+  hdf5_->write_attribute("OFDM_PILOT_SPACING", cfg_->OfdmPilotSpacing());
+  hdf5_->write_attribute("OFDM_CA_NUM", cfg_->OfdmCaNum());
 
   // Beacon sequence type (string)
   //hdf5_->write_attribute("BEACON_SEQ_TYPE", cfg_->beacon_seq());
@@ -196,11 +216,67 @@ void RecorderWorkerHDF5::Init() {
         num_antennas_, IQ};
     hdf5_->createDataset(datasets_.back(), dims_dl_data, cdims);
   }
-  //Should we add Pilot DL Data as a seperate dataset?
+
+  //*2 for complex
+  const hsize_t tx_data_size = 2 * cfg_->OfdmCaNum();
+  const std::array<hsize_t, kDsDimsNum> tx_data_dims = {1, 1, 1, 1,
+                                                        tx_data_size};
+  //Adding the ground truths as a DataSet
+  {
+    std::string dataset_name = "TxData";
+    datasets_.push_back(dataset_name);
+    const std::array<hsize_t, kDsDimsNum> total_dims = {
+        1, 1, cfg_->Frame().ClientDlPilotSymbols(), num_antennas_,
+        tx_data_size};
+
+    hdf5_->createDataset(datasets_.back(), total_dims, tx_data_dims,
+                         H5::PredType::INTEL_F32);
+  }
+
+  const hsize_t tx_pilot_size = 2 * cfg_->OfdmDataNum();
+  const std::array<hsize_t, kDsDimsNum> tx_pilot_dims = {1, 1, 1, 1,
+                                                         tx_pilot_size};
+  {  //TXPilot
+    std::string dataset_name = "TxPilot";
+    datasets_.push_back(dataset_name);
+    const std::array<hsize_t, kDsDimsNum> total_dims = {1, 1, 1, num_antennas_,
+                                                        tx_pilot_size};
+
+    hdf5_->createDataset(datasets_.back(), total_dims, tx_pilot_dims,
+                         H5::PredType::INTEL_F32);
+  }
 
   hdf5_->setTargetPrimaryDimSize(kMaxFrameInc);
   hdf5_->setMaxPrimaryDimSize(cfg_->FramesToTest());
   hdf5_->openDataset();
+
+  {
+    const std::string dataset_name = "TxData";
+    for (size_t ant = 0; ant < num_antennas_; ant++) {
+      for (size_t sym = 0; sym < cfg_->Frame().ClientDlPilotSymbols(); sym++) {
+        const std::array<hsize_t, kDsDimsNum> hdfoffset = {0, 0, sym, ant, 0};
+        AGORA_LOG_INFO(
+            "Attempting to write TxData for Symbol %zu, Antenna %zu total syms "
+            "%zu\n",
+            sym, ant, cfg_->Frame().ClientDlPilotSymbols());
+        hdf5_->writeDataset(
+            dataset_name, hdfoffset, tx_data_dims,
+            reinterpret_cast<float*>(const_cast<Config*>(cfg_)->DlIqF()[sym] +
+                                     (ant * cfg_->OfdmCaNum())));
+      }
+    }
+  }
+
+  {
+    const std::string dataset_name = "TxPilot";
+    for (size_t ant = 0; ant < num_antennas_; ant++) {
+      const std::array<hsize_t, kDsDimsNum> hdfoffset = {0, 0, 0, ant, 0};
+      hdf5_->writeDataset(
+          dataset_name, hdfoffset, tx_pilot_dims,
+          reinterpret_cast<float*>(
+              const_cast<Config*>(cfg_)->UeSpecificPilot()[ant]));
+    }
+  }
 }
 void RecorderWorkerHDF5::Finalize() {
   hdf5_->closeDataset();
