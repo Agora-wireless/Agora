@@ -56,64 +56,14 @@ class Agora {
   } flags_;
 
  private:
-  /// Determines if all the work has been completed on the frame_id
-  /// Completion is determined based on the ifft, tx, decode, and tomac
-  /// counters. If frame processing is complete.  All of the work counters are
-  /// reset and the cur_proc_frame_id_ is incremented.  Returns true if all
-  /// processing is complete AND the frame_id is the last frame to test. False
-  /// otherwise.
-  bool CheckFrameComplete(size_t frame_id);
-
   void WorkerFft(int tid);
   void WorkerZf(int tid);
   void WorkerDemul(int tid);
   void WorkerDecode(int tid);
   void Worker(int tid);
+  void CreateThreads();
 
-  void CreateThreads();  /// Launch worker threads
-
-  void InitializeQueues();
-  void InitializeUplinkBuffers();
-  void InitializeDownlinkBuffers();
-  void FreeQueues();
-  void FreeUplinkBuffers();
-  void FreeDownlinkBuffers();
-
-  void SaveDecodeDataToFile(int frame_id);
-  void SaveTxDataToFile(int frame_id);
-
-  void HandleEventFft(size_t tag);
-  void UpdateRxCounters(size_t frame_id, size_t symbol_id);
-  void PrintPerFrameDone(PrintType print_type, size_t frame_id);
-  void PrintPerSymbolDone(PrintType print_type, size_t frame_id,
-                          size_t symbol_id);
-  void PrintPerTaskDone(PrintType print_type, size_t frame_id, size_t symbol_id,
-                        size_t ant_or_sc_id);
-
-  /// Update Agora's RAN config parameters
-  void UpdateRanConfig(RanConfig rc);
-
-  void ScheduleSubcarriers(EventType event_type, size_t frame_id,
-                           size_t symbol_id);
-  void ScheduleAntennas(EventType event_type, size_t frame_id,
-                        size_t symbol_id);
-  void ScheduleAntennasTX(size_t frame_id, size_t symbol_id);
-  void ScheduleDownlinkProcessing(size_t frame_id);
-
-  /**
-   * @brief Schedule LDPC decoding or encoding over code blocks
-   * @param task_type Either LDPC decoding or LDPC encoding
-   * @param frame_id The monotonically increasing frame ID
-   * @param symbol_idx The index of the symbol among uplink symbols for LDPC
-   * decoding, and among downlink symbols for LDPC encoding
-   */
-  void ScheduleCodeblocks(EventType event_type, Direction dir, size_t frame_id,
-                          size_t symbol_idx);
-
-  void ScheduleUsers(EventType event_type, size_t frame_id, size_t symbol_id);
-
-  // Send current frame's SNR measurements from PHY to MAC
-  void SendSnrReport(EventType event_type, size_t frame_id, size_t symbol_id);
+  std::vector<std::thread> workers_;
 };
 
 #endif  // AGORA_H_
