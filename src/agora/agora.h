@@ -83,6 +83,9 @@ class Agora {
   void CheckIncrementScheduleFrame(size_t frame_id,
                                    ScheduleProcessingFlags completed);
 
+  // Handle events
+  size_t fetch_event(EventData events_list[], bool is_turn_to_dequeue_from_io);
+
   void WorkerFft(int tid);
   void WorkerZf(int tid);
   void WorkerDemul(int tid);
@@ -159,7 +162,6 @@ class Agora {
   // Worker thread i runs on core base_worker_core_offset + i
   const size_t base_worker_core_offset_;
 
-  Config* const config_;
   size_t fft_created_count_;
   size_t max_equaled_frame_ = SIZE_MAX;
   std::unique_ptr<PacketTxRx> packet_tx_rx_;
@@ -240,7 +242,6 @@ class Agora {
   // cur_sche_frame_id is the frame that is currently being scheduled.
   // A frame's schduling finishes before processing ends, so the two
   // variables are possible to have different values.
-  size_t cur_proc_frame_id_ = 0;
   size_t cur_sche_frame_id_ = 0;
 
   // The frame index for a symbol whose FFT is done
