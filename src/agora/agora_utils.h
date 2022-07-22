@@ -12,6 +12,7 @@
 #include <system_error>
 #include <vector>
 
+#include "agora_helper.h"
 #include "buffer.h"
 #include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"
@@ -35,30 +36,10 @@
 // TODO: global variables will hold variables while we disintegrate Agora class
 //       once we modularize Agora, we will move these to each class
 
-/* Parameters */
-// TODO: some should be moved to symbols.h
+// file specific debugger variables
 static const bool kDebugPrintPacketsFromMac = false;
 static const bool kDebugDeferral = true;
-static const size_t kDefaultMessageQueueSize = 512;
-static const size_t kDefaultWorkerQueueSize = 256;
-// Max number of worker threads allowed
-static const size_t kMaxWorkerNum = 50;
-static const size_t kScheduleQueues = 2;
-// Dequeue batch size, used to reduce the overhead of dequeue in main thread
-static const size_t kDequeueBulkSizeTXRX = 8;
-static const size_t kDequeueBulkSizeWorker = 4;
 
-enum ScheduleProcessingFlags : uint8_t {
-  kNone = 0,
-  kUplinkComplete = 0x1,
-  kDownlinkComplete = 0x2,
-  kProcessingComplete = (kUplinkComplete + kDownlinkComplete)
-};
-
-struct SchedInfoT {
-  moodycamel::ConcurrentQueue<EventData> concurrent_q;
-  moodycamel::ProducerToken* ptok;
-};
 SchedInfoT sched_info_arr[kScheduleQueues][kNumEventTypes];
 
 /* Configuration */
@@ -222,270 +203,6 @@ uint8_t schedule_process_flags_;
 std::queue<size_t> encode_deferral_;
 std::array<std::shared_ptr<CsvLog::MatLogger>, CsvLog::kMatLogs> mat_loggers_;
 
-// Function declaration
-void PrintPerSymbolDone(PrintType print_type, size_t frame_id,
-                        size_t symbol_id);
-void PrintPerSymbolDone(PrintType print_type, size_t frame_id,
-                        size_t symbol_id);
-
-/* Util functions */
-// Fetch the concurrent queue for this event type
-moodycamel::ConcurrentQueue<EventData>* GetConq(EventType event_type,
-                                                size_t qid) {
-  return &sched_info_arr[qid][static_cast<size_t>(event_type)].concurrent_q;
-}
-
-// Fetch the producer token for this event type
-moodycamel::ProducerToken* GetPtok(EventType event_type, size_t qid) {
-  return sched_info_arr[qid][static_cast<size_t>(event_type)].ptok;
-}
-
-// Return a string containing the sizes of the FFT queues
-std::string GetFftQueueSizesString() {
-  std::ostringstream ret;
-  ret << "[";
-  for (size_t i = 0; i < kFrameWnd; i++) {
-    ret << std::to_string(fft_queue_arr_[i].size()) << " ";
-  }
-  ret << "]";
-  return ret.str();
-}
-
-// Print functions
-void PrintPerFrameDone(PrintType print_type, size_t frame_id) {
-  if (kDebugPrintPerFrameDone == true) {
-    switch (print_type) {
-      case (PrintType::kPacketRXPilots):
-        AGORA_LOG_INFO(
-            "Main [frame %zu + %.2f ms]: Received all pilots\n", frame_id,
-            stats_->MasterGetDeltaMs(TsType::kPilotAllRX,
-                                     TsType::kFirstSymbolRX, frame_id));
-        break;
-      case (PrintType::kPacketRX):
-        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Received all packets\n",
-                       frame_id,
-                       stats_->MasterGetDeltaMs(
-                           TsType::kRXDone, TsType::kFirstSymbolRX, frame_id));
-        break;
-      case (PrintType::kFFTPilots):
-        AGORA_LOG_INFO(
-            "Main [frame %zu + %.2f ms]: FFT-ed all pilots\n", frame_id,
-            stats_->MasterGetDeltaMs(TsType::kFFTPilotsDone,
-                                     TsType::kFirstSymbolRX, frame_id));
-        break;
-      case (PrintType::kFFTCal):
-        AGORA_LOG_INFO(
-            "Main [frame %zu + %.2f ms]: FFT-ed all calibration symbols\n",
-            frame_id,
-            stats_->MasterGetUsSince(TsType::kRCAllRX, frame_id) / 1000.0);
-        break;
-      case (PrintType::kZF):
-        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed zero-forcing\n",
-                       frame_id,
-                       stats_->MasterGetDeltaMs(
-                           TsType::kZFDone, TsType::kFirstSymbolRX, frame_id));
-        break;
-      case (PrintType::kDemul):
-        AGORA_LOG_INFO(
-            "Main [frame %zu + %.2f ms]: Completed demodulation\n", frame_id,
-            stats_->MasterGetDeltaMs(TsType::kDemulDone, TsType::kFirstSymbolRX,
-                                     frame_id));
-        break;
-      case (PrintType::kDecode):
-        AGORA_LOG_INFO(
-            "Main [frame %zu + %.2f ms]: Completed LDPC decoding (%zu UL "
-            "symbols)\n",
-            frame_id,
-            stats_->MasterGetDeltaMs(TsType::kDecodeDone,
-                                     TsType::kFirstSymbolRX, frame_id),
-            config->Frame().NumULSyms());
-        break;
-      case (PrintType::kPacketFromMac):
-        AGORA_LOG_INFO(
-            "Main [frame %zu + %.2f ms]: Completed MAC RX \n", frame_id,
-            stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id));
-        break;
-      case (PrintType::kEncode):
-        AGORA_LOG_INFO(
-            "Main [frame %zu + %.2f ms]: Completed LDPC encoding\n", frame_id,
-            stats_->MasterGetDeltaMs(TsType::kEncodeDone,
-                                     TsType::kFirstSymbolRX, frame_id));
-        break;
-      case (PrintType::kPrecode):
-        AGORA_LOG_INFO(
-            "Main [frame %zu + %.2f ms]: Completed precoding\n", frame_id,
-            stats_->MasterGetDeltaMs(TsType::kPrecodeDone,
-                                     TsType::kFirstSymbolRX, frame_id));
-        break;
-      case (PrintType::kIFFT):
-        AGORA_LOG_INFO(
-            "Main [frame %zu + %.2f ms]: Completed IFFT\n", frame_id,
-            stats_->MasterGetDeltaMs(TsType::kIFFTDone, TsType::kFirstSymbolRX,
-                                     frame_id));
-        break;
-      case (PrintType::kPacketTXFirst):
-        AGORA_LOG_INFO(
-            "Main [frame %zu + %.2f ms]: Completed TX of first symbol\n",
-            frame_id,
-            stats_->MasterGetDeltaMs(TsType::kTXProcessedFirst,
-                                     TsType::kFirstSymbolRX, frame_id));
-        break;
-      case (PrintType::kPacketTX):
-        AGORA_LOG_INFO(
-            "Main [frame %zu + %.2f ms]: Completed TX (%zu DL symbols)\n",
-            frame_id,
-            stats_->MasterGetDeltaMs(TsType::kTXDone, TsType::kFirstSymbolRX,
-                                     frame_id),
-            config->Frame().NumDLSyms());
-        break;
-      case (PrintType::kPacketToMac):
-        AGORA_LOG_INFO(
-            "Main [frame %zu + %.2f ms]: Completed MAC TX \n", frame_id,
-            stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id));
-        break;
-      default:
-        AGORA_LOG_ERROR("Wrong task type in frame done print!");
-    }
-  }
-}
-
-void PrintPerSymbolDone(PrintType print_type, size_t frame_id,
-                        size_t symbol_id) {
-  if (kDebugPrintPerSymbolDone == true) {
-    switch (print_type) {
-      case (PrintType::kFFTPilots):
-        AGORA_LOG_INFO(
-            "Main [frame %zu symbol %zu + %.3f ms]: FFT-ed pilot symbol, "
-            "%zu symbols done\n",
-            frame_id, symbol_id,
-            stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
-            pilot_fft_counters_.GetSymbolCount(frame_id) + 1);
-        break;
-      case (PrintType::kFFTData):
-        AGORA_LOG_INFO(
-            "Main [frame %zu symbol %zu + %.3f ms]: FFT-ed data symbol, "
-            "%zu precoder status: %d\n",
-            frame_id, symbol_id,
-            stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
-            uplink_fft_counters_.GetSymbolCount(frame_id) + 1,
-            static_cast<int>(zf_last_frame_ == frame_id));
-        break;
-      case (PrintType::kDemul):
-        AGORA_LOG_INFO(
-            "Main [frame %zu symbol %zu + %.3f ms]: Completed "
-            "demodulation, "
-            "%zu symbols done\n",
-            frame_id, symbol_id,
-            stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
-            demul_counters_.GetSymbolCount(frame_id) + 1);
-        break;
-      case (PrintType::kDecode):
-        AGORA_LOG_INFO(
-            "Main [frame %zu symbol %zu + %.3f ms]: Completed decoding, "
-            "%zu symbols done\n",
-            frame_id, symbol_id,
-            stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
-            decode_counters_.GetSymbolCount(frame_id) + 1);
-        break;
-      case (PrintType::kEncode):
-        AGORA_LOG_INFO(
-            "Main [frame %zu symbol %zu + %.3f ms]: Completed encoding, "
-            "%zu symbols done\n",
-            frame_id, symbol_id,
-            stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
-            encode_counters_.GetSymbolCount(frame_id) + 1);
-        break;
-      case (PrintType::kPrecode):
-        AGORA_LOG_INFO(
-            "Main [frame %zu symbol %zu + %.3f ms]: Completed precoding, "
-            "%zu symbols done\n",
-            frame_id, symbol_id,
-            stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
-            precode_counters_.GetSymbolCount(frame_id) + 1);
-        break;
-      case (PrintType::kIFFT):
-        AGORA_LOG_INFO(
-            "Main [frame %zu symbol %zu + %.3f ms]: Completed IFFT, "
-            "%zu symbols done\n",
-            frame_id, symbol_id,
-            stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
-            ifft_counters_.GetSymbolCount(frame_id) + 1);
-        break;
-      case (PrintType::kPacketTX):
-        AGORA_LOG_INFO(
-            "Main [frame %zu symbol %zu + %.3f ms]: Completed TX, "
-            "%zu symbols done\n",
-            frame_id, symbol_id,
-            stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
-            tx_counters_.GetSymbolCount(frame_id) + 1);
-        break;
-      case (PrintType::kPacketToMac):
-        AGORA_LOG_INFO(
-            "Main [frame %zu symbol %zu + %.3f ms]: Completed MAC TX, "
-            "%zu symbols done\n",
-            frame_id, symbol_id,
-            stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
-            tomac_counters_.GetSymbolCount(frame_id) + 1);
-        break;
-      default:
-        AGORA_LOG_INFO("Wrong task type in symbol done print!");
-    }
-  }
-}
-
-void PrintPerTaskDone(PrintType print_type, size_t frame_id, size_t symbol_id,
-                      size_t ant_or_sc_id) {
-  if (kDebugPrintPerTaskDone == true) {
-    switch (print_type) {
-      case (PrintType::kZF):
-        AGORA_LOG_INFO("Main thread: ZF done frame: %zu, subcarrier %zu\n",
-                       frame_id, ant_or_sc_id);
-        break;
-      case (PrintType::kRC):
-        AGORA_LOG_INFO("Main thread: RC done frame: %zu, subcarrier %zu\n",
-                       frame_id, ant_or_sc_id);
-        break;
-      case (PrintType::kDemul):
-        AGORA_LOG_INFO(
-            "Main thread: Demodulation done frame: %zu, symbol: %zu, sc: "
-            "%zu, num blocks done: %zu\n",
-            frame_id, symbol_id, ant_or_sc_id,
-            demul_counters_.GetTaskCount(frame_id, symbol_id));
-        break;
-      case (PrintType::kDecode):
-        AGORA_LOG_INFO(
-            "Main thread: Decoding done frame: %zu, symbol: %zu, sc: %zu, "
-            "num blocks done: %zu\n",
-            frame_id, symbol_id, ant_or_sc_id,
-            decode_counters_.GetTaskCount(frame_id, symbol_id));
-        break;
-      case (PrintType::kPrecode):
-        AGORA_LOG_INFO(
-            "Main thread: Precoding done frame: %zu, symbol: %zu, "
-            "subcarrier: %zu, total SCs: %zu\n",
-            frame_id, symbol_id, ant_or_sc_id,
-            precode_counters_.GetTaskCount(frame_id, symbol_id));
-        break;
-      case (PrintType::kIFFT):
-        AGORA_LOG_INFO(
-            "Main thread: IFFT done frame: %zu, symbol: %zu, antenna: %zu, "
-            "total ants: %zu\n",
-            frame_id, symbol_id, ant_or_sc_id,
-            ifft_counters_.GetTaskCount(frame_id, symbol_id));
-        break;
-      case (PrintType::kPacketTX):
-        AGORA_LOG_INFO(
-            "Main thread: TX done frame: %zu, symbol: %zu, antenna: %zu, "
-            "total packets: %zu\n",
-            frame_id, symbol_id, ant_or_sc_id,
-            tx_counters_.GetTaskCount(frame_id, symbol_id));
-        break;
-      default:
-        AGORA_LOG_INFO("Wrong task type in task done print!");
-    }
-  }
-}
-
 /* Core Agora functions */
 // Event handler
 size_t fetch_event(EventData events_list[], bool is_turn_to_dequeue_from_io) {
@@ -559,12 +276,13 @@ void ScheduleSubcarriers(EventType event_type, size_t frame_id,
                                 block_size * (i * event.num_tags_ + j))
                 .tag_;
       }
-      TryEnqueueFallback(GetConq(event_type, qid), GetPtok(event_type, qid),
-                         event);
+      TryEnqueueFallback(GetConq(sched_info_arr, event_type, qid),
+                         GetPtok(sched_info_arr, event_type, qid), event);
     }
   } else {
     for (size_t i = 0; i < num_events; i++) {
-      TryEnqueueFallback(GetConq(event_type, qid), GetPtok(event_type, qid),
+      TryEnqueueFallback(GetConq(sched_info_arr, event_type, qid),
+                         GetPtok(sched_info_arr, event_type, qid),
                          EventData(event_type, base_tag.tag_));
       base_tag.sc_id_ += block_size;
     }
@@ -593,8 +311,8 @@ void ScheduleCodeblocks(EventType event_type, Direction dir, size_t frame_id,
       event.tags_[j] = base_tag.tag_;
       base_tag.cb_id_++;
     }
-    TryEnqueueFallback(GetConq(event_type, qid), GetPtok(event_type, qid),
-                       event);
+    TryEnqueueFallback(GetConq(sched_info_arr, event_type, qid),
+                       GetPtok(sched_info_arr, event_type, qid), event);
   }
 }
 
@@ -651,8 +369,8 @@ void ScheduleAntennas(EventType event_type, size_t frame_id, size_t symbol_id) {
       event.tags_[j] = base_tag.tag_;
       base_tag.ant_id_++;
     }
-    TryEnqueueFallback(GetConq(event_type, qid), GetPtok(event_type, qid),
-                       event);
+    TryEnqueueFallback(GetConq(sched_info_arr, event_type, qid),
+                       GetPtok(sched_info_arr, event_type, qid), event);
   }
 }
 
@@ -686,7 +404,7 @@ void ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
           "event(s) to worker %zu transmit queue\n",
           frame_id, symbol_id, worker.size(), enqueue_worker_id);
 
-      TryEnqueueBulkFallback(GetConq(EventType::kPacketTX, 0),
+      TryEnqueueBulkFallback(GetConq(sched_info_arr, EventType::kPacketTX, 0),
                              tx_ptoks_ptr[enqueue_worker_id], worker.data(),
                              worker.size());
     }
@@ -809,7 +527,8 @@ void HandleEventFft(size_t tag) {
     const bool last_fft_task =
         pilot_fft_counters_.CompleteTask(frame_id, symbol_id);
     if (last_fft_task == true) {
-      PrintPerSymbolDone(PrintType::kFFTPilots, frame_id, symbol_id);
+      stats_->PrintPerSymbolDone(PrintType::kFFTPilots, frame_id, symbol_id,
+                                 pilot_fft_counters_);
 
       if ((config->Frame().IsRecCalEnabled() == false) ||
           ((config->Frame().IsRecCalEnabled() == true) &&
@@ -819,7 +538,7 @@ void HandleEventFft(size_t tag) {
             pilot_fft_counters_.CompleteSymbol(frame_id);
         if (last_pilot_fft == true) {
           stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
-          PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
+          stats_->PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
           pilot_fft_counters_.Reset(frame_id);
           if (kPrintPhyStats == true) {
             phy_stats_->PrintSnrStats(frame_id);
@@ -840,7 +559,8 @@ void HandleEventFft(size_t tag) {
     if (last_fft_per_symbol == true) {
       fft_cur_frame_for_symbol_.at(symbol_idx_ul) = frame_id;
 
-      PrintPerSymbolDone(PrintType::kFFTData, frame_id, symbol_id);
+      stats_->PrintPerSymbolDone(PrintType::kFFTData, frame_id, symbol_id,
+                                 uplink_fft_counters_);
       // If precoder exist, schedule demodulation
       if (zf_last_frame_ == frame_id) {
         ScheduleSubcarriers(EventType::kDemul, frame_id, symbol_id);
@@ -853,11 +573,12 @@ void HandleEventFft(size_t tag) {
     }
   } else if ((sym_type == SymbolType::kCalDL) ||
              (sym_type == SymbolType::kCalUL)) {
-    PrintPerSymbolDone(PrintType::kFFTCal, frame_id, symbol_id);
+    stats_->PrintPerSymbolDone(PrintType::kFFTCal, frame_id, symbol_id,
+                               rc_counters_);
 
     const bool last_rc_task = rc_counters_.CompleteTask(frame_id);
     if (last_rc_task == true) {
-      PrintPerFrameDone(PrintType::kFFTCal, frame_id);
+      stats_->PrintPerFrameDone(PrintType::kFFTCal, frame_id);
       rc_counters_.Reset(frame_id);
       stats_->MasterSetTsc(TsType::kRCDone, frame_id);
       rc_last_frame_ = frame_id;
@@ -898,8 +619,8 @@ void InitializeQueues() {
 
   for (size_t i = 0; i < config->SocketThreadNum(); i++) {
     rx_ptoks_ptr[i] = new moodycamel::ProducerToken(message_queue);
-    tx_ptoks_ptr[i] =
-        new moodycamel::ProducerToken(*GetConq(EventType::kPacketTX, 0));
+    tx_ptoks_ptr[i] = new moodycamel::ProducerToken(
+        *GetConq(sched_info_arr, EventType::kPacketTX, 0));
   }
 
   for (size_t i = 0; i < config->WorkerThreadNum(); i++) {
@@ -1085,108 +806,4 @@ void FreeDownlinkBuffers() {
     dl_bits_buffer_.Free();
     dl_bits_buffer_status_.Free();
   }
-}
-
-// Config
-void UpdateRanConfig(RanConfig rc) {
-  nlohmann::json msc_params = config->MCSParams(Direction::kUplink);
-  msc_params["modulation"] = MapModToStr(rc.mod_order_bits_);
-  config->UpdateUlMCS(msc_params);
-}
-
-void UpdateRxCounters(size_t frame_id, size_t symbol_id) {
-  const size_t frame_slot = frame_id % kFrameWnd;
-  if (config->IsPilot(frame_id, symbol_id)) {
-    rx_counters_.num_pilot_pkts_[frame_slot]++;
-    if (rx_counters_.num_pilot_pkts_.at(frame_slot) ==
-        rx_counters_.num_pilot_pkts_per_frame_) {
-      rx_counters_.num_pilot_pkts_.at(frame_slot) = 0;
-      stats_->MasterSetTsc(TsType::kPilotAllRX, frame_id);
-      PrintPerFrameDone(PrintType::kPacketRXPilots, frame_id);
-    }
-  } else if (config->IsCalDlPilot(frame_id, symbol_id) ||
-             config->IsCalUlPilot(frame_id, symbol_id)) {
-    rx_counters_.num_reciprocity_pkts_.at(frame_slot)++;
-    if (rx_counters_.num_reciprocity_pkts_.at(frame_slot) ==
-        rx_counters_.num_reciprocity_pkts_per_frame_) {
-      rx_counters_.num_reciprocity_pkts_.at(frame_slot) = 0;
-      stats_->MasterSetTsc(TsType::kRCAllRX, frame_id);
-    }
-  }
-  // Receive first packet in a frame
-  if (rx_counters_.num_pkts_.at(frame_slot) == 0) {
-    if (kEnableMac == false) {
-      // schedule this frame's encoding
-      // Defer the schedule.  If frames are already deferred or the current
-      // received frame is too far off
-      if ((encode_deferral_.empty() == false) ||
-          (frame_id >= (cur_proc_frame_id + kScheduleQueues))) {
-        if (kDebugDeferral) {
-          AGORA_LOG_INFO("   +++ Deferring encoding of frame %zu\n", frame_id);
-        }
-        encode_deferral_.push(frame_id);
-      } else {
-        ScheduleDownlinkProcessing(frame_id);
-      }
-    }
-    stats_->MasterSetTsc(TsType::kFirstSymbolRX, frame_id);
-    if (kDebugPrintPerFrameStart) {
-      const size_t prev_frame_slot = (frame_slot + kFrameWnd - 1) % kFrameWnd;
-      AGORA_LOG_INFO(
-          "Main [frame %zu + %.2f ms since last frame]: Received "
-          "first packet. Remaining packets in prev frame: %zu\n",
-          frame_id,
-          stats_->MasterGetDeltaMs(TsType::kFirstSymbolRX, frame_id,
-                                   frame_id - 1),
-          rx_counters_.num_pkts_[prev_frame_slot]);
-    }
-  }
-
-  rx_counters_.num_pkts_.at(frame_slot)++;
-  if (rx_counters_.num_pkts_.at(frame_slot) ==
-      rx_counters_.num_rx_pkts_per_frame_) {
-    stats_->MasterSetTsc(TsType::kRXDone, frame_id);
-    PrintPerFrameDone(PrintType::kPacketRX, frame_id);
-    rx_counters_.num_pkts_.at(frame_slot) = 0;
-  }
-}
-
-// Utils
-void SaveDecodeDataToFile(int frame_id) {
-  const size_t num_decoded_bytes =
-      config->NumBytesPerCb(Direction::kUplink) *
-      config->LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
-
-  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string filename = cur_directory + "/data/decode_data.bin";
-  AGORA_LOG_INFO("Saving decode data to %s\n", filename.c_str());
-  FILE* fp = std::fopen(filename.c_str(), "wb");
-
-  for (size_t i = 0; i < config->Frame().NumULSyms(); i++) {
-    for (size_t j = 0; j < config->UeAntNum(); j++) {
-      int8_t* ptr = decoded_buffer_[(frame_id % kFrameWnd)][i][j];
-      std::fwrite(ptr, num_decoded_bytes, sizeof(uint8_t), fp);
-    }
-  }
-  std::fclose(fp);
-}
-
-void SaveTxDataToFile(UNUSED int frame_id) {
-  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string filename = cur_directory + "/data/tx_data.bin";
-  AGORA_LOG_INFO("Saving Frame %d TX data to %s\n", frame_id, filename.c_str());
-  FILE* fp = std::fopen(filename.c_str(), "wb");
-
-  for (size_t i = 0; i < config->Frame().NumDLSyms(); i++) {
-    size_t total_data_symbol_id = config->GetTotalDataSymbolIdxDl(frame_id, i);
-
-    for (size_t ant_id = 0; ant_id < config->BsAntNum(); ant_id++) {
-      size_t offset = total_data_symbol_id * config->BsAntNum() + ant_id;
-      auto* pkt = reinterpret_cast<Packet*>(
-          &dl_socket_buffer_[offset * config->DlPacketLength()]);
-      short* socket_ptr = pkt->data_;
-      std::fwrite(socket_ptr, config->SampsPerSymbol() * 2, sizeof(short), fp);
-    }
-  }
-  std::fclose(fp);
 }
