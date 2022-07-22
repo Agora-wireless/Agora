@@ -29,7 +29,6 @@ class RecorderWorkerHDF5 : public RecorderWorker {
  private:
   void Open();
   void Close();
-  void Gc();
 
   const Config* cfg_;
 
@@ -38,7 +37,9 @@ class RecorderWorkerHDF5 : public RecorderWorker {
 
   std::unique_ptr<Hdf5Lib> hdf5_;
   size_t max_frame_number_;
-  std::vector<std::string> datasets_;
+  std::vector<std::pair<std::string, std::array<hsize_t, kDsDimsNum>>>
+      datasets_;
+  const std::array<hsize_t, kDsDimsNum> data_chunk_dims_;
 };
 }; /* End namespace Agora_recorder */
 
