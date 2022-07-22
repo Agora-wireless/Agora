@@ -148,6 +148,12 @@ class Stats {
                                this->freq_ghz_);
   }
 
+  void PrintPerFrameDone(PrintType print_type, size_t frame_id);
+  void PrintPerSymbolDone(PrintType print_type, size_t frame_id,
+                          size_t symbol_id, FrameCounters counters);
+  void PrintPerTaskDone(PrintType print_type, size_t frame_id, size_t symbol_id,
+                        size_t ant_or_sc_id, FrameCounters counters);
+
   /// Get the DurationStat object used by thread thread_id for DoerType
   /// doer_type
   DurationStat* GetDurationStat(DoerType doer_type, size_t thread_id) {

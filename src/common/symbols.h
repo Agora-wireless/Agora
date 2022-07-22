@@ -112,6 +112,24 @@ enum class PrintType : int {
   kModul
 };
 
+enum ScheduleProcessingFlags : uint8_t {
+  kNone = 0,
+  kUplinkComplete = 0x1,
+  kDownlinkComplete = 0x2,
+  kProcessingComplete = (kUplinkComplete + kDownlinkComplete)
+};
+
+// Moved from Agora class
+// TODO: need organization
+static const size_t kDefaultMessageQueueSize = 512;
+static const size_t kDefaultWorkerQueueSize = 256;
+// Max number of worker threads allowed
+static const size_t kMaxWorkerNum = 50;
+static const size_t kScheduleQueues = 2;
+// Dequeue batch size, used to reduce the overhead of dequeue in main thread
+static const size_t kDequeueBulkSizeTXRX = 8;
+static const size_t kDequeueBulkSizeWorker = 4;
+
 // Enable thread pinning and exit if thread pinning fails. Thread pinning is
 // crucial for good performance. For testing or developing Agora on machines
 // with insufficient cores, disable this flag.
