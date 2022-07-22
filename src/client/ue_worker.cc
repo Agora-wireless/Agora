@@ -23,9 +23,6 @@ static constexpr bool kDebugPrintDecode = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDownlinkPilotStats = false;
 static constexpr bool kPrintEqualizedSymbols = false;
-static constexpr bool kRecordDownlinkFrame = true;
-static constexpr size_t kRecordFrameInterval = 100;
-static constexpr size_t kShortSerialLen = 3;
 static constexpr bool kDebugTxMemory = false;
 
 UeWorker::UeWorker(
@@ -160,7 +157,6 @@ void UeWorker::DoFftPilot(size_t tag) {
   const size_t symbol_id = pkt->symbol_id_;
   const size_t ant_id = pkt->ant_id_;
   const size_t frame_slot = frame_id % kFrameWnd;
-  const size_t radio_id = ant_id / config_.NumUeChannels();
 
   if (kDebugPrintInTask || kDebugPrintFft) {
     AGORA_LOG_INFO("UeWorker[%zu]: Fft Pilot(frame %zu, symbol %zu, ant %zu)\n",
@@ -186,30 +182,6 @@ void UeWorker::DoFftPilot(size_t tag) {
     AGORA_LOG_INFO(
         "UeWorker: Fft Pilot(frame %zu symbol %zu ant %zu) sig offset %zu\n",
         frame_id, symbol_id, ant_id, pilot_offset);
-  }
-
-  if (kRecordDownlinkFrame) {
-    if (frame_id > 0 && frame_id % kRecordFrameInterval == 0) {
-      const std::string short_serial =
-          config_.UeRadioId().empty()
-              ? "UE"
-              : config_.UeRadioId().at(radio_id).substr(
-                    config_.UeRadioId().at(radio_id).length() -
-                    kShortSerialLen);
-      const std::string pkt_id = "F" + std::to_string(frame_id) + "_S" +
-                                 std::to_string(symbol_id) + "_A" +
-                                 std::to_string(ant_id);
-      const std::string rx_fname =
-          "rxpilot_" + pkt_id + "_" + short_serial + ".bin";
-      FILE* f = std::fopen(rx_fname.c_str(), "wb");
-      std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
-      std::fclose(f);
-      const std::string tx_fname = "txpilot_" + pkt_id + ".bin";
-      f = std::fopen(tx_fname.c_str(), "wb");
-      std::fwrite(config_.UeSpecificPilot()[ant_id], 2 * sizeof(float),
-                  config_.OfdmDataNum(), f);
-      std::fclose(f);
-    }
   }
 
   // remove CP, do FFT
@@ -281,7 +253,6 @@ void UeWorker::DoFftData(size_t tag) {
   const size_t symbol_id = pkt->symbol_id_;
   const size_t ant_id = pkt->ant_id_;
   const size_t frame_slot = frame_id % kFrameWnd;
-  const size_t radio_id = ant_id / config_.NumUeChannels();
 
   if (kDebugPrintInTask || kDebugPrintFft) {
     AGORA_LOG_INFO("UeWorker[%zu]: Fft Data(frame %zu, symbol %zu, ant %zu)\n",
@@ -290,30 +261,6 @@ void UeWorker::DoFftData(size_t tag) {
 
   const size_t sig_offset = config_.OfdmRxZeroPrefixClient();
   const size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
-
-  if (kRecordDownlinkFrame) {
-    if (frame_id > 0 && frame_id % kRecordFrameInterval == 0) {
-      const std::string short_serial =
-          config_.UeRadioId().empty()
-              ? "UE"
-              : config_.UeRadioId().at(radio_id).substr(
-                    config_.UeRadioId().at(radio_id).length() -
-                    kShortSerialLen);
-      const std::string pkt_id = "F" + std::to_string(frame_id) + "_S" +
-                                 std::to_string(symbol_id) + "_A" +
-                                 std::to_string(ant_id);
-      const std::string rx_fname =
-          "rxdata_" + pkt_id + "_" + short_serial + ".bin";
-      FILE* f = std::fopen(rx_fname.c_str(), "wb");
-      std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
-      std::fclose(f);
-      const std::string tx_fname = "txdata_" + pkt_id + ".bin";
-      f = std::fopen(tx_fname.c_str(), "wb");
-      std::fwrite(config_.DlIqF()[dl_symbol_id] + ant_id * config_.OfdmCaNum(),
-                  2 * sizeof(float), config_.OfdmCaNum(), f);
-      std::fclose(f);
-    }
-  }
 
   // remove CP, do FFT
   size_t total_dl_symbol_id =

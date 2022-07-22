@@ -14,7 +14,7 @@
 namespace Agora_recorder {
 
 static constexpr bool kDebugPrint = false;
-static const std::string hdf5_filename = "TestOutputWithTx.h5";
+static const std::string hdf5_filename = "UeRxData.h5";
 static constexpr size_t kFrameInc = 2000;
 static constexpr size_t kDsDimSymbol = 2;
 
