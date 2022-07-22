@@ -215,7 +215,7 @@ void RecorderWorkerHDF5::Init() {
   }
 
   //Adding the ground truths as a DataSet
-  if (false) {  //TxData
+  {  //TxData
     //Including the Pilots here.....
     //*2 for complex
     const hsize_t tx_data_size = 2 * cfg_->OfdmCaNum();
@@ -224,7 +224,7 @@ void RecorderWorkerHDF5::Init() {
     const std::array<hsize_t, kDsDimsNum> tx_data_dims = {1, 1, 1, 1,
                                                           tx_data_size};
     const std::array<hsize_t, kDsDimsNum> total_dims = {
-        1, 1, num_dl_data_syms, num_antennas_, total_dims.back()};
+        1, 1, num_dl_data_syms, num_antennas_, tx_data_dims.back()};
 
     hdf5_->CreateDataset(dataset_name, tx_data_dims, total_dims, -1,
                          H5::PredType::INTEL_F32);
@@ -245,7 +245,7 @@ void RecorderWorkerHDF5::Init() {
     hdf5_->FinalizeDataset(dataset_name);
   }
 
-  if (false) {  //TXPilot
+  {  //TXPilot
     std::string dataset_name("TxPilot");
     const hsize_t tx_pilot_size = 2 * cfg_->OfdmDataNum();
     const std::array<hsize_t, kDsDimsNum> tx_pilot_dims = {1, 1, 1, 1,
