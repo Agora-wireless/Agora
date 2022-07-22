@@ -23,63 +23,54 @@ static constexpr size_t kDsDimsNum = 5;
 
 class Hdf5Lib {
  public:
-  Hdf5Lib(H5std_string file_name, H5std_string group_name);
+  Hdf5Lib(const H5std_string& file_name, const H5std_string& group_name);
   ~Hdf5Lib();
-  void closeFile();
-  int createDataset(std::string dataset_name,
-                    std::array<hsize_t, kDsDimsNum> tot_dims,
-                    std::array<hsize_t, kDsDimsNum> chunk_dims,
+
+  int CreateDataset(const std::string& dataset_name,
+                    const std::array<hsize_t, kDsDimsNum>& chunk_dims,
+                    const std::array<hsize_t, kDsDimsNum>& init_dims,
+                    const ssize_t extend_dimension = 0,
                     H5::PredType type = H5::PredType::STD_I16BE);
-  void removeDataset(std::string dataset_name);
-  void openDataset();
-  void closeDataset();
-  bool extendDataset(std::string dataset_name, size_t prim_dim_size);
-  herr_t writeDataset(std::string dataset_name,
-                      std::array<hsize_t, kDsDimsNum> target_id,
-                      std::array<hsize_t, kDsDimsNum> wrt_dim,
+  void FinalizeDataset(const std::string& dataset_name);
+
+  void ExtendDataset(const std::string& dataset_name,
+                     const std::array<hsize_t, kDsDimsNum>& extended_dims);
+  herr_t WriteDataset(const std::string& dataset_name,
+                      const std::array<hsize_t, kDsDimsNum>& start,
+                      const std::array<hsize_t, kDsDimsNum>& count,
                       const short* wrt_data);
 
-  herr_t writeDataset(std::string dataset_name,
-                      std::array<hsize_t, kDsDimsNum> target_id,
-                      std::array<hsize_t, kDsDimsNum> wrt_dim,
+  herr_t WriteDataset(const std::string& dataset_name,
+                      const std::array<hsize_t, kDsDimsNum>& start,
+                      const std::array<hsize_t, kDsDimsNum>& count,
                       const float* wrt_data);
 
-  std::vector<short> readDataset(std::string dataset_name,
-                                 std::array<hsize_t, kDsDimsNum> target_id,
-                                 std::array<hsize_t, kDsDimsNum> read_dim);
-  void setTargetPrimaryDimSize(hsize_t dim_size) {
-    target_prim_dim_size_ = dim_size;
-  }
-  hsize_t getTargetPrimaryDimSize() { return target_prim_dim_size_; }
-  void setMaxPrimaryDimSize(hsize_t dim_size) { max_prim_dim_size_ = dim_size; }
-  hsize_t getMaxPrimaryDimSize() { return max_prim_dim_size_; }
-  void write_attribute(const char name[], double val);
-  void write_attribute(const char name[], const std::vector<double>& val);
-  void write_attribute(const char name[],
-                       const std::vector<std::complex<int16_t>>& val);
-  void write_attribute(const char name[],
-                       const std::vector<std::complex<float>>& val);
-  void write_attribute(const char name[], size_t val);
-  void write_attribute(const char name[], int val);
-  void write_attribute(const char name[], const std::vector<size_t>& val);
-  void write_attribute(const char name[], const std::string& val);
-  void write_attribute(const char name[], const std::vector<std::string>& val);
+  //std::vector<short> ReadDataset(
+  //    const std::string& dataset_name,
+  //    const std::array<hsize_t, kDsDimsNum>& target_id,
+  //    const std::array<hsize_t, kDsDimsNum>& read_dim);
+
+  void WriteAttribute(const char name[], double val);
+  void WriteAttribute(const char name[], const std::vector<double>& val);
+  void WriteAttribute(const char name[],
+                      const std::vector<std::complex<int16_t>>& val);
+  void WriteAttribute(const char name[],
+                      const std::vector<std::complex<float>>& val);
+  void WriteAttribute(const char name[], size_t val);
+  void WriteAttribute(const char name[], int val);
+  void WriteAttribute(const char name[], const std::vector<size_t>& val);
+  void WriteAttribute(const char name[], const std::string& val);
+  void WriteAttribute(const char name[], const std::vector<std::string>& val);
 
  private:
   H5std_string hdf5_name_;
   H5std_string group_name_;
   std::unique_ptr<H5::H5File> file_;
-  H5::Group group_;
+  std::unique_ptr<H5::Group> group_;
 
-  std::vector<std::string> dataset_str_;
-  std::vector<H5::DSetCreatPropList> prop_list_;
-  std::vector<H5::DataSpace> dataspace_;
-  std::vector<std::unique_ptr<H5::DataSet>> datasets_;
-  std::vector<std::array<hsize_t, kDsDimsNum>> dims_;
-  hsize_t target_prim_dim_size_;
-  hsize_t max_prim_dim_size_;
-
+  ///Datset lookup table
   std::map<std::string, size_t> ds_name_id_;
+  std::vector<std::unique_ptr<H5::DataSet>> datasets_;
 };
 };      // namespace Agora_recorder
 #endif  // AGORA_HDF5LIB_H_
