@@ -896,7 +896,11 @@ void Config::GenData() {
   AllocBuffer1d(&pilot_ifft, this->ofdm_ca_num_,
                 Agora_memory::Alignment_t::kAlign64, 1);
   for (size_t j = 0; j < ofdm_data_num_; j++) {
-    pilot_ifft[j + this->ofdm_data_start_] = this->pilots_[j];
+    // FFT Shift
+    const size_t k = j + ofdm_data_start_ >= ofdm_ca_num_ / 2
+                         ? j + ofdm_data_start_ - ofdm_ca_num_ / 2
+                         : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
+    pilot_ifft[k] = this->pilots_[j];
   }
   CommsLib::IFFT(pilot_ifft, this->ofdm_ca_num_, false);
 
@@ -919,8 +923,11 @@ void Config::GenData() {
     for (size_t j = 0; j < this->ofdm_data_num_; j++) {
       this->ue_specific_pilot_[i][j] = {zc_ue_pilot_i[j].real(),
                                         zc_ue_pilot_i[j].imag()};
-      ue_pilot_ifft[i][j + this->ofdm_data_start_] =
-          this->ue_specific_pilot_[i][j];
+      // FFT Shift
+      const size_t k = j + ofdm_data_start_ >= ofdm_ca_num_ / 2
+                           ? j + ofdm_data_start_ - ofdm_ca_num_ / 2
+                           : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
+      ue_pilot_ifft[i][k] = this->ue_specific_pilot_[i][j];
     }
     CommsLib::IFFT(ue_pilot_ifft[i], ofdm_ca_num_, false);
   }
@@ -1111,7 +1118,10 @@ void Config::GenData() {
         int8_t* mod_input_ptr =
             GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, u, k);
         ul_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, ul_mod_table_);
-        ul_iq_ifft[i][q + j] = ul_iq_f_[i][q + j];
+        // FFT Shift
+        const size_t r =
+            j >= ofdm_ca_num_ / 2 ? j - ofdm_ca_num_ / 2 : j + ofdm_ca_num_ / 2;
+        ul_iq_ifft[i][q + r] = ul_iq_f_[i][q + j];
       }
       CommsLib::IFFT(&ul_iq_ifft[i][q], ofdm_ca_num_, false);
     }
@@ -1186,7 +1196,10 @@ void Config::GenData() {
         } else {
           dl_iq_f_[i][q + j] = ue_specific_pilot_[u][k];
         }
-        dl_iq_ifft[i][q + j] = dl_iq_f_[i][q + j];
+        // FFT Shift
+        const size_t r =
+            j >= ofdm_ca_num_ / 2 ? j - ofdm_ca_num_ / 2 : j + ofdm_ca_num_ / 2;
+        dl_iq_ifft[i][q + r] = dl_iq_f_[i][q + j];
       }
       CommsLib::IFFT(&dl_iq_ifft[i][q], ofdm_ca_num_, false);
     }

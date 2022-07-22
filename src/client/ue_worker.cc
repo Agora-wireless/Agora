@@ -190,10 +190,9 @@ void UeWorker::DoFftPilot(size_t tag) {
               ? "UE"
               : config_.UeRadioId().at(ant_id).substr(
                     config_.UeRadioId().at(ant_id).length() - kShortSerialLen);
-      const std::string fname_ext = std::to_string(frame_id) + "_" +
-                                    std::to_string(dl_symbol_id) + "_" +
-                                    std::to_string(ant_id) + "_" +
-                                    short_serial + ".bin";
+      const std::string fname_ext =
+          std::to_string(frame_id) + "_" + std::to_string(dl_symbol_id) + "_" +
+          std::to_string(ant_id) + "_" + short_serial + ".bin";
       std::string fname = "rxpilot_" + fname_ext;
       FILE* f = std::fopen(fname.c_str(), "wb");
       std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
@@ -223,6 +222,13 @@ void UeWorker::DoFftPilot(size_t tag) {
 
   // perform fft
   DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
+
+  //// FFT shift the buffer
+  std::vector<complex_float> temp_fft_buf(config_.OfdmCaNum());
+  auto* temp_buff = reinterpret_cast<complex_float*>(temp_fft_buf.data());
+  auto* fft_buff_complex =
+      reinterpret_cast<complex_float*>(fft_buffer_[fft_buffer_target_id]);
+  CommsLib::FFTShift(fft_buff_complex, temp_buff, config_.OfdmCaNum());
 
   size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
   auto* csi_buffer_ptr =
@@ -283,8 +289,8 @@ void UeWorker::DoFftData(size_t tag) {
 
   const size_t sig_offset = config_.OfdmRxZeroPrefixClient();
   const size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
-  const size_t dl_data_symbol_id = dl_symbol_id -
-                                   config_.Frame().ClientDlPilotSymbols();
+  const size_t dl_data_symbol_id =
+      dl_symbol_id - config_.Frame().ClientDlPilotSymbols();
 
   if (kRecordDownlinkFrame) {
     if (frame_id > 0 && frame_id % kRecordFrameInterval == 0) {
@@ -293,10 +299,9 @@ void UeWorker::DoFftData(size_t tag) {
               ? "UE"
               : config_.UeRadioId().at(ant_id).substr(
                     config_.UeRadioId().at(ant_id).length() - kShortSerialLen);
-      const std::string fname_ext = std::to_string(frame_id) + "_" +
-                                    std::to_string(dl_symbol_id) + "_" +
-                                    std::to_string(ant_id) + "_" +
-                                    short_serial + ".bin";
+      const std::string fname_ext =
+          std::to_string(frame_id) + "_" + std::to_string(dl_symbol_id) + "_" +
+          std::to_string(ant_id) + "_" + short_serial + ".bin";
       std::string fname = "rxdata_" + fname_ext;
       FILE* f = std::fopen(fname.c_str(), "wb");
       std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
@@ -324,6 +329,13 @@ void UeWorker::DoFftData(size_t tag) {
 
   // perform fft
   DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
+
+  //// FFT shift the buffer
+  std::vector<complex_float> temp_fft_buf(config_.OfdmCaNum());
+  auto* temp_buff = reinterpret_cast<complex_float*>(temp_fft_buf.data());
+  auto* fft_buff_complex =
+      reinterpret_cast<complex_float*>(fft_buffer_[fft_buffer_target_id]);
+  CommsLib::FFTShift(fft_buff_complex, temp_buff, config_.OfdmCaNum());
 
   size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
   auto* csi_buffer_ptr =
@@ -692,6 +704,9 @@ void UeWorker::DoIfft(size_t tag) {
   std::memset(ifft_buff + config_.OfdmDataStop(), 0,
               sizeof(complex_float) * config_.OfdmDataStart());
 
+  std::vector<complex_float> temp_fft_buf(config_.OfdmCaNum());
+  auto* temp_buff = reinterpret_cast<complex_float*>(temp_fft_buf.data());
+  CommsLib::FFTShift(ifft_buff, temp_buff, config_.OfdmCaNum());
   CommsLib::IFFT(ifft_buff, config_.OfdmCaNum(), false);
 
   const size_t tx_offset = buff_offset * config_.PacketLength();
