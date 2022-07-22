@@ -23,7 +23,7 @@ static constexpr size_t kDsDimsNum = 5;
 
 class Hdf5Lib {
  public:
-  Hdf5Lib(const H5std_string& file_name, const H5std_string& group_name);
+  Hdf5Lib(const H5std_string& hdf5_name, const H5std_string& group_name);
   ~Hdf5Lib();
 
   int CreateDataset(const std::string& dataset_name,

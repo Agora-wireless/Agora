@@ -67,19 +67,19 @@ int Hdf5Lib::CreateDataset(const std::string& dataset_name,
   }
   // catch failure caused by the H5File operations
   catch (H5::FileIException& error) {
-    error.printErrorStack();
+    H5::FileIException::printErrorStack();
     return -1;
   }
 
   // catch failure caused by the DataSet operations
   catch (H5::DataSetIException& error) {
-    error.printErrorStack();
+    H5::DataSetIException::printErrorStack();
     return -1;
   }
 
   // catch failure caused by the DataSpace operations
   catch (H5::DataSpaceIException& error) {
-    error.printErrorStack();
+    H5::DataSpaceIException::printErrorStack();
     return -1;
   }
   return 0;
@@ -148,11 +148,11 @@ void Hdf5Lib::ExtendDataset(
                    dataset_name.c_str(), extended_dims.at(kDExtendDimIdx));
 
   } catch (H5::DataSetIException& error) {
-    error.printErrorStack();
+    H5::DataSetIException::printErrorStack();
     AGORA_LOG_WARN("ExtendDataset: Failed to extend the dataset\n");
     throw;
   } catch (H5::DataSpaceIException& error) {
-    error.printErrorStack();
+    H5::DataSpaceIException::printErrorStack();
     AGORA_LOG_WARN("ExtendDataset: Failed to extend the dataset\n");
     throw;
   }
@@ -186,7 +186,7 @@ herr_t Hdf5Lib::WriteDataset(const std::string& dataset_name,
   }
   // catch failure caused by the DataSet operations
   catch (H5::DataSetIException& error) {
-    error.printErrorStack();
+    H5::DataSetIException::printErrorStack();
 
     AGORA_LOG_WARN(
         "DataSet: Failed to write to %s dataset at primary dim index: %llu\n",
@@ -207,7 +207,7 @@ herr_t Hdf5Lib::WriteDataset(const std::string& dataset_name,
   }
   // catch failure caused by the DataSpace operations
   catch (H5::DataSpaceIException& error) {
-    error.printErrorStack();
+    H5::DataSpaceIException::printErrorStack();
     ret = -1;
     throw;
   }
@@ -241,7 +241,7 @@ herr_t Hdf5Lib::WriteDataset(const std::string& dataset_name,
   }
   // catch failure caused by the DataSet operations
   catch (H5::DataSetIException& error) {
-    error.printErrorStack();
+    H5::DataSetIException::printErrorStack();
 
     AGORA_LOG_WARN(
         "DataSet: Failed to write to dataset at primary dim index: %llu\n",
@@ -262,67 +262,12 @@ herr_t Hdf5Lib::WriteDataset(const std::string& dataset_name,
   }
   // catch failure caused by the DataSpace operations
   catch (H5::DataSpaceIException& error) {
-    error.printErrorStack();
+    H5::DataSpaceIException::printErrorStack();
     ret = -1;
     throw;
   }
   return ret;
 }
-
-/*
-std::vector<short> Hdf5Lib::ReadDataset(
-    const std::string& dataset_name,
-    const std::array<hsize_t, kDsDimsNum>& target_id,
-    const std::array<hsize_t, kDsDimsNum>& read_dim) {
-  std::vector<short> read_data;
-  const std::string ds_name("/" + group_name_ + "/" + dataset_name);
-  const size_t ds_id = ds_name_id_[dataset_name];
-  // Select a hyperslab in extended portion of the dataset
-  try {
-    H5::Exception::dontPrint();
-    H5::DataSpace filespace(datasets_.at(ds_id)->getSpace());
-    filespace.selectHyperslab(H5S_SELECT_SET, read_dim.data(),
-                              target_id.data());
-    // define memory space
-    H5::DataSpace memspace(kDsDimsNum, read_dim.data(), NULL);
-    read_data.resize(read_dim.at(kDsDimsNum - 1), 0);
-    datasets_.at(ds_id)->read(read_data.data(), H5::PredType::NATIVE_INT16,
-                              memspace, filespace);
-    filespace.close();
-  }
-  // catch failure caused by the DataSet operations
-  catch (H5::DataSetIException& error) {
-    error.printErrorStack();
-
-    AGORA_LOG_WARN(
-        "DataSet: Failed to write to dataset at primary dim index: %llu",
-        target_id.at(kDExtendDimIdx));
-
-    const int ndims = datasets_.at(ds_id)->getSpace().getSimpleExtentNdims();
-
-    std::stringstream ss;
-    ss.str(std::string());
-    ss << "Dataset Dimension is: " << ndims;
-    for (size_t i = 0; i < (kDsDimsNum - 1); ++i) {
-      ss << dims_.at(ds_id)[i] << ",";
-    }
-    ss << dims_.at(ds_id)[kDsDimsNum - 1];
-    ss << "Requested Write Dimension is: " << ndims;
-    for (size_t i = 0; i < (kDsDimsNum - 1); ++i) {
-      ss << target_id[i] << ",";
-    }
-    ss << target_id[kDsDimsNum - 1];
-    AGORA_LOG_TRACE("%s", ss.str().c_str());
-    throw;
-  }
-  // catch failure caused by the DataSpace operations
-  catch (H5::DataSpaceIException& error) {
-    error.printErrorStack();
-    throw;
-  }
-  return read_data;
-}
-*/
 
 void Hdf5Lib::WriteAttribute(const char name[], double val) {
   hsize_t dims[] = {1};
@@ -397,8 +342,9 @@ void Hdf5Lib::WriteAttribute(const char name[],
   H5::Attribute att =
       group_->createAttribute(name, H5::PredType::STD_U32BE, attr_ds);
   std::vector<uint32_t> val_uint;
-  for (size_t i = 0; i < val.size(); i++)
+  for (size_t i = 0; i < val.size(); i++) {
     val_uint.push_back((uint32_t)val.at(i));
+  }
   att.write(H5::PredType::NATIVE_UINT, &val_uint[0]);
 }
 
@@ -413,18 +359,20 @@ void Hdf5Lib::WriteAttribute(const char name[], const std::string& val) {
 
 void Hdf5Lib::WriteAttribute(const char name[],
                              const std::vector<std::string>& val) {
-  if (val.empty()) return;
+  if (val.empty()) {
+    return;
+  }
   size_t size = val.size();
   H5::StrType strdatatype(H5::PredType::C_S1,
                           H5T_VARIABLE);  // of variable length characters
   hsize_t dims[] = {size};
   H5::DataSpace attr_ds = H5::DataSpace(1, dims);
   H5::Attribute att = group_->createAttribute(name, strdatatype, attr_ds);
-  const char* cStrArray[size];
+  const char* c_str_array[size];
 
   for (size_t i = 0; i < size; ++i) {
-    cStrArray[i] = val[i].c_str();
+    c_str_array[i] = val[i].c_str();
   }
-  att.write(strdatatype, cStrArray);
+  att.write(strdatatype, c_str_array);
 }
 };  // namespace Agora_recorder

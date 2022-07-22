@@ -22,7 +22,7 @@ RecorderThread::RecorderThread(const Config* in_cfg, size_t thread_id, int core,
                                bool wait_signal)
     : event_queue_(queue_size),
       producer_token_(event_queue_),
-      thread_(),
+
       id_(thread_id),
       core_alloc_(core),
       wait_signal_(wait_signal) {
@@ -70,9 +70,9 @@ void RecorderThread::Finalize() {
 bool RecorderThread::DispatchWork(const EventData& event) {
   AGORA_LOG_TRACE("RecorderThread::Dispatching work\n");
   bool ret = true;
-  if (event_queue_.try_enqueue(producer_token_, event) == 0) {
+  if (event_queue_.try_enqueue(producer_token_, event) == false) {
     AGORA_LOG_WARN("Queue limit has reached! try to increase queue size.\n");
-    if (event_queue_.enqueue(producer_token_, event) == 0) {
+    if (event_queue_.enqueue(producer_token_, event) == false) {
       AGORA_LOG_ERROR("Record task enqueue failed\n");
       throw std::runtime_error("Record task enqueue failed");
       ret = false;
@@ -139,13 +139,13 @@ void RecorderThread::HandleEvent(const EventData& event) {
   if (event.event_type_ == EventType::kThreadTermination) {
     running_ = false;
   } else {
-    auto* RxPacket = rx_tag_t(event.tags_[0u]).rx_packet_;
+    auto* rx_packet = rx_tag_t(event.tags_[0u]).rx_packet_;
     if (event.event_type_ == EventType::kPacketRX) {
       for (size_t i = 0; i < workers_.size(); i++) {
-        workers_.at(i)->Record(RxPacket->RawPacket());
+        workers_.at(i)->Record(rx_packet->RawPacket());
       }
     }
-    RxPacket->Free();
+    rx_packet->Free();
   }
 }
 };  // End namespace Agora_recorder

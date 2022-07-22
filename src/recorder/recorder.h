@@ -30,7 +30,7 @@ class Recorder {
   // buffer length of each rx thread
   static const int kSampleBufferFrameNum;
   // dequeue bulk size, used to reduce the overhead of dequeue in main thread
-  static const int KDequeueBulkSize;
+  static const int kDequeueBulkSize;
 
   const Config* cfg_;
   size_t rx_thread_buff_size_;
@@ -39,8 +39,8 @@ class Recorder {
   moodycamel::ConcurrentQueue<EventData> message_queue_;
 
   /* Core assignment start variables */
-  const size_t kMainDispatchCore;
-  const size_t kRecorderCore;
+  const size_t main_dispatch_core_;
+  const size_t recorder_core_;
 
   size_t num_writter_threads_;
 };     /* class Recorder */

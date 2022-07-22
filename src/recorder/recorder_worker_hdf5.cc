@@ -14,7 +14,7 @@
 namespace Agora_recorder {
 
 static constexpr bool kDebugPrint = false;
-static const std::string hdf5_filename = "UeRxData.h5";
+static const std::string kHdf5Filename = "UeRxData.h5";
 static constexpr size_t kFrameInc = 2000;
 static constexpr size_t kDsDimSymbol = 2;
 
@@ -35,8 +35,8 @@ RecorderWorkerHDF5::~RecorderWorkerHDF5() {}
 
 void RecorderWorkerHDF5::Init() {
   AGORA_LOG_INFO("RecorderWorkerHDF5::Creating output HD5F file: %s\n",
-                 hdf5_filename.c_str());
-  hdf5_ = std::make_unique<Hdf5Lib>(hdf5_filename, "Data");
+                 kHdf5Filename.c_str());
+  hdf5_ = std::make_unique<Hdf5Lib>(kHdf5Filename, "Data");
 
   hdf5_->WriteAttribute("SOFTWARE", "AGORA");
   hdf5_->WriteAttribute("SOFTWARE_VERSION", GetAgoraProjectVersion());
