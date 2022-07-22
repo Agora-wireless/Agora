@@ -112,8 +112,8 @@ void Recorder::DoIt() {
 
   /* Force the recorders to process all of the data they have left and exit
    * cleanly Send a stop to all the recorders */
-  for (size_t i = 0; i < recorders_.size(); i++) {
-    recorders_.at(i)->Stop();
+  for (auto & recorder : recorders_) {
+    recorder->Stop();
   }
   recorders_.clear();
 }

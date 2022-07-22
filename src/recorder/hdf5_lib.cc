@@ -10,6 +10,7 @@
 #include "hdf5_lib.h"
 
 #include <cassert>
+#include <utility>
 
 #include "logger.h"
 #include "utils.h"
@@ -18,8 +19,8 @@ namespace Agora_recorder {
 static constexpr bool kPrintDataSetInfo = true;
 static constexpr size_t kDExtendDimIdx = 0;
 
-Hdf5Lib::Hdf5Lib(const H5std_string& hdf5_name, const H5std_string& group_name)
-    : hdf5_name_(hdf5_name), group_name_(group_name) {
+Hdf5Lib::Hdf5Lib(H5std_string hdf5_name, H5std_string group_name)
+    : hdf5_name_(std::move(hdf5_name)), group_name_(std::move(group_name)) {
   AGORA_LOG_INFO("Creating output HD5F file: %s\n", hdf5_name_.c_str());
   file_ = std::make_unique<H5::H5File>(hdf5_name_, H5F_ACC_TRUNC);
   group_ = std::make_unique<H5::Group>(file_->createGroup("/" + group_name_));
@@ -177,7 +178,7 @@ herr_t Hdf5Lib::WriteDataset(const std::string& dataset_name,
     working_space.selectHyperslab(H5S_SELECT_SET, count.data(), start.data());
 
     // define memory space (wrt / chunk)
-    H5::DataSpace mem_space(kDsDimsNum, count.data(), NULL);
+    H5::DataSpace mem_space(kDsDimsNum, count.data(), nullptr);
     // Write the data to the hyperslab
     current_dataset->write(wrt_data, H5::PredType::NATIVE_INT16, mem_space,
                            working_space);
@@ -233,7 +234,7 @@ herr_t Hdf5Lib::WriteDataset(const std::string& dataset_name,
     working_space.selectHyperslab(H5S_SELECT_SET, count.data(), start.data());
 
     // define memory space (wrt / chunk)
-    H5::DataSpace mem_space(kDsDimsNum, count.data(), NULL);
+    H5::DataSpace mem_space(kDsDimsNum, count.data(), nullptr);
     // Write the data to the hyperslab
     current_dataset->write(wrt_data, H5::PredType::INTEL_F32, mem_space,
                            working_space);
@@ -342,8 +343,8 @@ void Hdf5Lib::WriteAttribute(const char name[],
   H5::Attribute att =
       group_->createAttribute(name, H5::PredType::STD_U32BE, attr_ds);
   std::vector<uint32_t> val_uint;
-  for (size_t i = 0; i < val.size(); i++) {
-    val_uint.push_back((uint32_t)val.at(i));
+  for (unsigned long i : val) {
+    val_uint.push_back(static_cast<uint32_t>(i));
   }
   att.write(H5::PredType::NATIVE_UINT, &val_uint[0]);
 }

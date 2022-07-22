@@ -31,7 +31,7 @@ RecorderWorkerHDF5::RecorderWorkerHDF5(const Config* in_cfg,
       data_chunk_dims_{
           {1, 1, 1, 1, static_cast<hsize_t>(2 * cfg_->SampsPerSymbol())}} {}
 
-RecorderWorkerHDF5::~RecorderWorkerHDF5() {}
+RecorderWorkerHDF5::~RecorderWorkerHDF5() = default;
 
 void RecorderWorkerHDF5::Init() {
   AGORA_LOG_INFO("RecorderWorkerHDF5::Creating output HD5F file: %s\n",
