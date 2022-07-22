@@ -144,8 +144,8 @@ void Hdf5Lib::ExtendDataset(
     // H5F_SCOPE_LOCAL | H5F_SCOPE_GLOBAL
     current_dataset->flush(H5F_SCOPE_LOCAL);
     current_dataset->extend(extended_dims.data());
-    AGORA_LOG_INFO("ExtendDataset: Extending to frame %llu\n",
-                   extended_dims.at(kDExtendDimIdx));
+    AGORA_LOG_INFO("ExtendDataset: Extending %s dataset to frame %llu\n",
+                   dataset_name.c_str(), extended_dims.at(kDExtendDimIdx));
 
   } catch (H5::DataSetIException& error) {
     error.printErrorStack();
@@ -153,6 +153,7 @@ void Hdf5Lib::ExtendDataset(
     throw;
   } catch (H5::DataSpaceIException& error) {
     error.printErrorStack();
+    AGORA_LOG_WARN("ExtendDataset: Failed to extend the dataset\n");
     throw;
   }
 }
@@ -164,7 +165,7 @@ herr_t Hdf5Lib::WriteDataset(const std::string& dataset_name,
   const std::string ds_name("/" + group_name_ + "/" + dataset_name);
   const size_t ds_id = ds_name_id_[dataset_name];
   herr_t ret = 0;
-  AGORA_LOG_TRACE("WriteDataset: %s\n", dataset_name.c_str());
+  AGORA_LOG_INFO("WriteDataset: %s\n", dataset_name.c_str());
 
   auto& current_dataset = datasets_.at(ds_id);
   // Select a hyperslab in extended portion of the dataset
@@ -188,8 +189,8 @@ herr_t Hdf5Lib::WriteDataset(const std::string& dataset_name,
     error.printErrorStack();
 
     AGORA_LOG_WARN(
-        "DataSet: Failed to write to dataset at primary dim index: %llu\n",
-        start.at(kDExtendDimIdx));
+        "DataSet: Failed to write to %s dataset at primary dim index: %llu\n",
+        dataset_name.c_str(), start.at(kDExtendDimIdx));
 
     const int ndims = datasets_.at(ds_id)->getSpace().getSimpleExtentNdims();
 
