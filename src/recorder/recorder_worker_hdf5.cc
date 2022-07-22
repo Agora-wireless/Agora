@@ -215,7 +215,7 @@ void RecorderWorkerHDF5::Init() {
   }
 
   //Adding the ground truths as a DataSet
-  {  //TxData
+  if (false) {  //TxData
     //Including the Pilots here.....
     //*2 for complex
     const hsize_t tx_data_size = 2 * cfg_->OfdmCaNum();
@@ -245,7 +245,7 @@ void RecorderWorkerHDF5::Init() {
     hdf5_->FinalizeDataset(dataset_name);
   }
 
-  {  //TXPilot
+  if (false) {  //TXPilot
     std::string dataset_name("TxPilot");
     const hsize_t tx_pilot_size = 2 * cfg_->OfdmDataNum();
     const std::array<hsize_t, kDsDimsNum> tx_pilot_dims = {1, 1, 1, 1,
@@ -309,7 +309,7 @@ int RecorderWorkerHDF5::Record(const Packet* pkt) {
         dataset.second.at(0) = dataset.second.at(0) + kFrameInc;
         RtAssert(dataset.second.at(0) > frame_id,
                  "Frame ID must be less than extended dimension");
-        hdf5_->ExtendDataset(std::string("DownlinkData"), dataset.second);
+        hdf5_->ExtendDataset(dataset.first, dataset.second);
       }
       start[kDsDimSymbol] = symbol_id;
       hdf5_->WriteDataset(dataset.first, start, data_chunk_dims_, pkt->data_);
@@ -321,7 +321,7 @@ int RecorderWorkerHDF5::Record(const Packet* pkt) {
         dataset.second.at(0) = dataset.second.at(0) + kFrameInc;
         RtAssert(dataset.second.at(0) > frame_id,
                  "Frame ID must be less than extended dimension");
-        hdf5_->ExtendDataset(std::string("DownlinkData"), dataset.second);
+        hdf5_->ExtendDataset(dataset.first, dataset.second);
       }
       start[kDsDimSymbol] = dl_symbol_id;
       hdf5_->WriteDataset(dataset.first, start, data_chunk_dims_, pkt->data_);
