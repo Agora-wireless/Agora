@@ -18,18 +18,19 @@
 namespace Agora_recorder {
 RecorderThread::RecorderThread(const Config* in_cfg, size_t thread_id, int core,
                                size_t queue_size, size_t antenna_offset,
-                               size_t num_antennas, bool wait_signal)
+                               size_t num_antennas, size_t interval,
+                               bool wait_signal)
     : event_queue_(queue_size),
       producer_token_(event_queue_),
       thread_(),
       id_(thread_id),
       core_alloc_(core),
       wait_signal_(wait_signal) {
-  workers_.emplace_back(std::make_unique<RecorderWorkerMultiFile>(
-      in_cfg, antenna_offset, num_antennas));
+  //workers_.emplace_back(std::make_unique<RecorderWorkerMultiFile>(
+  //    in_cfg, antenna_offset, num_antennas));
 
   workers_.emplace_back(std::make_unique<RecorderWorkerHDF5>(
-      in_cfg, antenna_offset, num_antennas));
+      in_cfg, antenna_offset, num_antennas, interval));
 
   for (size_t i = 0; i < workers_.size(); i++) {
     workers_.at(i)->Init();

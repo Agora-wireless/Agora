@@ -14,7 +14,8 @@ class RecorderWorker {
  public:
   RecorderWorker([[maybe_unused]] const Config* in_cfg,
                  [[maybe_unused]] size_t antenna_offset,
-                 [[maybe_unused]] size_t num_antennas){};
+                 [[maybe_unused]] size_t num_antennas,
+                 [[maybe_unused]] size_t record_interval){};
   virtual ~RecorderWorker() = default;
 
   virtual void Init() = 0;

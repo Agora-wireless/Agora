@@ -19,7 +19,8 @@
 static constexpr bool kDebugPrintPacketsFromMac = false;
 static constexpr bool kDebugPrintPacketsToMac = false;
 
-static constexpr bool kRecordDownlinkFrame = true;
+static constexpr bool kRecordDownlinkFrame = false;
+static constexpr size_t kRecordFrameInterval = 1;
 
 static const size_t kDefaultQueueSize = 36;
 
@@ -134,7 +135,7 @@ PhyUe::PhyUe(Config* config)
             config_, 0, core_offset_worker + config_->UeWorkerThreadNum(),
             kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntNum() *
                 kDefaultQueueSize,
-            0, config_->UeAntNum(), true));
+            0, config_->UeAntNum(), kRecordFrameInterval, true));
     new_recorder->Start();
   }
 
