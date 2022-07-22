@@ -20,11 +20,13 @@ static constexpr size_t kDsDimSymbol = 2;
 
 RecorderWorkerHDF5::RecorderWorkerHDF5(const Config* in_cfg,
                                        size_t antenna_offset,
-                                       size_t num_antennas)
-    : RecorderWorker(in_cfg, antenna_offset, num_antennas),
+                                       size_t num_antennas,
+                                       size_t record_interval)
+    : RecorderWorker(in_cfg, antenna_offset, num_antennas, record_interval),
       cfg_(in_cfg),
       antenna_offset_(antenna_offset),
       num_antennas_(num_antennas),
+      interval_(record_interval),
       max_frame_number_(0),
       data_chunk_dims_{
           {1, 1, 1, 1, static_cast<hsize_t>(2 * cfg_->SampsPerSymbol())}} {}
@@ -296,7 +298,16 @@ int RecorderWorkerHDF5::Record(const Packet* pkt) {
   if (frame_id > cfg_->FramesToTest()) {
     AGORA_LOG_ERROR("Closing file due to frame id %zu : %zu max\n", frame_id,
                     cfg_->FramesToTest());
-  } else {
+  } else if ((frame_id % interval_) == 0) {
+    if (kDebugPrint) {
+      std::printf(
+          "RecorderWorkerHDF5::record [frame %zu, symbol %zu, cell %d, "
+          "ant %zu] samples: %d %d %d %d %d %d %d %d ....\n",
+          frame_id, symbol_id, pkt->cell_id_, ant_id, pkt->data_[0u],
+          pkt->data_[1u], pkt->data_[2u], pkt->data_[3u], pkt->data_[4u],
+          pkt->data_[5u], pkt->data_[6u], pkt->data_[7u]);
+    }
+
     const uint32_t antenna_index = ant_id - antenna_offset_;
     std::array<hsize_t, kDsDimsNum> start = {frame_id, pkt->cell_id_, 0,
                                              antenna_index, 0};

@@ -11,22 +11,19 @@
 namespace Agora_recorder {
 
 static constexpr bool kDebugPrint = false;
-static constexpr size_t kRecordFrameInterval = 10;
 static constexpr size_t kShortSerialLen = 3;
 
 RecorderWorkerMultiFile::RecorderWorkerMultiFile(const Config* in_cfg,
                                                  size_t antenna_offset,
-                                                 size_t num_antennas)
-    : RecorderWorker(in_cfg, antenna_offset, num_antennas),
+                                                 size_t num_antennas,
+                                                 size_t record_interval)
+    : RecorderWorker(in_cfg, antenna_offset, num_antennas, record_interval),
       cfg_(in_cfg),
       antenna_offset_(antenna_offset),
-      num_antennas_(num_antennas) {}
+      num_antennas_(num_antennas),
+      interval_(record_interval) {}
 
-RecorderWorkerMultiFile::~RecorderWorkerMultiFile() { Gc(); }
-
-void RecorderWorkerMultiFile::Gc() {
-  AGORA_LOG_INFO("RecorderWorkerMultiFile::Garbage collect\n");
-}
+RecorderWorkerMultiFile::~RecorderWorkerMultiFile() {}
 
 void RecorderWorkerMultiFile::Init() {}
 void RecorderWorkerMultiFile::Finalize() {}
@@ -49,7 +46,7 @@ int RecorderWorkerMultiFile::Record(const Packet* pkt) {
   const size_t dl_symbol_id = cfg_->Frame().GetDLSymbolIdx(pkt->symbol_id_);
   const size_t radio_id = ant_id / cfg_->NumUeChannels();
 
-  if ((frame_id % kRecordFrameInterval) == 0) {
+  if ((frame_id % interval_) == 0) {
     //Remove the beacon?
     if (dl_symbol_id != SIZE_MAX) {
       if (kDebugPrint) {
@@ -78,7 +75,7 @@ int RecorderWorkerMultiFile::Record(const Packet* pkt) {
         FILE* f = std::fopen(fname.c_str(), "wb");
         std::fwrite(pkt->data_, 2 * sizeof(int16_t), cfg_->SampsPerSymbol(), f);
         std::fclose(f);
-        fname = "txdataR_" + pkt_id + ".bin";
+        fname = "txdata_" + pkt_id + ".bin";
         f = std::fopen(fname.c_str(), "wb");
         std::fwrite(const_cast<Config*>(cfg_)->DlIqF()[dl_symbol_id] +
                         ant_id * cfg_->OfdmCaNum(),
@@ -89,7 +86,7 @@ int RecorderWorkerMultiFile::Record(const Packet* pkt) {
         FILE* f = std::fopen(fname.c_str(), "wb");
         std::fwrite(pkt->data_, 2 * sizeof(int16_t), cfg_->SampsPerSymbol(), f);
         std::fclose(f);
-        fname = "txpilotR_" + pkt_id + ".bin";
+        fname = "txpilot_" + pkt_id + ".bin";
         f = std::fopen(fname.c_str(), "wb");
         std::fwrite(const_cast<Config*>(cfg_)->UeSpecificPilot()[ant_id],
                     2 * sizeof(float), cfg_->OfdmDataNum(), f);
