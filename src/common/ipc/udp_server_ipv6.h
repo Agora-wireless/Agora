@@ -22,8 +22,8 @@ class UDPServerIPv6 {
   // size = rx_buffer_size
   explicit UDPServerIPv6(const std::string& local_address, uint16_t local_port,
                          size_t rx_buffer_size = 0);
-  explicit UDPServerIPv6(const std::string& local_address,
-                         const std::string& local_port,
+  explicit UDPServerIPv6(std::string  local_address,
+                         std::string  local_port,
                          size_t rx_buffer_size = 0);
 
   UDPServerIPv6& operator=(const UDPServerIPv6&) = delete;

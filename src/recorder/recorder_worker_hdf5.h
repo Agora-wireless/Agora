@@ -17,7 +17,7 @@ class RecorderWorkerHDF5 : public RecorderWorker {
  public:
   explicit RecorderWorkerHDF5(const Config* in_cfg, size_t antenna_offset,
                               size_t num_antennas, size_t record_interval);
-  virtual ~RecorderWorkerHDF5();
+  ~RecorderWorkerHDF5() override;
 
   void Init() final;
   void Finalize() final;

@@ -23,7 +23,7 @@ RecorderWorkerMultiFile::RecorderWorkerMultiFile(const Config* in_cfg,
       num_antennas_(num_antennas),
       interval_(record_interval) {}
 
-RecorderWorkerMultiFile::~RecorderWorkerMultiFile() {}
+RecorderWorkerMultiFile::~RecorderWorkerMultiFile() = default;
 
 void RecorderWorkerMultiFile::Init() {}
 void RecorderWorkerMultiFile::Finalize() {}
