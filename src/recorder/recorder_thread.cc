@@ -26,9 +26,6 @@ RecorderThread::RecorderThread(const Config* in_cfg, size_t thread_id, int core,
       id_(thread_id),
       core_alloc_(core),
       wait_signal_(wait_signal) {
-  //workers_.emplace_back(std::make_unique<RecorderWorkerMultiFile>(
-  //    in_cfg, antenna_offset, num_antennas));
-
   workers_.emplace_back(std::make_unique<RecorderWorkerHDF5>(
       in_cfg, antenna_offset, num_antennas, interval));
 
