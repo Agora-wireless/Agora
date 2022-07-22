@@ -17,7 +17,7 @@ class RecorderWorkerMultiFile : public RecorderWorker {
 
   void Init() final;
   void Finalize() final;
-  int Record(const Packet* pkg) final;
+  int Record(const Packet* pkt) final;
 
   inline size_t NumAntennas() const final { return num_antennas_; }
   inline size_t AntennaOffset() const final { return antenna_offset_; }

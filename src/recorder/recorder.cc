@@ -11,13 +11,13 @@ namespace Agora_recorder {
 // buffer length of each rx thread
 const int Recorder::kSampleBufferFrameNum = 80;
 // dequeue bulk size, used to reduce the overhead of dequeue in main thread
-const int Recorder::KDequeueBulkSize = 5;
+const int Recorder::kDequeueBulkSize = 5;
 static const int kQueueSize = 36;
 
 Recorder::Recorder(const Config* in_cfg, size_t core_start)
     : cfg_(in_cfg),
-      kMainDispatchCore(core_start),
-      kRecorderCore(kMainDispatchCore + 1) {
+      main_dispatch_core_(core_start),
+      recorder_core_(main_dispatch_core_ + 1) {
   num_writter_threads_ = 1;
   const size_t ant_per_rx_thread = cfg_->UeAntNum() / num_writter_threads_;
 
@@ -61,7 +61,7 @@ void Recorder::DoIt() {
     }
 
     for (size_t i = 0u; i < num_writter_threads_; i++) {
-      const int thread_core = kRecorderCore + i;
+      const int thread_core = recorder_core_ + i;
 
       AGORA_LOG_INFO(
           "Creating recorder thread: %zu, with antennas %zu:%zu total %zu\n", i,
@@ -77,12 +77,12 @@ void Recorder::DoIt() {
 
   moodycamel::ConsumerToken ctok(message_queue_);
 
-  std::array<EventData, KDequeueBulkSize> events_list;
+  std::array<EventData, kDequeueBulkSize> events_list;
 
   while (cfg_->Running() == true) {
     // get a bulk of events from the receivers
     const auto ret = message_queue_.try_dequeue_bulk(ctok, events_list.data(),
-                                                     KDequeueBulkSize);
+                                                     kDequeueBulkSize);
     if (ret > 0) {
       AGORA_LOG_INFO("Message(s) received: %zu\n", ret);
     }
