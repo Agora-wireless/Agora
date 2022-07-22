@@ -112,7 +112,7 @@ void Recorder::DoIt() {
 
   /* Force the recorders to process all of the data they have left and exit
    * cleanly Send a stop to all the recorders */
-  for (auto & recorder : recorders_) {
+  for (auto& recorder : recorders_) {
     recorder->Stop();
   }
   recorders_.clear();

@@ -29,7 +29,7 @@ RecorderThread::RecorderThread(const Config* in_cfg, size_t thread_id, int core,
   workers_.emplace_back(std::make_unique<RecorderWorkerHDF5>(
       in_cfg, antenna_offset, num_antennas, interval));
 
-  for (auto & worker : workers_) {
+  for (auto& worker : workers_) {
     worker->Init();
   }
   running_ = false;
@@ -130,7 +130,7 @@ void RecorderThread::DoRecording() {
     }
   }
 
-  for (auto & worker : workers_) {
+  for (auto& worker : workers_) {
     worker->Finalize();
   }
 }
@@ -141,7 +141,7 @@ void RecorderThread::HandleEvent(const EventData& event) {
   } else {
     auto* rx_packet = rx_tag_t(event.tags_[0u]).rx_packet_;
     if (event.event_type_ == EventType::kPacketRX) {
-      for (auto & worker : workers_) {
+      for (auto& worker : workers_) {
         worker->Record(rx_packet->RawPacket());
       }
     }

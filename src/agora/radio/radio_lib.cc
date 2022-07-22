@@ -367,7 +367,7 @@ long long RadioConfig::SyncArrayTime() {
   constexpr long long kTimeSyncMaxLimit = 1000000;
   //Use the trigger to sync the array
   AGORA_LOG_TRACE("SyncArrayTime: Setting trigger time\n");
-  for (auto & radio : radios_) {
+  for (auto& radio : radios_) {
     radio->SetTimeAtTrigger();
   }
 

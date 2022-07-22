@@ -28,8 +28,7 @@ UDPServerIPv6::UDPServerIPv6(const std::string& local_address,
 
 // Initialize a UDP server listening on this UDP port with socket buffer
 // size = rx_buffer_size
-UDPServerIPv6::UDPServerIPv6(std::string  local_address,
-                             std::string  local_port,
+UDPServerIPv6::UDPServerIPv6(std::string local_address, std::string local_port,
                              size_t rx_buffer_size)
     : port_(std::move(local_port)),
       address_(std::move(local_address)),
