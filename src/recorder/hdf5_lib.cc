@@ -43,7 +43,8 @@ Hdf5Lib::~Hdf5Lib() {
 int Hdf5Lib::CreateDataset(const std::string& dataset_name,
                            const std::array<hsize_t, kDsDimsNum>& chunk_dims,
                            const std::array<hsize_t, kDsDimsNum>& init_dims,
-                           const ssize_t extend_dimension, H5::PredType type) {
+                           const ssize_t extend_dimension,
+                           const H5::PredType& type) {
   const std::string create_ds_name("/" + group_name_ + "/" + dataset_name);
 
   std::array<hsize_t, kDsDimsNum> max_ds_dims = init_dims;
@@ -343,6 +344,7 @@ void Hdf5Lib::WriteAttribute(const char name[],
   H5::Attribute att =
       group_->createAttribute(name, H5::PredType::STD_U32BE, attr_ds);
   std::vector<uint32_t> val_uint;
+  val_uint.reserve(val.size());
   for (unsigned long i : val) {
     val_uint.push_back(static_cast<uint32_t>(i));
   }

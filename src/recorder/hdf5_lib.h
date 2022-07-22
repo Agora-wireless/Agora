@@ -30,7 +30,7 @@ class Hdf5Lib {
                     const std::array<hsize_t, kDsDimsNum>& chunk_dims,
                     const std::array<hsize_t, kDsDimsNum>& init_dims,
                     const ssize_t extend_dimension = 0,
-                    H5::PredType type = H5::PredType::STD_I16BE);
+                    const H5::PredType& type = H5::PredType::STD_I16BE);
   void FinalizeDataset(const std::string& dataset_name);
 
   void ExtendDataset(const std::string& dataset_name,
