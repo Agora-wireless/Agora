@@ -509,6 +509,38 @@ MKL_LONG CommsLib::FFT(complex_float* in_out, int fftsize) {
   return status;
 }
 
+void CommsLib::FFTShift(complex_float* in, complex_float* tmp, int fftsize) {
+  std::memcpy(tmp, in + fftsize / 2, sizeof(float) * fftsize);
+  std::memcpy(in + fftsize / 2, in, sizeof(float) * fftsize);
+  std::memcpy(in, tmp, sizeof(float) * fftsize);
+}
+
+std::vector<std::complex<float>> CommsLib::FFTShift(
+    std::vector<std::complex<float>>& in) {
+  size_t fftSize = in.size();
+  std::vector<std::complex<float>> out(fftSize);
+  std::vector<std::complex<float>> in_freq_shifted;
+  in_freq_shifted.insert(in_freq_shifted.end(), in.begin() + fftSize / 2,
+                         in.end());
+  in_freq_shifted.insert(in_freq_shifted.end(), in.begin(),
+                         in.begin() + fftSize / 2);
+  memcpy(out.data(), in_freq_shifted.data(),
+         fftSize * sizeof(std::complex<float>));
+  return out;
+}
+
+std::vector<complex_float> CommsLib::FFTShift(std::vector<complex_float>& in) {
+  size_t fftSize = in.size();
+  std::vector<complex_float> out(fftSize);
+  std::vector<complex_float> in_freq_shifted;
+  in_freq_shifted.insert(in_freq_shifted.end(), in.begin() + fftSize / 2,
+                         in.end());
+  in_freq_shifted.insert(in_freq_shifted.end(), in.begin(),
+                         in.begin() + fftSize / 2);
+  memcpy(out.data(), in_freq_shifted.data(), fftSize * sizeof(float) * 2);
+  return out;
+}
+
 float CommsLib::ComputeOfdmSnr(const std::vector<std::complex<float>>& data_t,
                                size_t data_start_index,
                                size_t data_stop_index) {

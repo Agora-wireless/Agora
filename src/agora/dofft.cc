@@ -32,6 +32,9 @@ DoFFT::DoFFT(Config* config, size_t tid, Table<complex_float>& data_buffer,
   fft_inout_ = static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64,
       cfg_->OfdmCaNum() * sizeof(complex_float)));
+  fft_shift_tmp_ = static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
+      Agora_memory::Alignment_t::kAlign64,
+      cfg_->OfdmCaNum() * sizeof(complex_float)));
   temp_16bits_iq_ = static_cast<uint16_t*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64, 32 * sizeof(uint16_t)));
   rx_samps_tmp_ =
@@ -43,6 +46,7 @@ DoFFT::DoFFT(Config* config, size_t tid, Table<complex_float>& data_buffer,
 DoFFT::~DoFFT() {
   DftiFreeDescriptor(&mkl_handle_);
   std::free(fft_inout_);
+  std::free(fft_shift_tmp_);
   std::free(rx_samps_tmp_);
   std::free(temp_16bits_iq_);
 }
@@ -180,6 +184,13 @@ EventData DoFFT::Launch(size_t tag) {
         mkl_handle_,
         reinterpret_cast<float*>(fft_inout_));  // Compute FFT in-place
   }
+
+  //// FFT shift the buffer
+  std::memcpy(fft_shift_tmp_, fft_inout_, sizeof(float) * cfg_->OfdmCaNum());
+  std::memcpy(fft_inout_, fft_inout_ + cfg_->OfdmCaNum() / 2,
+              sizeof(float) * cfg_->OfdmCaNum());
+  std::memcpy(fft_inout_ + cfg_->OfdmCaNum() / 2, fft_shift_tmp_,
+              sizeof(float) * cfg_->OfdmCaNum());
 
   size_t start_tsc2 = GetTime::WorkerRdtsc();
   duration_stat->task_duration_.at(2) += start_tsc2 - start_tsc1;
