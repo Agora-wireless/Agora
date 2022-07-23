@@ -11,6 +11,9 @@ clang-format-11 -i src/agora/radio/*.h
 clang-format-11 -i src/agora/*.cc
 clang-format-11 -i src/agora/*.h
 
+clang-format-11 -i src/recorder/*.cc
+clang-format-11 -i src/recorder/*.h
+
 clang-format-11 -i src/client/*.cc
 clang-format-11 -i src/client/*.h
 

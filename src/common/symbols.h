@@ -54,13 +54,14 @@ enum class EventType : int {
   kPacketFromMac,
   kPacketToMac,
   kFFTPilot,
-  kSNRReport,   // Signal new SNR measurement from PHY to MAC
-  kRANUpdate,   // Signal new RAN config to Agora
-  kRBIndicator  // Signal RB schedule to UEs
+  kSNRReport,    // Signal new SNR measurement from PHY to MAC
+  kRANUpdate,    // Signal new RAN config to Agora
+  kRBIndicator,  // Signal RB schedule to UEs
+  kThreadTermination
 };
 
 static constexpr size_t kNumEventTypes =
-    static_cast<size_t>(EventType::kPacketToMac) + 1;
+    static_cast<size_t>(EventType::kThreadTermination) + 1;
 
 // Types of Agora Doers
 enum class DoerType : size_t {
@@ -203,6 +204,7 @@ enum class ThreadType {
   kWorkerMacTXRX,
   kMasterRX,
   kMasterTX,
+  kRecorderWorker
 };
 
 static inline std::string ThreadTypeStr(ThreadType thread_type) {
@@ -231,6 +233,8 @@ static inline std::string ThreadTypeStr(ThreadType thread_type) {
       return "Master (RX)";
     case ThreadType::kMasterTX:
       return "Master (TX)";
+    case ThreadType::kRecorderWorker:
+      return "Recorder Worker";
   }
   return "Invalid thread type";
 }
