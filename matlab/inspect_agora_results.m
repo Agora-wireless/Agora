@@ -16,8 +16,10 @@ function inspect_agora_results(dataset_filename, inspect_frame, verbose)
     cp_len = double(h5readatt(dataset_filename, group_id, 'CP_LEN'));
     total_dl_symbols = double(h5readatt(dataset_filename, group_id, 'DL_SLOTS'));
     dl_pilot_symbols = double(h5readatt(dataset_filename, group_id, 'DL_PILOT_SLOTS'));
-    dl_data_symbols = total_dl_symbols - dl_pilot_symbols;
     total_users = 1;
+    
+    configs = [samples_per_slot tx_zero_prefix_len data_size data_start data_stop fft_size cp_len ...
+        total_dl_symbols dl_pilot_symbols total_users];
 
     %Choose the downlink data
     dataset_id = '/DownlinkData';
@@ -74,56 +76,7 @@ function inspect_agora_results(dataset_filename, inspect_frame, verbose)
 
     clear dataset_filename group_id;
 
-
-    %% Process Loaded Files (Channel Estimation and Equalization)
-    % Plot Constellations and print EVMs and SNRs
-    start_id = cp_len + tx_zero_prefix_len;
-    snr = zeros(1, total_users);
-    evm = zeros(1, total_users);
-    cl = 0;
-    nz_sc_idx = data_start+1:data_stop;
-    plt_trk_sp = 16;
-    data_sc_idx = setdiff(1:data_size, 1:plt_trk_sp:data_size);
-    for u=1:total_users
-        % Process pilots
-        ch_est = zeros(data_size, dl_pilot_symbols);
-        for p=1:dl_pilot_symbols
-          rx_pilot_f_tmp = fftshift(fft(rx_pilot_cxdouble(start_id + 1:start_id + fft_size, u, p)));
-          ch_est(:, p) = rx_pilot_f_tmp(nz_sc_idx) ./ tx_pilot_cxdouble(:, u, p);
-        end
-        clear p
-        if dl_pilot_symbols == 1
-            ch_est_mean = ch_est;
-        else
-            ch_est_mean = mean(ch_est, 2);
-        end
-
-        %Process data symbols
-        data_phase_corr = zeros(data_size, dl_data_symbols);
-        aevms = zeros(u, dl_data_symbols);
-        for d=1:dl_data_symbols
-          rx_data_f_tmp = fftshift(fft(rx_data_cxdouble(start_id + 1:start_id + fft_size, u, d)));
-          data_eq = rx_data_f_tmp(nz_sc_idx) ./ ch_est_mean;
-
-          % pilot tracking
-          phase_err = angle(mean((data_eq(1:plt_trk_sp:end) .* conj(tx_pilot_cxdouble(1:plt_trk_sp:end, u)))));
-          data_phase_corr(data_sc_idx, d) = data_eq(data_sc_idx) .* exp(-1j*phase_err);
-
-          evm_mat = abs(data_phase_corr(data_sc_idx, d) - tx_data_cxdouble(data_sc_idx, u, d)).^2;
-          aevms(u, d) = mean(evm_mat(:)); % needs to be a scalar
-
-          cl = cl + 1;
-          figure(cl);
-          scatter(real(data_phase_corr(data_sc_idx, d)), imag(data_phase_corr(data_sc_idx, d)),'r')
-          hold on
-          scatter(real(tx_data_cxdouble(data_sc_idx)), imag(tx_data_cxdouble(data_sc_idx)),'b')
-          title(['Constellation [User ', num2str(u), ', Symbol ', num2str(d), ']'])
-        end
-        clear d
-
-        snr(u) = 10*log10(1./mean(aevms(u, :))); % calculate in dB scale.
-        evm(u) = mean(aevms(u, :)) * 100;
-    end
+    [evm, snr] = process_rx_frame(configs, tx_pilot_cxdouble, tx_data_cxdouble, rx_pilot_cxdouble, rx_data_cxdouble);
 
     clear u cl start_id rx_pilot_f_tmp rx_data_f_tmp plt_trk_sp nz_sc_idx;
 
