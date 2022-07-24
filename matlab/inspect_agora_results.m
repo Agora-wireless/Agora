@@ -8,17 +8,16 @@ function inspect_agora_results(dataset_filename, inspect_frame, verbose)
     end
 
     samples_per_slot = double(h5readatt(dataset_filename, group_id, 'SLOT_SAMP_LEN'));
+    tx_zero_prefix_len = double(h5readatt(dataset_filename, group_id, 'TX_ZERO_PREFIX_LEN'));
     data_size = double(h5readatt(dataset_filename, group_id, 'OFDM_DATA_NUM'));
     data_start = double(h5readatt(dataset_filename, group_id, 'OFDM_DATA_START'));
     data_stop = double(h5readatt(dataset_filename, group_id, 'OFDM_DATA_STOP'));
-    ofdm_ca_size = double(h5readatt(dataset_filename, group_id, 'OFDM_CA_NUM'));
+    fft_size = double(h5readatt(dataset_filename, group_id, 'OFDM_CA_NUM'));
+    cp_len = double(h5readatt(dataset_filename, group_id, 'CP_LEN'));
     total_dl_symbols = double(h5readatt(dataset_filename, group_id, 'DL_SLOTS'));
-    total_users = 1;
     dl_pilot_symbols = double(h5readatt(dataset_filename, group_id, 'DL_PILOT_SLOTS'));
     dl_data_symbols = total_dl_symbols - dl_pilot_symbols;
-    cp_len = double(h5readatt(dataset_filename, group_id, 'CP_LEN'));
-    tx_zero_prefix_len = double(h5readatt(dataset_filename, group_id, 'TX_ZERO_PREFIX_LEN'));
-    fft_size = double(h5readatt(dataset_filename, group_id, 'OFDM_CA_NUM'));
+    total_users = 1;
 
     %Choose the downlink data
     dataset_id = '/DownlinkData';
@@ -55,19 +54,16 @@ function inspect_agora_results(dataset_filename, inspect_frame, verbose)
     tx_pilot_hdf5 = double(h5read(dataset_filename, strcat(group_id,dataset_id), start, count));
     %Convert to complex
     tx_pilot_cxdouble = complex(tx_pilot_hdf5(1:2:end,:), tx_pilot_hdf5(2:2:end,:));
-    clear tx_pilot_hdf5 dataset_id start count total_samples;
+    clear tx_pilot_hdf5 dataset_id start count;
 
     dataset_id = '/TxData';
     %Compare the pilot data
-    total_samples = ofdm_ca_size * 2;
     if verbose == "true"
         h5disp(dataset_filename,strcat(group_id,dataset_id));
     end
     start = [1 1 1 1 1];
     count = [total_samples total_users total_dl_symbols 1 1];
     tx_data_hdf5 = double(h5read(dataset_filename, strcat(group_id,dataset_id), start, count));
-    %Trim to data only
-    tx_data_hdf5 = tx_data_hdf5(1+(data_start * 2):(data_stop * 2),1, :);
     %Convert to complex type
     tx_data_cxdouble = complex(tx_data_hdf5(1:2:end,:,:), tx_data_hdf5(2:2:end,:,:));
     % Samples (complex) x User Ant x Downlink Symbol Id
@@ -85,9 +81,7 @@ function inspect_agora_results(dataset_filename, inspect_frame, verbose)
     snr = zeros(1, total_users);
     evm = zeros(1, total_users);
     cl = 0;
-    nz_start_idx = (fft_size - data_size)/2;
-    nz_sc_idx = nz_start_idx+1:nz_start_idx+data_size;
-    clear nz_start_idx;
+    nz_sc_idx = data_start+1:data_stop;
     plt_trk_sp = 16;
     data_sc_idx = setdiff(1:data_size, 1:plt_trk_sp:data_size);
     for u=1:total_users

@@ -19,7 +19,7 @@
 static constexpr bool kDebugPrintPacketsFromMac = false;
 static constexpr bool kDebugPrintPacketsToMac = false;
 
-static constexpr bool kRecordDownlinkFrame = true;
+static constexpr bool kRecordDownlinkFrame = false;
 static constexpr size_t kRecordFrameInterval = 1;
 
 static const size_t kDefaultQueueSize = 36;
