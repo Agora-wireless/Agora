@@ -336,7 +336,7 @@ void UeWorker::DoFftData(size_t tag) {
                              equ_buffer_ptr[data_sc_id]);
       }
       complex_float tx =
-          config_.DlIqF()[dl_symbol_id][ant * config_.OfdmCaNum() + sc_id];
+          config_.DlIqF()[dl_symbol_id][ant * config_.OfdmDataNum() + j];
       evm +=
           std::norm(equ_buffer_ptr[data_sc_id] - arma::cx_float(tx.re, tx.im));
     }
@@ -345,8 +345,7 @@ void UeWorker::DoFftData(size_t tag) {
   evm = evm / config_.GetOFDMDataNum();
   if (kPrintEqualizedSymbols) {
     complex_float* tx =
-        &config_.DlIqF()[dl_symbol_id][ant_id * config_.OfdmCaNum() +
-                                       config_.OfdmDataStart()];
+        &config_.DlIqF()[dl_symbol_id][ant_id * config_.OfdmDataNum()];
     arma::cx_fvec x_vec(reinterpret_cast<arma::cx_float*>(tx),
                         config_.OfdmDataNum(), false);
     Utils::PrintVec(x_vec, std::string("x") +
