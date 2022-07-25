@@ -87,8 +87,14 @@ PhyStats::~PhyStats() {
   decoded_bits_count_.Free();
   bit_error_count_.Free();
 
+  frame_decoded_bits_.Free();
+  frame_bit_errors_.Free();
+
   decoded_blocks_count_.Free();
   block_error_count_.Free();
+
+  frame_symbol_errors_.Free();
+  frame_decoded_symbols_.Free();
 
   uncoded_bits_count_.Free();
   uncoded_bit_error_count_.Free();
@@ -99,6 +105,9 @@ PhyStats::~PhyStats() {
   calib_pilot_snr_.Free();
   ul_pilot_snr_.Free();
   dl_pilot_snr_.Free();
+
+  dl_pilot_rssi_.Free();
+  dl_pilot_noise_.Free();
 }
 
 void PhyStats::PrintPhyStats() {
