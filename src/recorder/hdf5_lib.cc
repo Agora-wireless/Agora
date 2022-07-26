@@ -167,7 +167,7 @@ herr_t Hdf5Lib::WriteDataset(const std::string& dataset_name,
   const std::string ds_name("/" + group_name_ + "/" + dataset_name);
   const size_t ds_id = ds_name_id_[dataset_name];
   herr_t ret = 0;
-  AGORA_LOG_INFO("WriteDataset: %s\n", dataset_name.c_str());
+  AGORA_LOG_TRACE("WriteDataset: %s\n", dataset_name.c_str());
 
   auto& current_dataset = datasets_.at(ds_id);
   // Select a hyperslab in extended portion of the dataset

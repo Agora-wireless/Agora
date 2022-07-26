@@ -5,6 +5,8 @@
 #ifndef AGORA_RECORDER_WORKER_H_
 #define AGORA_RECORDER_WORKER_H_
 
+#include <memory>
+
 #include "buffer.h"
 #include "config.h"
 
@@ -12,6 +14,7 @@ namespace Agora_recorder {
 
 class RecorderWorker {
  public:
+  enum RecorderWorkerTypes { kRecorderWorkerMultiFile, kRecorderWorkerHdf5 };
   RecorderWorker([[maybe_unused]] const Config* in_cfg,
                  [[maybe_unused]] size_t antenna_offset,
                  [[maybe_unused]] size_t num_antennas,
@@ -24,6 +27,13 @@ class RecorderWorker {
 
   virtual size_t NumAntennas() const { return 0; }
   virtual size_t AntennaOffset() const { return 0; }
+
+  ///Factory function to make concrete worker
+  static std::unique_ptr<RecorderWorker> Create(RecorderWorkerTypes type,
+                                                const Config* in_cfg,
+                                                size_t antenna_offset,
+                                                size_t num_antennas,
+                                                size_t record_interval);
 };
 }; /* End namespace Agora_recorder */
 
