@@ -19,8 +19,13 @@
 static constexpr bool kDebugPrintPacketsFromMac = false;
 static constexpr bool kDebugPrintPacketsToMac = false;
 
+#if defined(ENABLE_HDF5)
+static constexpr bool kRecordDownlinkFrame = true;
+static constexpr size_t kRecordFrameInterval = 1;
+#else
 static constexpr bool kRecordDownlinkFrame = false;
 static constexpr size_t kRecordFrameInterval = 1;
+#endif
 
 static const size_t kDefaultQueueSize = 36;
 
@@ -122,12 +127,16 @@ PhyUe::PhyUe(Config* config)
   }
 
   if (kRecordDownlinkFrame) {
+    //Add and writter / record type here
+    std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes> recorders;
+    recorders.push_back(Agora_recorder::RecorderWorker::RecorderWorkerTypes::
+                            kRecorderWorkerHdf5);
     auto& new_recorder = recorders_.emplace_back(
         std::make_unique<Agora_recorder::RecorderThread>(
             config_, 0, core_offset_worker + config_->UeWorkerThreadNum(),
             kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntNum() *
                 kDefaultQueueSize,
-            0, config_->UeAntNum(), kRecordFrameInterval, true));
+            0, config_->UeAntNum(), kRecordFrameInterval, recorders, true));
     new_recorder->Start();
   }
 
