@@ -4,6 +4,8 @@
  */
 #include "phy-ue.h"
 
+#include <sys/stat.h>
+
 #include <memory>
 
 #include "packet_txrx_client_radio.h"
@@ -326,6 +328,9 @@ void PhyUe::Start() {
   size_t miss_count = 0;
   size_t total_count = 0;
 
+  // create log directory if not exist
+  mkdir("log", 0777);
+
   std::array<EventData, kDequeueBulkSizeTXRX> events_list;
   size_t ret = 0;
   max_equaled_frame_ = 0;
@@ -467,15 +472,18 @@ void PhyUe::Start() {
                 this->phy_stats_->PrintDlSnrStats(frame_id);
               }
               if (kEnableCsvLog) {
-                const arma::uvec csi_rec_sc({20, 140, 280});
+                constexpr size_t kRecScNum = 3;
+                //set subcarriers to record DL CSI
+                constexpr std::array<size_t, kRecScNum> csi_rec_sc = {20, 140,
+                                                                      280};
                 const size_t csi_offset_base =
                     (frame_id % kFrameWnd) * config_->UeAntNum();
-                arma::fmat csi_rec(config_->UeAntNum(), csi_rec_sc.n_elem);
+                arma::fmat csi_rec(config_->UeAntNum(), csi_rec_sc.size());
                 for (size_t i = 0; i < csi_rec.n_rows; i++) {
                   auto* csi_buffer_ptr = reinterpret_cast<arma::cx_float*>(
                       csi_buffer_.at(csi_offset_base + i).data());
                   for (size_t j = 0; j < csi_rec.n_cols; j++) {
-                    csi_rec(i, j) = std::abs(csi_buffer_ptr[csi_rec_sc(j)]);
+                    csi_rec(i, j) = std::abs(csi_buffer_ptr[csi_rec_sc.at(j)]);
                   }
                 }
                 this->phy_stats_->RecordDlPilotSnr(frame_id);

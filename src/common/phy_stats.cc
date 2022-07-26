@@ -77,10 +77,7 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
   if (kEnableCsvLog) {
     for (size_t i = 0; i < csv_loggers_.size(); i++) {
       csv_loggers_.at(i) = std::make_shared<CsvLog::CsvLogger>(
-          i,
-          dir_ == Direction::kUplink ? config_->RadioId()     //BS side
-                                     : config_->UeRadioId(),  //UE side
-          dir_);
+          i, dir_ == Direction::kUplink ? "BS" : config_->UeRadioName().at(0));
     }
   }
 }
@@ -89,8 +86,14 @@ PhyStats::~PhyStats() {
   decoded_bits_count_.Free();
   bit_error_count_.Free();
 
+  frame_decoded_bits_.Free();
+  frame_bit_errors_.Free();
+
   decoded_blocks_count_.Free();
   block_error_count_.Free();
+
+  frame_symbol_errors_.Free();
+  frame_decoded_symbols_.Free();
 
   uncoded_bits_count_.Free();
   uncoded_bit_error_count_.Free();
@@ -101,6 +104,9 @@ PhyStats::~PhyStats() {
   calib_pilot_snr_.Free();
   ul_pilot_snr_.Free();
   dl_pilot_snr_.Free();
+
+  dl_pilot_rssi_.Free();
+  dl_pilot_noise_.Free();
 }
 
 void PhyStats::PrintPhyStats() {
