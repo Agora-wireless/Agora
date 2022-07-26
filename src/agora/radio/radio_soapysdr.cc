@@ -350,8 +350,7 @@ void RadioSoapySdr::Setup(const std::vector<double>& tx_gains,
             }
             //[0,17]
             dev_->setGain(SOAPY_SDR_RX, ch, "LNA2", 17);
-          }
-          else if (is_uhf) {
+          } else if (is_uhf) {
             //[-18,0]
             dev_->setGain(SOAPY_SDR_RX, ch, "ATTN1", -6);
             //[-18,0]
@@ -373,7 +372,10 @@ void RadioSoapySdr::Setup(const std::vector<double>& tx_gains,
           }
           if (is_dev) {
             //[-12,12]
-            dev_->setGain(SOAPY_SDR_TX, ch, "IAMP", 12);
+            dev_->setGain(
+                SOAPY_SDR_TX, ch, "IAMP",
+                (tx_gains.at(ch) > 52.0 ? std::max(12.0, tx_gains.at(ch) - 52.0)
+                                        : 0.0));
           } else {
             //[-12,12]
             dev_->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);

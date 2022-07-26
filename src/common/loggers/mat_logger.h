@@ -23,8 +23,7 @@ constexpr size_t kUEAnts = 1;
 
 class MatLogger : public CsvLogger {
  public:
-  MatLogger(size_t mat_log_id, const std::vector<std::string>& serial_vec,
-            Direction dir);
+  MatLogger(size_t mat_log_id, const std::string& radio_name);
   bool UpdateMatBuf(const size_t frame_id, const size_t sc_id,
                     const arma::cx_fmat& mat_in);
   ~MatLogger();
