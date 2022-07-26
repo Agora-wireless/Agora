@@ -38,7 +38,8 @@
     "beamsweep": false,
     "beacon_antenna": 7,
     "frame_schedule": [
-        "BGCLGGPGGDDDG"
+        /*"BGCLGGPGGDDDG"*/
+        "BGCLGGGPGDDDG"
     ],
     "client_dl_pilot_syms": 1,
     "ue_channel": "A",
