@@ -9,9 +9,6 @@
 
 #include <array>
 #include <memory>
-#include <vector>
-
-#include "symbols.h"
 
 #if defined(ENABLE_CSV_LOG)
 #include "spdlog/async.h"
@@ -22,27 +19,27 @@
 
 namespace CsvLog {
 
-constexpr size_t kCsvIdStart = 0;
-constexpr size_t kSNR = 0;
-constexpr size_t kRSSI = 1;
-constexpr size_t kNOISE = 2;
-constexpr size_t kEVM = 3;
-constexpr size_t kEVMSNR = 4;
-constexpr size_t kBER = 5;
-constexpr size_t kSER = 6;
-constexpr size_t kCSI = 7;
-constexpr size_t kCsvLogs = 8;
-constexpr size_t kMatIdStart = kCsvLogs;
-constexpr size_t kDLCSI = 0;
-constexpr size_t kDLZF = 1;
-constexpr size_t kMatLogs = 2;
+enum CsvLogId {
+  kSNR,
+  kRSSI,
+  kNOISE,
+  kEVM,
+  kEVMSNR,
+  kBER,
+  kSER,
+  kCSI,
+  kCsvLogs
+};
+
+enum MatLogId { kDLCSI, kDLZF, kMatLogs };
+
 constexpr size_t kAllLogs = kCsvLogs + kMatLogs;
 
 #if defined(ENABLE_CSV_LOG)
 const std::array<std::string, kAllLogs> kCsvName = {
     "snr", "rssi", "noise", "evm",   "evmsnr",
     "ber", "ser",  "csi",   "dlcsi", "dlzf"};
-const std::array<std::string, kAllLogs> kMatHeader = {
+const std::array<std::string, kMatLogs> kMatHeader = {
     "Frame,Subcarrier,BS-Ant,UE-Ant,Real,Imag",
     "Frame,Subcarrier,BS-Ant,UE-Ant,Real,Imag"};
 #endif

@@ -4,8 +4,6 @@
  */
 #include "phy-ue.h"
 
-#include <sys/stat.h>
-
 #include <memory>
 
 #include "packet_txrx_client_radio.h"
@@ -20,7 +18,15 @@
 static constexpr bool kDebugPrintPacketsFromMac = false;
 static constexpr bool kDebugPrintPacketsToMac = false;
 
-static const size_t kDefaultQueueSize = 36;
+static constexpr size_t kDefaultQueueSize = 36;
+
+//set subcarriers to record DL CSI
+static constexpr size_t kNumCsiSc = 3;
+static constexpr size_t kRecScLow = 20;
+static constexpr size_t kRecScMed = 140;
+static constexpr size_t kRecScHigh = 280;
+constexpr std::array<size_t, kNumCsiSc> kCsiScIdx = {kRecScLow, kRecScMed,
+                                                     kRecScHigh};
 
 PhyUe::PhyUe(Config* config)
     : stats_(std::make_unique<Stats>(config)),
@@ -299,9 +305,6 @@ void PhyUe::Start() {
   size_t miss_count = 0;
   size_t total_count = 0;
 
-  // create log directory if not exist
-  mkdir("log", 0777);
-
   std::array<EventData, kDequeueBulkSizeTXRX> events_list;
   size_t ret = 0;
   max_equaled_frame_ = 0;
@@ -438,23 +441,19 @@ void PhyUe::Start() {
                 this->phy_stats_->PrintDlSnrStats(frame_id);
               }
               if (kEnableCsvLog) {
-                constexpr size_t kRecScNum = 3;
-                //set subcarriers to record DL CSI
-                constexpr std::array<size_t, kRecScNum> csi_rec_sc = {20, 140,
-                                                                      280};
                 const size_t csi_offset_base =
                     (frame_id % kFrameWnd) * config_->UeAntNum();
-                arma::fmat csi_rec(config_->UeAntNum(), csi_rec_sc.size());
+                arma::fmat csi_rec(config_->UeAntNum(), kCsiScIdx.size());
                 for (size_t i = 0; i < csi_rec.n_rows; i++) {
                   auto* csi_buffer_ptr = reinterpret_cast<arma::cx_float*>(
                       csi_buffer_.at(csi_offset_base + i).data());
                   for (size_t j = 0; j < csi_rec.n_cols; j++) {
-                    csi_rec(i, j) = std::abs(csi_buffer_ptr[csi_rec_sc.at(j)]);
+                    csi_rec(i, j) = std::abs(csi_buffer_ptr[kCsiScIdx.at(j)]);
                   }
                 }
-                this->phy_stats_->RecordDlPilotSnr(frame_id);
                 this->phy_stats_->RecordDlCsi(frame_id, csi_rec);
               }
+              this->phy_stats_->RecordDlPilotSnr(frame_id);
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
               PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
               ScheduleDefferedDownlinkSymbols(frame_id);
@@ -509,13 +508,11 @@ void PhyUe::Start() {
               PrintPerFrameDone(PrintType::kDemul, frame_id);
               demul_counters_.Reset(frame_id);
 
-              if (kEnableCsvLog) {
-                this->phy_stats_->RecordEvm(frame_id);
-                this->phy_stats_->RecordEvmSnr(frame_id);
-                if (kDownlinkHardDemod) {
-                  this->phy_stats_->RecordBer(frame_id);
-                  this->phy_stats_->RecordSer(frame_id);
-                }
+              this->phy_stats_->RecordEvm(frame_id);
+              this->phy_stats_->RecordEvmSnr(frame_id);
+              if (kDownlinkHardDemod) {
+                this->phy_stats_->RecordBer(frame_id);
+                this->phy_stats_->RecordSer(frame_id);
               }
               this->phy_stats_->ClearEvmBuffer(frame_id);
 
@@ -562,11 +559,8 @@ void PhyUe::Start() {
               this->stats_->MasterSetTsc(TsType::kDecodeDone, frame_id);
               PrintPerFrameDone(PrintType::kDecode, frame_id);
               decode_counters_.Reset(frame_id);
-
-              if (kEnableCsvLog) {
-                this->phy_stats_->RecordBer(frame_id);
-                this->phy_stats_->RecordSer(frame_id);
-              }
+              this->phy_stats_->RecordBer(frame_id);
+              this->phy_stats_->RecordSer(frame_id);
               bool finished =
                   FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
               if (finished == true) {

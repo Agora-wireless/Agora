@@ -16,9 +16,9 @@ CsvLogger::CsvLogger(size_t log_id, const std::string& radio_name) {
   if (log_id >= kAllLogs) {
     AGORA_LOG_ERROR("Invalid log id %zu in CsvLogger\n", log_id);
   } else {
-    std::string filename =
+    const std::string filename =
         "log/log-" + kCsvName.at(log_id) + "-" + radio_name + ".csv";
-    std::remove(filename.c_str());
+    std::remove(filename.c_str());  // delete file if already exists
     logger_ = spdlog::create_async_nb<spdlog::sinks::basic_file_sink_mt>(
         kCsvName.at(log_id), filename);
     logger_->set_level(spdlog::level::info);

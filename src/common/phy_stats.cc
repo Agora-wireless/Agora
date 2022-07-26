@@ -152,7 +152,7 @@ void PhyStats::PrintEvmStats(size_t frame_id) {
   arma::fmat evm_mat =
       evm_buf.st() / (config_->OfdmDataNum() * num_rxdata_symbols_);
 
-  std::stringstream ss;
+  [[maybe_unused]] std::stringstream ss;
   ss << "Frame " << frame_id << " Constellation:\n"
      << "  EVM " << (100.0f * evm_mat) << ", SNR "
      << (-10.0f * arma::log10(evm_mat));
@@ -172,7 +172,7 @@ void PhyStats::ClearEvmBuffer(size_t frame_id) {
 }
 
 void PhyStats::PrintDlSnrStats(size_t frame_id) {
-  std::stringstream ss;
+  [[maybe_unused]] std::stringstream ss;
   ss << "Frame " << frame_id << " DL Pilot SNR (dB) at " << std::fixed
      << std::setw(5) << std::setprecision(1);
   size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
@@ -190,7 +190,7 @@ void PhyStats::PrintDlSnrStats(size_t frame_id) {
 }
 
 void PhyStats::PrintUlSnrStats(size_t frame_id) {
-  std::stringstream ss;
+  [[maybe_unused]] std::stringstream ss;
   ss << "Frame " << frame_id
      << " Pilot Signal SNR (dB) Range at BS Antennas: " << std::fixed
      << std::setw(5) << std::setprecision(1);
@@ -227,7 +227,7 @@ void PhyStats::PrintUlSnrStats(size_t frame_id) {
 }
 
 void PhyStats::PrintCalibSnrStats(size_t frame_id) {
-  std::stringstream ss;
+  [[maybe_unused]] std::stringstream ss;
   ss << "Cal Index " << frame_id
      << " Calibration Pilot Signal SNR (dB) Range at BS Antennas: "
      << std::fixed << std::setw(5) << std::setprecision(1);
@@ -401,9 +401,9 @@ void PhyStats::UpdateCalibPilotSnr(size_t frame_id, size_t calib_sym_id,
 
 void PhyStats::UpdateUlPilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
                                 complex_float* fft_data) {
-  arma::cx_fmat fft_mat((arma::cx_float*)fft_data, config_->OfdmCaNum(), 1,
-                        false);
-  arma::fmat fft_abs_mat = abs(fft_mat);
+  const arma::cx_fmat fft_mat(reinterpret_cast<arma::cx_float*>(fft_data),
+                              config_->OfdmCaNum(), 1, false);
+  arma::fmat fft_abs_mat = arma::abs(fft_mat);
   arma::fmat fft_abs_mag = fft_abs_mat % fft_abs_mat;
   const float rssi = arma::as_scalar(arma::sum(fft_abs_mag));
   const float noise_per_sc1 = arma::as_scalar(
@@ -419,8 +419,8 @@ void PhyStats::UpdateUlPilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
 
 void PhyStats::UpdateDlPilotSnr(size_t frame_id, size_t symbol_id,
                                 size_t ant_id, complex_float* fft_data) {
-  arma::cx_fmat fft_mat((arma::cx_float*)fft_data, config_->OfdmCaNum(), 1,
-                        false);
+  const arma::cx_fmat fft_mat(reinterpret_cast<arma::cx_float*>(fft_data),
+                              config_->OfdmCaNum(), 1, false);
   arma::fmat fft_abs_mat = arma::abs(fft_mat);
   arma::fmat fft_abs_mag = fft_abs_mat % fft_abs_mat;
   float rssi = arma::as_scalar(sum(fft_abs_mag));
@@ -441,7 +441,7 @@ void PhyStats::UpdateDlPilotSnr(size_t frame_id, size_t symbol_id,
 
 void PhyStats::PrintZfStats(size_t frame_id) {
   const size_t frame_slot = frame_id % kFrameWnd;
-  std::stringstream ss;
+  [[maybe_unused]] std::stringstream ss;
   ss << "Frame " << frame_id
      << " ZF matrix inverse condition number range: " << std::fixed
      << std::setw(5) << std::setprecision(2);
