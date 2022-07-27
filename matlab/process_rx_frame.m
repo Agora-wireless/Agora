@@ -56,10 +56,12 @@ function [evm, snr] = process_rx_frame(configs, tx_pilot_cxdouble, tx_data_cxdou
 
           cl = cl + 1;
           figure(cl);
-          scatter(real(data_phase_corr(data_sc_idx, d)), imag(data_phase_corr(data_sc_idx, d)),'r')
+          pt_size = 15;
+          scatter(real(data_phase_corr(data_sc_idx, d)), imag(data_phase_corr(data_sc_idx, d)),pt_size,'r','filled');
           hold on
-          scatter(real(tx_data_cxdouble(data_sc_idx)), imag(tx_data_cxdouble(data_sc_idx)),'b')
-          title(['Constellation [User ', num2str(u), ', Symbol ', num2str(d), ']'])
+          pt_size = 250;
+          scatter(real(tx_data_cxdouble(data_sc_idx)), imag(tx_data_cxdouble(data_sc_idx)),pt_size, 'b', 'p', 'filled');
+          title(['Constellation [User ', num2str(u), ', Symbol ', num2str(d), ']']);
         end
         clear d
 
