@@ -12,6 +12,7 @@
 
 #include "buffer.h"
 #include "client_radio.h"
+#include "rx_status_tracker.h"
 #include "txrx_worker.h"
 
 class TxRxWorkerClientHw : public TxRxWorker {
@@ -28,24 +29,27 @@ class TxRxWorkerClientHw : public TxRxWorker {
                      std::condition_variable& sync_cond,
                      std::atomic<bool>& can_proceed,
                      ClientRadioConfig& radio_config);
-
+  TxRxWorkerClientHw() = delete;
   ~TxRxWorkerClientHw() final;
   void DoTxRx() final;
 
  private:
-  TxRxWorkerClientHw() = delete;
   size_t DoTx(const long long time0);
   std::vector<Packet*> DoRx(size_t interface_id, size_t& global_frame_id,
                             size_t& global_symbol_id, long long& receive_time,
                             ssize_t& sample_offset);
 
   ssize_t SyncBeacon(size_t local_interface, size_t sample_window);
-  ssize_t FindSyncBeacon(std::complex<int16_t>* check_data,
+  ssize_t FindSyncBeacon(const std::complex<int16_t>* check_data,
                          size_t sample_window);
   void AdjustRx(size_t local_interface, size_t discard_samples);
   bool IsRxSymbol(size_t symbol_id);
   void TxUplinkSymbols(size_t radio_id, size_t frame_id, long long time0);
   void TxPilot(size_t pilot_ant, size_t frame_id, long long time0);
+
+  //DoRx helper routines
+  void InitRxStatus();
+  void ResetRxStatus(size_t interface, bool reuse_memory);
 
   // This object is created / owned by the parent process
   ClientRadioConfig& radio_;
@@ -53,6 +57,10 @@ class TxRxWorkerClientHw : public TxRxWorker {
 
   std::vector<std::vector<std::complex<int16_t>>> frame_zeros_;
   std::vector<std::vector<std::complex<int16_t>>> frame_storage_;
-  std::vector<void*> rx_frame_;
+  std::vector<RxPacket> rx_frame_pkts_;
+  std::vector<RxPacket*> rx_pkts_ptrs_;
+
+  //For each interface.
+  std::vector<TxRxWorkerRx::RxStatusTracker> rx_status_;
 };
 #endif  // TXRX_WORKER_CLIENT_HW_H_

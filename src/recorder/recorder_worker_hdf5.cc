@@ -1,0 +1,343 @@
+/**
+ * @file recorder_worker_multifile.cc
+ * @brief Recorder worker to write to multiple bin files per rx symbol
+ */
+
+#include "recorder_worker_hdf5.h"
+
+#include <ctime>
+
+#include "logger.h"
+#include "utils.h"
+#include "version_config.h"
+
+namespace Agora_recorder {
+
+static constexpr bool kDebugPrint = false;
+static const std::string kHdf5Filename = "UeRxData.h5";
+static constexpr size_t kFrameInc = 2000;
+static constexpr size_t kDsDimSymbol = 2;
+
+RecorderWorkerHDF5::RecorderWorkerHDF5(const Config* in_cfg,
+                                       size_t antenna_offset,
+                                       size_t num_antennas,
+                                       size_t record_interval)
+    : RecorderWorker(in_cfg, antenna_offset, num_antennas, record_interval),
+      cfg_(in_cfg),
+      antenna_offset_(antenna_offset),
+      num_antennas_(num_antennas),
+      interval_(record_interval),
+      max_frame_number_(0),
+      data_chunk_dims_{
+          {1, 1, 1, 1, static_cast<hsize_t>(2 * cfg_->SampsPerSymbol())}} {}
+
+RecorderWorkerHDF5::~RecorderWorkerHDF5() = default;
+
+void RecorderWorkerHDF5::Init() {
+  AGORA_LOG_INFO("RecorderWorkerHDF5::Creating output HD5F file: %s\n",
+                 kHdf5Filename.c_str());
+  hdf5_ = std::make_unique<Hdf5Lib>(kHdf5Filename, "Data");
+
+  hdf5_->WriteAttribute("SOFTWARE", "AGORA");
+  hdf5_->WriteAttribute("SOFTWARE_VERSION", GetAgoraProjectVersion());
+
+  auto time = std::time(nullptr);
+  auto local_time = *std::localtime(&time);
+
+  std::ostringstream oss;
+  oss << std::put_time(&local_time, "%d-%m-%Y %H-%M-%S");
+  hdf5_->WriteAttribute("TIME", oss.str());
+
+  // Write Atrributes
+  // ******* COMMON ******** //
+  // TX/RX Frequencyfile
+  hdf5_->WriteAttribute("FREQ", cfg_->Freq());
+
+  // BW
+  hdf5_->WriteAttribute("RATE", cfg_->Rate());
+
+  // Number of samples for prefix (padding)
+  hdf5_->WriteAttribute("TX_ZERO_PREFIX_LEN", cfg_->OfdmTxZeroPrefix());
+
+  // Number of samples for postfix (padding)
+  hdf5_->WriteAttribute("TX_ZERO_POSTFIX_LEN", cfg_->OfdmTxZeroPostfix());
+
+  // Number of samples on each symbol including prefix and postfix
+  hdf5_->WriteAttribute("SLOT_SAMP_LEN", cfg_->SampsPerSymbol());
+
+  // Size of FFT
+  //hdf5_->WriteAttribute("FFT_SIZE", cfg_->OfdmCaNum());
+
+  // Length of cyclic prefix
+  hdf5_->WriteAttribute("CP_LEN", cfg_->CpLen());
+
+  hdf5_->WriteAttribute("OFDM_DATA_NUM", cfg_->OfdmDataNum());
+  hdf5_->WriteAttribute("OFDM_DATA_START", cfg_->OfdmDataStart());
+  hdf5_->WriteAttribute("OFDM_DATA_STOP", cfg_->OfdmDataStop());
+  hdf5_->WriteAttribute("OFDM_PILOT_SPACING", cfg_->OfdmPilotSpacing());
+  hdf5_->WriteAttribute("OFDM_CA_NUM", cfg_->OfdmCaNum());
+
+  // Beacon sequence type (string)
+  //hdf5_->WriteAttribute("BEACON_SEQ_TYPE", cfg_->beacon_seq());
+
+  // Pilot sequence type (string)
+  //hdf5_->WriteAttribute("PILOT_SEQ_TYPE", cfg_->pilot_seq());
+
+  // ******* Base Station ******** //
+  // Hub ID
+  hdf5_->WriteAttribute("BS_HUB_ID", cfg_->HubId());
+
+  // BS SDR IDs
+  hdf5_->WriteAttribute("BS_SDR_ID", cfg_->RadioId());
+
+  // Number of Base Station Cells
+  hdf5_->WriteAttribute("BS_NUM_CELLS", cfg_->CellId().size());
+
+  // How many RF channels per Iris board are enabled ("single" or "dual")
+  hdf5_->WriteAttribute("BS_CH_PER_RADIO", cfg_->NumChannels());
+
+  // Frame schedule (vec of strings for now, this should change to matrix when we go to multi-cell)
+  hdf5_->WriteAttribute("BS_FRAME_SCHED", cfg_->Frame().FrameIdentifier());
+
+  // RX Gain RF channel A
+  hdf5_->WriteAttribute("BS_RX_GAIN_A", cfg_->RxGainA());
+
+  // TX Gain RF channel A
+  hdf5_->WriteAttribute("BS_TX_GAIN_A", cfg_->TxGainA());
+
+  // RX Gain RF channel B
+  hdf5_->WriteAttribute("BS_RX_GAIN_B", cfg_->RxGainB());
+
+  // TX Gain RF channel B
+  hdf5_->WriteAttribute("BS_TX_GAIN_B", cfg_->TxGainB());
+
+  // Beamsweep (true or false)
+  hdf5_->WriteAttribute("BS_BEAMSWEEP", cfg_->Beamsweep() ? 1 : 0);
+
+  // Beacon Antenna
+  hdf5_->WriteAttribute("BS_BEACON_ANT", cfg_->BeaconAnt());
+
+  //If the antennas are non consective this will be an issue.
+  //hdf5_->WriteAttribute("ANT_OFFSET", antenna_offset_);
+  //hdf5_->WriteAttribute("ANT_NUM", num_antennas_);
+  //hdf5_->WriteAttribute("ANT_TOTAL", cfg_->getTotNumAntennas());
+
+  // Number of symbols in a frame
+  hdf5_->WriteAttribute("BS_FRAME_LEN", cfg_->Frame().NumTotalSyms());
+
+  // Number of uplink symbols per frame
+  hdf5_->WriteAttribute("UL_SLOTS", cfg_->Frame().NumULSyms());
+  hdf5_->WriteAttribute("DL_SLOTS", cfg_->Frame().NumDLSyms());
+  hdf5_->WriteAttribute("PILOT_SLOTS", cfg_->Frame().NumPilotSyms());
+  //PILOT_NUM
+  hdf5_->WriteAttribute("DL_CAL_SLOTS", cfg_->Frame().NumDLCalSyms());
+  hdf5_->WriteAttribute("UL_CAL_SLOTS", cfg_->Frame().NumULCalSyms());
+  hdf5_->WriteAttribute("UL_PILOT_SLOTS", cfg_->Frame().ClientUlPilotSymbols());
+  hdf5_->WriteAttribute("DL_PILOT_SLOTS", cfg_->Frame().ClientDlPilotSymbols());
+
+  // Reciprocal Calibration Mode
+  hdf5_->WriteAttribute("RECIPROCAL_CALIB",
+                        cfg_->Frame().IsRecCalEnabled() ? 1 : 0);
+
+  // ******* Clients ******** //
+  // Freq. Domain Pilot symbols
+  //std::vector<double> split_vec_pilot_f(2 * cfg_->pilot_sym_f().at(0).size());
+  //for (size_t i = 0; i < cfg_->pilot_sym_f().at(0).size(); i++) {
+  //  split_vec_pilot_f[2 * i + 0] = cfg_->pilot_sym_f().at(0).at(i);
+  //  split_vec_pilot_f[2 * i + 1] = cfg_->pilot_sym_f().at(1).at(i);
+  //}
+  //hdf5_->WriteAttribute("OFDM_PILOT_F", split_vec_pilot_f);
+
+  // Time Domain Pilot symbols
+  //std::vector<double> split_vec_pilot(2 * cfg_->pilot_sym_t().at(0).size());
+  //for (size_t i = 0; i < cfg_->pilot_sym_t().at(0).size(); i++) {
+  //  split_vec_pilot[2 * i + 0] = cfg_->pilot_sym_t().at(0).at(i);
+  //  split_vec_pilot[2 * i + 1] = cfg_->pilot_sym_t().at(1).at(i);
+  //}
+  //hdf5_->WriteAttribute("OFDM_PILOT", split_vec_pilot);
+
+  // Data subcarriers
+  //if (cfg_->data_ind().size() > 0)
+  //  hdf5_->WriteAttribute("OFDM_DATA_SC", cfg_->data_ind());
+
+  // Pilot subcarriers (indexes)
+  //if (cfg_->pilot_sc_ind().size() > 0)
+  //  hdf5_->WriteAttribute("OFDM_PILOT_SC", cfg_->pilot_sc_ind());
+  //if (cfg_->pilot_sc().size() > 0)
+  //  hdf5_->WriteAttribute("OFDM_PILOT_SC_VALS", cfg_->pilot_sc());
+
+  // Number of Client Antennas
+  hdf5_->WriteAttribute("CL_NUM", cfg_->UeAntNum());
+
+  // Data modulation
+  //hdf5_->WriteAttribute("CL_MODULATION", cfg_->cl_data_mod());
+
+  // Client antenna polarization
+  //Should loop over all values
+  hdf5_->WriteAttribute("CL_CH_PER_RADIO", cfg_->NumUeChannels());
+
+  // RX Gain RF channel A
+  hdf5_->WriteAttribute("CL_RX_GAIN_A", cfg_->ClientRxGainA());
+
+  // TX Gain RF channel A
+  hdf5_->WriteAttribute("CL_TX_GAIN_A", cfg_->ClientTxGainA());
+
+  // RX Gain RF channel B
+  hdf5_->WriteAttribute("CL_RX_GAIN_B", cfg_->ClientRxGainB());
+
+  // TX Gain RF channel B
+  hdf5_->WriteAttribute("CL_TX_GAIN_B", cfg_->ClientTxGainB());
+
+  // Set of client SDR IDs (vec of strings)
+  hdf5_->WriteAttribute("CL_SDR_ID", cfg_->UeRadioId());
+  // ********************* //
+
+  if (cfg_->Frame().NumBeaconSyms() > 0) {
+    datasets_.emplace_back(
+        std::make_pair<std::string, std::array<hsize_t, kDsDimsNum>>(
+            std::string("BeaconData"),
+            {kFrameInc, cfg_->NumCells(), cfg_->Frame().NumBeaconSyms(),
+             num_antennas_, data_chunk_dims_.back()}));
+
+    auto& current_dataset = datasets_.back();
+    hdf5_->CreateDataset(current_dataset.first, data_chunk_dims_,
+                         current_dataset.second);
+  }
+
+  if (cfg_->Frame().NumDLSyms() > 0) {
+    datasets_.emplace_back(
+        std::make_pair<std::string, std::array<hsize_t, kDsDimsNum>>(
+            std::string("DownlinkData"),
+            {kFrameInc, cfg_->NumCells(), cfg_->Frame().NumDLSyms(),
+             num_antennas_, data_chunk_dims_.back()}));
+
+    auto& current_dataset = datasets_.back();
+    hdf5_->CreateDataset(current_dataset.first, data_chunk_dims_,
+                         current_dataset.second);
+  }
+
+  //Adding the ground truths as a DataSet
+  {  //TxData
+    //Including the Pilots here.....
+    //*2 for complex
+    const hsize_t tx_data_size = 2 * cfg_->OfdmDataNum();
+    const size_t num_dl_data_syms = cfg_->Frame().NumDLSyms();
+    std::string dataset_name("TxData");
+    const std::array<hsize_t, kDsDimsNum> tx_data_dims = {1, 1, 1, 1,
+                                                          tx_data_size};
+    const std::array<hsize_t, kDsDimsNum> total_dims = {
+        1, 1, num_dl_data_syms, num_antennas_, tx_data_dims.back()};
+
+    hdf5_->CreateDataset(dataset_name, tx_data_dims, total_dims, -1,
+                         H5::PredType::INTEL_F32);
+
+    for (size_t ant = 0; ant < num_antennas_; ant++) {
+      for (size_t sym = 0; sym < num_dl_data_syms; sym++) {
+        const std::array<hsize_t, kDsDimsNum> start = {0, 0, sym, ant, 0};
+        AGORA_LOG_INFO(
+            "Attempting to write TxData for Symbol %zu, Antenna %zu total syms "
+            "%zu\n",
+            sym, ant, cfg_->Frame().ClientDlPilotSymbols());
+        hdf5_->WriteDataset(
+            dataset_name, start, tx_data_dims,
+            reinterpret_cast<float*>(const_cast<Config*>(cfg_)->DlIqF()[sym] +
+                                     (ant * cfg_->OfdmDataNum())));
+      }
+    }
+    hdf5_->FinalizeDataset(dataset_name);
+  }
+
+  {  //TXPilot
+    std::string dataset_name("TxPilot");
+    const hsize_t tx_pilot_size = 2 * cfg_->OfdmDataNum();
+    const std::array<hsize_t, kDsDimsNum> tx_pilot_dims = {1, 1, 1, 1,
+                                                           tx_pilot_size};
+    const std::array<hsize_t, kDsDimsNum> total_dims = {1, 1, 1, num_antennas_,
+                                                        tx_pilot_dims.back()};
+
+    hdf5_->CreateDataset(dataset_name, total_dims, tx_pilot_dims, -1,
+                         H5::PredType::INTEL_F32);
+
+    for (size_t ant = 0; ant < num_antennas_; ant++) {
+      const std::array<hsize_t, kDsDimsNum> start = {0, 0, 0, ant, 0};
+      hdf5_->WriteDataset(
+          dataset_name, start, tx_pilot_dims,
+          reinterpret_cast<float*>(
+              const_cast<Config*>(cfg_)->UeSpecificPilot()[ant]));
+    }
+    hdf5_->FinalizeDataset(dataset_name);
+  }
+}
+
+void RecorderWorkerHDF5::Finalize() { hdf5_.reset(); }
+
+int RecorderWorkerHDF5::Record(const Packet* pkt) {
+  const size_t end_antenna = (antenna_offset_ + num_antennas_) - 1;
+
+  if ((pkt->ant_id_ < antenna_offset_) || (pkt->ant_id_ > end_antenna)) {
+    AGORA_LOG_ERROR(
+        "Antenna id is not within range of this recorder %d, %zu:%zu",
+        pkt->ant_id_, antenna_offset_, end_antenna);
+  }
+  assert((pkt->ant_id_ >= antenna_offset_) && (pkt->ant_id_ <= end_antenna));
+  int ret = 0;
+
+  const size_t frame_id = pkt->frame_id_;
+  const size_t ant_id = pkt->ant_id_;
+  const size_t symbol_id = pkt->symbol_id_;
+
+  if (kDebugPrint) {
+    std::printf(
+        "RecorderWorkerHDF5::record [frame %zu, symbol %zu, cell %d, "
+        "ant %zu] samples: %d %d %d %d %d %d %d %d ....\n",
+        frame_id, symbol_id, pkt->cell_id_, ant_id, pkt->data_[0u],
+        pkt->data_[1u], pkt->data_[2u], pkt->data_[3u], pkt->data_[4u],
+        pkt->data_[5u], pkt->data_[6u], pkt->data_[7u]);
+  }
+
+  if (frame_id > cfg_->FramesToTest()) {
+    AGORA_LOG_ERROR("Closing file due to frame id %zu : %zu max\n", frame_id,
+                    cfg_->FramesToTest());
+  } else if ((frame_id % interval_) == 0) {
+    if (kDebugPrint) {
+      std::printf(
+          "RecorderWorkerHDF5::record [frame %zu, symbol %zu, cell %d, "
+          "ant %zu] samples: %d %d %d %d %d %d %d %d ....\n",
+          frame_id, symbol_id, pkt->cell_id_, ant_id, pkt->data_[0u],
+          pkt->data_[1u], pkt->data_[2u], pkt->data_[3u], pkt->data_[4u],
+          pkt->data_[5u], pkt->data_[6u], pkt->data_[7u]);
+    }
+
+    const uint32_t antenna_index = ant_id - antenna_offset_;
+    std::array<hsize_t, kDsDimsNum> start = {frame_id, pkt->cell_id_, 0,
+                                             antenna_index, 0};
+
+    //Bad way to check for beacon.  But here it is
+    if (symbol_id == 0) {
+      auto& dataset = datasets_.at(0);
+      ///If the frame id is > than the current 0 indexed dimension then we need to extend
+      if (frame_id >= dataset.second.at(0)) {
+        dataset.second.at(0) = dataset.second.at(0) + kFrameInc;
+        RtAssert(dataset.second.at(0) > frame_id,
+                 "Frame ID must be less than extended dimension");
+        hdf5_->ExtendDataset(dataset.first, dataset.second);
+      }
+      start[kDsDimSymbol] = symbol_id;
+      hdf5_->WriteDataset(dataset.first, start, data_chunk_dims_, pkt->data_);
+    } else if (cfg_->IsDownlink(frame_id, symbol_id)) {
+      const size_t dl_symbol_id = cfg_->Frame().GetDLSymbolIdx(pkt->symbol_id_);
+      auto& dataset = datasets_.at(1);
+      ///If the frame id is > than the current 0 indexed dimension then we need to extend
+      if (frame_id >= dataset.second.at(0)) {
+        dataset.second.at(0) = dataset.second.at(0) + kFrameInc;
+        RtAssert(dataset.second.at(0) > frame_id,
+                 "Frame ID must be less than extended dimension");
+        hdf5_->ExtendDataset(dataset.first, dataset.second);
+      }
+      start[kDsDimSymbol] = dl_symbol_id;
+      hdf5_->WriteDataset(dataset.first, start, data_chunk_dims_, pkt->data_);
+    }
+  } /* End else */
+  return ret;
+}
+};  // End namespace Agora_recorder

@@ -87,6 +87,18 @@ class Config {
   inline double ClientRxGainB(size_t id) const {
     return this->client_rx_gain_b_.at(id);
   }
+  inline const std::vector<double>& ClientTxGainA() const {
+    return this->client_tx_gain_a_;
+  }
+  inline const std::vector<double>& ClientRxGainA() const {
+    return this->client_rx_gain_a_;
+  }
+  inline const std::vector<double>& ClientTxGainB() const {
+    return this->client_tx_gain_b_;
+  }
+  inline const std::vector<double>& ClientRxGainB() const {
+    return this->client_rx_gain_b_;
+  }
   inline size_t NumCells() const { return this->num_cells_; }
   inline size_t NumRadios() const { return this->num_radios_; }
   inline size_t InitCalibRepeat() const { return this->init_calib_repeat_; }
@@ -340,6 +352,9 @@ class Config {
   };
   inline const std::vector<std::string>& UeRadioId() const {
     return this->ue_radio_id_;
+  };
+  inline const std::vector<std::string>& UeRadioName() const {
+    return this->ue_radio_name_;
   };
   inline const std::vector<size_t>& CellId() const { return this->cell_id_; }
 
@@ -625,6 +640,7 @@ class Config {
   std::vector<std::string> radio_id_;
   std::vector<std::string> hub_id_;
   std::vector<std::string> ue_radio_id_;
+  std::vector<std::string> ue_radio_name_;
   std::vector<size_t> ref_radio_;
   std::vector<size_t> ref_ant_;
   std::vector<size_t> cell_id_;

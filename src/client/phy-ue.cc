@@ -4,12 +4,15 @@
  */
 #include "phy-ue.h"
 
+#include <sys/stat.h>
+
 #include <memory>
 
 #include "packet_txrx_client_radio.h"
 #include "packet_txrx_client_sim.h"
 #include "phy_ldpc_decoder_5gnr.h"
 #include "phy_stats.h"
+#include "recorder_thread.h"
 #include "scrambler.h"
 #include "signal_handler.h"
 #include "utils_ldpc.h"
@@ -17,6 +20,14 @@
 /* Print debug work */
 static constexpr bool kDebugPrintPacketsFromMac = false;
 static constexpr bool kDebugPrintPacketsToMac = false;
+
+#if defined(ENABLE_HDF5)
+static constexpr bool kRecordDownlinkFrame = true;
+static constexpr size_t kRecordFrameInterval = 1;
+#else
+static constexpr bool kRecordDownlinkFrame = false;
+static constexpr size_t kRecordFrameInterval = 1;
+#endif
 
 static const size_t kDefaultQueueSize = 36;
 
@@ -47,9 +58,9 @@ PhyUe::PhyUe(Config* config)
          j < config_->SampsPerSymbol() - config->OfdmTxZeroPostfix(); j++) {
       ue_pilot_vec_.at(i).push_back(std::complex<float>(
           static_cast<float>(config_->UeSpecificPilotT()[i][j].real()) /
-              32768.0f,
+              SHRT_MAX,
           static_cast<float>(config_->UeSpecificPilotT()[i][j].imag()) /
-              32768.0f));
+              SHRT_MAX));
     }
   }
 
@@ -105,24 +116,30 @@ PhyUe::PhyUe(Config* config)
         std::thread(&MacThreadClient::RunEventLoop, mac_thread_.get());
   }
 
-  if (kEnableCsvLog) {
-    for (size_t i = 0; i < csv_loggers_.size(); i++) {
-      csv_loggers_.at(i) =
-          std::make_shared<CsvLog::CsvLogger>(config_->UeRadioId().at(0), i);
-    }
-  }
-
   for (size_t i = 0; i < config_->UeWorkerThreadNum(); i++) {
     auto new_worker = std::make_unique<UeWorker>(
         i, *config_, *stats_, *phy_stats_, complete_queue_, work_queue_,
         *work_producer_token_.get(), ul_bits_buffer_, ul_syms_buffer_,
         modul_buffer_, ifft_buffer_, tx_buffer_, rx_buffer_, csi_buffer_,
         equal_buffer_, non_null_sc_ind_, fft_buffer_, demod_buffer_,
-        decoded_buffer_, ue_pilot_vec_, csv_loggers_.at(CsvLog::kEVMSNR),
-        csv_loggers_.at(CsvLog::kBERSER));
+        decoded_buffer_, ue_pilot_vec_);
 
     new_worker->Start(core_offset_worker);
     workers_.push_back(std::move(new_worker));
+  }
+
+  if (kRecordDownlinkFrame) {
+    //Add and writter / record type here
+    std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes> recorders;
+    recorders.push_back(Agora_recorder::RecorderWorker::RecorderWorkerTypes::
+                            kRecorderWorkerHdf5);
+    auto& new_recorder = recorders_.emplace_back(
+        std::make_unique<Agora_recorder::RecorderThread>(
+            config_, 0, core_offset_worker + config_->UeWorkerThreadNum(),
+            kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntNum() *
+                kDefaultQueueSize,
+            0, config_->UeAntNum(), kRecordFrameInterval, recorders, true));
+    new_recorder->Start();
   }
 
   // initilize all kinds of checkers
@@ -170,6 +187,12 @@ PhyUe::~PhyUe() {
     workers_.at(i)->Stop();
   }
   workers_.clear();
+
+  for (size_t i = 0; i < recorders_.size(); i++) {
+    AGORA_LOG_INFO("Waiting for Recording to complete %zu\n", i);
+    recorders_.at(i)->Stop();
+  }
+  recorders_.clear();
 
   if (kEnableMac == true) {
     mac_std_thread_.join();
@@ -305,6 +328,9 @@ void PhyUe::Start() {
   size_t miss_count = 0;
   size_t total_count = 0;
 
+  // create log directory if not exist
+  mkdir("log", 0777);
+
   std::array<EventData, kDequeueBulkSizeTXRX> events_list;
   size_t ret = 0;
   max_equaled_frame_ = 0;
@@ -330,8 +356,13 @@ void PhyUe::Start() {
 
       switch (event.event_type_) {
         case EventType::kPacketRX: {
-          RxPacket* rx = rx_tag_t(event.tags_[0]).rx_packet_;
+          RxPacket* rx = rx_tag_t(event.tags_[0u]).rx_packet_;
           Packet* pkt = rx->RawPacket();
+
+          if (recorders_.size() == 1) {
+            rx->Use();
+            recorders_.at(0)->DispatchWork(event);
+          }
 
           const size_t frame_id = pkt->frame_id_;
           const size_t symbol_id = pkt->symbol_id_;
@@ -438,11 +469,25 @@ void PhyUe::Start() {
                 fft_dlpilot_counters_.CompleteSymbol(frame_id);
             if (pilot_fft_complete) {
               if (kPrintPhyStats) {
-                this->phy_stats_->PrintDlSnrStats(frame_id, ant_id);
+                this->phy_stats_->PrintDlSnrStats(frame_id);
               }
               if (kEnableCsvLog) {
-                this->phy_stats_->RecordDlPilotSnr(
-                    csv_loggers_.at(CsvLog::kDLPSNR).get(), frame_id, ant_id);
+                constexpr size_t kRecScNum = 3;
+                //set subcarriers to record DL CSI
+                constexpr std::array<size_t, kRecScNum> csi_rec_sc = {20, 140,
+                                                                      280};
+                const size_t csi_offset_base =
+                    (frame_id % kFrameWnd) * config_->UeAntNum();
+                arma::fmat csi_rec(config_->UeAntNum(), csi_rec_sc.size());
+                for (size_t i = 0; i < csi_rec.n_rows; i++) {
+                  auto* csi_buffer_ptr = reinterpret_cast<arma::cx_float*>(
+                      csi_buffer_.at(csi_offset_base + i).data());
+                  for (size_t j = 0; j < csi_rec.n_cols; j++) {
+                    csi_rec(i, j) = std::abs(csi_buffer_ptr[csi_rec_sc.at(j)]);
+                  }
+                }
+                this->phy_stats_->RecordDlPilotSnr(frame_id);
+                this->phy_stats_->RecordDlCsi(frame_id, csi_rec);
               }
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
               PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
@@ -497,6 +542,17 @@ void PhyUe::Start() {
               this->stats_->MasterSetTsc(TsType::kDemulDone, frame_id);
               PrintPerFrameDone(PrintType::kDemul, frame_id);
               demul_counters_.Reset(frame_id);
+
+              if (kEnableCsvLog) {
+                this->phy_stats_->RecordEvm(frame_id);
+                this->phy_stats_->RecordEvmSnr(frame_id);
+                if (kDownlinkHardDemod) {
+                  this->phy_stats_->RecordBer(frame_id);
+                  this->phy_stats_->RecordSer(frame_id);
+                }
+              }
+              this->phy_stats_->ClearEvmBuffer(frame_id);
+
               if (kDownlinkHardDemod == true) {
                 bool finished =
                     FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
@@ -541,6 +597,10 @@ void PhyUe::Start() {
               PrintPerFrameDone(PrintType::kDecode, frame_id);
               decode_counters_.Reset(frame_id);
 
+              if (kEnableCsvLog) {
+                this->phy_stats_->RecordBer(frame_id);
+                this->phy_stats_->RecordSer(frame_id);
+              }
               bool finished =
                   FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
               if (finished == true) {

@@ -103,6 +103,8 @@ std::vector<EventData> TxRxWorker::GetPendingTxEvents(size_t max_events) {
 // This function as implmented is not thread safe
 RxPacket& TxRxWorker::GetRxPacket() {
   RxPacket& new_packet = rx_memory_.at(rx_memory_idx_);
+  AGORA_LOG_TRACE("TxRxWorker [%zu]: Getting new rx packet at location %ld\n",
+                  tid_, reinterpret_cast<intptr_t>(&new_packet));
 
   // if rx_buffer is full, exit
   if (new_packet.Empty() == false) {
@@ -125,27 +127,33 @@ RxPacket& TxRxWorker::GetRxPacket() {
 // Could be dangerous if you call this on memory that has been passed to another object
 // This function as implmented is not thread safe
 void TxRxWorker::ReturnRxPacket(RxPacket& unused_packet) {
+  size_t new_index;
   //Decrement the rx_memory_idx
   if (rx_memory_idx_ == 0) {
-    rx_memory_idx_ = rx_memory_.size() - 1;
+    new_index = rx_memory_.size() - 1;
   } else {
-    rx_memory_idx_ = rx_memory_idx_ - 1;
+    new_index = rx_memory_idx_ - 1;
   }
-  RxPacket& returned_packet = rx_memory_.at(rx_memory_idx_);
+  const RxPacket& returned_packet = rx_memory_.at(new_index);
   //Make sure we are returning the correct packet, used for extra error checking
   if (&returned_packet != &unused_packet) {
-    AGORA_LOG_ERROR("TxRxWorker [%zu]: returned memory that wasn't used last\n",
-                    tid_);
-    throw std::runtime_error(
-        "TxRxWorker: returned memory that wasn't used last");
+    AGORA_LOG_WARN(
+        "TxRxWorker [%zu]: returned memory that wasn't used last at address "
+        "%ld\n",
+        tid_, reinterpret_cast<intptr_t>(&unused_packet));
+  } else {
+    //If they are the same, reuse the old position
+    rx_memory_idx_ = new_index;
   }
   // if the returned packet is free, something is wrong
-  if (returned_packet.Empty()) {
-    AGORA_LOG_ERROR("TxRxWorker [%zu]: rx buffer returned free memory\n", tid_);
+  if (unused_packet.Empty()) {
+    AGORA_LOG_ERROR(
+        "TxRxWorker [%zu]: rx buffer returned free memory at address %ld\n",
+        tid_, reinterpret_cast<intptr_t>(&unused_packet));
     throw std::runtime_error("TxRxWorker: rx buffer returned free memory");
   }
   // Mark the packet as free
-  returned_packet.Free();
+  unused_packet.Free();
 }
 
 //Returns the location of the tx packet for a given frame / symbol / antenna

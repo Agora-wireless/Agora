@@ -72,17 +72,25 @@ message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DPROJECT_DIRECTORY=${SOURCE_DIR})
 
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
-set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "info" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
 set(USE_AVX2_ENCODER False CACHE STRING "Use Agora's AVX2 encoder instead of FlexRAN's AVX512 encoder")
-# TODO: add SoapyUHD check
-set(USE_UHD False CACHE STRING "USE_UHD defaulting to 'False'")
 
-message(STATUS "USE_UHD: ${USE_UHD}")
-message(STATUS "USE_ARGOS: ${USE_ARGOS}")
 message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
+
+set(RADIO_TYPE SIMULATION CACHE STRING "RADIO_TYPE defaulting to 'SIMULATION', valid types are SIMULATION / SOAPY_IRIS / SOAPY_UHD")
+message(STATUS "RADIO_TYPE: ${RADIO_TYPE}")
+
+if(RADIO_TYPE STREQUAL SOAPY_IRIS)
+  message(STATUS "Enabled SOAPY Iris radio type")
+  add_definitions(-DUSE_ARGOS)
+elseif(RADIO_TYPE STREQUAL SOAPY_UHD)
+  message(STATUS "Enabled SOAPY UHD radio type")
+  add_definitions(-DUSE_UHD)
+else()
+  message(STATUS "Enabled SIMULATION radio type")
+endif()
 
 set(FLEXRAN_FEC_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk)
 
@@ -167,31 +175,40 @@ set(MAC_BS_SOURCES
   src/mac/file_receiver.cc
   src/mac/mac_basestation.cc)
 
-# Don't allow both Argos and UHD support
-if(${USE_ARGOS} AND ${USE_UHD})
-  message(FATAL_ERROR "Both USE_ARGOS and USE_UHD cannot be defined.  Please correct arguments and rerun cmake")
-# Argos support
-elseif(${USE_ARGOS})
-  add_definitions(-DUSE_ARGOS)
-elseif(${USE_UHD})
-  add_definitions(-DUSE_UHD)
+#External Libraries
+find_package(Armadillo "11.0.0" REQUIRED)
+
+set(ENABLE_HDF5 False CACHE STRING "ENABLE_HDF5 defaulting to 'False'")
+message(STATUS "HDF5 Support Enabled: ${ENABLE_HDF5}")
+if (${ENABLE_HDF5})
+  add_definitions(-DENABLE_HDF5)
+  find_package(HDF5 1.10 REQUIRED COMPONENTS CXX)
+  if (NOT HDF5_FOUND)
+      message(FATAL_ERROR "HDF5 development files not found")
+      return()
+  endif()
+  message(STATUS "HDF5_INCLUDE_DIRS: ${HDF5_INCLUDE_DIRS}")
+  message(STATUS "HDF5_LIBRARIES: ${HDF5_LIBRARIES}")
+  include_directories(${HDF5_INCLUDE_DIRS})
 endif()
 
-#External Libraries
-find_package(Armadillo)
+find_package(PythonLibs REQUIRED)
+set(PYTHON_LIB ${PYTHON_LIBRARIES})
+include_directories(${PYTHON_INCLUDE_DIRS})
 
-find_package(SoapySDR "0.7" CONFIG)
+message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
+message(STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}")
+
+#Soapy
+find_package(SoapySDR "0.8.0" CONFIG)
 if(NOT SoapySDR_FOUND)
   message(FATAL_ERROR "SoapySDR development files not found")
 endif()
-message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
-find_package(PythonLibs REQUIRED)
-message(STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}")
+set(SOAPY_LIB ${SoapySDR_LIBRARIES})
+include_directories(${SOAPY_INCLUDE_DIRS})
+
 message(STATUS "SoapySDR_INCLUDE_DIRS: ${SoapySDR_INCLUDE_DIRS}")
 message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
-include_directories(${PYTHON_INCLUDE_DIRS} ${SoapySDR_INCLUDE_DIRS})
-set(SOAPY_LIB ${SoapySDR_LIBRARIES})
-set(PYTHON_LIB ${PYTHON_LIBRARIES}) 
 add_definitions(-DTHREADED_INIT)
 
 # Intel MKL
@@ -286,22 +303,38 @@ find_package(GTest REQUIRED)
 
 include_directories(
   src/common/
+  src/common/ipc
   src/common/loggers
+  src/recorder
   src/mac/
   src/agora/
-  src/agora/txrx/
+  src/agora/radio
+  src/agora/txrx
   src/agora/txrx/workers
-  src/client/
+  src/client
   src/client/txrx
   src/client/txrx/workers
-  /usr/include/mkl/
-  src/data_generator)
+  src/data_generator
+  /usr/include/mkl)
 
 include_directories(SYSTEM src/third_party src/third_party/spdlog/include src/third_party/nlohmann/single_include)
 
+set(RECORDER_SOURCES
+  src/recorder/recorder_thread.cc
+  src/recorder/recorder_worker.cc
+  src/recorder/recorder_worker_multifile.cc)
+
+if (${ENABLE_HDF5})
+  set(RECORDER_SOURCES
+      ${RECORDER_SOURCES}
+      src/recorder/hdf5_lib.cc
+      src/recorder/recorder_worker_hdf5.cc)
+endif()
+add_library(recorder_sources_lib OBJECT ${RECORDER_SOURCES})
+
 set(COMMON_SOURCES
   src/agora/stats.cc
-  src/agora/phy_stats.cc
+  src/common/phy_stats.cc
   src/common/framestats.cc
   src/agora/doencode.cc
   src/common/utils.cc
@@ -315,6 +348,16 @@ set(COMMON_SOURCES
   src/common/crc.cc
   src/common/memory_manage.cc
   src/common/scrambler.cc
+  src/agora/radio/radio.cc
+  src/agora/radio/radio_soapysdr.cc
+  src/agora/radio/radio_data_plane.cc
+  src/agora/radio/radio_socket.cc
+  src/agora/radio/radio_data_plane_soapy.cc
+  src/agora/radio/radio_data_plane_socket.cc
+  src/common/ipc/udp_client.cc
+  src/common/ipc/udp_server.cc
+  src/common/ipc/udp_server_ipv6.cc
+  src/common/ipc/network_utils.cc
   src/common/loggers/csv_logger.cc
   src/common/loggers/mat_logger.cc
   src/encoder/cyclic_shift.cc
@@ -343,9 +386,9 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/dodemul.cc
   src/agora/doprecode.cc
   src/agora/dodecode.cc
-  src/agora/radio_lib.cc
-  src/agora/radio_calibrate_digital.cc
-  src/agora/radio_calibrate_analog.cc
+  src/agora/radio/radio_lib.cc
+  src/agora/radio/radio_calibrate_digital.cc
+  src/agora/radio/radio_calibrate_analog.cc
   src/mac/mac_thread_basestation.cc
   src/agora/txrx/packet_txrx_sim.cc
   src/agora/txrx/packet_txrx_radio.cc
@@ -364,7 +407,7 @@ set(CLIENT_SOURCES
   src/client/txrx/packet_txrx_client_sim.cc
   src/client/txrx/packet_txrx_client_radio.cc
   src/client/txrx/workers/txrx_worker_client_sim.cc
-   src/client/txrx/workers/txrx_worker_client_hw.cc
+  src/client/txrx/workers/txrx_worker_client_hw.cc
   src/mac/mac_thread_client.cc)
 add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
   
@@ -379,7 +422,7 @@ set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
-set(COMMON_LIBS ${COMMON_LIBS} armadillo -lnuma ${DPDK_LIBRARIES} ${MKL_LIBS} ${SOAPY_LIB}
+set(COMMON_LIBS ${COMMON_LIBS} armadillo numa ${HDF5_LIBRARIES} ${DPDK_LIBRARIES} ${MKL_LIBS} ${SOAPY_LIB}
     ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
 
 # TODO: The main agora executable is performance-critical, so we need to
@@ -401,6 +444,7 @@ target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
 add_executable(user
   src/client/user-main.cc
+  $<TARGET_OBJECTS:recorder_sources_lib>
   $<TARGET_OBJECTS:client_sources_lib>
   $<TARGET_OBJECTS:shared_txrx_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
@@ -439,6 +483,16 @@ add_executable(macbs
      ${COMMON_SOURCES})
 target_link_libraries(macbs ${COMMON_LIBS})
 
+if(RADIO_TYPE STREQUAL SOAPY_IRIS)
+add_executable(radio_test
+    test/radio_test/main.cc
+    $<TARGET_OBJECTS:agora_sources_lib>
+    $<TARGET_OBJECTS:recorder_sources_lib>
+    $<TARGET_OBJECTS:client_sources_lib>
+    $<TARGET_OBJECTS:shared_txrx_sources_lib>
+    $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(radio_test ${COMMON_LIBS})
+endif()
 
 # End-to-end test
 add_executable(test_agora

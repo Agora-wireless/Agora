@@ -216,8 +216,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       std::vector<complex_float> pilots_t_ue(
           this->cfg_->OfdmCaNum());  // Zeroed
       for (size_t j = this->cfg_->OfdmDataStart();
-           j < this->cfg_->OfdmDataStart() + this->cfg_->OfdmDataNum();
-           j += this->cfg_->UeAntNum()) {
+           j < this->cfg_->OfdmDataStop(); j += this->cfg_->UeAntNum()) {
         pilots_t_ue.at(i + j) = pilot_td.at(i + j);
       }
       // Load pilots
@@ -275,6 +274,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   rx_data_all_symbols.Calloc(this->cfg_->Frame().NumTotalSyms(),
                              this->cfg_->OfdmCaNum() * this->cfg_->BsAntNum(),
                              Agora_memory::Alignment_t::kAlign64);
+  auto* ifft_shift_tmp =
+      static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
+          Agora_memory::Alignment_t::kAlign64,
+          cfg_->OfdmCaNum() * sizeof(complex_float)));
   for (size_t i = 0; i < this->cfg_->Frame().NumTotalSyms(); i++) {
     arma::cx_fmat mat_input_data(
         reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
@@ -295,8 +298,11 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       }
     }
     for (size_t j = 0; j < this->cfg_->BsAntNum(); j++) {
-      CommsLib::IFFT(rx_data_all_symbols[i] + j * this->cfg_->OfdmCaNum(),
-                     this->cfg_->OfdmCaNum(), false);
+      auto* this_ofdm_symbol =
+          rx_data_all_symbols[i] + j * this->cfg_->OfdmCaNum();
+      CommsLib::FFTShift(this_ofdm_symbol, ifft_shift_tmp,
+                         this->cfg_->OfdmCaNum());
+      CommsLib::IFFT(this_ofdm_symbol, this->cfg_->OfdmCaNum(), false);
     }
   }
 
@@ -581,6 +587,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       }
       for (size_t j = 0; j < this->cfg_->BsAntNum(); j++) {
         complex_float* ptr_ifft = dl_ifft_data[i] + j * this->cfg_->OfdmCaNum();
+        CommsLib::FFTShift(ptr_ifft, ifft_shift_tmp, this->cfg_->OfdmCaNum());
         CommsLib::IFFT(ptr_ifft, this->cfg_->OfdmCaNum(), false);
 
         short* tx_symbol = dl_tx_data[i] + j * this->cfg_->SampsPerSymbol() * 2;
@@ -653,6 +660,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   tx_data_all_symbols.Free();
   rx_data_all_symbols.Free();
   ue_specific_pilot.Free();
+  delete[] ifft_shift_tmp;
   delete[] ul_scrambler_buffer;
   delete[] dl_scrambler_buffer;
 }
