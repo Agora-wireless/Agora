@@ -81,7 +81,14 @@ UDPServerIPv6::UDPServerIPv6(std::string local_address, std::string local_port,
         : (family == AF_INET6) ? "AF_INET6"
                                : "???",
         rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-    if (family == AF_INET6) {
+    if (family == AF_INET) {
+      [[maybe_unused]] auto* address_ptr =
+          &((sockaddr_in*)rp->ai_addr)->sin_addr;
+      [[maybe_unused]] char address_buffer[INET_ADDRSTRLEN];
+      AGORA_LOG_TRACE("Ipv4 Address:  %s \n",
+                      ::inet_ntop(family, address_ptr, address_buffer,
+                                  sizeof(address_buffer)));
+    } else if (family == AF_INET6) {
       [[maybe_unused]] auto* address_ptr =
           &((sockaddr_in6*)rp->ai_addr)->sin6_addr;
       [[maybe_unused]] char address_buffer[INET6_ADDRSTRLEN];
@@ -116,7 +123,7 @@ UDPServerIPv6::UDPServerIPv6(std::string local_address, std::string local_port,
     const unsigned int desired_buf_size =
         static_cast<unsigned int>(rx_buffer_size);
     unsigned int actual_buf_size;
-    socklen_t actual_buf_storage_size = sizeof(actual_buf_size);
+    ::socklen_t actual_buf_storage_size = sizeof(actual_buf_size);
 
     ret = ::getsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &actual_buf_size,
                        &actual_buf_storage_size);
