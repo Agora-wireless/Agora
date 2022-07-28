@@ -25,6 +25,9 @@ static constexpr bool kPrintDownlinkPilotStats = false;
 static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr bool kDebugTxMemory = false;
 
+static constexpr bool kSingleScBer = false; // true for single SC BER; false for all SC BER
+static constexpr size_t kSingleScIdx = 10; // SC index for single SC BER
+
 UeWorker::UeWorker(
     size_t tid, Config& config, Stats& shared_stats, PhyStats& shared_phy_stats,
     moodycamel::ConcurrentQueue<EventData>& notify_queue,
@@ -440,8 +443,6 @@ void UeWorker::DoDemul(size_t tag) {
 
   if (kDownlinkHardDemod && (kPrintPhyStats || kEnableCsvLog) &&
       (dl_symbol_id >= config_.Frame().ClientDlPilotSymbols())) {
-    constexpr bool kSingleScBer = true; // true for single SC BER; false for all SC BER
-    constexpr size_t kSingleScIdx = 10; // SC index for single SC BER
     phy_stats_.UpdateDecodedBits(
         ant_id, total_dl_symbol_id, frame_slot,
         (kSingleScBer ? 1 : config_.GetOFDMDataNum())
