@@ -17,9 +17,13 @@
 #include <cstring>
 #include <stdexcept>
 
+#include "logger.h"
+
 namespace agora_comm {
 
 static constexpr bool kDebugPrint = false;
+/// Allow either - AF_INET6 | AF_INET
+static constexpr int kAllowedAiFamily = AF_UNSPEC;
 
 int ListLocalInterfaces() {
   ifaddrs *interfaces = nullptr;
@@ -172,6 +176,94 @@ std::string GetLocalAddressFromScope(size_t scope_id) {
                 std::strerror(errno));
   }
   return local_address;
+}
+
+::addrinfo *GetAddressInfo(std::string address, std::string port) {
+  ::addrinfo *ret_info = nullptr;
+  std::memset(&ret_info, 0u, sizeof(ret_info));
+  const char *node;
+  const char *service;
+  ::addrinfo hints;
+  std::memset(&hints, 0u, sizeof(hints));
+  hints.ai_family = kAllowedAiFamily;
+  hints.ai_socktype = SOCK_DGRAM;
+  hints.ai_flags = 0;
+  if (address.empty()) {
+    /// Set node to NULL for loopback or all interfaces
+    node = nullptr;
+    /// wildcard
+    hints.ai_flags |= AI_PASSIVE;
+  } else {
+    node = address.c_str();
+    hints.ai_flags |= AI_NUMERICHOST;
+  }
+
+  if (port.empty()) {
+    service = nullptr;
+  } else {
+    service = port.c_str();
+    hints.ai_flags |= AI_NUMERICSERV;
+  }
+  AGORA_LOG_TRACE("node: %s service: %s:%s\n", node, service);
+
+  //RtAssert((service != nullptr) || (node != nullptr),
+  //         "Node and Service cannot both be null");
+
+  /// Any protocol
+  hints.ai_protocol = 0;
+  hints.ai_canonname = nullptr;
+  hints.ai_addr = nullptr;
+  hints.ai_next = nullptr;
+
+  const int status = ::getaddrinfo(node, service, &hints, &ret_info);
+  if (status < 0) {
+    AGORA_LOG_ERROR("getaddrinfo returned error - %s (%d)\n",
+                    gai_strerror(status), status);
+    throw std::runtime_error("getaddrinfo returned error");
+  }
+  return ret_info;
+}
+
+void PrintAddressInfo(const ::addrinfo *print_info) {
+  for (const ::addrinfo *rp = print_info; rp != nullptr; rp = rp->ai_next) {
+    const int family = rp->ai_family;
+    AGORA_LOG_INFO(
+        "PrintAddressInfo: Found address with family : %s (%d) type %d, "
+        "protocol %d, flags %d\n",
+        (family == AF_PACKET)  ? "AF_PACKET"
+        : (family == AF_INET)  ? "AF_INET"
+        : (family == AF_INET6) ? "AF_INET6"
+                               : "???",
+        rp->ai_family, rp->ai_socktype, rp->ai_protocol, rp->ai_flags);
+    if (family == AF_INET) {
+      [[maybe_unused]] auto *address_ptr =
+          &((sockaddr_in *)rp->ai_addr)->sin_addr;
+      [[maybe_unused]] auto *port_ptr = &((sockaddr_in *)rp->ai_addr)->sin_port;
+      [[maybe_unused]] auto *family_ptr =
+          &((sockaddr_in *)rp->ai_addr)->sin_family;
+      [[maybe_unused]] char address_buffer[INET_ADDRSTRLEN];
+      AGORA_LOG_INFO("Ipv4 Address:  %s, Port %d, Family %d \n",
+                     ::inet_ntop(family, address_ptr, address_buffer,
+                                 sizeof(address_buffer)),
+                     *port_ptr, *family_ptr);
+    } else if (family == AF_INET6) {
+      [[maybe_unused]] auto *address_ptr =
+          &((sockaddr_in6 *)rp->ai_addr)->sin6_addr;
+      [[maybe_unused]] auto *port_ptr =
+          &((sockaddr_in6 *)rp->ai_addr)->sin6_port;
+      [[maybe_unused]] auto *family_ptr =
+          &((sockaddr_in6 *)rp->ai_addr)->sin6_family;
+      [[maybe_unused]] char address_buffer[INET6_ADDRSTRLEN];
+      AGORA_LOG_INFO("Ipv6 Address:  %s Port %d, Family %d \n",
+                     ::inet_ntop(family, address_ptr, address_buffer,
+                                 sizeof(address_buffer)),
+                     *port_ptr, *family_ptr);
+    } else {
+      AGORA_LOG_ERROR(
+          "PrintAddressInfo: Found address with unsupported family %d\n",
+          family);
+    }
+  }
 }
 
 }  // namespace agora_comm

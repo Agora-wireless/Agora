@@ -19,10 +19,21 @@ class UDPClient {
  public:
   static const bool kDebugPrintUdpClientInit = false;
   static const bool kDebugPrintUdpClientSend = false;
+  explicit UDPClient(std::string src_addr, uint16_t src_port);
   explicit UDPClient(uint16_t src_port = 0);
 
   UDPClient(const UDPClient&) = delete;
   ~UDPClient();
+
+  /**
+   * @brief The remote_address | remote_port is the address to which datagrams are sent.
+   * 1:1 association me->remote
+   *
+   * @param remote_address Hostname or IP address of the remote server
+   * @param remote_port UDP port that the remote server is listening on
+   */
+  ssize_t Connect(const std::string& remote_address,
+                  uint16_t remote_port);
 
   /**
    * @brief Send one UDP packet to a remote server. The client caches the
@@ -37,6 +48,14 @@ class UDPClient {
    */
   void Send(const std::string& rem_hostname, uint16_t rem_port,
             const uint8_t* msg, size_t len);
+
+  /**
+   * @brief Send one UDP packet to the connected remote server.
+   *
+   * @param msg Pointer to the message to send
+   * @param len Length in bytes of the message to send
+   */
+  void Send(const uint8_t* msg, size_t len);
 
   // Enable recording of all packets sent by this UDP client
   inline void EnableRecording() { enable_recording_flag_ = true; }
