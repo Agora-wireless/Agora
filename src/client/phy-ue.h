@@ -179,7 +179,7 @@ class PhyUe {
    * First dimension: OFDM_CA_NUM * kFrameWnd
    * Second dimension: BS_ANT_NUM * UE_NUM
    */
-  std::vector<myVec> csi_buffer_;
+  Table<complex_float> csi_buffer_;
 
   /**
    * Data after equalization

@@ -34,7 +34,7 @@ UeWorker::UeWorker(
     moodycamel::ProducerToken& work_producer, Table<int8_t>& ul_bits_buffer,
     Table<int8_t>& encoded_buffer, Table<complex_float>& modul_buffer,
     Table<complex_float>& ifft_buffer, char* const tx_buffer,
-    Table<char>& rx_buffer, std::vector<myVec>& csi_buffer,
+    Table<char>& rx_buffer, Table<complex_float>& csi_buffer,
     std::vector<myVec>& equal_buffer, std::vector<size_t>& non_null_sc_ind,
     Table<complex_float>& fft_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer,
@@ -220,7 +220,7 @@ void UeWorker::DoFftPilot(size_t tag) {
 
   size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
   auto* csi_buffer_ptr =
-      reinterpret_cast<arma::cx_float*>(csi_buffer_.at(csi_offset).data());
+      reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset]);
   auto* fft_buffer_ptr =
       reinterpret_cast<arma::cx_float*>(fft_buffer_[fft_buffer_target_id]);
 
@@ -316,7 +316,7 @@ void UeWorker::DoFftData(size_t tag) {
 
   size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
   auto* csi_buffer_ptr =
-      reinterpret_cast<arma::cx_float*>(csi_buffer_.at(csi_offset).data());
+      reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset]);
   auto* fft_buffer_ptr =
       reinterpret_cast<arma::cx_float*>(fft_buffer_[fft_buffer_target_id]);
 

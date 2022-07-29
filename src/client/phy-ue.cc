@@ -20,13 +20,8 @@ static constexpr bool kDebugPrintPacketsToMac = false;
 
 static constexpr size_t kDefaultQueueSize = 36;
 
-//set subcarriers to record DL CSI
-static constexpr size_t kNumCsiSc = 3;
-static constexpr size_t kRecScLow = 20;
-static constexpr size_t kRecScMed = 140;
-static constexpr size_t kRecScHigh = 280;
-constexpr std::array<size_t, kNumCsiSc> kCsiScIdx = {kRecScLow, kRecScMed,
-                                                     kRecScHigh};
+//set the number of subcarriers to record DL CSI
+static constexpr size_t kNumRecSc = 4;
 
 PhyUe::PhyUe(Config* config)
     : stats_(std::make_unique<Stats>(config)),
@@ -239,7 +234,7 @@ void PhyUe::ScheduleDefferedDownlinkSymbols(size_t frame_id) {
     for (size_t ofdm_data = 0; ofdm_data < config_->OfdmDataNum();
          ofdm_data++) {
       auto* csi_buffer_ptr =
-          reinterpret_cast<arma::cx_float*>(csi_buffer_.at(csi_offset).data());
+          reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset]);
 
       csi_buffer_ptr[ofdm_data] /= dl_pilot_symbol_perframe_;
     }
@@ -261,8 +256,8 @@ void PhyUe::ClearCsi(size_t frame_id) {
       const size_t csi_offset = csi_offset_base + user;
       for (size_t ofdm_data = 0u; ofdm_data < config_->OfdmDataNum();
            ofdm_data++) {
-        auto* csi_buffer_ptr = reinterpret_cast<arma::cx_float*>(
-            csi_buffer_.at(csi_offset).data());
+        auto* csi_buffer_ptr =
+            reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset]);
 
         csi_buffer_ptr[ofdm_data] = 0;
       }
@@ -440,19 +435,7 @@ void PhyUe::Start() {
               if (kPrintPhyStats) {
                 this->phy_stats_->PrintDlSnrStats(frame_id);
               }
-              if (kEnableCsvLog) {
-                const size_t csi_offset_base =
-                    (frame_id % kFrameWnd) * config_->UeAntNum();
-                arma::fmat csi_rec(config_->UeAntNum(), kCsiScIdx.size());
-                for (size_t i = 0; i < csi_rec.n_rows; i++) {
-                  auto* csi_buffer_ptr = reinterpret_cast<arma::cx_float*>(
-                      csi_buffer_.at(csi_offset_base + i).data());
-                  for (size_t j = 0; j < csi_rec.n_cols; j++) {
-                    csi_rec(i, j) = std::abs(csi_buffer_ptr[kCsiScIdx.at(j)]);
-                  }
-                }
-                this->phy_stats_->RecordDlCsi(frame_id, csi_rec);
-              }
+              this->phy_stats_->RecordDlCsi(frame_id, kNumRecSc, csi_buffer_);
               this->phy_stats_->RecordDlPilotSnr(frame_id);
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
               PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
@@ -935,17 +918,15 @@ void PhyUe::InitializeDownlinkBuffers() {
                      Agora_memory::Alignment_t::kAlign64);
 
   // initialize CSI buffer
-  csi_buffer_.resize(config_->UeAntNum() * kFrameWnd);
-  for (auto& i : csi_buffer_) {
-    i.resize(config_->OfdmDataNum());
-
-    for (auto& csi_value : i) {
-      if (config_->Frame().ClientDlPilotSymbols() == 0) {
-        csi_value.re = 1;
-        csi_value.im = 0;
-      } else {
-        csi_value.re = 0;
-        csi_value.im = 0;
+  csi_buffer_.Calloc(config_->UeAntNum() * kFrameWnd, config_->OfdmDataNum(),
+                     Agora_memory::Alignment_t::kAlign64);
+  assert(reinterpret_cast<size_t>(csi_buffer_[0]) % 64 == 0);
+  if (config_->Frame().ClientDlPilotSymbols() == 0) {
+    for (size_t i = 0; i < csi_buffer_.Dim1(); i++) {
+      complex_float* csi_data_sc = csi_buffer_[i];
+      for (size_t j = 0; j < csi_buffer_.Dim2(); j++) {
+        csi_data_sc[j].re = 1.0f;
+        csi_data_sc[j].im = 0.0f;
       }
     }
   }
