@@ -950,6 +950,7 @@ void PhyUe::InitializeDownlinkBuffers() {
 void PhyUe::FreeDownlinkBuffers() {
   rx_buffer_.Free();
   fft_buffer_.Free();
+  csi_buffer_.Free();
 }
 
 void PhyUe::PrintPerTaskDone(PrintType print_type, size_t frame_id,
