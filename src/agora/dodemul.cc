@@ -82,6 +82,8 @@ EventData DoDemul::Launch(size_t tag) {
   const size_t base_sc_id = gen_tag_t(tag).sc_id_;
 
   const size_t symbol_idx_ul = this->cfg_->Frame().GetULSymbolIdx(symbol_id);
+  const size_t data_symbol_idx_ul =
+      symbol_idx_ul - this->cfg_->Frame().ClientUlPilotSymbols();
   const size_t total_data_symbol_idx_ul =
       cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
   const complex_float* data_buf = data_buffer_[total_data_symbol_idx_ul];
@@ -270,11 +272,9 @@ EventData DoDemul::Launch(size_t tag) {
         mat_equaled %= mat_phase_correct;
 
         // Measure EVM from ground truth
-        if (symbol_idx_ul == cfg_->Frame().ClientUlPilotSymbols()) {
-          phy_stats_->UpdateEvmStats(frame_id, cur_sc_id, mat_equaled);
-          if (kPrintPhyStats && cur_sc_id == 0) {
-            phy_stats_->PrintEvmStats(frame_id - 1);
-          }
+        if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
+          phy_stats_->UpdateEvm(frame_id, data_symbol_idx_ul, cur_sc_id,
+                                mat_equaled.col(0));
         }
       }
       size_t start_tsc3 = GetTime::WorkerRdtsc();
@@ -346,10 +346,11 @@ EventData DoDemul::Launch(size_t tag) {
     if ((kUplinkHardDemod == true) && (kPrintPhyStats == true) &&
         (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols())) {
       phy_stats_->UpdateDecodedBits(
-          ue_id, total_data_symbol_idx_ul,
+          ue_id, total_data_symbol_idx_ul, frame_slot,
           max_sc_ite * cfg_->ModOrderBits(Direction::kUplink));
       // Each block here is max_sc_ite
-      phy_stats_->IncrementDecodedBlocks(ue_id, total_data_symbol_idx_ul);
+      phy_stats_->IncrementDecodedBlocks(ue_id, total_data_symbol_idx_ul,
+                                         frame_slot);
       size_t block_error(0);
       int8_t* tx_bytes =
           cfg_->GetModBitsBuf(cfg_->UlModBits(), Direction::kUplink, 0,
@@ -357,13 +358,13 @@ EventData DoDemul::Launch(size_t tag) {
       for (size_t i = 0; i < max_sc_ite; i++) {
         uint8_t rx_byte = static_cast<uint8_t>(demod_ptr[i]);
         uint8_t tx_byte = static_cast<uint8_t>(tx_bytes[i]);
-        phy_stats_->UpdateBitErrors(ue_id, total_data_symbol_idx_ul, tx_byte,
-                                    rx_byte);
+        phy_stats_->UpdateBitErrors(ue_id, total_data_symbol_idx_ul, frame_slot,
+                                    tx_byte, rx_byte);
         if (rx_byte != tx_byte) {
           block_error++;
         }
       }
-      phy_stats_->UpdateBlockErrors(ue_id, total_data_symbol_idx_ul,
+      phy_stats_->UpdateBlockErrors(ue_id, total_data_symbol_idx_ul, frame_slot,
                                     block_error);
     }
 

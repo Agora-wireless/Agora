@@ -113,20 +113,23 @@ EventData DoDecode::Launch(size_t tag) {
 
   if ((kEnableMac == false) && (kPrintPhyStats == true) &&
       (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols())) {
-    phy_stats_->UpdateDecodedBits(ue_id, symbol_offset, num_bytes_per_cb * 8);
-    phy_stats_->IncrementDecodedBlocks(ue_id, symbol_offset);
+    phy_stats_->UpdateDecodedBits(ue_id, symbol_offset, frame_slot,
+                                  num_bytes_per_cb * 8);
+    phy_stats_->IncrementDecodedBlocks(ue_id, symbol_offset, frame_slot);
     size_t block_error(0);
     for (size_t i = 0; i < num_bytes_per_cb; i++) {
       uint8_t rx_byte = decoded_buffer_ptr[i];
       auto tx_byte = static_cast<uint8_t>(
           cfg_->GetInfoBits(cfg_->UlBits(), Direction::kUplink, symbol_idx_ul,
                             ue_id, cur_cb_id)[i]);
-      phy_stats_->UpdateBitErrors(ue_id, symbol_offset, tx_byte, rx_byte);
+      phy_stats_->UpdateBitErrors(ue_id, symbol_offset, frame_slot, tx_byte,
+                                  rx_byte);
       if (rx_byte != tx_byte) {
         block_error++;
       }
     }
-    phy_stats_->UpdateBlockErrors(ue_id, symbol_offset, block_error);
+    phy_stats_->UpdateBlockErrors(ue_id, symbol_offset, frame_slot,
+                                  block_error);
   }
 
   size_t duration = GetTime::WorkerRdtsc() - start_tsc;

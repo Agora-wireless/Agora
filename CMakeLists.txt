@@ -306,7 +306,7 @@ include_directories(SYSTEM src/third_party src/third_party/spdlog/include src/th
 
 set(COMMON_SOURCES
   src/agora/stats.cc
-  src/agora/phy_stats.cc
+  src/common/phy_stats.cc
   src/common/framestats.cc
   src/agora/doencode.cc
   src/common/utils.cc
