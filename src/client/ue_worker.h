@@ -34,7 +34,7 @@ class UeWorker {
       moodycamel::ProducerToken& work_producer, Table<int8_t>& ul_bits_buffer,
       Table<int8_t>& encoded_buffer, Table<complex_float>& modul_buffer,
       Table<complex_float>& ifft_buffer, char* const tx_buffer,
-      Table<char>& rx_buffer, std::vector<myVec>& csi_buffer,
+      Table<char>& rx_buffer, Table<complex_float>& csi_buffer,
       std::vector<myVec>& equal_buffer, std::vector<size_t>& non_null_sc_ind,
       Table<complex_float>& fft_buffer,
       PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer,
@@ -146,7 +146,7 @@ class UeWorker {
 
   // Downlink
   Table<char>& rx_buffer_;
-  std::vector<myVec>& csi_buffer_;
+  Table<complex_float>& csi_buffer_;
   std::vector<myVec>& equal_buffer_;
   std::vector<size_t>& non_null_sc_ind_;
   Table<complex_float>& fft_buffer_;
