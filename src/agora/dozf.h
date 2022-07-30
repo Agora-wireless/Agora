@@ -30,8 +30,8 @@ class DoZF : public Doer {
        PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_,
        PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_,
        PhyStats* in_phy_stats, Stats* stats_manager,
-       std::shared_ptr<CsvLog::MatLogger> csi_logger = {},
-       std::shared_ptr<CsvLog::MatLogger> dlzf_logger = {});
+       std::shared_ptr<CsvLog::MatLogger> dl_csi_logger = {},
+       std::shared_ptr<CsvLog::MatLogger> dl_zf_logger = {});
   ~DoZF() override;
 
   /**
@@ -57,7 +57,8 @@ class DoZF : public Doer {
 
   /// Compute the uplink zeroforcing detector matrix and/or the downlink
   /// zeroforcing precoder using this CSI matrix and calibration buffer
-  float ComputePrecoder(const arma::cx_fmat& mat_csi,
+  float ComputePrecoder(size_t frame_id, size_t cur_sc_id,
+                        const arma::cx_fmat& mat_csi,
                         const arma::cx_fvec& calib_sc_vec,
                         complex_float* ul_zf_mem, complex_float* dl_zf_mem);
   void ComputeCalib(size_t frame_id, size_t sc_id, arma::cx_fvec& calib_sc_vec);
@@ -110,8 +111,8 @@ class DoZF : public Doer {
   arma::uvec ext_ref_id_;
   size_t num_ext_ref_;
 
-  std::shared_ptr<CsvLog::MatLogger> csi_logger_;
-  std::shared_ptr<CsvLog::MatLogger> dlzf_logger_;
+  std::shared_ptr<CsvLog::MatLogger> dl_csi_logger_;
+  std::shared_ptr<CsvLog::MatLogger> dl_zf_logger_;
 };
 
 #endif  // DOZF_H_

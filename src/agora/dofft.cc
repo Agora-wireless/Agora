@@ -187,7 +187,8 @@ EventData DoFFT::Launch(size_t tag) {
   if (sym_type == SymbolType::kPilot) {
     size_t pilot_symbol_id = cfg_->Frame().GetPilotSymbolIdx(symbol_id);
     if (kCollectPhyStats) {
-      phy_stats_->UpdatePilotSnr(frame_id, pilot_symbol_id, ant_id, fft_inout_);
+      phy_stats_->UpdateUlPilotSnr(frame_id, pilot_symbol_id, ant_id,
+                                   fft_inout_);
     }
     const size_t ue_id = pilot_symbol_id;
     PartialTranspose(csi_buffers_[frame_slot][ue_id], ant_id,

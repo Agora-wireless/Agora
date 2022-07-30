@@ -334,7 +334,7 @@ add_library(recorder_sources_lib OBJECT ${RECORDER_SOURCES})
 
 set(COMMON_SOURCES
   src/agora/stats.cc
-  src/agora/phy_stats.cc
+  src/common/phy_stats.cc
   src/common/framestats.cc
   src/agora/doencode.cc
   src/common/utils.cc

@@ -353,6 +353,9 @@ class Config {
   inline const std::vector<std::string>& UeRadioId() const {
     return this->ue_radio_id_;
   };
+  inline const std::vector<std::string>& UeRadioName() const {
+    return this->ue_radio_name_;
+  };
   inline const std::vector<size_t>& CellId() const { return this->cell_id_; }
 
   // non-const (can modify)
@@ -637,6 +640,7 @@ class Config {
   std::vector<std::string> radio_id_;
   std::vector<std::string> hub_id_;
   std::vector<std::string> ue_radio_id_;
+  std::vector<std::string> ue_radio_name_;
   std::vector<size_t> ref_radio_;
   std::vector<size_t> ref_ant_;
   std::vector<size_t> cell_id_;
