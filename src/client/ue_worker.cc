@@ -264,8 +264,6 @@ void UeWorker::DoFftData(size_t tag) {
 
   const size_t sig_offset = config_.OfdmRxZeroPrefixClient();
   const size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
-  const size_t dl_data_symbol_id =
-      dl_symbol_id - config_.Frame().ClientDlPilotSymbols();
 
   // remove CP, do FFT
   size_t total_dl_symbol_id =
