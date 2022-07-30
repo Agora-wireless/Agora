@@ -7,8 +7,10 @@ data_size = 304;
 offset = 160;
 cp = 32;
 n_user = 1;
-pig = 0;
+pig = [0];
 dig = [1:2];
+ue_serial = ['UE';''];
+frame_id = 100;
 
 nz_start_idx = (fft_size - data_size)/2;
 nz_sc_idx = nz_start_idx+1:nz_start_idx+data_size;
@@ -19,19 +21,21 @@ data_sc_idx = setdiff(1:data_size, 1:plt_trk_sp:data_size);
 rx_pilot = zeros(symbol_size, n_user, length(pig));
 tx_pilot = zeros(data_size, n_user, length(pig));
 rx_data = zeros(symbol_size, n_user, length(dig));
-tx_data=zeros(data_size, n_user, length(dig));
+tx_data = zeros(data_size, n_user, length(dig));
 
 %% Load Data
 % read rx and tx pilot files
 for u=1:n_user
   for p=1:length(pig)
-    filename = 'rxpilot' + string(pig(p)) + '_' + string(u-1) + '.bin';
+    filename_ext = strcat(int2str(frame_id), '_', int2str(pig(p)), '_', ...
+                          int2str(u-1), '_', ue_serial(u,:), '.bin');
+    filename = strcat('rxpilot_', filename_ext);
     fileID = fopen(filename, 'r');
     rx = fread(fileID, 'short');
     fclose(fileID);
     rx_pilot(:, u, p) = rx(1:2:end)/32768 + 1j*rx(2:2:end)/32768;
     
-    filename = 'txpilot_f_' + string(pig(p)) + '_' + string(u-1) + '.bin';
+    filename = strcat('txpilot_', filename_ext);
     fileID = fopen(filename, 'r');
     tx = fread(fileID, 'float');
     fclose(fileID);
@@ -42,13 +46,15 @@ end
 % read rx and tx data files
 for u=1:n_user
   for d=1:length(dig)
-    filename = 'rxdata' + string(dig(d)) + '_' + string(u-1) + '.bin';
+    filename_ext = strcat(int2str(frame_id), '_', int2str(dig(d)), '_', ...
+                          int2str(u-1), '_', ue_serial(u,:), '.bin');
+    filename = strcat('rxdata_', filename_ext);
     fileID = fopen(filename, 'r');
     data = fread(fileID, 'short');
     fclose(fileID);
     rx_data(:, u, d) = data(1:2:end)/32768 + 1j*data(2:2:end)/32768;
     
-    filename = 'txdata' + string(dig(d)) + '_' + string(u-1) + '.bin';
+    filename = strcat('txdata_', filename_ext);
     fileID = fopen(filename, 'r');
     data = fread(fileID, 'float');
     fclose(fileID);
@@ -90,9 +96,9 @@ for u=1:n_user
       
       cl = cl + 1;
       figure(cl);
-      scatter(real(data_phase_corr(data_sc_idx, d)), imag(data_phase_corr(data_sc_idx, d)),'ro')
+      scatter(real(data_phase_corr(data_sc_idx, d)), imag(data_phase_corr(data_sc_idx, d)),'r')
       hold on
-      scatter(real(tx_data(data_sc_idx)), imag(tx_data(data_sc_idx)),'bo')
+      scatter(real(tx_data(data_sc_idx)), imag(tx_data(data_sc_idx)),'b')
       title(['Constellation [User ', num2str(u), ', Symbol ', num2str(d), ']'])
     end
    
