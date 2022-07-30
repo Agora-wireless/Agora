@@ -324,6 +324,8 @@ void RadioSoapySdr::Setup(const std::vector<double>& tx_gains,
         sdr_fe = hw_info["frontend"];
       }
       const bool is_cbrs = (sdr_fe.find("CBRS") != std::string::npos);
+      const bool is_uhf = (sdr_fe.find("UHF") != std::string::npos);
+      const bool is_dev = (sdr_fe.find("DEV") != std::string::npos);
       const bool is_iris = (sdr_label.find("Iris") != std::string::npos);
       const bool is_villager = (sdr_label.find("VGER") != std::string::npos);
 
@@ -348,6 +350,11 @@ void RadioSoapySdr::Setup(const std::vector<double>& tx_gains,
             }
             //[0,17]
             dev_->setGain(SOAPY_SDR_RX, ch, "LNA2", 17);
+          } else if (is_uhf) {
+            //[-18,0]
+            dev_->setGain(SOAPY_SDR_RX, ch, "ATTN1", -6);
+            //[-18,0]
+            dev_->setGain(SOAPY_SDR_RX, ch, "ATTN2", -6);
           }
 
           //[0,30]
@@ -363,8 +370,16 @@ void RadioSoapySdr::Setup(const std::vector<double>& tx_gains,
             //[0|15]
             dev_->setGain(SOAPY_SDR_TX, ch, "PA2", 0);
           }
-          //[-12,12]
-          dev_->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);
+          if (is_dev) {
+            //[-12,12]
+            dev_->setGain(
+                SOAPY_SDR_TX, ch, "IAMP",
+                (tx_gains.at(ch) > 52.0 ? std::max(12.0, tx_gains.at(ch) - 52.0)
+                                        : 0.0));
+          } else {
+            //[-12,12]
+            dev_->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);
+          }
           //[0,30]
           dev_->setGain(SOAPY_SDR_TX, ch, "PAD", tx_gains.at(ch));
         }  // end single gain
