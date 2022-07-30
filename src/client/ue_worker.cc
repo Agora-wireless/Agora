@@ -316,6 +316,8 @@ void UeWorker::DoFftData(size_t tag) {
       equ_buffer_ptr[data_sc_id] = (y / csi_buffer_ptr[j]) * phc;
       size_t ant = (kDebugDownlink == true) ? 0 : ant_id;
       if (kCollectPhyStats) {
+        const size_t dl_data_symbol_id =
+            dl_symbol_id - config_.Frame().ClientDlPilotSymbols();
         phy_stats_.UpdateEvm(frame_id, dl_data_symbol_id, j, ant, ant_id,
                              equ_buffer_ptr[data_sc_id]);
       }
