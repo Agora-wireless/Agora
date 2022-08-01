@@ -497,8 +497,7 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
       std::vector<const void*> txbuf(channels_per_interface_);
       if (kDebugDownlink == true) {
         for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-          // Not exactly sure why 0 index was selected here.  Could it be a beacon ant?
-          if (!kBeamsweepData && ant_id != 0) {
+          if (!kBeamsweepData && ant_id != Configuration()->BeaconAnt()) {
             txbuf.at(ch) = zeros_.data();
           } else if (dl_symbol_idx <
                      Configuration()->Frame().ClientDlPilotSymbols()) {

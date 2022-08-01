@@ -7,7 +7,6 @@
 #ifndef MAT_LOGGER_H_
 #define MAT_LOGGER_H_
 
-#include <array>
 #include <cstdint>
 #include <string>
 
@@ -16,14 +15,15 @@
 
 namespace CsvLog {
 
-constexpr size_t kFrames = 1000;
+constexpr size_t kFrames = 10;
+constexpr size_t kFrameStart = 100;
 constexpr size_t kSCs = 304;
 constexpr size_t kBSAnts = 8;
 constexpr size_t kUEAnts = 1;
 
 class MatLogger : public CsvLogger {
  public:
-  MatLogger(const std::string& radio_id, size_t mat_log_id);
+  MatLogger(size_t mat_log_id, const std::string& radio_name);
   bool UpdateMatBuf(const size_t frame_id, const size_t sc_id,
                     const arma::cx_fmat& mat_in);
   ~MatLogger();
@@ -31,10 +31,7 @@ class MatLogger : public CsvLogger {
  private:
   void SaveMatBuf();
 #if defined(ENABLE_MAT_LOG)
-  std::array<
-      std::array<std::array<std::array<arma::cx_float, kUEAnts>, kBSAnts>,
-                 kSCs>,
-      kFrames>
+  std::array<std::array<arma::cx_fmat::fixed<kBSAnts, kUEAnts>, kSCs>, kFrames>
       mat_buffer_;
 #endif
 };  //Class MatLogger;
