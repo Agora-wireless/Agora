@@ -23,8 +23,8 @@ DoZF::DoZF(Config* config, int tid,
            PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
            PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
            PhyStats* in_phy_stats, Stats* stats_manager,
-           std::shared_ptr<CsvLog::MatLogger> csi_logger,
-           std::shared_ptr<CsvLog::MatLogger> dlzf_logger)
+           std::shared_ptr<CsvLog::MatLogger> dl_csi_logger,
+           std::shared_ptr<CsvLog::MatLogger> dl_zf_logger)
     : Doer(config, tid),
       csi_buffers_(csi_buffers),
       calib_dl_buffer_(calib_dl_buffer),
@@ -34,8 +34,8 @@ DoZF::DoZF(Config* config, int tid,
       ul_zf_matrices_(ul_zf_matrices),
       dl_zf_matrices_(dl_zf_matrices),
       phy_stats_(in_phy_stats),
-      csi_logger_(std::move(csi_logger)),
-      dlzf_logger_(std::move(dlzf_logger)) {
+      dl_csi_logger_(std::move(dl_csi_logger)),
+      dl_zf_logger_(std::move(dl_zf_logger)) {
   duration_stat_ = stats_manager->GetDurationStat(DoerType::kZF, tid);
   pred_csi_buffer_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
@@ -94,7 +94,8 @@ EventData DoZF::Launch(size_t tag) {
   return EventData(EventType::kZF, tag);
 }
 
-float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
+float DoZF::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
+                            const arma::cx_fmat& mat_csi,
                             const arma::cx_fvec& calib_sc_vec,
                             complex_float* ul_zf_mem,
                             complex_float* dl_zf_mem) {
@@ -125,6 +126,9 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
       mat_dl_zf_tmp = mat_ul_zf_tmp * inv_calib_mat;
     } else {
       arma::cx_fmat mat_dl_csi = arma::diagmat(calib_sc_vec) * mat_csi;
+      if (kEnableMatLog && dl_csi_logger_) {
+        dl_csi_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_csi);
+      }
       if (kUseInverseForZF) {
         try {
           mat_dl_zf_tmp =
@@ -154,6 +158,9 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(dl_zf_mem),
                             cfg_->BsAntNum(), cfg_->UeAntNum(), false);
     mat_dl_zf = mat_dl_zf_tmp.st();
+    if (kEnableMatLog && dl_zf_logger_) {
+      dl_zf_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_zf);
+    }
   }
   for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {
     if (cfg_->ExternalRefNode(i) == true) {
@@ -378,25 +385,12 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
     double start_tsc3 = GetTime::WorkerRdtsc();
     duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
 
-    auto rcond = ComputePrecoder(mat_csi, cal_sc_vec,
+    auto rcond = ComputePrecoder(frame_id, cur_sc_id, mat_csi, cal_sc_vec,
                                  ul_zf_matrices_[frame_slot][cur_sc_id],
                                  dl_zf_matrices_[frame_slot][cur_sc_id]);
     if (kPrintZfStats) {
       phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
     }
-    if (kEnableMatLog) {
-      if (csi_logger_) {
-        csi_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_csi);
-      }
-
-      if (dlzf_logger_) {
-        arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(
-                                    dl_zf_matrices_[frame_slot][cur_sc_id]),
-                                cfg_->BsAntNum(), cfg_->UeAntNum(), false);
-        dlzf_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_zf);
-      }
-    }
-
     duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
     duration_stat_->task_count_++;
     duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;
@@ -471,7 +465,7 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
   arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer_),
                         cfg_->BsAntNum(), cfg_->UeAntNum(), false);
 
-  ComputePrecoder(mat_csi, cal_sc_vec,
+  ComputePrecoder(frame_id, base_sc_id, mat_csi, cal_sc_vec,
                   ul_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)],
                   dl_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)]);
 
