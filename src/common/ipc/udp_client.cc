@@ -21,7 +21,7 @@ UDPClient::UDPClient(uint16_t src_port) : UDPClient(std::string(), src_port) {}
 
 /// getaddrinfo() -> socket -> bind (for local address/port assignment)
 UDPClient::UDPClient(std::string src_addr, uint16_t src_port) {
-  std::string port_string;
+  std::string port_string = "";
   ///0 indicates that we are not assigning a port
   if (src_port != 0) {
     port_string = std::to_string(src_port);
@@ -195,6 +195,8 @@ void UDPClient::Send(const uint8_t* msg, size_t len) {
 
   const ssize_t ret = ::send(sock_fd_, msg, len, 0);
   if (ret != static_cast<ssize_t>(len)) {
+    AGORA_LOG_ERROR("UDPClient send failed with code %d message %s\n", errno,
+                    std::strerror(errno));
     throw std::runtime_error(
         "UDPClient::send() failed. Do you have a connection? " +
         std::string(std::strerror(errno)));

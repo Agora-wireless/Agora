@@ -204,7 +204,7 @@ std::string GetLocalAddressFromScope(size_t scope_id) {
     service = port.c_str();
     hints.ai_flags |= AI_NUMERICSERV;
   }
-  AGORA_LOG_TRACE("node: %s service: %s:%s\n", node, service);
+  AGORA_LOG_TRACE("node: %s service: %s\n", node, service);
 
   //RtAssert((service != nullptr) || (node != nullptr),
   //         "Node and Service cannot both be null");
