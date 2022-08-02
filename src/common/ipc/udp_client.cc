@@ -15,7 +15,7 @@
 #include "network_utils.h"
 
 /// Allow either - AF_INET6 | AF_INET
-static const int kAllowedAiFamily = AF_UNSPEC;
+static const int kDefaultAiFamily = AF_INET;
 
 UDPClient::UDPClient(uint16_t src_port) : UDPClient(std::string(), src_port) {}
 
@@ -36,8 +36,7 @@ UDPClient::UDPClient(std::string src_addr, uint16_t src_port) {
     ::addrinfo my_info;
     ///Default to IPV4, don't bind
     std::memset(&my_info, 0, sizeof(my_info));
-    //Default AF_INET or AF_INT6
-    my_info.ai_family = AF_INET6;
+    my_info.ai_family = kDefaultAiFamily;
     my_info.ai_socktype = SOCK_DGRAM;
     my_info.ai_protocol = IPPROTO_UDP;
     my_info.ai_next = nullptr;

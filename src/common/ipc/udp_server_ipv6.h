@@ -9,8 +9,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <map>
-#include <mutex>
 #include <string>
 
 /// Basic UDP server class based on OS sockets that supports receiving messages
@@ -29,6 +27,13 @@ class UDPServerIPv6 {
   UDPServerIPv6(const UDPServerIPv6&) = delete;
   ~UDPServerIPv6();
 
+  /**
+   * @brief The remote_address | remote_port is the only address to which datagrams are received.
+   * 1:1 association remote<-me
+   *
+   * @param remote_address Hostname or IP address of the remote server
+   * @param remote_port UDP port of the remote server
+   */
   ssize_t Connect(const std::string& remote_address,
                   const std::string& remote_port);
   ssize_t Connect(const std::string& remote_address, uint16_t remote_port);
