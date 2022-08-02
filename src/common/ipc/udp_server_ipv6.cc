@@ -160,28 +160,29 @@ ssize_t UDPServerIPv6::RecvFrom(std::byte* buf, size_t len,
   const std::string port_string = std::to_string(src_port);
   const std::string remote_uri = src_address + ":" + port_string;
   ::addrinfo* rem_addrinfo = nullptr;
+  AGORA_LOG_TRACE("Attempting Recv from %s \n", remote_uri.c_str());
 
   const auto remote_itr = addrinfo_map_.find(remote_uri);
   if (remote_itr == addrinfo_map_.end()) {
-    auto info = agora_comm::GetAddressInfo(src_address.c_str(), port_string);
-    if (info == nullptr) {
+    rem_addrinfo = agora_comm::GetAddressInfo(src_address, port_string);
+    if (rem_addrinfo == nullptr) {
       char issue_msg[1000u];
       AGORA_LOG_ERROR(issue_msg, "Failed to resolve %s", remote_uri.c_str());
       throw std::runtime_error(issue_msg);
     }
 
-    std::pair<std::map<std::string, addrinfo*>::iterator, bool>
+    std::pair<std::map<std::string, ::addrinfo*>::iterator, bool>
         map_insert_result;
     {  // Synchronize access to insert for thread safety
       std::scoped_lock map_access(map_insert_access_);
       map_insert_result = addrinfo_map_.insert(
-          std::pair<std::string, addrinfo*>(remote_uri, rem_addrinfo));
+          std::pair<std::string, ::addrinfo*>(remote_uri, rem_addrinfo));
     }
   } else {
     rem_addrinfo = remote_itr->second;
   }
 
-  ::socklen_t addrlen = rem_addrinfo->ai_addrlen;
+  auto addrlen = rem_addrinfo->ai_addrlen;
   ssize_t ret = ::recvfrom(sock_fd_, static_cast<void*>(buf), len, 0,
                            rem_addrinfo->ai_addr, &addrlen);
 
