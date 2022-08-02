@@ -99,6 +99,11 @@ UDPServerIPv6::UDPServerIPv6(std::string local_address, std::string local_port,
 }
 
 UDPServerIPv6::~UDPServerIPv6() {
+  for (const auto& kv : addrinfo_map_) {
+    ::freeaddrinfo(kv.second);
+  }
+  addrinfo_map_.clear();
+
   if (sock_fd_ > 0) {
     auto status = ::close(sock_fd_);
     sock_fd_ = -1;
@@ -143,6 +148,58 @@ ssize_t UDPServerIPv6::Recv(std::byte* buf, size_t len) const {
 }
 
 /**
+   * @brief Try once to receive up to len bytes in buf
+   *
+   * @return Return the number of bytes received if non-zero bytes are
+   * received. If no bytes are received, return zero. If there was an error
+   * in receiving, return -1.
+   */
+ssize_t UDPServerIPv6::RecvFrom(std::byte* buf, size_t len,
+                                const std::string& src_address,
+                                uint16_t src_port) {
+  const std::string port_string = std::to_string(src_port);
+  const std::string remote_uri = src_address + ":" + port_string;
+  ::addrinfo* rem_addrinfo = nullptr;
+
+  const auto remote_itr = addrinfo_map_.find(remote_uri);
+  if (remote_itr == addrinfo_map_.end()) {
+    auto info = agora_comm::GetAddressInfo(src_address.c_str(), port_string);
+    if (info == nullptr) {
+      char issue_msg[1000u];
+      AGORA_LOG_ERROR(issue_msg, "Failed to resolve %s", remote_uri.c_str());
+      throw std::runtime_error(issue_msg);
+    }
+
+    std::pair<std::map<std::string, addrinfo*>::iterator, bool>
+        map_insert_result;
+    {  // Synchronize access to insert for thread safety
+      std::scoped_lock map_access(map_insert_access_);
+      map_insert_result = addrinfo_map_.insert(
+          std::pair<std::string, addrinfo*>(remote_uri, rem_addrinfo));
+    }
+  } else {
+    rem_addrinfo = remote_itr->second;
+  }
+
+  ::socklen_t addrlen = rem_addrinfo->ai_addrlen;
+  ssize_t ret = ::recvfrom(sock_fd_, static_cast<void*>(buf), len, 0,
+                           rem_addrinfo->ai_addr, &addrlen);
+
+  if (ret == -1) {
+    if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+      // These errors mean that there's no data to receive
+      ret = 0;
+    } else {
+      AGORA_LOG_ERROR("UDPServer: recvfrom() failed with unexpected error %s\n",
+                      std::strerror(errno));
+    }
+  } else if (ret == 0) {
+    AGORA_LOG_ERROR("UDPServer: recv() failed with return of 0\n");
+  }
+  return ret;
+}
+
+/**
    * @brief Locate and connect to a remote address 
    *
    * @return Connect for DGRAM sockets just indicates a 1:1 socket
@@ -167,7 +224,7 @@ ssize_t UDPServerIPv6::Connect(const std::string& remote_address,
         "Connect(): Too many acceptable addresses returned from getaddrinfo");
   }
 
-  // getaddrinfo() returns a list of address structures, find the correct one to connect
+  // GetAddressInfo() returns a list of address structures, find the correct one to connect
   if (kDebugPrintUdpServerInit) {
     for (addrinfo* rem_connect = client_address_info; rem_connect != nullptr;
          rem_connect = rem_connect->ai_next) {

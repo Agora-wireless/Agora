@@ -9,6 +9,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
+#include <mutex>
 #include <string>
 
 /// Basic UDP server class based on OS sockets that supports receiving messages
@@ -47,6 +49,9 @@ class UDPServerIPv6 {
    */
   ssize_t Recv(std::byte* buf, size_t len) const;
 
+  ssize_t RecvFrom(std::byte* buf, size_t len, const std::string& src_address,
+                   uint16_t src_port);
+
   /**
    * @brief Configures the socket in blocking mode.  Any calls to recv / send
    * will now block
@@ -66,6 +71,17 @@ class UDPServerIPv6 {
    * @brief The raw socket file descriptor
    */
   int sock_fd_ = -1;
+
+  /**
+   * @brief A cache mapping hostname:udp_port to addrinfo
+   * Used in RecvFrom
+   */
+  std::map<std::string, addrinfo*> addrinfo_map_;
+  /**
+   * @brief Variable to control write access to the non-thread safe data
+   * structures
+   */
+  std::mutex map_insert_access_;
 };
 
 #endif  // UDP_SERVER_IPV6_H_
