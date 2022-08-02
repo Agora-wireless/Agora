@@ -76,7 +76,7 @@ class UDPServerIPv6 {
    * @brief A cache mapping hostname:udp_port to addrinfo
    * Used in RecvFrom
    */
-  std::map<std::string, addrinfo*> addrinfo_map_;
+  std::map<std::string, ::addrinfo*> addrinfo_map_;
   /**
    * @brief Variable to control write access to the non-thread safe data
    * structures
