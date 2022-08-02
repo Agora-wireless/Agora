@@ -19,17 +19,12 @@ static const int kDefaultAiFamily = AF_INET;
 
 UDPClient::UDPClient(uint16_t src_port) : UDPClient(std::string(), src_port) {}
 
-/// getaddrinfo() -> socket -> bind (for local port assignment)
+/// getaddrinfo() -> socket -> bind (for local address/port assignment)
 UDPClient::UDPClient(std::string src_addr, uint16_t src_port) {
   std::string port_string;
   ///0 indicates that we are not assigning a port
   if (src_port != 0) {
     port_string = std::to_string(src_port);
-  }
-
-  if (kDebugPrintUdpClientInit) {
-    AGORA_LOG_INFO("Creating UDP Client socket sending from port %d\n",
-                   src_port);
   }
 
   if (src_addr.empty() && port_string.empty()) {
@@ -41,11 +36,17 @@ UDPClient::UDPClient(std::string src_addr, uint16_t src_port) {
     my_info.ai_protocol = IPPROTO_UDP;
     my_info.ai_next = nullptr;
 
+    if (kDebugPrintUdpClientInit) {
+      AGORA_LOG_INFO("UDPClient: Init to default family and port\n");
+    }
+
     sock_fd_ = ::socket(my_info.ai_family, my_info.ai_socktype | SOCK_NONBLOCK,
                         my_info.ai_protocol);
   } else {
     auto local_info = agora_comm::GetAddressInfo(src_addr, port_string);
-    agora_comm::PrintAddressInfo(local_info);
+    if (kDebugPrintUdpClientInit) {
+      agora_comm::PrintAddressInfo(local_info);
+    }
 
     /// loop through all the results and bind to the first we can
     for (auto* check = local_info; check != nullptr; check = check->ai_next) {
@@ -59,7 +60,7 @@ UDPClient::UDPClient(std::string src_addr, uint16_t src_port) {
       } else {
         const auto bind_status =
             ::bind(sock_fd_, check->ai_addr, check->ai_addrlen);
-        if (bind_status == -1) {
+        if (bind_status != 0) {
           AGORA_LOG_ERROR(
               "UDPClient: Failed to bind local socket %d. errno = %s\n",
               sock_fd_, std::strerror(errno));
@@ -70,7 +71,6 @@ UDPClient::UDPClient(std::string src_addr, uint16_t src_port) {
         }
       }
     }
-    /// Find and copy the correct "info"
     ::freeaddrinfo(local_info);
   }
   if (sock_fd_ == -1) {
