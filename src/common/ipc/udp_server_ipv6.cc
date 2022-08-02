@@ -16,10 +16,8 @@
 #include <utility>
 
 #include "logger.h"
+#include "network_utils.h"
 #include "utils.h"
-
-//Allow IPv4 or IPv6(AF_UNSPEC);
-static const int kAllowedAiFamily = AF_INET6;
 
 UDPServerIPv6::UDPServerIPv6(const std::string& local_address,
                              uint16_t local_port, size_t rx_buffer_size)
@@ -36,75 +34,14 @@ UDPServerIPv6::UDPServerIPv6(std::string local_address, std::string local_port,
       server_address_info_(nullptr),
       connected_address_info_(nullptr) {
   AGORA_LOG_TRACE("Creating UDP Server at address %s port %s\n",
-                  local_address.c_str(), local_port.c_str());
+                  address_.c_str(), port_.c_str());
+  /// Find the pairing remote
+  server_address_info_ = agora_comm::GetAddressInfo(address_, port_);
+  agora_comm::PrintAddressInfo(server_address_info_);
 
-  //Set node to nullptr for loopback
-  //node = &address_buffer[0u];
-  //auto pton_result =
-  //    ::inet_pton(kAllowedAiFamily, local_address.c_str(), address_buffer);
-  //std::printf("Pton result %d\n", pton_result);
-
-  const char* node;
-  addrinfo hints;
-  std::memset(&hints, 0u, sizeof(hints));
-  hints.ai_family = kAllowedAiFamily;
-  hints.ai_socktype = SOCK_DGRAM;
-  hints.ai_flags = AI_NUMERICSERV;
-  if (address_.empty()) {
-    /// Set node to NULL for loopback or all interfaces
-    node = nullptr;
-    /// wildcard
-    hints.ai_flags |= AI_PASSIVE;
-  } else {
-    node = address_.c_str();
-    hints.ai_flags |= AI_NUMERICHOST;
-  }
-  /// Any protocol
-  hints.ai_protocol = 0;
-  hints.ai_canonname = nullptr;
-  hints.ai_addr = nullptr;
-  hints.ai_next = nullptr;
-
-  int ret = ::getaddrinfo(node, port_.c_str(), &hints, &server_address_info_);
-  if (ret < 0) {
-    AGORA_LOG_ERROR("getaddrinfo returned error - %s (%d)\n", gai_strerror(ret),
-                    ret);
-    throw std::runtime_error("getaddrinfo returned error");
-  }
-
-  for (addrinfo* rp = server_address_info_; rp != nullptr; rp = rp->ai_next) {
-    const int family = rp->ai_family;
-    AGORA_LOG_TRACE(
-        "Found address with family : %s (%d) type %d and protocol %d\n",
-        (family == AF_PACKET)  ? "AF_PACKET"
-        : (family == AF_INET)  ? "AF_INET"
-        : (family == AF_INET6) ? "AF_INET6"
-                               : "???",
-        rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-    if (family == AF_INET) {
-      [[maybe_unused]] auto* address_ptr =
-          &((sockaddr_in*)rp->ai_addr)->sin_addr;
-      [[maybe_unused]] char address_buffer[INET_ADDRSTRLEN];
-      AGORA_LOG_TRACE("Ipv4 Address:  %s \n",
-                      ::inet_ntop(family, address_ptr, address_buffer,
-                                  sizeof(address_buffer)));
-    } else if (family == AF_INET6) {
-      [[maybe_unused]] auto* address_ptr =
-          &((sockaddr_in6*)rp->ai_addr)->sin6_addr;
-      [[maybe_unused]] char address_buffer[INET6_ADDRSTRLEN];
-      AGORA_LOG_TRACE("Ipv6 Address:  %s \n",
-                      ::inet_ntop(family, address_ptr, address_buffer,
-                                  sizeof(address_buffer)));
-    } else {
-      AGORA_LOG_ERROR(
-          "UDPServerIPv6: Found address with unsupported family %d\n", family);
-    }
-  }
-
-  RtAssert((ret == 0) && (server_address_info_ != nullptr) &&
+  RtAssert((server_address_info_ != nullptr) &&
                (server_address_info_->ai_next == nullptr),
-           "Found 0 or more than 1 acceptable address with return status " +
-               std::to_string(ret));
+           "Found 0 or more than 1 acceptable address");
 
   if (kDebugPrintUdpServerInit) {
     AGORA_LOG_INFO("Creating UDP server listening at port %s\n", port_.c_str());
@@ -125,22 +62,22 @@ UDPServerIPv6::UDPServerIPv6(std::string local_address, std::string local_port,
     unsigned int actual_buf_size;
     ::socklen_t actual_buf_storage_size = sizeof(actual_buf_size);
 
-    ret = ::getsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &actual_buf_size,
-                       &actual_buf_storage_size);
+    auto sock_ret = ::getsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF,
+                                 &actual_buf_size, &actual_buf_storage_size);
 
-    if (ret < 0 || (actual_buf_size != desired_buf_size)) {
+    if (sock_ret < 0 || (actual_buf_size != desired_buf_size)) {
       actual_buf_size = desired_buf_size;
-      ret = ::setsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &actual_buf_size,
-                         actual_buf_storage_size);
+      sock_ret = ::setsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &actual_buf_size,
+                              actual_buf_storage_size);
 
-      if (ret != 0) {
+      if (sock_ret != 0) {
         throw std::runtime_error(
             "UDPServerIPv6: Failed to set RX buffer size.");
       }
     }
 
-    ret = ::getsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &actual_buf_size,
-                       &actual_buf_storage_size);
+    sock_ret = ::getsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &actual_buf_size,
+                            &actual_buf_storage_size);
 
     // Linux likes to return 2* the buffer size
     if ((actual_buf_size != desired_buf_size) &&
@@ -148,14 +85,14 @@ UDPServerIPv6::UDPServerIPv6(std::string local_address, std::string local_port,
       AGORA_LOG_ERROR(
           "Error setting RX buffer size to %zu actual size %d with status "
           "%d\n",
-          rx_buffer_size, actual_buf_size, ret);
+          rx_buffer_size, actual_buf_size, sock_ret);
     }
   }
 
-  //Listen on the found address
-  ret = ::bind(sock_fd_, server_address_info_->ai_addr,
-               server_address_info_->ai_addrlen);
-  if (ret != 0) {
+  ///Listen on the found address
+  auto bind_status = ::bind(sock_fd_, server_address_info_->ai_addr,
+                            server_address_info_->ai_addrlen);
+  if (bind_status != 0) {
     throw std::runtime_error("UDPServerIPv6: Failed to bind socket to port " +
                              port_ + ". Error: " + std::strerror(errno));
   }
