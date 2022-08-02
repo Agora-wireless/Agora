@@ -26,6 +26,7 @@ static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr bool kRecordDownlinkFrame = true;
 static constexpr size_t kRecordFrameInterval = 100;
 static constexpr bool kDebugTxMemory = false;
+static constexpr size_t kStartStatsFrame = 20;
 
 UeWorker::UeWorker(
     size_t tid, Config& config, Stats& shared_stats, PhyStats& shared_phy_stats,
@@ -464,7 +465,8 @@ void UeWorker::DoDemul(size_t tag) {
   }
 
   if (kDownlinkHardDemod && (kPrintPhyStats || kEnableCsvLog) &&
-      (dl_symbol_id >= config_.Frame().ClientDlPilotSymbols())) {
+      (dl_symbol_id >= config_.Frame().ClientDlPilotSymbols()) &&
+      (frame_id >= kStartStatsFrame)) {
     phy_stats_.UpdateDecodedBits(
         ant_id, total_dl_symbol_id, frame_slot,
         config_.GetOFDMDataNum() * config_.ModOrderBits(Direction::kDownlink));
