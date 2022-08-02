@@ -32,8 +32,7 @@ class UDPClient {
    * @param remote_address Hostname or IP address of the remote server
    * @param remote_port UDP port that the remote server is listening on
    */
-  ssize_t Connect(const std::string& remote_address,
-                  uint16_t remote_port);
+  ssize_t Connect(const std::string& remote_address, uint16_t remote_port);
 
   /**
    * @brief Send one UDP packet to a remote server. The client caches the
