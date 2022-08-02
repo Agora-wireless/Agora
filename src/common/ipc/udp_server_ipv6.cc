@@ -30,25 +30,25 @@ UDPServerIPv6::UDPServerIPv6(std::string local_address, std::string local_port,
                              size_t rx_buffer_size)
     : port_(std::move(local_port)),
       address_(std::move(local_address)),
-      sock_fd_(-1),
-      server_address_info_(nullptr),
-      connected_address_info_(nullptr) {
-  AGORA_LOG_TRACE("Creating UDP Server at address %s port %s\n",
-                  address_.c_str(), port_.c_str());
-  /// Find the pairing remote
-  server_address_info_ = agora_comm::GetAddressInfo(address_, port_);
-  agora_comm::PrintAddressInfo(server_address_info_);
+      sock_fd_(-1) {
+  if (kDebugPrintUdpServerInit) {
+    AGORA_LOG_TRACE("Creating UDP Server at address %s port %s\n",
+                    address_.c_str(), port_.c_str());
+  }
+  /// Find the local interface
+  auto server_address_info = agora_comm::GetAddressInfo(address_, port_);
+  if (kDebugPrintUdpServerInit) {
+    agora_comm::PrintAddressInfo(server_address_info);
+  }
 
-  RtAssert((server_address_info_ != nullptr) &&
-               (server_address_info_->ai_next == nullptr),
+  RtAssert((server_address_info != nullptr) &&
+               (server_address_info->ai_next == nullptr),
            "Found 0 or more than 1 acceptable address");
 
-  if (kDebugPrintUdpServerInit) {
-    AGORA_LOG_INFO("Creating UDP server listening at port %s\n", port_.c_str());
-  }
-  sock_fd_ = ::socket(server_address_info_->ai_family,
-                      server_address_info_->ai_socktype | SOCK_NONBLOCK,
-                      server_address_info_->ai_protocol);
+  sock_fd_ = ::socket(server_address_info->ai_family,
+                      server_address_info->ai_socktype | SOCK_NONBLOCK,
+                      server_address_info->ai_protocol);
+  ::freeaddrinfo(server_address_info);
   if (sock_fd_ < 0) {
     throw std::runtime_error(
         "UDPServerIPv6: Failed to create local socket. errno = " +
@@ -82,16 +82,16 @@ UDPServerIPv6::UDPServerIPv6(std::string local_address, std::string local_port,
     // Linux likes to return 2* the buffer size
     if ((actual_buf_size != desired_buf_size) &&
         (actual_buf_size != (desired_buf_size * 2))) {
-      AGORA_LOG_ERROR(
+      AGORA_LOG_WARN(
           "Error setting RX buffer size to %zu actual size %d with status "
           "%d\n",
           rx_buffer_size, actual_buf_size, sock_ret);
     }
   }
 
-  ///Listen on the found address
-  auto bind_status = ::bind(sock_fd_, server_address_info_->ai_addr,
-                            server_address_info_->ai_addrlen);
+  /// Listen on the found address
+  const auto bind_status = ::bind(sock_fd_, server_address_info->ai_addr,
+                                  server_address_info->ai_addrlen);
   if (bind_status != 0) {
     throw std::runtime_error("UDPServerIPv6: Failed to bind socket to port " +
                              port_ + ". Error: " + std::strerror(errno));
@@ -111,16 +111,6 @@ UDPServerIPv6::~UDPServerIPv6() {
     if (kDebugPrintUdpServerInit) {
       AGORA_LOG_INFO("UDPServerIPv6: Closing the socket\n");
     }
-  }
-
-  if (server_address_info_ != nullptr) {
-    ::freeaddrinfo(server_address_info_);
-    server_address_info_ = nullptr;
-  }
-
-  if (connected_address_info_ != nullptr) {
-    ::freeaddrinfo(connected_address_info_);
-    connected_address_info_ = nullptr;
   }
 
   if (kDebugPrintUdpServerInit) {
@@ -159,27 +149,18 @@ ssize_t UDPServerIPv6::Recv(std::byte* buf, size_t len) const {
    */
 ssize_t UDPServerIPv6::Connect(const std::string& remote_address,
                                const std::string& remote_port) {
-  RtAssert(
-      (connected_address_info_ == nullptr) && (server_address_info_ != nullptr),
-      "Connected address must be null before connection");
+  /// Find the local interface
+  auto client_address_info =
+      agora_comm::GetAddressInfo(remote_address, remote_port);
+  if (kDebugPrintUdpServerInit) {
+    agora_comm::PrintAddressInfo(client_address_info);
+  }
 
-  addrinfo hints;
-  std::memset(&hints, 0u, sizeof(hints));
-  hints.ai_family = server_address_info_->ai_family;
-  hints.ai_socktype = server_address_info_->ai_socktype;
-  hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
-  hints.ai_protocol = server_address_info_->ai_protocol;
-  hints.ai_canonname = server_address_info_->ai_canonname;
-  hints.ai_addr = nullptr;
-  hints.ai_next = nullptr;
-
-  int r = ::getaddrinfo(remote_address.c_str(), remote_port.c_str(), &hints,
-                        &connected_address_info_);
-  if ((r != 0) || (connected_address_info_ == nullptr)) {
-    AGORA_LOG_ERROR("Failed to resolve %s. getaddrinfo error = %s.",
-                    remote_address.c_str(), gai_strerror(r));
-    throw std::runtime_error("Failed to result getaddrinfo");
-  } else if (connected_address_info_->ai_next != nullptr) {
+  if (client_address_info == nullptr) {
+    AGORA_LOG_ERROR("Failed to resolve %s", remote_address.c_str());
+    throw std::runtime_error("Failed to resolve getaddrinfo()");
+  } else if (client_address_info->ai_next != nullptr) {
+    ::freeaddrinfo(client_address_info);
     AGORA_LOG_ERROR("Too many client sockets found for address %s. port %s.\n",
                     remote_address.c_str(), remote_port.c_str());
     throw std::runtime_error(
@@ -187,28 +168,30 @@ ssize_t UDPServerIPv6::Connect(const std::string& remote_address,
   }
 
   // getaddrinfo() returns a list of address structures, find the correct one to connect
-  for (addrinfo* rem_connect = connected_address_info_; rem_connect != nullptr;
-       rem_connect = rem_connect->ai_next) {
-    if ((rem_connect->ai_family == server_address_info_->ai_family) &&
-        (rem_connect->ai_socktype == server_address_info_->ai_socktype) &&
-        (rem_connect->ai_protocol == server_address_info_->ai_protocol)) {
-      AGORA_LOG_TRACE("Found remote with family %d, type %d, proto %d\n",
-                      rem_connect->ai_family, rem_connect->ai_socktype,
-                      rem_connect->ai_protocol);
-      break;
+  if (kDebugPrintUdpServerInit) {
+    for (addrinfo* rem_connect = client_address_info; rem_connect != nullptr;
+         rem_connect = rem_connect->ai_next) {
+      AGORA_LOG_INFO("Found remote with family %d, type %d, proto %d\n",
+                     rem_connect->ai_family, rem_connect->ai_socktype,
+                     rem_connect->ai_protocol);
     }
-    AGORA_LOG_INFO("Found remote with family %d, type %d, proto %d\n",
-                   rem_connect->ai_family, rem_connect->ai_socktype,
-                   rem_connect->ai_protocol);
   }
-  // Need to change this to rem_connect if we allow more than 1.
-  r = ::connect(sock_fd_, connected_address_info_->ai_addr,
-                connected_address_info_->ai_addrlen);
+  auto r = ::connect(sock_fd_, client_address_info->ai_addr,
+                     client_address_info->ai_addrlen);
+  ::freeaddrinfo(client_address_info);
+  if (r != 0) {
+    AGORA_LOG_ERROR("Failed to connect %s", remote_address.c_str());
+    throw std::runtime_error("Failed to connect()");
+  }
   return r;
 }
 
 ssize_t UDPServerIPv6::Connect(const std::string& remote_address,
                                uint16_t remote_port) {
+  std::string remote = std::to_string(remote_port);
+  if (remote == "0") {
+    remote.clear();
+  }
   return Connect(remote_address, std::to_string(remote_port));
 }
 
@@ -221,7 +204,7 @@ void UDPServerIPv6::MakeBlocking(size_t timeout_sec) const {
   if (current_flags == -1) {
     throw std::runtime_error("UDPServerIPv6: fcntl failed to get flags");
   }
-  int desired_flags = current_flags & (~O_NONBLOCK);
+  const int desired_flags = current_flags & (~O_NONBLOCK);
 
   if (desired_flags != current_flags) {
     int fcntl_status = ::fcntl(sock_fd_, F_SETFL, desired_flags);

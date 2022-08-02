@@ -66,9 +66,6 @@ class UDPServerIPv6 {
    * @brief The raw socket file descriptor
    */
   int sock_fd_ = -1;
-  ::addrinfo* server_address_info_;
-  //Client address info (for connection)
-  ::addrinfo* connected_address_info_;
 };
 
 #endif  // UDP_SERVER_IPV6_H_
