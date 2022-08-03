@@ -178,6 +178,20 @@ set(MAC_BS_SOURCES
 #External Libraries
 find_package(Armadillo "11.0.0" REQUIRED)
 
+set(ENABLE_HDF5 False CACHE STRING "ENABLE_HDF5 defaulting to 'False'")
+message(STATUS "HDF5 Support Enabled: ${ENABLE_HDF5}")
+if (${ENABLE_HDF5})
+  add_definitions(-DENABLE_HDF5)
+  find_package(HDF5 1.10 REQUIRED COMPONENTS CXX)
+  if (NOT HDF5_FOUND)
+      message(FATAL_ERROR "HDF5 development files not found")
+      return()
+  endif()
+  message(STATUS "HDF5_INCLUDE_DIRS: ${HDF5_INCLUDE_DIRS}")
+  message(STATUS "HDF5_LIBRARIES: ${HDF5_LIBRARIES}")
+  include_directories(${HDF5_INCLUDE_DIRS})
+endif()
+
 find_package(PythonLibs REQUIRED)
 set(PYTHON_LIB ${PYTHON_LIBRARIES})
 include_directories(${PYTHON_INCLUDE_DIRS})
@@ -291,6 +305,7 @@ include_directories(
   src/common/
   src/common/ipc
   src/common/loggers
+  src/recorder
   src/mac/
   src/agora/
   src/agora/radio
@@ -303,6 +318,19 @@ include_directories(
   /usr/include/mkl)
 
 include_directories(SYSTEM src/third_party src/third_party/spdlog/include src/third_party/nlohmann/single_include)
+
+set(RECORDER_SOURCES
+  src/recorder/recorder_thread.cc
+  src/recorder/recorder_worker.cc
+  src/recorder/recorder_worker_multifile.cc)
+
+if (${ENABLE_HDF5})
+  set(RECORDER_SOURCES
+      ${RECORDER_SOURCES}
+      src/recorder/hdf5_lib.cc
+      src/recorder/recorder_worker_hdf5.cc)
+endif()
+add_library(recorder_sources_lib OBJECT ${RECORDER_SOURCES})
 
 set(COMMON_SOURCES
   src/agora/stats.cc
@@ -394,7 +422,7 @@ set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
-set(COMMON_LIBS ${COMMON_LIBS} armadillo -lnuma ${DPDK_LIBRARIES} ${MKL_LIBS} ${SOAPY_LIB}
+set(COMMON_LIBS ${COMMON_LIBS} armadillo numa ${HDF5_LIBRARIES} ${DPDK_LIBRARIES} ${MKL_LIBS} ${SOAPY_LIB}
     ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
 
 # TODO: The main agora executable is performance-critical, so we need to
@@ -416,6 +444,7 @@ target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
 add_executable(user
   src/client/user-main.cc
+  $<TARGET_OBJECTS:recorder_sources_lib>
   $<TARGET_OBJECTS:client_sources_lib>
   $<TARGET_OBJECTS:shared_txrx_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
@@ -458,6 +487,7 @@ if(RADIO_TYPE STREQUAL SOAPY_IRIS)
 add_executable(radio_test
     test/radio_test/main.cc
     $<TARGET_OBJECTS:agora_sources_lib>
+    $<TARGET_OBJECTS:recorder_sources_lib>
     $<TARGET_OBJECTS:client_sources_lib>
     $<TARGET_OBJECTS:shared_txrx_sources_lib>
     $<TARGET_OBJECTS:common_sources_lib>)

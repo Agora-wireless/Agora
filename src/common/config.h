@@ -87,6 +87,18 @@ class Config {
   inline double ClientRxGainB(size_t id) const {
     return this->client_rx_gain_b_.at(id);
   }
+  inline const std::vector<double>& ClientTxGainA() const {
+    return this->client_tx_gain_a_;
+  }
+  inline const std::vector<double>& ClientRxGainA() const {
+    return this->client_rx_gain_a_;
+  }
+  inline const std::vector<double>& ClientTxGainB() const {
+    return this->client_tx_gain_b_;
+  }
+  inline const std::vector<double>& ClientRxGainB() const {
+    return this->client_rx_gain_b_;
+  }
   inline size_t NumCells() const { return this->num_cells_; }
   inline size_t NumRadios() const { return this->num_radios_; }
   inline size_t InitCalibRepeat() const { return this->init_calib_repeat_; }

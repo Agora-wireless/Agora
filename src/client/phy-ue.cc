@@ -11,6 +11,7 @@
 #include "packet_txrx_client_sim.h"
 #include "phy_ldpc_decoder_5gnr.h"
 #include "phy_stats.h"
+#include "recorder_thread.h"
 #include "scrambler.h"
 #include "signal_handler.h"
 #include "utils_ldpc.h"
@@ -18,6 +19,14 @@
 /* Print debug work */
 static constexpr bool kDebugPrintPacketsFromMac = false;
 static constexpr bool kDebugPrintPacketsToMac = false;
+
+#if defined(ENABLE_HDF5)
+static constexpr bool kRecordDownlinkFrame = true;
+static constexpr size_t kRecordFrameInterval = 1;
+#else
+static constexpr bool kRecordDownlinkFrame = false;
+static constexpr size_t kRecordFrameInterval = 1;
+#endif
 
 static constexpr size_t kDefaultQueueSize = 36;
 
@@ -121,6 +130,20 @@ PhyUe::PhyUe(Config* config)
     workers_.push_back(std::move(new_worker));
   }
 
+  if (kRecordDownlinkFrame) {
+    //Add and writter / record type here
+    std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes> recorders;
+    recorders.push_back(Agora_recorder::RecorderWorker::RecorderWorkerTypes::
+                            kRecorderWorkerHdf5);
+    auto& new_recorder = recorders_.emplace_back(
+        std::make_unique<Agora_recorder::RecorderThread>(
+            config_, 0, core_offset_worker + config_->UeWorkerThreadNum(),
+            kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntNum() *
+                kDefaultQueueSize,
+            0, config_->UeAntNum(), kRecordFrameInterval, recorders, true));
+    new_recorder->Start();
+  }
+
   // initilize all kinds of checkers
   // Init the frame work tracking structure
   for (size_t frame = 0; frame < this->frame_tasks_.size(); frame++) {
@@ -166,6 +189,12 @@ PhyUe::~PhyUe() {
     workers_.at(i)->Stop();
   }
   workers_.clear();
+
+  for (size_t i = 0; i < recorders_.size(); i++) {
+    AGORA_LOG_INFO("Waiting for Recording to complete %zu\n", i);
+    recorders_.at(i)->Stop();
+  }
+  recorders_.clear();
 
   if (kEnableMac == true) {
     mac_std_thread_.join();
@@ -329,8 +358,13 @@ void PhyUe::Start() {
 
       switch (event.event_type_) {
         case EventType::kPacketRX: {
-          RxPacket* rx = rx_tag_t(event.tags_[0]).rx_packet_;
+          RxPacket* rx = rx_tag_t(event.tags_[0u]).rx_packet_;
           Packet* pkt = rx->RawPacket();
+
+          if (recorders_.size() == 1) {
+            rx->Use();
+            recorders_.at(0)->DispatchWork(event);
+          }
 
           const size_t frame_id = pkt->frame_id_;
           const size_t symbol_id = pkt->symbol_id_;

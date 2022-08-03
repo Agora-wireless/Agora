@@ -23,8 +23,6 @@ static constexpr bool kDebugPrintDecode = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDownlinkPilotStats = false;
 static constexpr bool kPrintEqualizedSymbols = false;
-static constexpr bool kRecordDownlinkFrame = true;
-static constexpr size_t kRecordFrameInterval = 100;
 static constexpr bool kDebugTxMemory = false;
 static constexpr size_t kStartStatsFrame = 20;
 
@@ -183,24 +181,6 @@ void UeWorker::DoFftPilot(size_t tag) {
         frame_id, symbol_id, ant_id, pilot_offset);
   }
 
-  if (kRecordDownlinkFrame) {
-    if (frame_id > 0 && frame_id % kRecordFrameInterval == 0) {
-      const std::string fname_ext = std::to_string(frame_id) + "_" +
-                                    std::to_string(dl_symbol_id) + "_" +
-                                    std::to_string(ant_id) + "_" +
-                                    config_.UeRadioName().at(ant_id) + ".bin";
-      std::string fname = "log/rxpilot_" + fname_ext;
-      FILE* f = std::fopen(fname.c_str(), "wb");
-      std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
-      std::fclose(f);
-      fname = "log/txpilot_" + fname_ext;
-      f = std::fopen(fname.c_str(), "wb");
-      std::fwrite(config_.UeSpecificPilot()[ant_id], 2 * sizeof(float),
-                  config_.OfdmDataNum(), f);
-      std::fclose(f);
-    }
-  }
-
   // remove CP, do FFT
   size_t total_dl_symbol_id =
       (frame_slot * config_.Frame().NumDLSyms()) + dl_symbol_id;
@@ -218,6 +198,13 @@ void UeWorker::DoFftPilot(size_t tag) {
 
   // perform fft
   DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
+
+  //// FFT shift the buffer
+  std::vector<complex_float> temp_fft_buf(config_.OfdmCaNum());
+  auto* temp_buff = reinterpret_cast<complex_float*>(temp_fft_buf.data());
+  auto* fft_buff_complex =
+      reinterpret_cast<complex_float*>(fft_buffer_[fft_buffer_target_id]);
+  CommsLib::FFTShift(fft_buff_complex, temp_buff, config_.OfdmCaNum());
 
   size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
   auto* csi_buffer_ptr =
@@ -278,26 +265,6 @@ void UeWorker::DoFftData(size_t tag) {
 
   const size_t sig_offset = config_.OfdmRxZeroPrefixClient();
   const size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
-  const size_t dl_data_symbol_id =
-      dl_symbol_id - config_.Frame().ClientDlPilotSymbols();
-
-  if (kRecordDownlinkFrame) {
-    if (frame_id > 0 && frame_id % kRecordFrameInterval == 0) {
-      const std::string fname_ext = std::to_string(frame_id) + "_" +
-                                    std::to_string(dl_symbol_id) + "_" +
-                                    std::to_string(ant_id) + "_" +
-                                    config_.UeRadioName().at(ant_id) + ".bin";
-      std::string fname = "log/rxdata_" + fname_ext;
-      FILE* f = std::fopen(fname.c_str(), "wb");
-      std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
-      std::fclose(f);
-      fname = "log/txdata_" + fname_ext;
-      f = std::fopen(fname.c_str(), "wb");
-      std::fwrite(config_.DlIqF()[dl_symbol_id] + ant_id * config_.OfdmCaNum(),
-                  2 * sizeof(float), config_.OfdmCaNum(), f);
-      std::fclose(f);
-    }
-  }
 
   // remove CP, do FFT
   size_t total_dl_symbol_id =
@@ -314,6 +281,13 @@ void UeWorker::DoFftData(size_t tag) {
 
   // perform fft
   DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
+
+  //// FFT shift the buffer
+  std::vector<complex_float> temp_fft_buf(config_.OfdmCaNum());
+  auto* temp_buff = reinterpret_cast<complex_float*>(temp_fft_buf.data());
+  auto* fft_buff_complex =
+      reinterpret_cast<complex_float*>(fft_buffer_[fft_buffer_target_id]);
+  CommsLib::FFTShift(fft_buff_complex, temp_buff, config_.OfdmCaNum());
 
   size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
   auto* csi_buffer_ptr =
@@ -357,11 +331,13 @@ void UeWorker::DoFftData(size_t tag) {
       equ_buffer_ptr[data_sc_id] = (y / csi_buffer_ptr[j]) * phc;
       size_t ant = (kDebugDownlink == true) ? 0 : ant_id;
       if (kCollectPhyStats) {
+        const size_t dl_data_symbol_id =
+            dl_symbol_id - config_.Frame().ClientDlPilotSymbols();
         phy_stats_.UpdateEvm(frame_id, dl_data_symbol_id, j, ant, ant_id,
                              equ_buffer_ptr[data_sc_id]);
       }
       complex_float tx =
-          config_.DlIqF()[dl_symbol_id][ant * config_.OfdmCaNum() + sc_id];
+          config_.DlIqF()[dl_symbol_id][ant * config_.OfdmDataNum() + j];
       evm +=
           std::norm(equ_buffer_ptr[data_sc_id] - arma::cx_float(tx.re, tx.im));
     }
@@ -370,8 +346,7 @@ void UeWorker::DoFftData(size_t tag) {
   evm = evm / config_.GetOFDMDataNum();
   if (kPrintEqualizedSymbols) {
     complex_float* tx =
-        &config_.DlIqF()[dl_symbol_id][ant_id * config_.OfdmCaNum() +
-                                       config_.OfdmDataStart()];
+        &config_.DlIqF()[dl_symbol_id][ant_id * config_.OfdmDataNum()];
     arma::cx_fvec x_vec(reinterpret_cast<arma::cx_float*>(tx),
                         config_.OfdmDataNum(), false);
     Utils::PrintVec(x_vec, std::string("x") +
@@ -683,6 +658,9 @@ void UeWorker::DoIfft(size_t tag) {
   std::memset(ifft_buff + config_.OfdmDataStop(), 0,
               sizeof(complex_float) * config_.OfdmDataStart());
 
+  std::vector<complex_float> temp_fft_buf(config_.OfdmCaNum());
+  auto* temp_buff = reinterpret_cast<complex_float*>(temp_fft_buf.data());
+  CommsLib::FFTShift(ifft_buff, temp_buff, config_.OfdmCaNum());
   CommsLib::IFFT(ifft_buff, config_.OfdmCaNum(), false);
 
   const size_t tx_offset = buff_offset * config_.PacketLength();
