@@ -53,10 +53,9 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
           (dir_ == Direction::kDownlink)
               ? cfg->DlIqF()[cfg->Frame().ClientDlPilotSymbols() + i]
               : cfg->UlIqF()[cfg->Frame().ClientUlPilotSymbols() + i]);
-      arma::cx_fmat iq_f_mat(iq_f_ptr, cfg->OfdmCaNum(), cfg->UeAntNum(),
+      arma::cx_fmat iq_f_mat(iq_f_ptr, cfg->OfdmDataNum(), cfg->UeAntNum(),
                              false);
-      gt_cube_.slice(i) =
-          iq_f_mat.rows(cfg->OfdmDataStart(), (cfg->OfdmDataStop() - 1)).st();
+      gt_cube_.slice(i) = iq_f_mat.st();
     }
   }
   dl_pilot_snr_.Calloc(kFrameWnd,
