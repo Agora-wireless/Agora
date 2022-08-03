@@ -24,6 +24,7 @@ static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDownlinkPilotStats = false;
 static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr bool kDebugTxMemory = false;
+static constexpr size_t kStartStatsFrame = 20;
 
 static constexpr bool kSingleScBer = false; // true for single SC BER; false for all SC BER
 static constexpr size_t kSingleScIdx = 10; // SC index for single SC BER
@@ -35,7 +36,7 @@ UeWorker::UeWorker(
     moodycamel::ProducerToken& work_producer, Table<int8_t>& ul_bits_buffer,
     Table<int8_t>& encoded_buffer, Table<complex_float>& modul_buffer,
     Table<complex_float>& ifft_buffer, char* const tx_buffer,
-    Table<char>& rx_buffer, std::vector<myVec>& csi_buffer,
+    Table<char>& rx_buffer, Table<complex_float>& csi_buffer,
     std::vector<myVec>& equal_buffer, std::vector<size_t>& non_null_sc_ind,
     Table<complex_float>& fft_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer,
@@ -210,7 +211,7 @@ void UeWorker::DoFftPilot(size_t tag) {
 
   size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
   auto* csi_buffer_ptr =
-      reinterpret_cast<arma::cx_float*>(csi_buffer_.at(csi_offset).data());
+      reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset]);
   auto* fft_buffer_ptr =
       reinterpret_cast<arma::cx_float*>(fft_buffer_[fft_buffer_target_id]);
 
@@ -295,7 +296,7 @@ void UeWorker::DoFftData(size_t tag) {
 
   size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
   auto* csi_buffer_ptr =
-      reinterpret_cast<arma::cx_float*>(csi_buffer_.at(csi_offset).data());
+      reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset]);
   auto* fft_buffer_ptr =
       reinterpret_cast<arma::cx_float*>(fft_buffer_[fft_buffer_target_id]);
 
@@ -442,7 +443,8 @@ void UeWorker::DoDemul(size_t tag) {
   }
 
   if (kDownlinkHardDemod && (kPrintPhyStats || kEnableCsvLog) &&
-      (dl_symbol_id >= config_.Frame().ClientDlPilotSymbols())) {
+      (dl_symbol_id >= config_.Frame().ClientDlPilotSymbols()) &&
+      (frame_id >= kStartStatsFrame)) {
     phy_stats_.UpdateDecodedBits(
         ant_id, total_dl_symbol_id, frame_slot,
         (kSingleScBer ? 1 : config_.GetOFDMDataNum())

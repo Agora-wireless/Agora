@@ -452,13 +452,11 @@ void Agora::Start() {
               if (kPrintPhyStats) {
                 this->phy_stats_->PrintEvmStats(frame_id);
               }
-              if (kEnableCsvLog) {
-                this->phy_stats_->RecordEvm(frame_id);
-                this->phy_stats_->RecordEvmSnr(frame_id);
-                if (kUplinkHardDemod) {
-                  this->phy_stats_->RecordBer(frame_id);
-                  this->phy_stats_->RecordSer(frame_id);
-                }
+              this->phy_stats_->RecordEvm(frame_id);
+              this->phy_stats_->RecordEvmSnr(frame_id);
+              if (kUplinkHardDemod) {
+                this->phy_stats_->RecordBer(frame_id);
+                this->phy_stats_->RecordSer(frame_id);
               }
               this->phy_stats_->ClearEvmBuffer(frame_id);
 
@@ -500,10 +498,8 @@ void Agora::Start() {
             if (last_decode_symbol == true) {
               this->stats_->MasterSetTsc(TsType::kDecodeDone, frame_id);
               PrintPerFrameDone(PrintType::kDecode, frame_id);
-              if (kEnableCsvLog) {
-                this->phy_stats_->RecordBer(frame_id);
-                this->phy_stats_->RecordSer(frame_id);
-              }
+              this->phy_stats_->RecordBer(frame_id);
+              this->phy_stats_->RecordSer(frame_id);
               if (kEnableMac == false) {
                 assert(this->cur_proc_frame_id_ == frame_id);
                 const bool work_finished = this->CheckFrameComplete(frame_id);
@@ -839,9 +835,7 @@ void Agora::HandleEventFft(size_t tag) {
           if (kPrintPhyStats == true) {
             this->phy_stats_->PrintUlSnrStats(frame_id);
           }
-          if (kEnableCsvLog) {
-            this->phy_stats_->RecordUlPilotSnr(frame_id);
-          }
+          this->phy_stats_->RecordUlPilotSnr(frame_id);
           if (kEnableMac == true) {
             SendSnrReport(EventType::kSNRReport, frame_id, symbol_id);
           }
