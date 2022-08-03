@@ -16,7 +16,6 @@ static constexpr size_t kMessageSize = 9000;
 static constexpr size_t kNumPackets = 10000;
 static std::atomic<bool> server_ready;
 
-static const std::string kLocalHost = "localhost";
 static const std::string kIpv4Address = "127.0.0.1";
 static const std::string kIpv6Address = "::1";
 
@@ -94,7 +93,7 @@ void ServerRecvFrom(const std::string& src_address, uint16_t src_port,
         udp_server.Recv(src_address, src_port, &pkt_buf[0u], kMessageSize);
     ASSERT_GE(ret, 0);
     if (ret != 0) {
-      auto pkt_index = *reinterpret_cast<size_t*>(&pkt_buf[0]);
+      auto pkt_index = *reinterpret_cast<size_t*>(&pkt_buf[0u]);
       if (pkt_index < largest_pkt_index) {
         num_pkts_reordered++;
       }

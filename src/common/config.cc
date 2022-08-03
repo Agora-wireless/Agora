@@ -218,6 +218,7 @@ Config::Config(const std::string& jsonfile)
   bs_server_addr_ = tdd_conf.value("bs_server_addr", "127.0.0.1");
   bs_rru_addr_ = tdd_conf.value("bs_rru_addr", "127.0.0.1");
   ue_server_addr_ = tdd_conf.value("ue_server_addr", "127.0.0.1");
+  ue_rru_addr_ = tdd_conf.value("ue_rru_addr", "127.0.0.1");
   mac_remote_addr_ = tdd_conf.value("mac_remote_addr", "127.0.0.1");
   bs_server_port_ = tdd_conf.value("bs_server_port", 8000);
   bs_rru_port_ = tdd_conf.value("bs_rru_port", 9000);
