@@ -4,7 +4,7 @@
  */
 #include "receiver.h"
 
-#include "udp_server.h"
+#include "udp_comm.h"
 
 Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset)
     : rx_thread_num_(rx_thread_num), core_id_(core_offset), cfg_(cfg) {}
@@ -46,8 +46,8 @@ void* Receiver::LoopRecv(size_t tid) {
   PinToCoreWithOffset(ThreadType::kWorkerRX, core_offset, tid);
 
   const size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
-  auto udp_server =
-      std::make_unique<UDPServer>(cfg_->BsRruPort() + tid, sock_buf_size);
+  auto udp_server = std::make_unique<UDPComm>(
+      cfg_->BsRruAddr(), cfg_->BsRruPort() + tid, sock_buf_size, 0);
 
   udp_server->MakeBlocking(1);
 
@@ -67,9 +67,10 @@ void* Receiver::LoopRecv(size_t tid) {
       throw std::runtime_error("Receiver: Receive thread buffer full");
     }
 
-    ssize_t recvlen = udp_server->RecvFrom(
-        reinterpret_cast<uint8_t*>(current_packet->RawPacket()),
-        cfg_->PacketLength(), cfg_->BsServerAddr(), cfg_->BsServerPort() + tid);
+    ssize_t recvlen = udp_server->Recv(
+        cfg_->BsServerAddr(), cfg_->BsServerPort() + tid,
+        reinterpret_cast<std::byte*>(current_packet->RawPacket()),
+        cfg_->PacketLength());
     if (recvlen < 0) {
       std::perror("recv failed");
       throw std::runtime_error("Receiver: recv failed");
