@@ -21,8 +21,7 @@
 #include "memory_manage.h"
 #include "signal_handler.h"
 #include "symbols.h"
-#include "udp_client.h"
-#include "udp_server.h"
+#include "udp_comm.h"
 
 using AlignedByteVector =
     std::vector<unsigned char,
@@ -82,18 +81,12 @@ class ChannelSim {
   void DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
             size_t ant_per_socket, uint8_t* tx_buffer,
             const arma::cx_float* source_data, AlignedByteVector* udp_pkt_buf,
-            std::vector<std::unique_ptr<UDPClient>>& udp_clients,
-            const std::string& dest_address, size_t dest_port);
+            std::vector<std::unique_ptr<UDPComm>>& udp_senders);
 
-  // BS-facing sending clients
-  std::vector<std::unique_ptr<UDPClient>> client_bs_;
   // BS-facing sockets
-  std::vector<std::unique_ptr<UDPServer>> server_bs_;
-
-  // UE-facing sending clients
-  std::vector<std::unique_ptr<UDPClient>> client_ue_;
+  std::vector<std::unique_ptr<UDPComm>> bs_comm_;
   // UE-facing sockets
-  std::vector<std::unique_ptr<UDPServer>> server_ue_;
+  std::vector<std::unique_ptr<UDPComm>> ue_comm_;
 
   const Config* const cfg_;
   std::unique_ptr<Channel> channel_;
