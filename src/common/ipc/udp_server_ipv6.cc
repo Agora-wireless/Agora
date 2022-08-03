@@ -154,9 +154,8 @@ ssize_t UDPServerIPv6::Recv(std::byte* buf, size_t len) const {
    * received. If no bytes are received, return zero. If there was an error
    * in receiving, return -1.
    */
-ssize_t UDPServerIPv6::RecvFrom(std::byte* buf, size_t len,
-                                const std::string& src_address,
-                                uint16_t src_port) {
+ssize_t UDPServerIPv6::Recv(const std::string& src_address, uint16_t src_port,
+                            std::byte* buf, size_t len) {
   const std::string port_string = std::to_string(src_port);
   const std::string remote_uri = src_address + ":" + port_string;
   ::addrinfo* rem_addrinfo = nullptr;
@@ -257,7 +256,7 @@ ssize_t UDPServerIPv6::Connect(const std::string& remote_address,
    * @brief Configures the socket in blocking mode.  Any calls to recv / send
    * will now block
    */
-void UDPServerIPv6::MakeBlocking(size_t timeout_sec) const {
+void UDPServerIPv6::MakeBlocking(size_t rx_timeout_sec) const {
   int current_flags = ::fcntl(sock_fd_, F_GETFL);
   if (current_flags == -1) {
     throw std::runtime_error("UDPServerIPv6: fcntl failed to get flags");
@@ -281,9 +280,9 @@ void UDPServerIPv6::MakeBlocking(size_t timeout_sec) const {
   }
 
   // Set timeout
-  if (timeout_sec != 0) {
+  if (rx_timeout_sec != 0) {
     timeval tv;
-    tv.tv_sec = timeout_sec;
+    tv.tv_sec = rx_timeout_sec;
     tv.tv_usec = 0;
     int opt_status =
         ::setsockopt(sock_fd_, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));

@@ -6,7 +6,7 @@
 
 #include "gettime.h"
 #include "udp_client.h"
-#include "udp_server.h"
+#include "udp_comm.h"
 #include "udp_server_ipv6.h"
 #include "utils.h"
 
@@ -56,6 +56,24 @@ void ClientConnect(const std::string& src_address, uint16_t src_port,
   }
 }
 
+///Test the connection use case
+void UDPSend(const std::string& local_address, uint16_t local_port,
+             const std::string& remote_address, uint16_t remote_port) {
+  std::vector<uint8_t> packet(kMessageSize);
+  UDPComm udp_client(local_address, local_port, 0, 0);
+
+  while (server_ready == false) {
+    // Wait for server to get ready
+  }
+  udp_client.Connect(remote_address, remote_port);
+
+  for (size_t i = 1; i <= kNumPackets; i++) {
+    static_assert(kMessageSize >= sizeof(size_t));
+    *reinterpret_cast<size_t*>(&packet[0u]) = i;
+    udp_client.Send(&packet[0u], kMessageSize);
+  }
+}
+
 // Spin until kNumPackets are received
 void ServerRecvFrom(const std::string& src_address, uint16_t src_port,
                     const std::string& dest_address, uint16_t dest_port) {
@@ -73,7 +91,7 @@ void ServerRecvFrom(const std::string& src_address, uint16_t src_port,
   size_t num_pkts_reordered = 0;
   while (true) {
     const ssize_t ret =
-        udp_server.RecvFrom(&pkt_buf[0u], kMessageSize, src_address, src_port);
+        udp_server.Recv(src_address, src_port, &pkt_buf[0u], kMessageSize);
     ASSERT_GE(ret, 0);
     if (ret != 0) {
       auto pkt_index = *reinterpret_cast<size_t*>(&pkt_buf[0]);
@@ -105,6 +123,46 @@ void ServerConnect(const std::string& src_address, const uint16_t src_port,
   std::vector<std::byte> pkt_buf(kMessageSize);
   //Optional method to create 1:1 connection
   udp_server.Connect(src_address, src_port);
+
+  server_ready = true;
+  size_t largest_pkt_index = 0;
+  const size_t start_time = GetTime::Rdtsc();
+  size_t num_pkts_received = 0;
+  size_t num_pkts_reordered = 0;
+  while (true) {
+    const ssize_t ret = udp_server.Recv(&pkt_buf[0u], kMessageSize);
+    ASSERT_GE(ret, 0);
+    if (ret != 0) {
+      auto pkt_index = *reinterpret_cast<size_t*>(&pkt_buf[0u]);
+      if (pkt_index < largest_pkt_index) {
+        num_pkts_reordered++;
+      }
+      largest_pkt_index = std::max(pkt_index, largest_pkt_index);
+      num_pkts_received++;
+
+      if (num_pkts_received == kNumPackets) {
+        break;
+      }
+    }
+  }
+  server_ready = false;
+  std::printf("Bandwidth = %.2f Gbps/s, number of reordered packets = %zu\n",
+              (kNumPackets * kMessageSize * 8) /
+                  GetTime::CyclesToNs(GetTime::Rdtsc() - start_time, freq_ghz),
+              num_pkts_reordered);
+}
+
+///Test the connection use case
+void UDPRecv(const std::string& local_address, uint16_t local_port,
+             const std::string& remote_address, uint16_t remote_port) {
+  const double freq_ghz = GetTime::MeasureRdtscFreq();
+
+  // Without buffer resizing, the server will sometimes drop packets and
+  // therefore never return from this function
+  UDPComm udp_server(local_address, local_port, kMessageSize * kNumPackets, 0);
+  std::vector<std::byte> pkt_buf(kMessageSize);
+  //Optional method to create 1:1 connection
+  udp_server.Connect(remote_address, remote_port);
 
   server_ready = true;
   size_t largest_pkt_index = 0;
@@ -168,10 +226,21 @@ TEST(UDPClientServer, PerfIpv6RecvFrom) {
   client_thread.join();
 }
 
+TEST(UDPComm, PerfUDP) {
+  server_ready = false;
+  std::thread receive_thread(UDPRecv, kIpv6Address, kReceivePort, kIpv6Address,
+                             kSendPort);
+  std::thread send_thread(UDPSend, kIpv6Address, kSendPort, kIpv6Address,
+                          kReceivePort);
+
+  receive_thread.join();
+  send_thread.join();
+}
+
 // Test that the server is actually non-blocking
 TEST(UDPClientServer, ServerIsNonBlocking) {
-  UDPServer udp_server(kReceivePort);
-  std::vector<uint8_t> packet(kMessageSize);
+  UDPServerIPv6 udp_server(kIpv6Address, kReceivePort);
+  std::vector<std::byte> packet(kMessageSize);
 
   // If the UDP server is blocking, this call never completes because there is
   // no data to receive
