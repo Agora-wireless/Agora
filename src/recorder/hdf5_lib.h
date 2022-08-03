@@ -26,11 +26,11 @@ class Hdf5Lib {
   Hdf5Lib(H5std_string hdf5_name, H5std_string group_name);
   ~Hdf5Lib();
 
-  int CreateDataset(const std::string& dataset_name,
-                    const std::array<hsize_t, kDsDimsNum>& chunk_dims,
-                    const std::array<hsize_t, kDsDimsNum>& init_dims,
-                    const ssize_t extend_dimension = 0,
-                    const H5::PredType& type = H5::PredType::STD_I16BE);
+  void CreateDataset(const std::string& dataset_name,
+                     const std::array<hsize_t, kDsDimsNum>& chunk_dims,
+                     const std::array<hsize_t, kDsDimsNum>& init_dims,
+                     const ssize_t extend_dimension = 0,
+                     const H5::PredType& type = H5::PredType::STD_I16BE);
   void FinalizeDataset(const std::string& dataset_name);
 
   void ExtendDataset(const std::string& dataset_name,
@@ -44,11 +44,6 @@ class Hdf5Lib {
                       const std::array<hsize_t, kDsDimsNum>& start,
                       const std::array<hsize_t, kDsDimsNum>& count,
                       const float* wrt_data);
-
-  //std::vector<short> ReadDataset(
-  //    const std::string& dataset_name,
-  //    const std::array<hsize_t, kDsDimsNum>& target_id,
-  //    const std::array<hsize_t, kDsDimsNum>& read_dim);
 
   void WriteAttribute(const char name[], double val);
   void WriteAttribute(const char name[], const std::vector<double>& val);

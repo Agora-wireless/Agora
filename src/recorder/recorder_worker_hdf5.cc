@@ -17,6 +17,7 @@ static constexpr bool kDebugPrint = false;
 static const std::string kHdf5Filename = "UeRxData.h5";
 static constexpr size_t kFrameInc = 2000;
 static constexpr size_t kDsDimSymbol = 2;
+static constexpr ssize_t kFixedDimensions = -1;
 
 RecorderWorkerHDF5::RecorderWorkerHDF5(const Config* in_cfg,
                                        size_t antenna_offset,
@@ -198,7 +199,6 @@ void RecorderWorkerHDF5::Init() {
             std::string("BeaconData"),
             {kFrameInc, cfg_->NumCells(), cfg_->Frame().NumBeaconSyms(),
              num_antennas_, data_chunk_dims_.back()}));
-
     auto& current_dataset = datasets_.back();
     hdf5_->CreateDataset(current_dataset.first, data_chunk_dims_,
                          current_dataset.second);
@@ -214,59 +214,60 @@ void RecorderWorkerHDF5::Init() {
     auto& current_dataset = datasets_.back();
     hdf5_->CreateDataset(current_dataset.first, data_chunk_dims_,
                          current_dataset.second);
-  }
 
-  //Adding the ground truths as a DataSet
-  {  //TxData
-    //Including the Pilots here.....
-    //*2 for complex
-    const hsize_t tx_data_size = 2 * cfg_->OfdmCaNum();
-    const size_t num_dl_data_syms = cfg_->Frame().NumDLSyms();
-    std::string dataset_name("TxData");
-    const std::array<hsize_t, kDsDimsNum> tx_data_dims = {1, 1, 1, 1,
-                                                          tx_data_size};
-    const std::array<hsize_t, kDsDimsNum> total_dims = {
-        1, 1, num_dl_data_syms, num_antennas_, tx_data_dims.back()};
+    //Adding the ground truths as a DataSet
+    {  //TxData
+      const std::string dataset_name("TxData");
+      //Including the Pilots here.....
+      //*2 for complex
+      const hsize_t tx_data_size = 2 * cfg_->OfdmCaNum();
+      const size_t num_dl_data_syms = cfg_->Frame().NumDLSyms();
+      const std::array<hsize_t, kDsDimsNum> tx_data_dims = {1, 1, 1, 1,
+                                                            tx_data_size};
+      const std::array<hsize_t, kDsDimsNum> total_dims = {
+          1, 1, num_dl_data_syms, num_antennas_, tx_data_dims.back()};
 
-    hdf5_->CreateDataset(dataset_name, tx_data_dims, total_dims, -1,
-                         H5::PredType::INTEL_F32);
+      hdf5_->CreateDataset(dataset_name, tx_data_dims, total_dims,
+                           kFixedDimensions, H5::PredType::INTEL_F32);
 
-    for (size_t ant = 0; ant < num_antennas_; ant++) {
-      for (size_t sym = 0; sym < num_dl_data_syms; sym++) {
-        const std::array<hsize_t, kDsDimsNum> start = {0, 0, sym, ant, 0};
-        AGORA_LOG_INFO(
-            "Attempting to write TxData for Symbol %zu, Antenna %zu total syms "
-            "%zu\n",
-            sym, ant, cfg_->Frame().ClientDlPilotSymbols());
-        hdf5_->WriteDataset(
-            dataset_name, start, tx_data_dims,
-            reinterpret_cast<float*>(const_cast<Config*>(cfg_)->DlIqF()[sym] +
-                                     (ant * cfg_->OfdmCaNum())));
+      for (size_t ant = 0; ant < num_antennas_; ant++) {
+        for (size_t sym = 0; sym < num_dl_data_syms; sym++) {
+          const std::array<hsize_t, kDsDimsNum> start = {0, 0, sym, ant, 0};
+          AGORA_LOG_TRACE(
+              "Attempting to write TxData for Symbol %zu, Antenna %zu total "
+              "syms %zu\n",
+              sym, ant, num_dl_data_syms);
+          hdf5_->WriteDataset(
+              dataset_name, start, tx_data_dims,
+              reinterpret_cast<float*>(const_cast<Config*>(cfg_)->DlIqF()[sym] +
+                                       (ant * cfg_->OfdmCaNum())));
+        }
       }
+      hdf5_->FinalizeDataset(dataset_name);
     }
-    hdf5_->FinalizeDataset(dataset_name);
-  }
 
-  {  //TXPilot
-    std::string dataset_name("TxPilot");
-    const hsize_t tx_pilot_size = 2 * cfg_->OfdmDataNum();
-    const std::array<hsize_t, kDsDimsNum> tx_pilot_dims = {1, 1, 1, 1,
-                                                           tx_pilot_size};
-    const std::array<hsize_t, kDsDimsNum> total_dims = {1, 1, 1, num_antennas_,
-                                                        tx_pilot_dims.back()};
+    {  //TXPilot
+      const std::string dataset_name("TxPilot");
+      const hsize_t tx_pilot_size = 2 * cfg_->OfdmDataNum();
+      const std::array<hsize_t, kDsDimsNum> tx_pilot_dims = {1, 1, 1, 1,
+                                                             tx_pilot_size};
+      const std::array<hsize_t, kDsDimsNum> total_dims = {
+          1, 1, 1, num_antennas_, tx_pilot_dims.back()};
 
-    hdf5_->CreateDataset(dataset_name, total_dims, tx_pilot_dims, -1,
-                         H5::PredType::INTEL_F32);
+      hdf5_->CreateDataset(dataset_name, tx_pilot_dims, total_dims,
+                           kFixedDimensions, H5::PredType::INTEL_F32);
 
-    for (size_t ant = 0; ant < num_antennas_; ant++) {
-      const std::array<hsize_t, kDsDimsNum> start = {0, 0, 0, ant, 0};
-      hdf5_->WriteDataset(
-          dataset_name, start, tx_pilot_dims,
-          reinterpret_cast<float*>(
-              const_cast<Config*>(cfg_)->UeSpecificPilot()[ant]));
+      for (size_t ant = 0; ant < num_antennas_; ant++) {
+        const std::array<hsize_t, kDsDimsNum> start = {0, 0, 0, ant, 0};
+        AGORA_LOG_TRACE("Attempting to write TxPilot for Antenna %zu\n", ant);
+        hdf5_->WriteDataset(
+            dataset_name, start, tx_pilot_dims,
+            reinterpret_cast<float*>(
+                const_cast<Config*>(cfg_)->UeSpecificPilot()[ant]));
+      }
+      hdf5_->FinalizeDataset(dataset_name);
     }
-    hdf5_->FinalizeDataset(dataset_name);
-  }
+  }  // end cfg_->Frame().NumDLSyms() > 0
 }
 
 void RecorderWorkerHDF5::Finalize() { hdf5_.reset(); }
