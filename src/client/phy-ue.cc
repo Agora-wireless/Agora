@@ -333,9 +333,6 @@ void PhyUe::Start() {
   size_t miss_count = 0;
   size_t total_count = 0;
 
-  // create log directory if not exist
-  mkdir("log", 0777);
-
   std::array<EventData, kDequeueBulkSizeTXRX> events_list;
   size_t ret = 0;
   max_equaled_frame_ = 0;
