@@ -48,7 +48,6 @@ UDPServerIPv6::UDPServerIPv6(std::string local_address, std::string local_port,
   sock_fd_ = ::socket(server_address_info->ai_family,
                       server_address_info->ai_socktype | SOCK_NONBLOCK,
                       server_address_info->ai_protocol);
-  ::freeaddrinfo(server_address_info);
   if (sock_fd_ < 0) {
     throw std::runtime_error(
         "UDPServerIPv6: Failed to create local socket. errno = " +
@@ -96,6 +95,7 @@ UDPServerIPv6::UDPServerIPv6(std::string local_address, std::string local_port,
     throw std::runtime_error("UDPServerIPv6: Failed to bind socket to port " +
                              port_ + ". Error: " + std::strerror(errno));
   }
+  ::freeaddrinfo(server_address_info);
 }
 
 UDPServerIPv6::~UDPServerIPv6() {
