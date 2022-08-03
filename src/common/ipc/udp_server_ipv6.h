@@ -48,9 +48,8 @@ class UDPServerIPv6 {
    * in receiving, return -1.
    */
   ssize_t Recv(std::byte* buf, size_t len) const;
-
-  ssize_t RecvFrom(std::byte* buf, size_t len, const std::string& src_address,
-                   uint16_t src_port);
+  ssize_t Recv(const std::string& src_address, uint16_t src_port,
+               std::byte* buf, size_t len);
 
   /**
    * @brief Configures the socket in blocking mode.  Any calls to recv / send
