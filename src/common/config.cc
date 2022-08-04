@@ -22,16 +22,17 @@ static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
 
-Config::Config(const std::string& jsonfile)
+Config::Config(const std::string& jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
       ul_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
-      frame_("") {
+      frame_(""),
+      config_filename_(jsonfilename) {
   pilots_ = nullptr;
   pilots_sgn_ = nullptr;
 
   std::string conf;
-  Utils::LoadTddConfig(jsonfile, conf);
+  Utils::LoadTddConfig(config_filename_, conf);
   // Allow json comments
   const auto tdd_conf = json::parse(conf, nullptr, true, true);
 
