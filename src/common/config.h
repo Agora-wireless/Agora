@@ -35,7 +35,7 @@ class Config {
  public:
   static constexpr bool kDebugRecipCal = false;
   // Constructor
-  explicit Config(const std::string& jsonfilename);
+  explicit Config(std::string  jsonfilename);
   ~Config();
 
   inline void Running(bool value) { this->running_.store(value); }
