@@ -23,7 +23,8 @@ static const std::string kIpv6Address = "::1";
 void ClientSendTo(const std::string& src_address, uint16_t src_port,
                   const std::string& dest_address, uint16_t dest_port) {
   std::vector<uint8_t> packet(kMessageSize);
-  UDPClient udp_client(src_address, src_port);
+  //This will use the default socket type (currently ipv4)
+  UDPClient udp_client;
 
   while (server_ready == false) {
     // Wait for server to get ready
@@ -214,11 +215,11 @@ TEST(UDPClientServer, PerfIpv6) {
   client_thread.join();
 }
 
-TEST(UDPClientServer, PerfIpv6RecvFrom) {
+TEST(UDPClientServer, PerfIpv4RecvFrom) {
   server_ready = false;
-  std::thread server_thread(ServerRecvFrom, kIpv6Address, kSendPort,
-                            kIpv6Address, kReceivePort);
-  std::thread client_thread(ClientSendTo, kIpv6Address, kSendPort, kIpv6Address,
+  std::thread server_thread(ServerRecvFrom, kIpv4Address, kSendPort,
+                            kIpv4Address, kReceivePort);
+  std::thread client_thread(ClientSendTo, kIpv4Address, kSendPort, kIpv4Address,
                             kReceivePort);
 
   server_thread.join();

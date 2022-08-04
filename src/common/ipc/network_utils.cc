@@ -180,7 +180,6 @@ std::string GetLocalAddressFromScope(size_t scope_id) {
 
 ::addrinfo *GetAddressInfo(std::string address, std::string port) {
   ::addrinfo *ret_info = nullptr;
-  std::memset(&ret_info, 0u, sizeof(ret_info));
   const char *node;
   const char *service;
   ::addrinfo hints;
@@ -198,7 +197,7 @@ std::string GetLocalAddressFromScope(size_t scope_id) {
     hints.ai_flags |= AI_NUMERICHOST;
   }
 
-  if (port.empty()) {
+  if (port.empty() || (port == "0")) {
     service = nullptr;
   } else {
     service = port.c_str();
@@ -206,8 +205,10 @@ std::string GetLocalAddressFromScope(size_t scope_id) {
   }
   AGORA_LOG_TRACE("node: %s service: %s\n", node, service);
 
-  //RtAssert((service != nullptr) || (node != nullptr),
-  //         "Node and Service cannot both be null");
+  if ((service == nullptr) && (node == nullptr)) {
+    throw std::runtime_error(
+        "GetAddressInfo(): Node and Service cannot both be null");
+  }
 
   /// Any protocol
   hints.ai_protocol = 0;
@@ -245,7 +246,7 @@ void PrintAddressInfo(const ::addrinfo *print_info) {
       AGORA_LOG_INFO("Ipv4 Address:  %s, Port %d, Family %d \n",
                      ::inet_ntop(family, address_ptr, address_buffer,
                                  sizeof(address_buffer)),
-                     *port_ptr, *family_ptr);
+                     ntohs(*port_ptr), *family_ptr);
     } else if (family == AF_INET6) {
       [[maybe_unused]] auto *address_ptr =
           &((sockaddr_in6 *)rp->ai_addr)->sin6_addr;
@@ -257,7 +258,7 @@ void PrintAddressInfo(const ::addrinfo *print_info) {
       AGORA_LOG_INFO("Ipv6 Address:  %s Port %d, Family %d \n",
                      ::inet_ntop(family, address_ptr, address_buffer,
                                  sizeof(address_buffer)),
-                     *port_ptr, *family_ptr);
+                     ntohs(*port_ptr), *family_ptr);
     } else {
       AGORA_LOG_ERROR(
           "PrintAddressInfo: Found address with unsupported family %d\n",

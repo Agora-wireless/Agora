@@ -1,29 +1,27 @@
 /**
  * @file udp_server.h
- * @brief Declaration file for the UDPServer class
+ * @brief Provides the UDPServer functions from the UDPComm class.  Receiver only support
  */
 #ifndef UDP_SERVER_H_
 #define UDP_SERVER_H_
 
-#include <netdb.h>
+#include "udp_comm.h"
 
-#include <cstdint>
-#include <map>
-#include <mutex>
-#include <string>
-
-/// Basic UDP server class based on OS sockets that supports receiving messages
 class UDPServer {
  public:
-  static const bool kDebugPrintUdpServerInit = true;
-
   // Initialize a UDP server listening on this UDP port with socket buffer
   // size = rx_buffer_size
-  explicit UDPServer(uint16_t port, size_t rx_buffer_size = 0);
+  explicit UDPServer(uint16_t port, size_t rx_buffer_size = 0)
+      : comm_object_(std::string(), port, rx_buffer_size, 0) {}
 
   UDPServer& operator=(const UDPServer&) = delete;
   UDPServer(const UDPServer&) = delete;
-  ~UDPServer();
+  ~UDPServer() = default;
+
+  inline ssize_t Connect(const std::string& remote_address,
+                         uint16_t remote_port) {
+    return comm_object_.Connect(remote_address, remote_port);
+  }
 
   /**
    * @brief Try to receive up to len bytes in buf by default this will not block
@@ -32,7 +30,9 @@ class UDPServer {
    * received. If no bytes are received, return zero. If there was an error
    * in receiving, return -1.
    */
-  ssize_t Recv(uint8_t* buf, size_t len) const;
+  inline ssize_t Recv(uint8_t* buf, size_t len) const {
+    return comm_object_.Recv(reinterpret_cast<std::byte*>(buf), len);
+  }
 
   /**
    * @brief Try once to receive up to len bytes in buf
@@ -41,34 +41,22 @@ class UDPServer {
    * received. If no bytes are received, return zero. If there was an error
    * in receiving, return -1.
    */
-  ssize_t RecvFrom(uint8_t* buf, size_t len, const std::string& src_address,
-                   uint16_t src_port);
+  inline ssize_t RecvFrom(uint8_t* buf, size_t len,
+                          const std::string& src_address, uint16_t src_port) {
+    return comm_object_.Recv(src_address, src_port,
+                             reinterpret_cast<std::byte*>(buf), len);
+  }
 
   /**
    * @brief Configures the socket in blocking mode.  Any calls to recv / send
    * will now block
    */
-  void MakeBlocking(size_t timeout_sec = 0) const;
+  inline void MakeBlocking(size_t timeout_sec = 0) const {
+    return comm_object_.MakeBlocking(timeout_sec);
+  }
 
  private:
-  /**
-   * @brief The UDP port to server is listening on
-   */
-  uint16_t port_;
-  /**
-   * @brief The raw socket file descriptor
-   */
-  int sock_fd_ = -1;
-
-  /**
-   * @brief A cache mapping hostname:udp_port to addrinfo
-   */
-  std::map<std::string, addrinfo*> addrinfo_map_;
-  /**
-   * @brief Variable to control write access to the non-thread safe data
-   * structures
-   */
-  std::mutex map_insert_access_;
+  UDPComm comm_object_;
 };
 
 #endif  // UDP_SERVER_H_
