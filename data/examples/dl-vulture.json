@@ -58,12 +58,16 @@
     "hw_framer": true,
     /* Compute configuration */
     "exclude_cores": [],
-    "ue_core_offset": 14,
-    "ue_worker_thread_num": 4,
-    "ue_socket_thread_num": 2,
+    "ue_core_offset": 13,
+    /*"ue_core_offset": 16,*/ /*bad*/
+    "ue_worker_thread_num": 2,
+    "ue_socket_thread_num": 1,
     /* Vulture radios */
     "core_offset": 0,
     "worker_thread_num": 8,
+    /*"worker_thread_num": 10,*/
+    /*"worker_thread_num": 12,*/  /*bad*/
+    "wlan_scrambler" : false,
     "socket_thread_num": 4,
     "max_frame": 5000
 }
