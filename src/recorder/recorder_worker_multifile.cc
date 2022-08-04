@@ -11,7 +11,6 @@
 namespace Agora_recorder {
 
 static constexpr bool kDebugPrint = false;
-static constexpr size_t kShortSerialLen = 3;
 
 RecorderWorkerMultiFile::RecorderWorkerMultiFile(const Config* in_cfg,
                                                  size_t antenna_offset,
@@ -29,7 +28,6 @@ void RecorderWorkerMultiFile::Init() {}
 void RecorderWorkerMultiFile::Finalize() {}
 
 int RecorderWorkerMultiFile::Record(const Packet* pkt) {
-  /* TODO: remove TEMP check */
   const size_t end_antenna = (antenna_offset_ + num_antennas_) - 1;
 
   if ((pkt->ant_id_ < antenna_offset_) || (pkt->ant_id_ > end_antenna)) {
@@ -64,33 +62,55 @@ int RecorderWorkerMultiFile::Record(const Packet* pkt) {
                                  std::to_string(symbol_id) + "_A" +
                                  std::to_string(ant_id);
 
-      const std::string short_serial =
-          cfg_->UeRadioId().empty()
-              ? "UE"
-              : cfg_->UeRadioId().at(radio_id).substr(
-                    cfg_->UeRadioId().at(radio_id).length() - kShortSerialLen);
+      const std::string short_serial = cfg_->UeRadioName().at(radio_id);
 
       if (is_data) {
-        std::string fname = "rxdataR_" + pkt_id + "_" + short_serial + ".bin";
-        FILE* f = std::fopen(fname.c_str(), "wb");
-        std::fwrite(pkt->data_, 2 * sizeof(int16_t), cfg_->SampsPerSymbol(), f);
-        std::fclose(f);
-        fname = "txdata_" + pkt_id + ".bin";
-        f = std::fopen(fname.c_str(), "wb");
+        const std::string fname_rxdata =
+            "rxdata_" + pkt_id + "_" + short_serial + ".bin";
+        FILE* fp_rxdata = std::fopen(fname_rxdata.c_str(), "wb");
+        if (fp_rxdata == nullptr) {
+          throw std::runtime_error(
+              "RecorderWorkerMultiFile failed to open rxdata file for "
+              "writing");
+        }
+        std::fwrite(pkt->data_, 2 * sizeof(int16_t), cfg_->SampsPerSymbol(),
+                    fp_rxdata);
+        std::fclose(fp_rxdata);
+        ///Tx data
+        const std::string fname_txdata = "txdata_" + pkt_id + ".bin";
+        FILE* fp_txdata = std::fopen(fname_txdata.c_str(), "wb");
+        if (fp_txdata == nullptr) {
+          throw std::runtime_error(
+              "RecorderWorkerMultiFile failed to open txdata file for "
+              "writing");
+        }
         std::fwrite(const_cast<Config*>(cfg_)->DlIqF()[dl_symbol_id] +
                         ant_id * cfg_->OfdmCaNum(),
-                    2 * sizeof(float), cfg_->OfdmCaNum(), f);
-        std::fclose(f);
+                    2 * sizeof(float), cfg_->OfdmCaNum(), fp_txdata);
+        std::fclose(fp_txdata);
       } else {
-        std::string fname = "rxpilotR_" + pkt_id + "_" + short_serial + ".bin";
-        FILE* f = std::fopen(fname.c_str(), "wb");
-        std::fwrite(pkt->data_, 2 * sizeof(int16_t), cfg_->SampsPerSymbol(), f);
-        std::fclose(f);
-        fname = "txpilot_" + pkt_id + ".bin";
-        f = std::fopen(fname.c_str(), "wb");
+        const std::string fname_rxpilot =
+            "rxpilot_" + pkt_id + "_" + short_serial + ".bin";
+        FILE* fp_rxpilot = std::fopen(fname_rxpilot.c_str(), "wb");
+        if (fp_rxpilot == nullptr) {
+          throw std::runtime_error(
+              "RecorderWorkerMultiFile failed to open rxpilot file for "
+              "writing");
+        }
+        std::fwrite(pkt->data_, 2 * sizeof(int16_t), cfg_->SampsPerSymbol(),
+                    fp_rxpilot);
+        std::fclose(fp_rxpilot);
+        ///Tx pilot
+        const std::string fname_txpilot = "txpilot_" + pkt_id + ".bin";
+        FILE* fp_txpilot = std::fopen(fname_txpilot.c_str(), "wb");
+        if (fp_txpilot == nullptr) {
+          throw std::runtime_error(
+              "RecorderWorkerMultiFile failed to open txpilot file for "
+              "writing");
+        }
         std::fwrite(const_cast<Config*>(cfg_)->UeSpecificPilot()[ant_id],
-                    2 * sizeof(float), cfg_->OfdmDataNum(), f);
-        std::fclose(f);
+                    2 * sizeof(float), cfg_->OfdmDataNum(), fp_txpilot);
+        std::fclose(fp_txpilot);
       }
     }
   }

@@ -6,6 +6,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <vector>
 
 #include "packet_txrx_client_radio.h"
 #include "packet_txrx_client_sim.h"
@@ -19,19 +20,28 @@
 /* Print debug work */
 static constexpr bool kDebugPrintPacketsFromMac = false;
 static constexpr bool kDebugPrintPacketsToMac = false;
-
-#if defined(ENABLE_HDF5)
-static constexpr bool kRecordDownlinkFrame = true;
-static constexpr size_t kRecordFrameInterval = 1;
-#else
-static constexpr bool kRecordDownlinkFrame = false;
-static constexpr size_t kRecordFrameInterval = 1;
-#endif
-
 static constexpr size_t kDefaultQueueSize = 36;
 
 //set the number of subcarriers to record DL CSI
 static constexpr size_t kNumRecSc = 4;
+
+//Recording parameters
+static constexpr size_t kRecordFrameInterval = 1;
+#if defined(ENABLE_HDF5)
+static constexpr bool kRecordDownlinkFrame = true;
+
+//set the recording types, can add multiple
+static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
+    kRecorderTypes{Agora_recorder::RecorderWorker::RecorderWorkerTypes::
+                       kRecorderWorkerHdf5};
+#else
+static constexpr bool kRecordDownlinkFrame = false;
+
+//set the recording types, can add multiple
+static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
+    kRecorderTypes{Agora_recorder::RecorderWorker::RecorderWorkerTypes::
+                       kRecorderWorkerMultiFile};
+#endif
 
 PhyUe::PhyUe(Config* config)
     : stats_(std::make_unique<Stats>(config)),
@@ -43,7 +53,6 @@ PhyUe::PhyUe(Config* config)
           config->LdpcConfig(Direction::kDownlink).NumBlocksInSymbol() *
               Roundup<64>(config->NumBytesPerCb(Direction::kDownlink))) {
   srand(time(nullptr));
-
   // TODO take into account the UeAntOffset to allow for multiple PhyUe
   // instances
   this->config_ = config;
@@ -131,16 +140,13 @@ PhyUe::PhyUe(Config* config)
   }
 
   if (kRecordDownlinkFrame) {
-    //Add and writter / record type here
-    std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes> recorders;
-    recorders.push_back(Agora_recorder::RecorderWorker::RecorderWorkerTypes::
-                            kRecorderWorkerHdf5);
     auto& new_recorder = recorders_.emplace_back(
         std::make_unique<Agora_recorder::RecorderThread>(
             config_, 0, core_offset_worker + config_->UeWorkerThreadNum(),
             kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntNum() *
                 kDefaultQueueSize,
-            0, config_->UeAntNum(), kRecordFrameInterval, recorders, true));
+            0, config_->UeAntNum(), kRecordFrameInterval, kRecorderTypes,
+            true));
     new_recorder->Start();
   }
 

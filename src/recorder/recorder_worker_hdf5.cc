@@ -6,6 +6,8 @@
 #include "recorder_worker_hdf5.h"
 
 #include <ctime>
+#include <fstream>
+#include <nlohmann/json.hpp>
 
 #include "logger.h"
 #include "utils.h"
@@ -49,6 +51,13 @@ void RecorderWorkerHDF5::Init() {
   oss << std::put_time(&local_time, "%d-%m-%Y %H-%M-%S");
   hdf5_->WriteAttribute("TIME", oss.str());
 
+  // Write the entire config
+  const std::string conf_filename = cfg_->ConfigFilename();
+  std::ifstream conf(conf_filename);
+  nlohmann::json data = nlohmann::json::parse(conf, nullptr, true, true);
+  conf.close();
+  hdf5_->WriteAttribute("CONFIG", data.dump());
+
   // Write Atrributes
   // ******* COMMON ******** //
   // TX/RX Frequencyfile
@@ -66,9 +75,6 @@ void RecorderWorkerHDF5::Init() {
   // Number of samples on each symbol including prefix and postfix
   hdf5_->WriteAttribute("SLOT_SAMP_LEN", cfg_->SampsPerSymbol());
 
-  // Size of FFT
-  //hdf5_->WriteAttribute("FFT_SIZE", cfg_->OfdmCaNum());
-
   // Length of cyclic prefix
   hdf5_->WriteAttribute("CP_LEN", cfg_->CpLen());
 
@@ -77,12 +83,6 @@ void RecorderWorkerHDF5::Init() {
   hdf5_->WriteAttribute("OFDM_DATA_STOP", cfg_->OfdmDataStop());
   hdf5_->WriteAttribute("OFDM_PILOT_SPACING", cfg_->OfdmPilotSpacing());
   hdf5_->WriteAttribute("OFDM_CA_NUM", cfg_->OfdmCaNum());
-
-  // Beacon sequence type (string)
-  //hdf5_->WriteAttribute("BEACON_SEQ_TYPE", cfg_->beacon_seq());
-
-  // Pilot sequence type (string)
-  //hdf5_->WriteAttribute("PILOT_SEQ_TYPE", cfg_->pilot_seq());
 
   // ******* Base Station ******** //
   // Hub ID
@@ -118,11 +118,6 @@ void RecorderWorkerHDF5::Init() {
   // Beacon Antenna
   hdf5_->WriteAttribute("BS_BEACON_ANT", cfg_->BeaconAnt());
 
-  //If the antennas are non consective this will be an issue.
-  //hdf5_->WriteAttribute("ANT_OFFSET", antenna_offset_);
-  //hdf5_->WriteAttribute("ANT_NUM", num_antennas_);
-  //hdf5_->WriteAttribute("ANT_TOTAL", cfg_->getTotNumAntennas());
-
   // Number of symbols in a frame
   hdf5_->WriteAttribute("BS_FRAME_LEN", cfg_->Frame().NumTotalSyms());
 
@@ -140,38 +135,12 @@ void RecorderWorkerHDF5::Init() {
   hdf5_->WriteAttribute("RECIPROCAL_CALIB",
                         cfg_->Frame().IsRecCalEnabled() ? 1 : 0);
 
-  // ******* Clients ******** //
-  // Freq. Domain Pilot symbols
-  //std::vector<double> split_vec_pilot_f(2 * cfg_->pilot_sym_f().at(0).size());
-  //for (size_t i = 0; i < cfg_->pilot_sym_f().at(0).size(); i++) {
-  //  split_vec_pilot_f[2 * i + 0] = cfg_->pilot_sym_f().at(0).at(i);
-  //  split_vec_pilot_f[2 * i + 1] = cfg_->pilot_sym_f().at(1).at(i);
-  //}
-  //hdf5_->WriteAttribute("OFDM_PILOT_F", split_vec_pilot_f);
-
-  // Time Domain Pilot symbols
-  //std::vector<double> split_vec_pilot(2 * cfg_->pilot_sym_t().at(0).size());
-  //for (size_t i = 0; i < cfg_->pilot_sym_t().at(0).size(); i++) {
-  //  split_vec_pilot[2 * i + 0] = cfg_->pilot_sym_t().at(0).at(i);
-  //  split_vec_pilot[2 * i + 1] = cfg_->pilot_sym_t().at(1).at(i);
-  //}
-  //hdf5_->WriteAttribute("OFDM_PILOT", split_vec_pilot);
-
-  // Data subcarriers
-  //if (cfg_->data_ind().size() > 0)
-  //  hdf5_->WriteAttribute("OFDM_DATA_SC", cfg_->data_ind());
-
-  // Pilot subcarriers (indexes)
-  //if (cfg_->pilot_sc_ind().size() > 0)
-  //  hdf5_->WriteAttribute("OFDM_PILOT_SC", cfg_->pilot_sc_ind());
-  //if (cfg_->pilot_sc().size() > 0)
-  //  hdf5_->WriteAttribute("OFDM_PILOT_SC_VALS", cfg_->pilot_sc());
-
   // Number of Client Antennas
   hdf5_->WriteAttribute("CL_NUM", cfg_->UeAntNum());
 
   // Data modulation
-  //hdf5_->WriteAttribute("CL_MODULATION", cfg_->cl_data_mod());
+  hdf5_->WriteAttribute("UL_MCS", cfg_->MCSParams(Direction::kUplink).dump());
+  hdf5_->WriteAttribute("DL_MCS", cfg_->MCSParams(Direction::kDownlink).dump());
 
   // Client antenna polarization
   //Should loop over all values
