@@ -7,7 +7,6 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netdb.h>
-#include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -17,8 +16,8 @@
 #include "logger.h"
 #include "network_utils.h"
 
-/// Allow either - AF_INET6 | AF_INET
-static const int kDefaultAiFamily = AF_INET;
+///Default to ipv4 for historic reasons, use ::1 if you want ipv6
+static const std::string kDefaultAddress = "127.0.0.1";
 
 UDPComm::UDPComm(std::string local_addr, uint16_t local_port,
                  size_t rx_buffer_size, size_t tx_buffer_size)
@@ -30,41 +29,15 @@ UDPComm::UDPComm(std::string local_addr, uint16_t local_port,
 UDPComm::UDPComm(std::string local_addr, std::string local_port,
                  size_t rx_buffer_size, size_t tx_buffer_size) {
   std::string bound_port;
-  ::addrinfo* local_info = nullptr;
-  ::addrinfo default_info;
-  ::sockaddr default_addr;
 
   //If no address or port defined, then use the default
   if (local_addr.empty() && (local_port.empty() || (local_port == "0"))) {
-    std::memset(&default_info, 0u, sizeof(default_info));
-    default_info.ai_family = kDefaultAiFamily;
-    default_info.ai_socktype = SOCK_DGRAM;
-    default_info.ai_protocol = IPPROTO_UDP;
-    default_info.ai_next = nullptr;
-    default_info.ai_addr = &default_addr;
+    local_addr = kDefaultAddress;
+  }
 
-    if (kDefaultAiFamily == AF_INET) {
-      ::sockaddr_in* serveraddr =
-          reinterpret_cast<::sockaddr_in*>(&default_addr);
-      serveraddr->sin_family = kDefaultAiFamily;
-      serveraddr->sin_addr.s_addr = htonl(INADDR_ANY);
-      serveraddr->sin_port = 0;
-      std::memset(serveraddr->sin_zero, 0u, sizeof(serveraddr->sin_zero));
-      default_info.ai_addrlen = sizeof(::sockaddr_in);
-    } else {
-      ::sockaddr_in6* serveraddr =
-          reinterpret_cast<::sockaddr_in6*>(&default_addr);
-      serveraddr->sin6_family = kDefaultAiFamily;
-      serveraddr->sin6_addr = IN6ADDR_ANY_INIT;
-      serveraddr->sin6_port = 0;
-      default_info.ai_addrlen = sizeof(::sockaddr_in6);
-    }
-    local_info = &default_info;
-  } else {
-    local_info = agora_comm::GetAddressInfo(local_addr, local_port);
-    if (kDebugPrintUdpInit) {
-      agora_comm::PrintAddressInfo(local_info);
-    }
+  auto local_info = agora_comm::GetAddressInfo(local_addr, local_port);
+  if (kDebugPrintUdpInit) {
+    agora_comm::PrintAddressInfo(local_info);
   }
 
   /// loop through all the results and bind to the first we can
@@ -76,10 +49,8 @@ UDPComm::UDPComm(std::string local_addr, std::string local_port,
       AGORA_LOG_ERROR("UDPComm: Failed to create local socket. errno = %s\n",
                       std::strerror(errno));
     } else {
-      AGORA_LOG_ERROR("Binding\n");
       const auto bind_status =
           ::bind(sock_fd_, check->ai_addr, check->ai_addrlen);
-      //auto bind_status = 0;
       if (bind_status != 0) {
         AGORA_LOG_ERROR("UDPComm: Failed to bind local socket %d. errno = %s\n",
                         sock_fd_, std::strerror(errno));
@@ -133,9 +104,7 @@ UDPComm::UDPComm(std::string local_addr, std::string local_port,
       }
     }
   }
-  if (local_info != &default_info) {
-    ::freeaddrinfo(local_info);
-  }
+  ::freeaddrinfo(local_info);
   if (sock_fd_ == -1) {
     throw std::runtime_error(
         "UDPComm: Failed to create local socket. errno = " +
