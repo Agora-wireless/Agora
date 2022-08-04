@@ -74,7 +74,7 @@ void Hdf5Lib::CreateDataset(const std::string& dataset_name,
   catch (H5::FileIException& error) {
     AGORA_LOG_ERROR("CreateDataset %s, FileIException - %s\n",
                     create_ds_name.c_str(), error.getCDetailMsg());
-    error.printErrorStack();
+    H5::FileIException::printErrorStack();
     throw error;
   }
 
@@ -82,7 +82,7 @@ void Hdf5Lib::CreateDataset(const std::string& dataset_name,
   catch (H5::DataSetIException& error) {
     AGORA_LOG_ERROR("CreateDataset %s, DataSetIException - %s\n",
                     create_ds_name.c_str(), error.getCDetailMsg());
-    error.printErrorStack();
+    H5::DataSetIException::printErrorStack();
     throw error;
   }
 
@@ -90,7 +90,7 @@ void Hdf5Lib::CreateDataset(const std::string& dataset_name,
   catch (H5::DataSpaceIException& error) {
     AGORA_LOG_ERROR("CreateDataset %s, DataSpaceIException - %s\n",
                     create_ds_name.c_str(), error.getCDetailMsg());
-    error.printErrorStack();
+    H5::DataSpaceIException::printErrorStack();
     throw error;
   }
   AGORA_LOG_TRACE("CreateDataset: %s\n", dataset_name.c_str());
