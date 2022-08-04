@@ -10,6 +10,7 @@
 #include "config.h"
 
 #include <boost/range/algorithm/count.hpp>
+#include <ctime>
 #include <utility>
 
 #include "logger.h"
@@ -23,7 +24,7 @@ static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
 
-Config::Config(std::string  jsonfilename)
+Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
       ul_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
@@ -491,6 +492,25 @@ Config::Config(std::string  jsonfilename)
              "tx_advance size must be same as the number of clients!");
     cl_tx_advance_.assign(tx_advance.begin(), tx_advance.end());
   }
+
+  // set trace file path
+  auto time = std::time(nullptr);
+  auto local_time = *std::localtime(&time);
+
+  const std::string ul_present_str = (frame_.NumULSyms() > 0 ? "uplink-" : "");
+  const std::string dl_present_str =
+      (frame_.NumDLSyms() > 0 ? "downlink-" : "");
+  std::string filename = "trace-" + ul_present_str + dl_present_str +
+                         std::to_string(1900 + local_time.tm_year) + "-" +
+                         std::to_string(1 + local_time.tm_mon) + "-" +
+                         std::to_string(local_time.tm_mday) + "-" +
+                         std::to_string(local_time.tm_hour) + "-" +
+                         std::to_string(local_time.tm_min) + "-" +
+                         std::to_string(local_time.tm_sec) + "_" +
+                         std::to_string(num_cells_) + "_" +
+                         std::to_string(BsAntNum()) + "x" +
+                         std::to_string(UeAntTotal()) + ".hdf5";
+  trace_file_ = tdd_conf.value("trace_file", filename);
 
   // Agora configurations
   frames_to_test_ = tdd_conf.value("max_frame", 9600);

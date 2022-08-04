@@ -35,7 +35,7 @@ class Config {
  public:
   static constexpr bool kDebugRecipCal = false;
   // Constructor
-  explicit Config(std::string  jsonfilename);
+  explicit Config(std::string jsonfilename);
   ~Config();
 
   inline void Running(bool value) { this->running_.store(value); }
@@ -521,8 +521,8 @@ class Config {
   inline bool IsDataSubcarrier(size_t sc_id) const {
     return symbol_map_.at(sc_id) == SubcarrierType::kData;
   }
-
   inline const std::string& ConfigFilename() const { return config_filename_; }
+  inline const std::string& TraceFilename() const { return trace_file_; }
 
  private:
   void Print() const;
@@ -848,5 +848,6 @@ class Config {
 
   bool fft_in_rru_;  // If true, the RRU does FFT instead of Agora
   const std::string config_filename_;
+  std::string trace_file_;
 };
 #endif /* CONFIG_HPP_ */
