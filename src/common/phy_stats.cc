@@ -339,7 +339,7 @@ void PhyStats::RecordDlCsi(size_t frame_id, size_t num_rec_sc,
     std::stringstream ss;
     ss << frame_id;
     for (size_t i = 0; i < config_->UeAntNum(); i++) {
-      auto* csi_buffer_ptr = reinterpret_cast<const arma::cx_float*>(
+      const auto* csi_buffer_ptr = reinterpret_cast<const arma::cx_float*>(
           csi_buffer.At(csi_offset_base + i));
       for (size_t j = 0; j < num_rec_sc; j++) {
         const size_t sc_idx = (config_->OfdmDataNum() / num_rec_sc) * j;

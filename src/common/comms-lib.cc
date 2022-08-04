@@ -517,28 +517,28 @@ void CommsLib::FFTShift(complex_float* in, complex_float* tmp, int fftsize) {
 
 std::vector<std::complex<float>> CommsLib::FFTShift(
     const std::vector<std::complex<float>>& in) {
-  const size_t fftSize = in.size();
-  std::vector<std::complex<float>> out(fftSize);
+  const size_t fft_size = in.size();
+  std::vector<std::complex<float>> out(fft_size);
   std::vector<std::complex<float>> in_freq_shifted;
-  in_freq_shifted.insert(in_freq_shifted.end(), in.begin() + fftSize / 2,
+  in_freq_shifted.insert(in_freq_shifted.end(), in.begin() + fft_size / 2,
                          in.end());
   in_freq_shifted.insert(in_freq_shifted.end(), in.begin(),
-                         in.begin() + fftSize / 2);
+                         in.begin() + fft_size / 2);
   std::memcpy(out.data(), in_freq_shifted.data(),
-              fftSize * sizeof(std::complex<float>));
+              fft_size * sizeof(std::complex<float>));
   return out;
 }
 
 std::vector<complex_float> CommsLib::FFTShift(
     const std::vector<complex_float>& in) {
-  const size_t fftSize = in.size();
-  std::vector<complex_float> out(fftSize);
+  const size_t fft_size = in.size();
+  std::vector<complex_float> out(fft_size);
   std::vector<complex_float> in_freq_shifted;
-  in_freq_shifted.insert(in_freq_shifted.end(), in.begin() + fftSize / 2,
+  in_freq_shifted.insert(in_freq_shifted.end(), in.begin() + fft_size / 2,
                          in.end());
   in_freq_shifted.insert(in_freq_shifted.end(), in.begin(),
-                         in.begin() + fftSize / 2);
-  std::memcpy(out.data(), in_freq_shifted.data(), fftSize * sizeof(float) * 2);
+                         in.begin() + fft_size / 2);
+  std::memcpy(out.data(), in_freq_shifted.data(), fft_size * sizeof(float) * 2);
   return out;
 }
 
