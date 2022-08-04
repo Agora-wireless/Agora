@@ -17,10 +17,13 @@
 // and caches remote addrinfo mappings
 class UDPComm {
  public:
-  static constexpr bool kDebugPrintUdpInit = false;
+  static constexpr bool kDebugPrintUdpInit = true;
   static constexpr bool kDebugPrintUdpSend = false;
   static constexpr bool kDebugPrintUdpRecv = false;
   explicit UDPComm(std::string local_addr, uint16_t local_port,
+                   size_t rx_buffer_size, size_t tx_buffer_size);
+
+  explicit UDPComm(std::string local_addr, std::string local_port,
                    size_t rx_buffer_size, size_t tx_buffer_size);
 
   UDPComm& operator=(const UDPComm&) = delete;
@@ -79,9 +82,6 @@ class UDPComm {
    * will now block
    */
   void MakeBlocking(size_t rx_timeout_sec = 0) const;
-
-  //inline const std::string& Address() const { return address_; }
-  //inline const std::string& Port() const { return port_; }
 
  private:
   /**

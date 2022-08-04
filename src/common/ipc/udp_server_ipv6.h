@@ -1,33 +1,33 @@
 /**
  * @file udp_server_ipv6.h
- * @brief Declaration file for the UDPServerIPv6 class
+ * @brief Provides the UDPServerIPv6 functions from the UDPComm class.  Receiver only support
  */
 #ifndef UDP_SERVER_IPV6_H_
 #define UDP_SERVER_IPV6_H_
 
-#include <netdb.h>
+#include <utility>
 
-#include <cstddef>
-#include <cstdint>
-#include <map>
-#include <mutex>
-#include <string>
+#include "udp_comm.h"
 
 /// Basic UDP server class based on OS sockets that supports receiving messages
 class UDPServerIPv6 {
  public:
-  static constexpr bool kDebugPrintUdpServerInit = false;
-
   // Initialize a UDP server listening on this UDP port with socket buffer
   // size = rx_buffer_size
-  explicit UDPServerIPv6(const std::string& local_address, uint16_t local_port,
-                         size_t rx_buffer_size = 0);
+  explicit UDPServerIPv6(std::string local_address, uint16_t local_port,
+                         size_t rx_buffer_size = 0)
+      : address_(std::move(local_address)),
+        port_(std::to_string(local_port)),
+        comm_object_(address_, port_, rx_buffer_size, 0) {}
   explicit UDPServerIPv6(std::string local_address, std::string local_port,
-                         size_t rx_buffer_size = 0);
+                         size_t rx_buffer_size = 0)
+      : address_(std::move(local_address)),
+        port_(std::move(local_port)),
+        comm_object_(address_, port_, rx_buffer_size, 0) {}
 
   UDPServerIPv6& operator=(const UDPServerIPv6&) = delete;
   UDPServerIPv6(const UDPServerIPv6&) = delete;
-  ~UDPServerIPv6();
+  ~UDPServerIPv6() = default;
 
   /**
    * @brief The remote_address | remote_port is the only address to which datagrams are received.
@@ -36,9 +36,14 @@ class UDPServerIPv6 {
    * @param remote_address Hostname or IP address of the remote server
    * @param remote_port UDP port of the remote server
    */
-  ssize_t Connect(const std::string& remote_address,
-                  const std::string& remote_port);
-  ssize_t Connect(const std::string& remote_address, uint16_t remote_port);
+  inline ssize_t Connect(const std::string& remote_address,
+                         const std::string& remote_port) {
+    return comm_object_.Connect(remote_address, remote_port);
+  }
+  inline ssize_t Connect(const std::string& remote_address,
+                         uint16_t remote_port) {
+    return comm_object_.Connect(remote_address, remote_port);
+  }
 
   /**
    * @brief Try to receive up to len bytes in buf by default this will not block
@@ -47,15 +52,21 @@ class UDPServerIPv6 {
    * received. If no bytes are received, return zero. If there was an error
    * in receiving, return -1.
    */
-  ssize_t Recv(std::byte* buf, size_t len) const;
-  ssize_t Recv(const std::string& src_address, uint16_t src_port,
-               std::byte* buf, size_t len);
+  inline ssize_t Recv(std::byte* buf, size_t len) const {
+    return comm_object_.Recv(buf, len);
+  }
+  inline ssize_t Recv(const std::string& src_address, uint16_t src_port,
+                      std::byte* buf, size_t len) {
+    return comm_object_.Recv(src_address, src_port, buf, len);
+  }
 
   /**
    * @brief Configures the socket in blocking mode.  Any calls to recv / send
    * will now block
    */
-  void MakeBlocking(size_t timeout_sec = 0) const;
+  inline void MakeBlocking(size_t timeout_sec = 0) const {
+    return comm_object_.MakeBlocking(timeout_sec);
+  }
 
   inline const std::string& Address() const { return address_; }
   inline const std::string& Port() const { return port_; }
@@ -64,23 +75,9 @@ class UDPServerIPv6 {
   /**
    * @brief The UDP port to server is listening on
    */
-  const std::string port_;
   const std::string address_;
-  /**
-   * @brief The raw socket file descriptor
-   */
-  int sock_fd_ = -1;
-
-  /**
-   * @brief A cache mapping hostname:udp_port to addrinfo
-   * Used in RecvFrom
-   */
-  std::map<std::string, ::addrinfo*> addrinfo_map_;
-  /**
-   * @brief Variable to control write access to the non-thread safe data
-   * structures
-   */
-  std::mutex map_insert_access_;
+  const std::string port_;
+  UDPComm comm_object_;
 };
 
 #endif  // UDP_SERVER_IPV6_H_
