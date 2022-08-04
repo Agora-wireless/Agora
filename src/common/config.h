@@ -35,7 +35,7 @@ class Config {
  public:
   static constexpr bool kDebugRecipCal = false;
   // Constructor
-  explicit Config(const std::string& /*jsonfile*/);
+  explicit Config(const std::string& jsonfilename);
   ~Config();
 
   inline void Running(bool value) { this->running_.store(value); }
@@ -86,6 +86,18 @@ class Config {
   }
   inline double ClientRxGainB(size_t id) const {
     return this->client_rx_gain_b_.at(id);
+  }
+  inline const std::vector<double>& ClientTxGainA() const {
+    return this->client_tx_gain_a_;
+  }
+  inline const std::vector<double>& ClientRxGainA() const {
+    return this->client_rx_gain_a_;
+  }
+  inline const std::vector<double>& ClientTxGainB() const {
+    return this->client_tx_gain_b_;
+  }
+  inline const std::vector<double>& ClientRxGainB() const {
+    return this->client_rx_gain_b_;
   }
   inline size_t NumCells() const { return this->num_cells_; }
   inline size_t NumRadios() const { return this->num_radios_; }
@@ -275,7 +287,7 @@ class Config {
     return dir == Direction::kUplink ? this->ul_mod_table_
                                      : this->dl_mod_table_;
   }
-  inline nlohmann::json MCSParams(Direction dir) {
+  inline const nlohmann::json& MCSParams(Direction dir) const {
     return dir == Direction::kUplink ? this->ul_mcs_params_
                                      : this->dl_mcs_params_;
   }
@@ -509,6 +521,8 @@ class Config {
   inline bool IsDataSubcarrier(size_t sc_id) const {
     return symbol_map_.at(sc_id) == SubcarrierType::kData;
   }
+
+  inline const std::string& ConfigFilename() const { return config_filename_; }
 
  private:
   void Print() const;
@@ -833,5 +847,6 @@ class Config {
   size_t dl_num_bytes_per_cb_;
 
   bool fft_in_rru_;  // If true, the RRU does FFT instead of Agora
+  const std::string config_filename_;
 };
 #endif /* CONFIG_HPP_ */
