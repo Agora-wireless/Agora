@@ -140,10 +140,6 @@ PhyUe::PhyUe(Config* config)
   }
 
   if (kRecordDownlinkFrame) {
-    //Add and writter / record type here
-    std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes> recorders;
-    recorders.push_back(Agora_recorder::RecorderWorker::RecorderWorkerTypes::
-                            kRecorderWorkerHdf5);
     auto& new_recorder = recorders_.emplace_back(
         std::make_unique<Agora_recorder::RecorderThread>(
             config_, 0, core_offset_worker + config_->UeWorkerThreadNum(),

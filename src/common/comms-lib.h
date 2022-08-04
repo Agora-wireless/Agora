@@ -61,8 +61,9 @@ class CommsLib {
   static MKL_LONG IFFT(complex_float* in_out, int fftsize,
                        bool normalize = true);
   static std::vector<std::complex<float>> FFTShift(
-      std::vector<std::complex<float>>& in);
-  static std::vector<complex_float> FFTShift(std::vector<complex_float>& in);
+      const std::vector<std::complex<float>>& in);
+  static std::vector<complex_float> FFTShift(
+      const std::vector<complex_float>& in);
   static void FFTShift(complex_float* in, complex_float* tmp, int fftsize);
 
   static float ComputeOfdmSnr(const std::vector<std::complex<float>>& data_t,

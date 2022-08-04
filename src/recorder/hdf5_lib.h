@@ -45,11 +45,6 @@ class Hdf5Lib {
                       const std::array<hsize_t, kDsDimsNum>& count,
                       const float* wrt_data);
 
-  //std::vector<short> ReadDataset(
-  //    const std::string& dataset_name,
-  //    const std::array<hsize_t, kDsDimsNum>& target_id,
-  //    const std::array<hsize_t, kDsDimsNum>& read_dim);
-
   void WriteAttribute(const char name[], double val);
   void WriteAttribute(const char name[], const std::vector<double>& val);
   void WriteAttribute(const char name[],
