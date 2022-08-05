@@ -176,7 +176,7 @@ size_t TxRxWorkerClientSim::DequeueSend() {
       new (tx_packet) Packet(frame_id, symbol_id, 0 /* cell_id */, ue_ant);
 
       udp_comm_.at(local_interface)
-          ->Send(reinterpret_cast<uint8_t*>(tx_packet),
+          ->Send(reinterpret_cast<std::byte*>(tx_packet),
                  Configuration()->PacketLength());
     }
 
@@ -198,7 +198,7 @@ size_t TxRxWorkerClientSim::DequeueSend() {
 
         // Send data (one OFDM symbol)
         udp_comm_.at(local_interface)
-            ->Send(reinterpret_cast<uint8_t*>(tx_packet),
+            ->Send(reinterpret_cast<std::byte*>(tx_packet),
                    Configuration()->PacketLength());
       }
     }  // event.event_type_ == EventType::kPacketTX

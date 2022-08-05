@@ -10,10 +10,12 @@
 // Basic UDP client class based on OS sockets that supports sending messages
 class UDPClient {
  public:
-  explicit UDPClient(std::string src_addr, uint16_t src_port)
-      : comm_object_(src_addr, src_port, 0, 0) {}
-  explicit UDPClient(uint16_t src_port = 0)
+  explicit UDPClient(std::string src_addr, uint16_t src_port,
+                     size_t tx_buffer_size = 0)
+      : comm_object_(src_addr, src_port, 0, tx_buffer_size) {}
+  explicit UDPClient(uint16_t src_port)
       : comm_object_(std::string(), src_port, 0, 0) {}
+  explicit UDPClient(std::string src_addr) : comm_object_(src_addr, 0, 0, 0) {}
 
   UDPClient& operator=(const UDPClient&) = delete;
   UDPClient(const UDPClient&) = delete;
@@ -43,7 +45,7 @@ class UDPClient {
    * @param len Length in bytes of the message to send
    */
   inline void Send(const std::string& rem_hostname, uint16_t rem_port,
-                   const uint8_t* msg, size_t len) {
+                   const std::byte* msg, size_t len) {
     return comm_object_.Send(rem_hostname, rem_port, msg, len);
   }
 
@@ -53,7 +55,7 @@ class UDPClient {
    * @param msg Pointer to the message to send
    * @param len Length in bytes of the message to send
    */
-  inline void Send(const uint8_t* msg, size_t len) {
+  inline void Send(const std::byte* msg, size_t len) {
     return comm_object_.Send(msg, len);
   }
 

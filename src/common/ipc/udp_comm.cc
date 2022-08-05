@@ -270,7 +270,7 @@ ssize_t UDPComm::Connect(const std::string& remote_address,
    * @param len Length in bytes of the message to send
    */
 void UDPComm::Send(const std::string& rem_hostname, uint16_t rem_port,
-                   const uint8_t* msg, size_t len) {
+                   const std::byte* msg, size_t len) {
   const std::string port_str = std::to_string(rem_port);
   const std::string remote_uri = rem_hostname + ":" + port_str;
   ::addrinfo* rem_addrinfo = nullptr;
@@ -291,7 +291,7 @@ void UDPComm::Send(const std::string& rem_hostname, uint16_t rem_port,
     const int r = ::getaddrinfo(rem_hostname.c_str(), port_str.c_str(), &hints,
                                 &rem_addrinfo);
     if (kDebugPrintUdpSend) {
-      //agora_comm::PrintAddressInfo(rem_addrinfo);
+      agora_comm::PrintAddressInfo(rem_addrinfo);
     }
 
     if ((r != 0) || (rem_addrinfo == nullptr)) {
@@ -332,7 +332,8 @@ void UDPComm::Send(const std::string& rem_hostname, uint16_t rem_port,
 
   if (enable_recording_flag_) {
     std::scoped_lock map_access(map_insert_access_);
-    sent_vec_.emplace_back(msg, msg + len);
+    sent_vec_.emplace_back(reinterpret_cast<const uint8_t*>(msg),
+                           reinterpret_cast<const uint8_t*>(msg) + len);
   }
 }
 
@@ -342,7 +343,7 @@ void UDPComm::Send(const std::string& rem_hostname, uint16_t rem_port,
    * @param msg Pointer to the message to send
    * @param len Length in bytes of the message to send
    */
-void UDPComm::Send(const uint8_t* msg, size_t len) {
+void UDPComm::Send(const std::byte* msg, size_t len) {
   if (kDebugPrintUdpSend) {
     AGORA_LOG_INFO("UDPComm sending message of size %zu\n", len);
   }
@@ -358,7 +359,8 @@ void UDPComm::Send(const uint8_t* msg, size_t len) {
 
   if (enable_recording_flag_) {
     std::scoped_lock map_access(map_insert_access_);
-    sent_vec_.emplace_back(msg, msg + len);
+    sent_vec_.emplace_back(reinterpret_cast<const uint8_t*>(msg),
+                           reinterpret_cast<const uint8_t*>(msg) + len);
   }
 }
 
@@ -404,7 +406,7 @@ ssize_t UDPComm::Recv(const std::string& src_address, uint16_t src_port,
   if (remote_itr == addrinfo_map_.end()) {
     rem_addrinfo = agora_comm::GetAddressInfo(src_address, port_string);
     if (kDebugPrintUdpRecv) {
-      //agora_comm::PrintAddressInfo(rem_addrinfo);
+      agora_comm::PrintAddressInfo(rem_addrinfo);
     }
     if (rem_addrinfo == nullptr) {
       char issue_msg[1000u];

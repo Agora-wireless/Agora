@@ -141,8 +141,7 @@ void RadioSocket::Create(size_t samples_per_symbol,
                          const std::string& remote_port) {
   samples_per_symbol_ = samples_per_symbol;
   static constexpr size_t kSockBufSize = (1024 * 1024 * 64 * 8) - 1;
-  socket_ =
-      std::make_unique<UDPServerIPv6>(local_addr, local_port, kSockBufSize);
+  socket_ = std::make_unique<UDPServer>(local_addr, local_port, kSockBufSize);
 
   //Creates a 1:1 connection for DATAGRAM sockets
   auto ret = socket_->Connect(remote_addr, remote_port);

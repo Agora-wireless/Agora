@@ -12,6 +12,9 @@
 #include "udp_server.h"
 
 static const bool kDebugMacReceiver = true;
+static const std::string kMacRxAddress = "";
+static const std::string kMacTxAddress = "127.0.0.1";
+static constexpr uint16_t kMacTxPort = 0;
 
 MacReceiver::MacReceiver(Config* const cfg, size_t num_frame_data_bytes,
                          std::string phy_server_address, size_t phy_port,
@@ -59,12 +62,12 @@ void* MacReceiver::LoopRecv(size_t tid) {
   PinToCoreWithOffset(ThreadType::kWorkerRX, core_offset, tid);
 
   static constexpr size_t kSockBufSize = (1024 * 1024 * 64 * 8) - 1;
-  auto udp_server =
-      std::make_unique<UDPServer>(phy_port_ + ue_id, kSockBufSize);
+  auto udp_server = std::make_unique<UDPServer>(
+      kMacRxAddress, phy_port_ + ue_id, kSockBufSize);
 
   std::unique_ptr<UDPClient> udp_streamer;
   if (enable_udp_output_) {
-    udp_streamer = std::make_unique<UDPClient>();
+    udp_streamer = std::make_unique<UDPClient>(kMacTxAddress, kMacTxPort);
   }
 
   udp_server->MakeBlocking(1);
@@ -74,12 +77,12 @@ void* MacReceiver::LoopRecv(size_t tid) {
 
   // Create a rx buffer
   const size_t max_packet_length = data_bytes_;
-  auto* rx_buffer = new uint8_t[max_packet_length];
+  auto* rx_buffer = new std::byte[max_packet_length];
 
   while ((SignalHandler::GotExitSignal() == false) &&
          (cfg_->Running() == true)) {
-    ssize_t recvlen = udp_server->RecvFrom(&rx_buffer[0u], max_packet_length,
-                                           phy_address_, phy_port_ + ue_id);
+    const ssize_t recvlen = udp_server->Recv(phy_address_, phy_port_ + ue_id,
+                                             &rx_buffer[0u], max_packet_length);
     if (recvlen < 0) {
       std::perror("recv failed");
       throw std::runtime_error("Receiver: recv failed");
@@ -94,7 +97,7 @@ void* MacReceiver::LoopRecv(size_t tid) {
         AGORA_LOG_INFO("MacReceiver: Thread %zu, Data Bytes: %zu:%zu, Data:",
                        tid, recvlen, max_packet_length);
         for (size_t i = 0; i < static_cast<size_t>(recvlen); i++) {
-          AGORA_LOG_INFO(" %02x", rx_buffer[i]);
+          AGORA_LOG_INFO(" %02x", static_cast<uint8_t>(rx_buffer[i]));
         }
         AGORA_LOG_INFO("\n");
       }

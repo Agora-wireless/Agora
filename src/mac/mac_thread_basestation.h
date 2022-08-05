@@ -14,8 +14,7 @@
 #include "gettime.h"
 #include "ran_config.h"
 #include "symbols.h"
-#include "udp_client.h"
-#include "udp_server.h"
+#include "udp_comm.h"
 
 /**
  * @brief The MAC thread that runs alongside the PHY processing at the Agora
@@ -91,12 +90,10 @@ class MacThreadBaseStation {
   std::string log_filename_;
 
   // UDP endpoint used for sending messages
-  std::unique_ptr<UDPClient> udp_client_;
-  // UDP endpoint used for receiving messages
-  std::unique_ptr<UDPServer> udp_server_;
+  std::unique_ptr<UDPComm> udp_comm_;
 
   // A preallocated buffer to store UDP packets received via recv()
-  std::vector<uint8_t> udp_pkt_buf_;
+  std::vector<std::byte> udp_pkt_buf_;
 
   // The timestamp at which we last received a UDP packet from an application
   size_t last_mac_pkt_rx_tsc_ = 0;
@@ -115,7 +112,7 @@ class MacThreadBaseStation {
   // Server-only members
   struct {
     // Staging buffers to accumulate decoded uplink code blocks for each UE
-    std::array<std::vector<uint8_t>, kMaxUEs> frame_data_;
+    std::array<std::vector<std::byte>, kMaxUEs> frame_data_;
 
     // n_filled_in_frame_[i] is the number of bytes received in the current
     // frame for UE #i

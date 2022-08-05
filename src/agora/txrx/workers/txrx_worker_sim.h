@@ -38,7 +38,7 @@ class TxRxWorkerSim : public TxRxWorker {
   //1 for each responsible interface (ie radio)
   //socket for incomming messages (received data)
   std::vector<std::unique_ptr<UDPComm>> udp_comm_;
-  std::vector<uint8_t> beacon_buffer_;
+  std::vector<std::byte> beacon_buffer_;
   double beacon_send_time_;
 };
 #endif  // TXRX_WORKER_SIM_H_

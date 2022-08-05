@@ -24,8 +24,7 @@
 #include "udp_comm.h"
 
 using AlignedByteVector =
-    std::vector<unsigned char,
-                boost::alignment::aligned_allocator<unsigned char, 64>>;
+    std::vector<std::byte, boost::alignment::aligned_allocator<std::byte, 64>>;
 
 struct WorkerThreadStorage {
   size_t tid_;
@@ -79,7 +78,7 @@ class ChannelSim {
 
  private:
   void DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
-            size_t ant_per_socket, uint8_t* tx_buffer,
+            size_t ant_per_socket, std::byte* tx_buffer,
             const arma::cx_float* source_data, AlignedByteVector* udp_pkt_buf,
             std::vector<std::unique_ptr<UDPComm>>& udp_senders);
 

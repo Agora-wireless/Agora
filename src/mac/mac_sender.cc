@@ -13,6 +13,9 @@
 #include "udp_client.h"
 #include "video_receiver.h"
 
+static const std::string kMacSendFromAddress = "127.0.0.1";
+static constexpr uint16_t kMacSendFromPort = 0;
+
 //#define USE_UDP_DATA_SOURCE
 static constexpr bool kDebugPrintSender = false;
 static constexpr size_t kFrameLoadAdvance = 10;
@@ -334,7 +337,8 @@ void* MacSender::WorkerThread(size_t tid) {
     return nullptr;
   }
 
-  UDPClient udp_client;
+  //Send from local address
+  UDPClient udp_client(kMacSendFromAddress, kMacSendFromPort);
 
   double begin = GetTime::GetTimeUs();
   size_t total_tx_packets = 0;
@@ -380,7 +384,7 @@ void* MacSender::WorkerThread(size_t tid) {
               tx_packet->Symbol(), mac_packet_tx_size);
 
           udp_client.Send(server_address_, server_rx_port_,
-                          reinterpret_cast<const uint8_t*>(tx_packet),
+                          reinterpret_cast<const std::byte*>(tx_packet),
                           mac_packet_tx_size);
           mac_packet_location += tx_buffer_pkt_offset_;
         }

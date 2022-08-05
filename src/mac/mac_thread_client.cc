@@ -60,8 +60,9 @@ MacThreadClient::MacThreadClient(
   AGORA_LOG_INFO(
       "MacThreadClient: setting up udp server for mac data at port %zu\n",
       udp_server_port);
-  udp_server_ = std::make_unique<UDPServer>(
-      udp_server_port, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
+  udp_comm_ =
+      std::make_unique<UDPComm>(cfg_->UeServerAddr(), udp_server_port,
+                                udp_pkt_len * kMaxUEs * kMaxPktsPerUE, 0);
 
   const size_t udp_control_len = sizeof(RBIndicator);
   udp_control_buf_.resize(udp_control_len);
@@ -70,10 +71,9 @@ MacThreadClient::MacThreadClient(
       "MacThreadClient: setting up udp server for mac control channel at port "
       "%zu\n",
       kMacBaseClientPort);
-  udp_control_channel_ = std::make_unique<UDPServer>(
-      kMacBaseClientPort, udp_control_len * kMaxUEs * kMaxPktsPerUE);
-
-  udp_client_ = std::make_unique<UDPClient>();
+  udp_control_channel_ =
+      std::make_unique<UDPServer>(cfg_->UeServerAddr(), kMacBaseClientPort,
+                                  udp_control_len * kMaxUEs * kMaxPktsPerUE);
   crc_obj_ = std::make_unique<DoCRC>();
 }
 
@@ -229,8 +229,8 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
     }
 
     if (dest_offset > 0) {
-      udp_client_->Send(kMacRemoteHostname, cfg_->UeMacTxPort() + ue_id,
-                        &server_.frame_data_.at(ue_id).at(0), dest_offset);
+      udp_comm_->Send(kMacRemoteHostname, cfg_->UeMacTxPort() + ue_id,
+                      &server_.frame_data_.at(ue_id).at(0), dest_offset);
     }
 
     ss << "MacThreadClient: Sent data for frame " << frame_id << ", ue "
@@ -242,7 +242,7 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
     }
 
     for (size_t i = 0u; i < dest_offset; i++) {
-      ss << std::to_string(server_.frame_data_.at(ue_id).at(i)) << " ";
+      ss << static_cast<uint8_t>(server_.frame_data_.at(ue_id).at(i)) << " ";
     }
     std::fprintf(log_file_, "%s", ss.str().c_str());
     ss.str("");
@@ -293,8 +293,8 @@ void MacThreadClient::ProcessUdpPacketsFromApps(RBIndicator ri) {
   const size_t max_recv_attempts = (packets_required * 10u);
   size_t rx_attempts;
   for (rx_attempts = 0u; rx_attempts < max_recv_attempts; rx_attempts++) {
-    ssize_t ret = udp_server_->Recv(&udp_pkt_buf_.at(total_bytes_received),
-                                    udp_pkt_buf_.size() - total_bytes_received);
+    ssize_t ret = udp_comm_->Recv(&udp_pkt_buf_.at(total_bytes_received),
+                                  (udp_pkt_buf_.size() - total_bytes_received));
     if (ret == 0) {
       AGORA_LOG_TRACE("MacThreadClient: No data received with %zu pending\n",
                       total_bytes_received);
