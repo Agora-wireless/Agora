@@ -7,14 +7,14 @@
 #include "gettime.h"
 #include "udp_client.h"
 #include "udp_comm.h"
-#include "udp_server_ipv6.h"
+#include "udp_server.h"
 #include "utils.h"
 
 static constexpr size_t kSendPort = 3195;
 static constexpr size_t kReceivePort = 3185;
 static constexpr size_t kMessageSize = 9000;
-static constexpr size_t kNumPackets = 10000;
-static std::atomic<bool> server_ready;
+static constexpr size_t kNumPackets = 10;
+static std::atomic<bool> server_ready = false;
 
 static const std::string kIpv4Address = "127.0.0.1";
 static const std::string kIpv6Address = "::1";
@@ -22,9 +22,10 @@ static const std::string kIpv6Address = "::1";
 ///Test the non-connection use case (SendTo)
 void ClientSendTo(const std::string& src_address, uint16_t src_port,
                   const std::string& dest_address, uint16_t dest_port) {
-  std::vector<uint8_t> packet(kMessageSize);
+  unused(src_port);
+  std::vector<std::byte> packet(kMessageSize);
   //This will use the default socket type (currently ipv4)
-  UDPClient udp_client;
+  UDPClient udp_client(src_address);
 
   while (server_ready == false) {
     // Wait for server to get ready
@@ -40,7 +41,7 @@ void ClientSendTo(const std::string& src_address, uint16_t src_port,
 ///Test the connection use case
 void ClientConnect(const std::string& src_address, uint16_t src_port,
                    const std::string& dest_address, uint16_t dest_port) {
-  std::vector<uint8_t> packet(kMessageSize);
+  std::vector<std::byte> packet(kMessageSize);
   ///Port will be selected by the system
   UDPClient udp_client(src_address, src_port);
 
@@ -59,7 +60,7 @@ void ClientConnect(const std::string& src_address, uint16_t src_port,
 ///Test the connection use case
 void UDPSend(const std::string& local_address, uint16_t local_port,
              const std::string& remote_address, uint16_t remote_port) {
-  std::vector<uint8_t> packet(kMessageSize);
+  std::vector<std::byte> packet(kMessageSize);
   UDPComm udp_client(local_address, local_port, 0, 0);
 
   while (server_ready == false) {
@@ -81,7 +82,7 @@ void ServerRecvFrom(const std::string& src_address, uint16_t src_port,
 
   // Without buffer resizing, the server will sometimes drop packets and
   // therefore never return from this function
-  UDPServerIPv6 udp_server(dest_address, dest_port, kMessageSize * kNumPackets);
+  UDPServer udp_server(dest_address, dest_port, kMessageSize * kNumPackets);
   std::vector<std::byte> pkt_buf(kMessageSize);
 
   server_ready = true;
@@ -119,7 +120,7 @@ void ServerConnect(const std::string& src_address, const uint16_t src_port,
 
   // Without buffer resizing, the server will sometimes drop packets and
   // therefore never return from this function
-  UDPServerIPv6 udp_server(dest_address, dest_port, kMessageSize * kNumPackets);
+  UDPServer udp_server(dest_address, dest_port, kMessageSize * kNumPackets);
   std::vector<std::byte> pkt_buf(kMessageSize);
   //Optional method to create 1:1 connection
   udp_server.Connect(src_address, src_port);
@@ -239,7 +240,7 @@ TEST(UDPComm, PerfUDP) {
 
 // Test that the server is actually non-blocking
 TEST(UDPClientServer, ServerIsNonBlocking) {
-  UDPServerIPv6 udp_server(kIpv6Address, kReceivePort);
+  UDPServer udp_server(kIpv6Address, kReceivePort);
   std::vector<std::byte> packet(kMessageSize);
 
   // If the UDP server is blocking, this call never completes because there is

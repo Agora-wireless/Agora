@@ -444,7 +444,7 @@ void* Sender::WorkerThread(int tid) {
         const size_t interface_idx = cur_radio - radio_lo;
         udp_clients.at(interface_idx)
             ->Send(cfg_->BsServerAddr(), dest_port,
-                   reinterpret_cast<uint8_t*>(socks_pkt_buf),
+                   reinterpret_cast<std::byte*>(socks_pkt_buf),
                    cfg_->PacketLength());
 #endif
 

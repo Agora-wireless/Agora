@@ -7,7 +7,7 @@
 
 #include <netdb.h>
 
-#include <cstdint>
+#include <cstddef>
 #include <map>
 #include <mutex>
 #include <string>
@@ -53,7 +53,7 @@ class UDPComm {
    * @param len Length in bytes of the message to send
    */
   void Send(const std::string& to_hostname, uint16_t to_port,
-            const uint8_t* msg, size_t len);
+            const std::byte* msg, size_t len);
 
   /**
    * @brief Send one UDP packet to the connected remote server.
@@ -61,7 +61,7 @@ class UDPComm {
    * @param msg Pointer to the message to send
    * @param len Length in bytes of the message to send
    */
-  void Send(const uint8_t* msg, size_t len);
+  void Send(const std::byte* msg, size_t len);
 
   /**
    * @brief Try to receive up to len bytes in buf by default this will not block

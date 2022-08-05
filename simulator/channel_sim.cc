@@ -613,7 +613,7 @@ void* ChannelSim::UeRxLoop(size_t tid) {
 
 /// Warning: Threads are sharing these sender sockets.
 void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
-                      size_t ant_per_socket, uint8_t* tx_buffer,
+                      size_t ant_per_socket, std::byte* tx_buffer,
                       const arma::cx_float* source_data,
                       AlignedByteVector* udp_pkt_buf,
                       std::vector<std::unique_ptr<UDPComm>>& udp_senders) {

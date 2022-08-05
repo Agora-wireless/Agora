@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include "udp_server_ipv6.h"
+#include "udp_server.h"
 
 ///Class to commicate with the Radios.  Including symbol parsing, packing and unpacking based on control plan MTU settings.
 class RadioSocket {
@@ -50,7 +50,7 @@ class RadioSocket {
   size_t GetPackedSamples(std::vector<void*>& out_samples, long long& rx_time,
                           size_t sample_offset, size_t req_samples);
 
-  std::unique_ptr<UDPServerIPv6> socket_;
+  std::unique_ptr<UDPServer> socket_;
   std::vector<std::byte> rx_buffer_;
   std::queue<size_t> rx_pkt_byte_count_;
 

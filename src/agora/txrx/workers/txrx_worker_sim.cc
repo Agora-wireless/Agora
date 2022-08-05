@@ -267,7 +267,7 @@ size_t TxRxWorkerSim::DequeueSend() {
     const size_t local_interface_idx = interface_id - interface_offset_;
     // Send data (one OFDM symbol)
     udp_comm_.at(local_interface_idx)
-        ->Send(reinterpret_cast<uint8_t*>(pkt),
+        ->Send(reinterpret_cast<std::byte*>(pkt),
                Configuration()->DlPacketLength());
 
     auto complete_event =
