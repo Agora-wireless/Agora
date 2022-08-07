@@ -1,4 +1,4 @@
-function inspect_agora_results(dataset_filename, verbose)
+function inspect_single_frame(dataset_filename, inspect_frame, verbose)
     %%Load data from the input file and inspect evm and snr
     %dataset_filename = "UeRxData.h5";
     %inspect_frame = 100;
@@ -28,33 +28,33 @@ function inspect_agora_results(dataset_filename, verbose)
     %Choose the downlink data
     dataset_id = '/DownlinkData';
 
+    % Dimensions  [Samples, Ant, Symbol, Cells, Frame]
+    start = [1 1 1 1 inspect_frame];
+    count = [(samples_per_slot * 2) total_users total_dl_symbols 1 1];
     %Display Info
     if verbose == "true"
         h5disp(dataset_filename,strcat(group_id,dataset_id));
     end
     %Generate a int16 array
-    rx_syms_hdf5 = h5read(dataset_filename, strcat(group_id,dataset_id));
-    total_frames = size(rx_syms_hdf5, 5);
-    %n_symbols = size(rx_syms_hdf5, 3);
-    %n_users = size(rx_syms_hdf5, 2);
-    %n_samps = size(rx_syms_hdf5, 1);
+    rx_syms_hdf5 = h5read(dataset_filename, strcat(group_id,dataset_id), start, count);
     %Convert to double and scale
     rx_syms_scaled_double = double(rx_syms_hdf5) ./ double(intmax('int16'));
     clear rx_syms_hdf5;
     %Convert to complex double
     % Samples x User x Symbol
-    rx_syms_cxdouble = complex(rx_syms_scaled_double(1:2:end, :, :, :), rx_syms_scaled_double(2:2:end,:, :, :));
+    rx_syms_cxdouble = complex(rx_syms_scaled_double(1:2:end,:,:), rx_syms_scaled_double(2:2:end,:, :));
     clear rx_syms_scaled_double;
     % Split off pilots and data
-    rx_pilot_cxdouble = rx_syms_cxdouble(:,:,1:dl_pilot_symbols, :);
-    rx_data_cxdouble = rx_syms_cxdouble(:,:,1+dl_pilot_symbols:end, :);
+    rx_pilot_cxdouble = rx_syms_cxdouble(:,:,1:dl_pilot_symbols);
+    rx_data_cxdouble = rx_syms_cxdouble(:,:,1+dl_pilot_symbols:end);
+    clear start count;
     
     %Choose the Beacon data
     dataset_id = '/BeaconData';
 
     % Dimensions  [Samples, Ant, Symbol, Cells, Frame]
-    start = [1 1 1 1 1];
-    count = [(samples_per_slot * 2) total_users beacon_syms 1 total_frames];
+    start = [1 1 1 1 inspect_frame];
+    count = [(samples_per_slot * 2) total_users beacon_syms 1 1];
     %Display Info
     if verbose == "true"
         h5disp(dataset_filename,strcat(group_id,dataset_id));
@@ -66,11 +66,18 @@ function inspect_agora_results(dataset_filename, verbose)
     clear rx_beacon_hdf5;
     %Convert to complex double
     % Samples x User x Symbol
-    rx_beacon_cxdouble = complex(rx_beacon_scaled_double(1:2:end, :, :, :), rx_beacon_scaled_double(2:2:end,:, :, :));
+    rx_beacon_cxdouble = complex(rx_beacon_scaled_double(1:2:end,:,:), rx_beacon_scaled_double(2:2:end,:, :));
     rx_beacon_rssi = process_beacon(rx_beacon_cxdouble, tx_zero_prefix_len);
+%     beacon_samp_start = tx_zero_prefix_len + 240; % 15 reps of STS (16-samps) at the start;
+%     beacon_samp_len = 256; % two reps of 128-samps Gold code;
+%     rx_beacon_rssi = zeros(1, total_users);
+%     for u = 1:total_users
+%         rx_beacon = rx_beacon_cxdouble(beacon_samp_start+1:beacon_samp_start+beacon_samp_len, u, 1);
+%         rx_beacon_rssi(u) = 10*log10((rx_beacon'*rx_beacon) / beacon_samp_len);
+%     end
     clear rx_beacon_scaled_double;
     clear start count;
-    
+
     dataset_id = '/TxPilot';
     %*2 for complex type (native float)
     total_samples = data_size * 2;
@@ -102,42 +109,42 @@ function inspect_agora_results(dataset_filename, verbose)
     disp(isequal(tx_pilot_bad, tx_pilot_cxdouble));
     clear tx_pilot_bad;
 
+    clear dataset_filename group_id;
     clear beacon_syms cp_len data_size data_start data_stop dl_pilot_symbols samples_per_slot tx_zero_prefix_len total_dl_symbols fft_size;
-    evm = zeros(1, total_frames);
-    snr = zeros(1, total_frames);
-    for i=1:total_frames
-        [~, ~, evm(i), snr(i)] = process_rx_frame(configs, tx_pilot_cxdouble, tx_data_cxdouble, rx_pilot_cxdouble(:, :, :, i), rx_data_cxdouble(:, :, :, i));
-    end
-    clear configs tx_pilot_cxdouble tx_data_cxdouble rx_pilot_cxdouble rx_data_cxdouble;
+    [demul_data, data_sc_idx, evm, snr] = process_rx_frame(configs, tx_pilot_cxdouble, tx_data_cxdouble, rx_pilot_cxdouble, rx_data_cxdouble);
+    clear configs tx_pilot_cxdouble rx_pilot_cxdouble rx_data_cxdouble;
     
-    experiment = 'MU-MIMO';
-    if total_users == 1
-        experiment = 'SU-MIMO';
-    end
-    
-    %Plot SNR & EVM Results
-    figure('Name', ['File ' dataset_filename]);
+    %Plot Rx waveform
+    combined_rx = vertcat(rx_beacon_cxdouble, reshape(squeeze(rx_syms_cxdouble(:,1,:)), [], 1));
+    figure('Name', ['Frame ' num2str(inspect_frame) ' Receive WaveForm']);
     tiledlayout(2,1)
-    % Top (SNR)
+    %Top (Real)
     nexttile;
-    plot(snr);
-    ylabel('SNR (dB)')
-    title([experiment ' Beamforming SNR & EVM plots'])
-    %axis([0 inf -1 1]);
-    %Bottom (EVM)
+    plot(real(combined_rx));
+    axis([0 inf -1 1]);
+    title('Rx Real (I)');
+    %Bottom (Q)
     nexttile;
-    plot(evm);
-    axis([0 total_frames 0 4 * mean(evm)]);
-    ylabel('EVM (%)')
+    plot(imag(combined_rx));
+    axis([0 inf -1 1]);
+    title('Rx Imag (Q)');
     
+
+    for u=1:total_users
+        rx_cnstl = demul_data(data_sc_idx, : , u);
+        tx_cnstl = tx_data_cxdouble(data_sc_idx, :, u);
+        figure('Name', ['Constellation [User ', num2str(u), ']']);
+        pt_size = 15;
+        scatter(real(rx_cnstl(:)), imag(rx_cnstl(:)),pt_size,'r','filled');
+        hold on
+        pt_size = 250;
+        scatter(real(tx_cnstl(:)), imag(tx_cnstl(:)),pt_size, 'b', 'p', 'filled');
+        title(['Constellation [User ', num2str(u), ', Frame ', num2str(inspect_frame), ']']);
+    end
+    clear total_users tx_data_cxdouble rx_beacon_cxdouble rx_syms_cxdouble tx_syms_cxdouble combined_rx;
     
-    % New (Beacon RSSI)
-    figure('Name', 'Beacon');
-    plot(rx_beacon_rssi)
-    axis([0 total_frames -50 0]);
-    ylabel('Beacon RSSI (dB)')
-    xlabel('Frame')
-    title(['Rx Beacon Power in ' experiment ' Experiment'])
-    clear rx_beacon_cxdouble rx_syms_cxdouble tx_syms_cxdouble total_users ;
-    
+    disp(['Frame Inspect: ', num2str(inspect_frame)]);
+    disp(['Beacon RSSI (dB): ', num2str(rx_beacon_rssi)]);
+    disp(['SNR: ', num2str(snr)]);
+    disp(['EVM: ', num2str(evm)]);
 end
