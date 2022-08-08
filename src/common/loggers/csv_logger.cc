@@ -8,29 +8,31 @@
 
 #include "logger.h"
 #include "utils.h"
+#if defined(ENABLE_CSV_LOG)
+#include "spdlog/async.h"
+#include "spdlog/pattern_formatter.h"
+#include "spdlog/sinks/basic_file_sink.h"
+#endif
 
 namespace CsvLog {
 
-CsvLogger::CsvLogger(const std::string& radio_id, const size_t log_id) {
+CsvLogger::CsvLogger(size_t log_id, const std::string& radio_name) {
 #if defined(ENABLE_CSV_LOG)
-
   if (log_id >= kAllLogs) {
     AGORA_LOG_ERROR("Invalid log id %zu in CsvLogger\n", log_id);
   } else {
-    constexpr size_t kShortIdLen = 3;
-    const std::string short_id =
-        radio_id.substr(radio_id.length() - kShortIdLen);
-    std::string filename = kCsvName.at(log_id) + "-" + short_id + ".csv";
-    std::remove(filename.c_str());
+    const std::string filename =
+        "log/log-" + kCsvName.at(log_id) + "-" + radio_name + ".csv";
+    std::remove(filename.c_str());  // delete file if already exists
     logger_ = spdlog::create_async_nb<spdlog::sinks::basic_file_sink_mt>(
         kCsvName.at(log_id), filename);
     logger_->set_level(spdlog::level::info);
     logger_->set_pattern("%v");
-    logger_->info(kCsvHeader.at(log_id));
   }
 #else
-  unused(radio_id);
   unused(log_id);
+  unused(radio_name);
 #endif  //ENABLE_CSV_LOG
 }
+
 }  //namespace CsvLog

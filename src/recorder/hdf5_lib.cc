@@ -6,7 +6,6 @@
  Implementation of Hdf5Lib API Class
 ---------------------------------------------------------------------
 */
-
 #include "hdf5_lib.h"
 
 #include <cassert>
@@ -24,13 +23,19 @@ Hdf5Lib::Hdf5Lib(H5std_string hdf5_name, H5std_string group_name)
   AGORA_LOG_INFO("Creating output HD5F file: %s\n", hdf5_name_.c_str());
   file_ = std::make_unique<H5::H5File>(hdf5_name_, H5F_ACC_TRUNC);
   group_ = std::make_unique<H5::Group>(file_->createGroup("/" + group_name_));
+  ///Disable for debugging
+  H5::Exception::dontPrint();
 }
 
 Hdf5Lib::~Hdf5Lib() {
   for (auto& value : ds_name_id_) {
-    datasets_.at(value.second)->close();
+    AGORA_LOG_INFO("%s - Finalizing Dataset\n", value.first.c_str());
+    if (datasets_.at(value.second) != nullptr) {
+      datasets_.at(value.second)->close();
+    } else {
+      AGORA_LOG_WARN("%s - Dataset already closed\n", value.first.c_str());
+    }
     datasets_.at(value.second).reset();
-    AGORA_LOG_INFO("%s - Closing Dataset\n", value.first.c_str());
   }
   datasets_.clear();
   ds_name_id_.clear();
@@ -40,20 +45,19 @@ Hdf5Lib::~Hdf5Lib() {
 
 ///Dataset -> Data Type + Dataspace
 ///extend_dimension -1 for no extension
-int Hdf5Lib::CreateDataset(const std::string& dataset_name,
-                           const std::array<hsize_t, kDsDimsNum>& chunk_dims,
-                           const std::array<hsize_t, kDsDimsNum>& init_dims,
-                           const ssize_t extend_dimension,
-                           const H5::PredType& type) {
+void Hdf5Lib::CreateDataset(const std::string& dataset_name,
+                            const std::array<hsize_t, kDsDimsNum>& chunk_dims,
+                            const std::array<hsize_t, kDsDimsNum>& init_dims,
+                            const ssize_t extend_dimension,
+                            const H5::PredType& type) {
   const std::string create_ds_name("/" + group_name_ + "/" + dataset_name);
-
   std::array<hsize_t, kDsDimsNum> max_ds_dims = init_dims;
   if ((extend_dimension >= 0) &&
       (static_cast<size_t>(extend_dimension) <= kDsDimsNum)) {
     max_ds_dims.at(extend_dimension) = H5S_UNLIMITED;
   }
+
   try {
-    H5::Exception::dontPrint();
     //Rank | Create Dimensions | Max Dimensions
     H5::DataSpace ds_dataspace(kDsDimsNum, init_dims.data(),
                                max_ds_dims.data());
@@ -65,84 +69,48 @@ int Hdf5Lib::CreateDataset(const std::string& dataset_name,
     ds_prop.close();
     //Save name -> dataset idx (quick lookup table)
     ds_name_id_[dataset_name] = datasets_.size() - 1;
-    AGORA_LOG_INFO("CreateDataset: %s\n", dataset_name.c_str());
   }
   // catch failure caused by the H5File operations
   catch (H5::FileIException& error) {
+    AGORA_LOG_ERROR("CreateDataset %s, FileIException - %s\n",
+                    create_ds_name.c_str(), error.getCDetailMsg());
     H5::FileIException::printErrorStack();
-    return -1;
+    throw error;
   }
 
   // catch failure caused by the DataSet operations
   catch (H5::DataSetIException& error) {
+    AGORA_LOG_ERROR("CreateDataset %s, DataSetIException - %s\n",
+                    create_ds_name.c_str(), error.getCDetailMsg());
     H5::DataSetIException::printErrorStack();
-    return -1;
+    throw error;
   }
 
   // catch failure caused by the DataSpace operations
   catch (H5::DataSpaceIException& error) {
+    AGORA_LOG_ERROR("CreateDataset %s, DataSpaceIException - %s\n",
+                    create_ds_name.c_str(), error.getCDetailMsg());
     H5::DataSpaceIException::printErrorStack();
-    return -1;
+    throw error;
   }
-  return 0;
+  AGORA_LOG_TRACE("CreateDataset: %s\n", dataset_name.c_str());
 }
-
-/*
-///Opens all Datasets that were "created"
-void Hdf5Lib::OpenDataset() {
-  AGORA_LOG_INFO("Open HDF5 file Dataset: %s\n", hdf5_name_.c_str());
-  ///Probably not necessary to open the file here
-  file_->openFile(hdf5_name_, H5F_ACC_RDWR);
-
-  //for (size_t i = 0; i < dataset_str_.size(); i++) {
-  const std::string ds_name("/" + group_name_ + "/" + dataset_str_.at(i));
-  try {
-    datasets_.emplace_back(
-        std::make_unique<H5::DataSet>(file_->openDataSet(ds_name)));
-    H5::DataSpace filespace(datasets_.at(i)->getSpace());
-    prop_list_.at(i).copy(datasets_.at(i)->getCreatePlist());
-    if (kPrintDataSetInfo) {
-      const int ndims = filespace.getSimpleExtentNdims();
-      int cndims = 0;
-      if (H5D_CHUNKED == prop_list_.at(i).getLayout()) {
-        cndims = prop_list_.at(i).getChunk(ndims, dims_.at(i).data());
-      }
-      std::cout << "dim " + dataset_str_.at(i) + " chunk = " << cndims
-                << std::endl
-                << "New " + dataset_str_.at(i) + " Dataset Dimension: [";
-      for (size_t j = 0; j < kDsDimsNum - 1; ++j) {
-        std::cout << dims_.at(i).at(j) << ",";
-      }
-      std::cout << dims_.at(i).at(kDsDimsNum - 1) << "]" << std::endl;
-    }
-    filespace.close();
-  }
-  // catch failure caused by the H5File operations
-  catch (H5::FileIException& error) {
-    error.printErrorStack();
-    throw;
-  }
-}
-*/
 
 void Hdf5Lib::FinalizeDataset(const std::string& dataset_name) {
-  //const std::string ds_name("/" + group_name_ + "/" + dataset_name);
-  const size_t ds_id = ds_name_id_[dataset_name];
+  const size_t ds_id = ds_name_id_.at(dataset_name);
   ds_name_id_.erase(dataset_name);
   datasets_.at(ds_id)->close();
   datasets_.at(ds_id).reset();
-
-  AGORA_LOG_INFO("%s - Closing Dataset\n", dataset_name.c_str());
+  AGORA_LOG_INFO("%s(%zu) - FinalizeDataset\n", dataset_name.c_str(), ds_id);
 }
 
 void Hdf5Lib::ExtendDataset(
     const std::string& dataset_name,
     const std::array<hsize_t, kDsDimsNum>& extended_dims) {
   const std::string ds_name("/" + group_name_ + "/" + dataset_name);
-  const size_t ds_id = ds_name_id_[dataset_name];
+  const size_t ds_id = ds_name_id_.at(dataset_name);
   auto& current_dataset = datasets_.at(ds_id);
   try {
-    H5::Exception::dontPrint();
     // H5F_SCOPE_LOCAL | H5F_SCOPE_GLOBAL
     current_dataset->flush(H5F_SCOPE_LOCAL);
     current_dataset->extend(extended_dims.data());
@@ -151,12 +119,14 @@ void Hdf5Lib::ExtendDataset(
 
   } catch (H5::DataSetIException& error) {
     H5::DataSetIException::printErrorStack();
-    AGORA_LOG_WARN("ExtendDataset: Failed to extend the dataset\n");
-    throw;
+    AGORA_LOG_WARN(
+        "ExtendDataset: DataSetIException - Failed to extend the dataset\n");
+    throw error;
   } catch (H5::DataSpaceIException& error) {
     H5::DataSpaceIException::printErrorStack();
-    AGORA_LOG_WARN("ExtendDataset: Failed to extend the dataset\n");
-    throw;
+    AGORA_LOG_WARN(
+        "ExtendDataset: DataSpaceIException - Failed to extend the dataset\n");
+    throw error;
   }
 }
 
@@ -165,15 +135,13 @@ herr_t Hdf5Lib::WriteDataset(const std::string& dataset_name,
                              const std::array<hsize_t, kDsDimsNum>& count,
                              const short* wrt_data) {
   const std::string ds_name("/" + group_name_ + "/" + dataset_name);
-  const size_t ds_id = ds_name_id_[dataset_name];
+  const size_t ds_id = ds_name_id_.at(dataset_name);
   herr_t ret = 0;
   AGORA_LOG_INFO("WriteDataset: %s\n", dataset_name.c_str());
 
   auto& current_dataset = datasets_.at(ds_id);
   // Select a hyperslab in extended portion of the dataset
   try {
-    H5::Exception::dontPrint();
-
     H5::DataSpace working_space = current_dataset->getSpace();
     ///Select the hyperslab
     working_space.selectHyperslab(H5S_SELECT_SET, count.data(), start.data());
@@ -203,15 +171,15 @@ herr_t Hdf5Lib::WriteDataset(const std::string& dataset_name,
       ss << start.at(i) << ", ";
     }
     ss << start.at(kDsDimsNum - 1);
-    AGORA_LOG_TRACE("%s\n", ss.str().c_str());
+    AGORA_LOG_WARN("%s\n", ss.str().c_str());
     ret = -1;
-    throw;
+    throw error;
   }
   // catch failure caused by the DataSpace operations
   catch (H5::DataSpaceIException& error) {
     H5::DataSpaceIException::printErrorStack();
     ret = -1;
-    throw;
+    throw error;
   }
   return ret;
 }
@@ -221,15 +189,13 @@ herr_t Hdf5Lib::WriteDataset(const std::string& dataset_name,
                              const std::array<hsize_t, kDsDimsNum>& count,
                              const float* wrt_data) {
   const std::string ds_name("/" + group_name_ + "/" + dataset_name);
-  const size_t ds_id = ds_name_id_[dataset_name];
+  const size_t ds_id = ds_name_id_.at(dataset_name);
   herr_t ret = 0;
   AGORA_LOG_TRACE("WriteDataset: %s\n", dataset_name.c_str());
 
   auto& current_dataset = datasets_.at(ds_id);
   // Select a hyperslab in extended portion of the dataset
   try {
-    H5::Exception::dontPrint();
-
     H5::DataSpace working_space = current_dataset->getSpace();
     ///Select the hyperslab
     working_space.selectHyperslab(H5S_SELECT_SET, count.data(), start.data());

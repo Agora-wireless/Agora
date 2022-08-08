@@ -1,14 +1,14 @@
 {
   /* Tested with 21 bs radios and 2 ue radios */
-  "serial_file": "data/anechoic_conf/topology-powder-ul.json",
+  "serial_file": "data/examples/topology-meb.json",
   "cells": 1,
   "channel": "AB",
-  "frequency": 3.56e9,
+  "frequency": 3.5475e9,
   "single_gain": true,
-  "rx_gain_a": 60,
-  "tx_gain_a": 75,
-  "rx_gain_b": 60,
-  "tx_gain_b": 75,
+  "rx_gain_a": 70,
+  "tx_gain_a": 81,
+  "rx_gain_b": 70,
+  "tx_gain_b": 81,
   "sample_rate": 5e6,
   "cp_size": 32,
   "fft_size": 2048,
@@ -29,20 +29,20 @@
   /* UE configuration */
   "ue_channel": "AB",
   "ue_rx_gain_a": [
-    65,
-    65
+    78,
+    78
   ],
   "ue_tx_gain_a": [
-    75,
-    75
+    81,
+    81
   ],
   "ue_rx_gain_b": [
-    65,
-    65
+    78,
+    78
   ],
   "ue_tx_gain_b": [
-    75,
-    75
+    81,
+    81
   ],
   "tx_advance": [
     140,

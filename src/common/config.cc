@@ -10,6 +10,8 @@
 #include "config.h"
 
 #include <boost/range/algorithm/count.hpp>
+#include <ctime>
+#include <utility>
 
 #include "logger.h"
 #include "scrambler.h"
@@ -17,20 +19,22 @@
 
 using json = nlohmann::json;
 
-static const size_t kMacAlignmentBytes = 64u;
+static constexpr size_t kMacAlignmentBytes = 64u;
 static constexpr bool kDebugPrintConfiguration = false;
-static const size_t kMaxSupportedZc = 256;
+static constexpr size_t kMaxSupportedZc = 256;
+static constexpr size_t kShortIdLen = 3;
 
-Config::Config(const std::string& jsonfile)
+Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
       ul_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
-      frame_("") {
+      frame_(""),
+      config_filename_(std::move(jsonfilename)) {
   pilots_ = nullptr;
   pilots_sgn_ = nullptr;
 
   std::string conf;
-  Utils::LoadTddConfig(jsonfile, conf);
+  Utils::LoadTddConfig(config_filename_, conf);
   // Allow json comments
   const auto tdd_conf = json::parse(conf, nullptr, true, true);
 
@@ -129,8 +133,18 @@ Config::Config(const std::string& jsonfile)
 
   if (ue_radio_id_.empty() == false) {
     ue_num_ = ue_radio_id_.size();
+    for (size_t i = 0; i < ue_num_; i++) {
+      ue_radio_name_.push_back(
+          "UE" + (ue_radio_id_.at(i).length() > kShortIdLen
+                      ? ue_radio_id_.at(i).substr(ue_radio_id_.at(i).length() -
+                                                  kShortIdLen)
+                      : ue_radio_id_.at(i)));
+    }
   } else {
     ue_num_ = tdd_conf.value("ue_radio_num", 8);
+    for (size_t i = 0; i < ue_num_; i++) {
+      ue_radio_name_.push_back("UE" + std::to_string(i));
+    }
   }
 
   channel_ = tdd_conf.value("channel", "A");
@@ -479,6 +493,25 @@ Config::Config(const std::string& jsonfile)
              "tx_advance size must be same as the number of clients!");
     cl_tx_advance_.assign(tx_advance.begin(), tx_advance.end());
   }
+
+  // set trace file path
+  auto time = std::time(nullptr);
+  auto local_time = *std::localtime(&time);
+
+  const std::string ul_present_str = (frame_.NumULSyms() > 0 ? "uplink-" : "");
+  const std::string dl_present_str =
+      (frame_.NumDLSyms() > 0 ? "downlink-" : "");
+  std::string filename = "trace-" + ul_present_str + dl_present_str +
+                         std::to_string(1900 + local_time.tm_year) + "-" +
+                         std::to_string(1 + local_time.tm_mon) + "-" +
+                         std::to_string(local_time.tm_mday) + "-" +
+                         std::to_string(local_time.tm_hour) + "-" +
+                         std::to_string(local_time.tm_min) + "-" +
+                         std::to_string(local_time.tm_sec) + "_" +
+                         std::to_string(num_cells_) + "_" +
+                         std::to_string(BsAntNum()) + "x" +
+                         std::to_string(UeAntTotal()) + ".hdf5";
+  trace_file_ = tdd_conf.value("trace_file", filename);
 
   // Agora configurations
   frames_to_test_ = tdd_conf.value("max_frame", 9600);
@@ -897,7 +930,11 @@ void Config::GenData() {
   AllocBuffer1d(&pilot_ifft, this->ofdm_ca_num_,
                 Agora_memory::Alignment_t::kAlign64, 1);
   for (size_t j = 0; j < ofdm_data_num_; j++) {
-    pilot_ifft[j + this->ofdm_data_start_] = this->pilots_[j];
+    // FFT Shift
+    const size_t k = j + ofdm_data_start_ >= ofdm_ca_num_ / 2
+                         ? j + ofdm_data_start_ - ofdm_ca_num_ / 2
+                         : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
+    pilot_ifft[k] = this->pilots_[j];
   }
   CommsLib::IFFT(pilot_ifft, this->ofdm_ca_num_, false);
 
@@ -920,8 +957,11 @@ void Config::GenData() {
     for (size_t j = 0; j < this->ofdm_data_num_; j++) {
       this->ue_specific_pilot_[i][j] = {zc_ue_pilot_i[j].real(),
                                         zc_ue_pilot_i[j].imag()};
-      ue_pilot_ifft[i][j + this->ofdm_data_start_] =
-          this->ue_specific_pilot_[i][j];
+      // FFT Shift
+      const size_t k = j + ofdm_data_start_ >= ofdm_ca_num_ / 2
+                           ? j + ofdm_data_start_ - ofdm_ca_num_ / 2
+                           : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
+      ue_pilot_ifft[i][k] = this->ue_specific_pilot_[i][j];
     }
     CommsLib::IFFT(ue_pilot_ifft[i], ofdm_ca_num_, false);
   }
@@ -932,7 +972,7 @@ void Config::GenData() {
   dl_bits_.Malloc(this->frame_.NumDLSyms(),
                   dl_num_bytes_per_ue_pad * this->ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
-  dl_iq_f_.Calloc(this->frame_.NumDLSyms(), ofdm_ca_num_ * ue_ant_num_,
+  dl_iq_f_.Calloc(this->frame_.NumDLSyms(), ofdm_data_num_ * ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
   dl_iq_t_.Calloc(this->frame_.NumDLSyms(),
                   this->samps_per_symbol_ * this->ue_ant_num_,
@@ -944,7 +984,7 @@ void Config::GenData() {
                   ul_num_bytes_per_ue_pad * this->ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
   ul_iq_f_.Calloc(this->frame_.NumULSyms(),
-                  this->ofdm_ca_num_ * this->ue_ant_num_,
+                  this->ofdm_data_num_ * this->ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
   ul_iq_t_.Calloc(this->frame_.NumULSyms(),
                   this->samps_per_symbol_ * this->ue_ant_num_,
@@ -1105,16 +1145,19 @@ void Config::GenData() {
                     Agora_memory::Alignment_t::kAlign64);
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
     for (size_t u = 0; u < this->ue_ant_num_; u++) {
-      size_t q = u * this->ofdm_ca_num_;
+      size_t q = u * ofdm_data_num_;
 
-      for (size_t j = this->ofdm_data_start_; j < this->ofdm_data_stop_; j++) {
-        size_t k = j - ofdm_data_start_;
+      for (size_t j = 0; j < ofdm_data_num_; j++) {
+        size_t sc = j + ofdm_data_start_;
         int8_t* mod_input_ptr =
-            GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, u, k);
+            GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, u, j);
         ul_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, ul_mod_table_);
-        ul_iq_ifft[i][q + j] = ul_iq_f_[i][q + j];
+        // FFT Shift
+        const size_t k = sc >= ofdm_ca_num_ / 2 ? sc - ofdm_ca_num_ / 2
+                                                : sc + ofdm_ca_num_ / 2;
+        ul_iq_ifft[i][u * ofdm_ca_num_ + k] = ul_iq_f_[i][q + j];
       }
-      CommsLib::IFFT(&ul_iq_ifft[i][q], ofdm_ca_num_, false);
+      CommsLib::IFFT(&ul_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
     }
   }
 
@@ -1175,21 +1218,24 @@ void Config::GenData() {
                     Agora_memory::Alignment_t::kAlign64);
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
     for (size_t u = 0; u < ue_ant_num_; u++) {
-      size_t q = u * ofdm_ca_num_;
+      size_t q = u * ofdm_data_num_;
 
-      for (size_t j = ofdm_data_start_; j < ofdm_data_stop_; j++) {
-        int k = j - ofdm_data_start_;
-        if (IsDataSubcarrier(k) == true) {
+      for (size_t j = 0; j < ofdm_data_num_; j++) {
+        size_t sc = j + ofdm_data_start_;
+        if (IsDataSubcarrier(j) == true) {
           int8_t* mod_input_ptr =
               GetModBitsBuf(dl_mod_bits_, Direction::kDownlink, 0, i, u,
-                            this->GetOFDMDataIndex(k));
+                            this->GetOFDMDataIndex(j));
           dl_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, dl_mod_table_);
         } else {
-          dl_iq_f_[i][q + j] = ue_specific_pilot_[u][k];
+          dl_iq_f_[i][q + j] = ue_specific_pilot_[u][j];
         }
-        dl_iq_ifft[i][q + j] = dl_iq_f_[i][q + j];
+        // FFT Shift
+        const size_t k = sc >= ofdm_ca_num_ / 2 ? sc - ofdm_ca_num_ / 2
+                                                : sc + ofdm_ca_num_ / 2;
+        dl_iq_ifft[i][u * ofdm_ca_num_ + k] = dl_iq_f_[i][q + j];
       }
-      CommsLib::IFFT(&dl_iq_ifft[i][q], ofdm_ca_num_, false);
+      CommsLib::IFFT(&dl_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
     }
   }
 
