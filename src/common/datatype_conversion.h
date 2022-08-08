@@ -10,28 +10,18 @@
 #include <immintrin.h>
 
 #include <bitset>
+#include <climits>
 
 #include "utils.h"
 
 //#define DATATYPE_MEMORY_CHECK
 
-// Convert a short array [in_buf] to a float array [out_buf]. Each array must
-// have [n_elems] elements.
-// in_buf and out_buf must be 64-byte aligned
-// n_elems must be a multiple of 16
-// reference:
-// https://stackoverflow.com/questions/50597764/convert-signed-short-to-float-in-c-simd
-static inline void SimdConvertShortToFloat(const short* in_buf, float* out_buf,
-                                           size_t n_elems) {
-#if defined(DATATYPE_MEMORY_CHECK)
-  RtAssert(((n_elems % 16) == 0) &&
-               ((reinterpret_cast<size_t>(in_buf) % 64) == 0) &&
-               ((reinterpret_cast<size_t>(out_buf) % 64) == 0),
-           "Data Alignment not correct before calling into AVX optimizations");
-#endif
-
+static inline void SimdConvertShortToFloatAVX512(const short* in_buf,
+                                                 float* out_buf,
+                                                 size_t n_elems) {
 #if defined(__AVX512F__)
-  const __m512 magic = _mm512_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
+  const __m512 magic =
+      _mm512_set1_ps(float((1 << 23) + (1 << 15)) / static_cast<float>(32768));
   const __m512i magic_i = _mm512_castps_si512(magic);
   for (size_t i = 0; i < n_elems; i += 16) {
     /* get input */
@@ -46,12 +36,22 @@ static inline void SimdConvertShortToFloat(const short* in_buf, float* out_buf,
     _mm512_store_ps(out_buf + i, converted);         // port 2,3,4,7
   }
 #else
-  const __m256 magic = _mm256_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
+  unused(in_buf);
+  unused(out_buf);
+  unused(n_elems);
+  throw std::runtime_error("AVX512 is not supported");
+#endif
+}
+
+static inline void SimdConvertShortToFloatAVX2(const short* in_buf,
+                                               float* out_buf, size_t n_elems) {
+  //Divisior must be power of 2?
+  const __m256 magic =
+      _mm256_set1_ps(float((1 << 23) + (1 << 15)) / static_cast<float>(32768));
   const __m256i magic_i = _mm256_castps_si256(magic);
   for (size_t i = 0; i < n_elems; i += 16) {
     /* get input */
     __m128i val = _mm_load_si128((__m128i*)(in_buf + i));  // port 2,3
-
     __m128i val1 = _mm_load_si128((__m128i*)(in_buf + i + 8));
     /* interleave with 0x0000 */
     __m256i val_unpacked = _mm256_cvtepu16_epi32(val);  // port 5
@@ -69,6 +69,27 @@ static inline void SimdConvertShortToFloat(const short* in_buf, float* out_buf,
     __m256 converted1 = _mm256_sub_ps(val_f1, magic);  // port 1,5 ?
     _mm256_store_ps(out_buf + i + 8, converted1);      // port 2,3,4,7
   }
+}
+
+// Convert a short array [in_buf] to a float array [out_buf]. Each array must
+// have [n_elems] elements.
+// in_buf and out_buf must be 64-byte aligned
+// n_elems must be a multiple of 16
+// reference:
+// https://stackoverflow.com/questions/50597764/convert-signed-short-to-float-in-c-simd
+static inline void SimdConvertShortToFloat(const short* in_buf, float* out_buf,
+                                           size_t n_elems) {
+#if defined(DATATYPE_MEMORY_CHECK)
+  RtAssert(((n_elems % 16) == 0) &&
+               ((reinterpret_cast<size_t>(in_buf) % 64) == 0) &&
+               ((reinterpret_cast<size_t>(out_buf) % 64) == 0),
+           "Data Alignment not correct before calling into AVX optimizations");
+#endif
+
+#if defined(__AVX512F__)
+  return SimdConvertShortToFloatAVX512(in_buf, out_buf, n_elems);
+#else
+  return SimdConvertShortToFloatAVX2(in_buf, out_buf, n_elems);
 #endif
 }
 
@@ -87,7 +108,8 @@ static inline void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
            "Data Alignment not correct before calling into AVX optimizations");
 #endif
 
-  const float scale_factor_float = 32768.0 / scale_down_factor;
+  const float scale_factor_float =
+      static_cast<float>(32768) / static_cast<float>(scale_down_factor);
 
 #ifdef __AVX512F__
   const __m512 scale_factor = _mm512_set1_ps(scale_factor_float);
@@ -142,8 +164,10 @@ static inline void ConvertFloatTo12bitIq(const float* in_buf, uint8_t* out_buf,
 #endif
   size_t index_short = 0;
   for (size_t i = 0; i < n_elems; i = i + 2) {
-    auto temp_i = static_cast<unsigned short>(in_buf[i] * 32768 * 4);
-    auto temp_q = static_cast<unsigned short>(in_buf[i + 1] * 32768 * 4);
+    auto temp_i =
+        static_cast<unsigned short>(in_buf[i] * static_cast<float>(32768) * 4);
+    auto temp_q = static_cast<unsigned short>(in_buf[i + 1] *
+                                              static_cast<float>(32768) * 4);
     // Take the higher 12 bits and ignore the lower 4 bits
     out_buf[index_short] = (uint8_t)(temp_i >> 4);
     out_buf[index_short + 1] =
@@ -385,11 +409,12 @@ static inline void SimdConvertFloat16ToFloat32(float* out_buf,
                                                const float* in_buf,
                                                size_t n_elems) {
 #if defined(DATATYPE_MEMORY_CHECK)
-  RtAssert(
-      ((n_elems % 16) == 0) && ((reinterpret_cast<size_t>(in_buf) % 32) == 0) &&
-          ((reinterpret_cast<size_t>(out_buf) % 32) == 0),
-      "SimdConvertFloat16ToFloat32: Data Alignment not correct before calling "
-      "into AVX optimizations");
+  RtAssert(((n_elems % 16) == 0) &&
+               ((reinterpret_cast<size_t>(in_buf) % 32) == 0) &&
+               ((reinterpret_cast<size_t>(out_buf) % 32) == 0),
+           "SimdConvertFloat16ToFloat32: Data Alignment not correct before "
+           "calling "
+           "into AVX optimizations");
 #endif
 #ifdef __AVX512F__
   for (size_t i = 0; i < n_elems; i += 16) {
@@ -414,11 +439,12 @@ static inline void SimdConvertFloat32ToFloat16(float* out_buf,
                                                const float* in_buf,
                                                size_t n_elems) {
 #if defined(DATATYPE_MEMORY_CHECK)
-  RtAssert(
-      ((n_elems % 16) == 0) && ((reinterpret_cast<size_t>(in_buf) % 32) == 0) &&
-          ((reinterpret_cast<size_t>(out_buf) % 32) == 0),
-      "SimdConvertFloat32ToFloat16: Data Alignment not correct before calling "
-      "into AVX optimizations");
+  RtAssert(((n_elems % 16) == 0) &&
+               ((reinterpret_cast<size_t>(in_buf) % 32) == 0) &&
+               ((reinterpret_cast<size_t>(out_buf) % 32) == 0),
+           "SimdConvertFloat32ToFloat16: Data Alignment not correct before "
+           "calling "
+           "into AVX optimizations");
 #endif
 
 #ifdef __AVX512F__
