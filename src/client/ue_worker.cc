@@ -198,6 +198,13 @@ void UeWorker::DoFftPilot(size_t tag) {
   // perform fft
   DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 
+  //// FFT shift the buffer
+  std::vector<complex_float> temp_fft_buf(config_.OfdmCaNum());
+  auto* temp_buff = reinterpret_cast<complex_float*>(temp_fft_buf.data());
+  auto* fft_buff_complex =
+      reinterpret_cast<complex_float*>(fft_buffer_[fft_buffer_target_id]);
+  CommsLib::FFTShift(fft_buff_complex, temp_buff, config_.OfdmCaNum());
+
   size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
   auto* csi_buffer_ptr =
       reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset]);
@@ -274,6 +281,13 @@ void UeWorker::DoFftData(size_t tag) {
   // perform fft
   DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 
+  //// FFT shift the buffer
+  std::vector<complex_float> temp_fft_buf(config_.OfdmCaNum());
+  auto* temp_buff = reinterpret_cast<complex_float*>(temp_fft_buf.data());
+  auto* fft_buff_complex =
+      reinterpret_cast<complex_float*>(fft_buffer_[fft_buffer_target_id]);
+  CommsLib::FFTShift(fft_buff_complex, temp_buff, config_.OfdmCaNum());
+
   size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
   auto* csi_buffer_ptr =
       reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset]);
@@ -322,7 +336,7 @@ void UeWorker::DoFftData(size_t tag) {
                              equ_buffer_ptr[data_sc_id]);
       }
       complex_float tx =
-          config_.DlIqF()[dl_symbol_id][ant * config_.OfdmCaNum() + sc_id];
+          config_.DlIqF()[dl_symbol_id][ant * config_.OfdmDataNum() + j];
       evm +=
           std::norm(equ_buffer_ptr[data_sc_id] - arma::cx_float(tx.re, tx.im));
     }
@@ -331,8 +345,7 @@ void UeWorker::DoFftData(size_t tag) {
   evm = evm / config_.GetOFDMDataNum();
   if (kPrintEqualizedSymbols) {
     complex_float* tx =
-        &config_.DlIqF()[dl_symbol_id][ant_id * config_.OfdmCaNum() +
-                                       config_.OfdmDataStart()];
+        &config_.DlIqF()[dl_symbol_id][ant_id * config_.OfdmDataNum()];
     arma::cx_fvec x_vec(reinterpret_cast<arma::cx_float*>(tx),
                         config_.OfdmDataNum(), false);
     Utils::PrintVec(x_vec, std::string("x") +
@@ -643,6 +656,9 @@ void UeWorker::DoIfft(size_t tag) {
   std::memset(ifft_buff + config_.OfdmDataStop(), 0,
               sizeof(complex_float) * config_.OfdmDataStart());
 
+  std::vector<complex_float> temp_fft_buf(config_.OfdmCaNum());
+  auto* temp_buff = reinterpret_cast<complex_float*>(temp_fft_buf.data());
+  CommsLib::FFTShift(ifft_buff, temp_buff, config_.OfdmCaNum());
   CommsLib::IFFT(ifft_buff, config_.OfdmCaNum(), false);
 
   const size_t tx_offset = buff_offset * config_.PacketLength();

@@ -53,10 +53,9 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
           (dir_ == Direction::kDownlink)
               ? cfg->DlIqF()[cfg->Frame().ClientDlPilotSymbols() + i]
               : cfg->UlIqF()[cfg->Frame().ClientUlPilotSymbols() + i]);
-      arma::cx_fmat iq_f_mat(iq_f_ptr, cfg->OfdmCaNum(), cfg->UeAntNum(),
+      arma::cx_fmat iq_f_mat(iq_f_ptr, cfg->OfdmDataNum(), cfg->UeAntNum(),
                              false);
-      gt_cube_.slice(i) =
-          iq_f_mat.rows(cfg->OfdmDataStart(), (cfg->OfdmDataStop() - 1)).st();
+      gt_cube_.slice(i) = iq_f_mat.st();
     }
   }
   dl_pilot_snr_.Calloc(kFrameWnd,
@@ -340,7 +339,7 @@ void PhyStats::RecordDlCsi(size_t frame_id, size_t num_rec_sc,
     std::stringstream ss;
     ss << frame_id;
     for (size_t i = 0; i < config_->UeAntNum(); i++) {
-      auto* csi_buffer_ptr = reinterpret_cast<const arma::cx_float*>(
+      const auto* csi_buffer_ptr = reinterpret_cast<const arma::cx_float*>(
           csi_buffer.At(csi_offset_base + i));
       for (size_t j = 0; j < num_rec_sc; j++) {
         const size_t sc_idx = (config_->OfdmDataNum() / num_rec_sc) * j;
