@@ -8,6 +8,11 @@
 
 #include "logger.h"
 #include "utils.h"
+#if defined(ENABLE_CSV_LOG)
+#include "spdlog/async.h"
+#include "spdlog/pattern_formatter.h"
+#include "spdlog/sinks/basic_file_sink.h"
+#endif
 
 namespace CsvLog {
 
