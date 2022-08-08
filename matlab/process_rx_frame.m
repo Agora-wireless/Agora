@@ -20,7 +20,6 @@ function [data_phase_corr, data_sc_idx, evm, snr] = process_rx_frame(configs, tx
     start_id = cp_len + tx_zero_prefix_len;
     snr = zeros(1, total_users);
     evm = zeros(1, total_users);
-    cl = 0;
     nz_start_idx = (fft_size - data_size)/2;
     nz_sc_idx = nz_start_idx+1:nz_start_idx+data_size;
     clear nz_start_idx;
@@ -43,7 +42,7 @@ function [data_phase_corr, data_sc_idx, evm, snr] = process_rx_frame(configs, tx
 
         %Process data symbols
         %data_phase_corr = zeros(data_size, dl_data_symbols);
-        aevms = zeros(u, dl_data_symbols);
+        aevms = zeros(1, dl_data_symbols);
         for d=1:dl_data_symbols
           rx_data_f_tmp = fftshift(fft(rx_data_cxdouble(start_id + 1:start_id + fft_size, u, d)));
           data_eq = rx_data_f_tmp(nz_sc_idx) ./ ch_est_mean;
@@ -53,13 +52,13 @@ function [data_phase_corr, data_sc_idx, evm, snr] = process_rx_frame(configs, tx
           data_phase_corr(data_sc_idx, d, u) = data_eq(data_sc_idx) .* exp(-1j*phase_err);
 
           evm_mat = abs(data_phase_corr(data_sc_idx, d, u) - tx_data_cxdouble(data_sc_idx, u, d)).^2;
-          aevms(u, d) = mean(evm_mat(:)); % needs to be a scalar
+          aevms(d) = mean(evm_mat(:)); % needs to be a scalar
 
         end
         clear d
 
-        snr(u) = 10*log10(1./mean(aevms(u, :))); % calculate in dB scale.
-        evm(u) = mean(aevms(u, :)) * 100;
+        snr(u) = 10*log10(1./mean(aevms)); % calculate in dB scale.
+        evm(u) = mean(aevms) * 100;
     end
 
 end

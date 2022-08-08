@@ -189,8 +189,8 @@ void RecorderWorkerHDF5::Init() {
       const std::string dataset_name("TxData");
       //Including the Pilots here.....
       //*2 for complex
-      const hsize_t tx_data_size = 2 * cfg_->OfdmCaNum();
-      const size_t num_dl_syms = cfg_->Frame().NumDLSyms();
+      const hsize_t tx_data_size = 2 * cfg_->OfdmDataNum();
+      const size_t num_dl_data_syms = cfg_->Frame().NumDLSyms();
       const std::array<hsize_t, kDsDimsNum> tx_data_dims = {1, 1, 1, 1,
                                                             tx_data_size};
       const std::array<hsize_t, kDsDimsNum> total_dims = {
@@ -209,7 +209,7 @@ void RecorderWorkerHDF5::Init() {
           hdf5_->WriteDataset(
               dataset_name, start, tx_data_dims,
               reinterpret_cast<float*>(const_cast<Config*>(cfg_)->DlIqF()[sym] +
-                                       (ant * cfg_->OfdmCaNum())));
+                                       (ant * cfg_->OfdmDataNum())));
         }
       }
       hdf5_->FinalizeDataset(dataset_name);
