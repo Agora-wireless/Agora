@@ -32,14 +32,12 @@ UeWorker::UeWorker(
     moodycamel::ProducerToken& work_producer, Table<int8_t>& ul_bits_buffer,
     Table<int8_t>& encoded_buffer, Table<complex_float>& modul_buffer,
     Table<complex_float>& ifft_buffer, char* const tx_buffer,
-    Table<char>& rx_buffer, std::vector<myVec>& csi_buffer,
+    Table<char>& rx_buffer, Table<complex_float>& csi_buffer,
     std::vector<myVec>& equal_buffer, std::vector<size_t>& non_null_sc_ind,
     Table<complex_float>& fft_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
-    std::vector<std::vector<std::complex<float>>>& ue_pilot_vec,
-    std::shared_ptr<CsvLog::CsvLogger> logger_evmsnr,
-    std::shared_ptr<CsvLog::CsvLogger> logger_berser)
+    std::vector<std::vector<std::complex<float>>>& ue_pilot_vec)
     : tid_(tid),
       notify_queue_(notify_queue),
       work_queue_(work_queue),
@@ -59,9 +57,7 @@ UeWorker::UeWorker(
       fft_buffer_(fft_buffer),
       demod_buffer_(demod_buffer),
       decoded_buffer_(decoded_buffer),
-      ue_pilot_vec_(ue_pilot_vec),
-      logger_evmsnr_(std::move(logger_evmsnr)),
-      logger_berser_(std::move(logger_berser)) {
+      ue_pilot_vec_(ue_pilot_vec) {
   ptok_ = std::make_unique<moodycamel::ProducerToken>(notify_queue);
 
   AllocBuffer1d(&rx_samps_tmp_, config_.SampsPerSymbol(),
@@ -202,9 +198,16 @@ void UeWorker::DoFftPilot(size_t tag) {
   // perform fft
   DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 
+  //// FFT shift the buffer
+  std::vector<complex_float> temp_fft_buf(config_.OfdmCaNum());
+  auto* temp_buff = reinterpret_cast<complex_float*>(temp_fft_buf.data());
+  auto* fft_buff_complex =
+      reinterpret_cast<complex_float*>(fft_buffer_[fft_buffer_target_id]);
+  CommsLib::FFTShift(fft_buff_complex, temp_buff, config_.OfdmCaNum());
+
   size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
   auto* csi_buffer_ptr =
-      reinterpret_cast<arma::cx_float*>(csi_buffer_.at(csi_offset).data());
+      reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset]);
   auto* fft_buffer_ptr =
       reinterpret_cast<arma::cx_float*>(fft_buffer_[fft_buffer_target_id]);
 
@@ -278,9 +281,16 @@ void UeWorker::DoFftData(size_t tag) {
   // perform fft
   DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 
+  //// FFT shift the buffer
+  std::vector<complex_float> temp_fft_buf(config_.OfdmCaNum());
+  auto* temp_buff = reinterpret_cast<complex_float*>(temp_fft_buf.data());
+  auto* fft_buff_complex =
+      reinterpret_cast<complex_float*>(fft_buffer_[fft_buffer_target_id]);
+  CommsLib::FFTShift(fft_buff_complex, temp_buff, config_.OfdmCaNum());
+
   size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
   auto* csi_buffer_ptr =
-      reinterpret_cast<arma::cx_float*>(csi_buffer_.at(csi_offset).data());
+      reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset]);
   auto* fft_buffer_ptr =
       reinterpret_cast<arma::cx_float*>(fft_buffer_[fft_buffer_target_id]);
 
@@ -319,8 +329,14 @@ void UeWorker::DoFftData(size_t tag) {
       arma::cx_float y = fft_buffer_ptr[sc_id];
       equ_buffer_ptr[data_sc_id] = (y / csi_buffer_ptr[j]) * phc;
       size_t ant = (kDebugDownlink == true) ? 0 : ant_id;
+      if (kCollectPhyStats) {
+        const size_t dl_data_symbol_id =
+            dl_symbol_id - config_.Frame().ClientDlPilotSymbols();
+        phy_stats_.UpdateEvm(frame_id, dl_data_symbol_id, j, ant, ant_id,
+                             equ_buffer_ptr[data_sc_id]);
+      }
       complex_float tx =
-          config_.DlIqF()[dl_symbol_id][ant * config_.OfdmCaNum() + sc_id];
+          config_.DlIqF()[dl_symbol_id][ant * config_.OfdmDataNum() + j];
       evm +=
           std::norm(equ_buffer_ptr[data_sc_id] - arma::cx_float(tx.re, tx.im));
     }
@@ -329,8 +345,7 @@ void UeWorker::DoFftData(size_t tag) {
   evm = evm / config_.GetOFDMDataNum();
   if (kPrintEqualizedSymbols) {
     complex_float* tx =
-        &config_.DlIqF()[dl_symbol_id][ant_id * config_.OfdmCaNum() +
-                                       config_.OfdmDataStart()];
+        &config_.DlIqF()[dl_symbol_id][ant_id * config_.OfdmDataNum()];
     arma::cx_fvec x_vec(reinterpret_cast<arma::cx_float*>(tx),
                         config_.OfdmDataNum(), false);
     Utils::PrintVec(x_vec, std::string("x") +
@@ -345,12 +360,6 @@ void UeWorker::DoFftData(size_t tag) {
     AGORA_LOG_INFO("Frame: %zu, Symbol: %zu, User: %zu, EVM: %f, SNR: %f\n",
                    frame_id, symbol_id, ant_id, (100.0f * evm),
                    (-10.0f * std::log10(evm)));
-  }
-  if (kEnableCsvLog) {
-    if (logger_evmsnr_) {
-      logger_evmsnr_->Write(frame_id, symbol_id, ant_id, 100.0f * evm,
-                            -10.0f * std::log10(evm));
-    }
   }
 
   if (kDebugPrintPerTaskDone || kDebugPrintFft) {
@@ -432,9 +441,9 @@ void UeWorker::DoDemul(size_t tag) {
   if (kDownlinkHardDemod && (kPrintPhyStats || kEnableCsvLog) &&
       (dl_symbol_id >= config_.Frame().ClientDlPilotSymbols())) {
     phy_stats_.UpdateDecodedBits(
-        ant_id, total_dl_symbol_id,
+        ant_id, total_dl_symbol_id, frame_slot,
         config_.GetOFDMDataNum() * config_.ModOrderBits(Direction::kDownlink));
-    phy_stats_.IncrementDecodedBlocks(ant_id, total_dl_symbol_id);
+    phy_stats_.IncrementDecodedBlocks(ant_id, total_dl_symbol_id, frame_slot);
     int8_t* tx_bytes = config_.GetModBitsBuf(
         config_.DlModBits(), Direction::kDownlink, 0, dl_symbol_id,
         kDebugDownlink ? 0 : ant_id, base_sc_id);
@@ -442,7 +451,8 @@ void UeWorker::DoDemul(size_t tag) {
     for (size_t i = 0; i < config_.GetOFDMDataNum(); i++) {
       uint8_t rx_byte = static_cast<uint8_t>(demod_ptr[i]);
       uint8_t tx_byte = static_cast<uint8_t>(tx_bytes[i]);
-      phy_stats_.UpdateBitErrors(ant_id, total_dl_symbol_id, tx_byte, rx_byte);
+      phy_stats_.UpdateBitErrors(ant_id, total_dl_symbol_id, frame_slot,
+                                 tx_byte, rx_byte);
       if (rx_byte != tx_byte) {
         block_error++;
       }
@@ -451,16 +461,8 @@ void UeWorker::DoDemul(size_t tag) {
       AGORA_LOG_INFO("Frame %zu Symbol %zu Ue %zu: %zu symbol errors\n",
                      frame_id, symbol_id, ant_id, block_error);
     }
-    phy_stats_.UpdateBlockErrors(ant_id, total_dl_symbol_id, block_error);
-    if (kEnableCsvLog) {
-      if (logger_berser_) {
-        logger_berser_->Write(
-            frame_id, symbol_id, ant_id,
-            phy_stats_.GetBitErrorRate(ant_id, total_dl_symbol_id),
-            static_cast<float>(block_error) /
-                static_cast<float>(config_.GetOFDMDataNum()));
-      }
-    }
+    phy_stats_.UpdateBlockErrors(ant_id, total_dl_symbol_id, frame_slot,
+                                 block_error);
   }
 
   if ((kDebugPrintPerTaskDone == true) || (kDebugPrintDemul == true)) {
@@ -654,6 +656,9 @@ void UeWorker::DoIfft(size_t tag) {
   std::memset(ifft_buff + config_.OfdmDataStop(), 0,
               sizeof(complex_float) * config_.OfdmDataStart());
 
+  std::vector<complex_float> temp_fft_buf(config_.OfdmCaNum());
+  auto* temp_buff = reinterpret_cast<complex_float*>(temp_fft_buf.data());
+  CommsLib::FFTShift(ifft_buff, temp_buff, config_.OfdmCaNum());
   CommsLib::IFFT(ifft_buff, config_.OfdmCaNum(), false);
 
   const size_t tx_offset = buff_offset * config_.PacketLength();

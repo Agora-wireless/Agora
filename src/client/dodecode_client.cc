@@ -115,20 +115,23 @@ EventData DoDecodeClient::Launch(size_t tag) {
   if ((kEnableMac == false) && (kPrintPhyStats == true) &&
       (symbol_idx_dl >= cfg_->Frame().ClientDlPilotSymbols())) {
     phy_stats_->UpdateDecodedBits(
-        ue_id, symbol_offset, cfg_->NumBytesPerCb(Direction::kDownlink) * 8);
-    phy_stats_->IncrementDecodedBlocks(ue_id, symbol_offset);
+        ue_id, symbol_offset, frame_slot,
+        cfg_->NumBytesPerCb(Direction::kDownlink) * 8);
+    phy_stats_->IncrementDecodedBlocks(ue_id, symbol_offset, frame_slot);
     size_t block_error(0);
     for (size_t i = 0; i < cfg_->NumBytesPerCb(Direction::kDownlink); i++) {
       uint8_t rx_byte = decoded_buffer_ptr[i];
       auto tx_byte = static_cast<uint8_t>(
           cfg_->GetInfoBits(cfg_->DlBits(), Direction::kDownlink, symbol_idx_dl,
                             kDebugDownlink ? 0 : ue_id, cur_cb_id)[i]);
-      phy_stats_->UpdateBitErrors(ue_id, symbol_offset, tx_byte, rx_byte);
+      phy_stats_->UpdateBitErrors(ue_id, symbol_offset, frame_slot, tx_byte,
+                                  rx_byte);
       if (rx_byte != tx_byte) {
         block_error++;
       }
     }
-    phy_stats_->UpdateBlockErrors(ue_id, symbol_offset, block_error);
+    phy_stats_->UpdateBlockErrors(ue_id, symbol_offset, frame_slot,
+                                  block_error);
   }
 
   size_t duration = GetTime::WorkerRdtsc() - start_tsc;
