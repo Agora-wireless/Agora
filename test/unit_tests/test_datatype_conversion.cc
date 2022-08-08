@@ -2,7 +2,6 @@
  * @file test_datatype_conversion.cc
  * @brief Unit tests for data type and bit-level conversions
  */
-
 #include <gtest/gtest.h>
 
 #include <bitset>
@@ -10,6 +9,9 @@
 #include "comms-lib.h"
 #include "datatype_conversion.h"
 #include "utils_ldpc.h"
+
+//Should define
+#define DATATYPE_MEMORY_CHECK
 
 static constexpr size_t kSIMDTestNum = 1024;
 
@@ -109,6 +111,70 @@ TEST(SIMD, float_32_to_16) {
   std::free(in_buf);
   std::free(medium);
   std::free(out_buf);
+}
+
+TEST(SIMD, int16_to_float) {
+  //For avx512 the arrays must be multiples of 512bits
+  const size_t array_size_bytes = 64;
+  const size_t int16_elements = array_size_bytes / sizeof(int16_t);
+  const size_t float_eq_elements = array_size_bytes / sizeof(float);
+  const size_t float_array_expanded =
+      (int16_elements / float_eq_elements) * array_size_bytes;
+  //const size_t float_elements = int16_elements;
+  //For avx512 the arrays must be multiples of 512bits
+  auto* in_buf = static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
+      Agora_memory::Alignment_t::kAlign64, array_size_bytes));
+
+  auto* float_buf = static_cast<float*>(Agora_memory::PaddedAlignedAlloc(
+      Agora_memory::Alignment_t::kAlign64, float_array_expanded));
+
+  auto* regen_buf = static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
+      Agora_memory::Alignment_t::kAlign64, array_size_bytes));
+
+  std::printf("Elements (%zu) Bytes (%zu:%zu)\n", int16_elements,
+              array_size_bytes, float_array_expanded);
+
+  int16_t value = SHRT_MIN;
+  const size_t simd_interations =
+      (static_cast<size_t>(SHRT_MAX - SHRT_MIN) / int16_elements) + 1;
+  //const size_t simd_interations = 1;
+
+  //Convert to Float
+  for (size_t i = 0; i < simd_interations; i++) {
+    //Load Input
+    for (size_t j = 0; j < int16_elements; j++) {
+      in_buf[j] = value++;
+    }
+    //Convert
+    SimdConvertShortToFloat(in_buf, float_buf, int16_elements);
+
+    //Check Output
+    for (size_t j = 0; j < int16_elements; j++) {
+      if (i % 128 == 0) {
+        //std::printf("In %d, Out %f\n", in_buf[j], float_buf[j]);
+      }
+    }
+
+    //Convert Back
+    SimdConvertFloatToShort(float_buf, regen_buf, int16_elements, 0, 1);
+
+    //Check Output
+    for (size_t j = 0; j < int16_elements; j++) {
+      if (in_buf[j] != regen_buf[j]) {
+        std::printf("Value Mismatch - Orig %d, Float %f, Conv %d\n", in_buf[j],
+                    float_buf[j], regen_buf[j]);
+      }
+      //std::printf("Orig %d, Float %f, Conv %d\n", in_buf[j], float_buf[j],
+      //            regen_buf[j]);
+    }
+  }
+
+  //for (size_t j = 0; j < int16_elements; j++) {
+  //  std::printf("In %d, Out %f\n", in_buf[j], out_buf[j]);
+  //}
+  std::free(in_buf);
+  std::free(float_buf);
+  std::free(regen_buf);
 }
 
 int main(int argc, char** argv) {
