@@ -190,7 +190,7 @@ void RecorderWorkerHDF5::Init() {
       //Including the Pilots here.....
       //*2 for complex
       const hsize_t tx_data_size = 2 * cfg_->OfdmDataNum();
-      const size_t num_dl_data_syms = cfg_->Frame().NumDLSyms();
+      const size_t num_dl_syms = cfg_->Frame().NumDLSyms();
       const std::array<hsize_t, kDsDimsNum> tx_data_dims = {1, 1, 1, 1,
                                                             tx_data_size};
       const std::array<hsize_t, kDsDimsNum> total_dims = {
