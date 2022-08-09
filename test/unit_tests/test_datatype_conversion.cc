@@ -10,9 +10,6 @@
 #include "datatype_conversion.h"
 #include "utils_ldpc.h"
 
-//Should define
-//#define DATATYPE_MEMORY_CHECK
-
 static constexpr size_t kSIMDTestNum = 1024;
 
 TEST(Modulation, adapt_bits_for_mod_one) {
