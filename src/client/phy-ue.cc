@@ -4,7 +4,6 @@
  */
 #include "phy-ue.h"
 
-#include <filesystem>
 #include <memory>
 #include <vector>
 
@@ -312,9 +311,6 @@ void PhyUe::Stop() {
 
 void PhyUe::Start() {
   PinToCoreWithOffset(ThreadType::kMaster, config_->UeCoreOffset(), 0);
-  if (std::filesystem::is_directory("log") == false) {
-    std::filesystem::create_directory("log");
-  }
 
   Table<complex_float> calib_buffer;
   calib_buffer.Malloc(kFrameWnd, config_->UeAntNum() * config_->OfdmDataNum(),

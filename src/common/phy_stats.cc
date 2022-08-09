@@ -286,7 +286,8 @@ void PhyStats::RecordEvm(size_t frame_id) {
     ss << frame_id;
     const size_t num_frame_data = config_->OfdmDataNum() * num_rxdata_symbols_;
     for (size_t i = 0; i < config_->UeAntNum(); i++) {
-      ss << "," << (evm_buffer_[frame_id % kFrameWnd][i] / num_frame_data);
+      ss << ","
+         << ((evm_buffer_[frame_id % kFrameWnd][i] / num_frame_data) * 100.0f);
     }
     csv_loggers_.at(CsvLog::kEVM)->Write(ss.str());
   }
