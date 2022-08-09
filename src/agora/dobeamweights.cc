@@ -24,7 +24,7 @@ DoBeamWeights::DoBeamWeights(
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices,
     PhyStats* in_phy_stats, Stats* stats_manager,
-    std::shared_ptr<CsvLog::MatLogger> csi_logger,
+    std::shared_ptr<CsvLog::MatLogger> dl_csi_logger,
     std::shared_ptr<CsvLog::MatLogger> dl_beam_logger)
     : Doer(config, tid),
       csi_buffers_(csi_buffers),
@@ -35,7 +35,7 @@ DoBeamWeights::DoBeamWeights(
       ul_beam_matrices_(ul_beam_matrices),
       dl_beam_matrices_(dl_beam_matrices),
       phy_stats_(in_phy_stats),
-      csi_logger_(std::move(csi_logger)),
+      dl_csi_logger_(std::move(dl_csi_logger)),
       dl_beam_logger_(std::move(dl_beam_logger)) {
   duration_stat_ = stats_manager->GetDurationStat(DoerType::kBeam, tid);
   pred_csi_buffer_ =
@@ -95,7 +95,8 @@ EventData DoBeamWeights::Launch(size_t tag) {
   return EventData(EventType::kBeam, tag);
 }
 
-float DoBeamWeights::ComputePrecoder(const arma::cx_fmat& mat_csi,
+float DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
+                                     const arma::cx_fmat& mat_csi,
                                      const arma::cx_fvec& calib_sc_vec,
                                      const float noise,
                                      complex_float* ul_beam_mem,
@@ -144,6 +145,9 @@ float DoBeamWeights::ComputePrecoder(const arma::cx_fmat& mat_csi,
       mat_dl_beam_tmp = mat_ul_beam_tmp * inv_calib_mat;
     } else {
       arma::cx_fmat mat_dl_csi = inv(arma::diagmat(calib_sc_vec)) * mat_csi;
+      if (kEnableMatLog && dl_csi_logger_) {
+        dl_csi_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_csi);
+      }
       switch (cfg_->BeamformingAlgo()) {
         case CommsLib::BeamformingAlgorithm::kZF:
           if (kUseInverseForZF) {
@@ -191,6 +195,9 @@ float DoBeamWeights::ComputePrecoder(const arma::cx_fmat& mat_csi,
     arma::cx_fmat mat_dl_beam(reinterpret_cast<arma::cx_float*>(dl_beam_mem),
                               cfg_->BsAntNum(), cfg_->UeAntNum(), false);
     mat_dl_beam = mat_dl_beam_tmp.st();
+    if (kEnableMatLog && dl_beam_logger_) {
+      dl_beam_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_beam);
+    }
   }
   for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {
     if (cfg_->ExternalRefNode(i) == true) {
@@ -417,18 +424,19 @@ void DoBeamWeights::ComputeFullCsiBeams(size_t tag) {
     duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
 
     float noise = 0;
-    if (cfg_->BeamformingAlgo()) {
+    if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
       noise = phy_stats_->GetNoise(frame_id);
     }
-    auto rcond = ComputePrecoder(mat_csi, cal_sc_vec, noise,
-                                 ul_beam_matrices_[frame_slot][cur_sc_id],
-                                 dl_beam_matrices_[frame_slot][cur_sc_id]);
+    auto rcond =
+        ComputePrecoder(frame_id, cur_sc_id, mat_csi, cal_sc_vec, noise,
+                        ul_beam_matrices_[frame_slot][cur_sc_id],
+                        dl_beam_matrices_[frame_slot][cur_sc_id]);
     if (kPrintBeamStats) {
       phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
     }
     if (kEnableMatLog) {
-      if (csi_logger_) {
-        csi_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_csi);
+      if (dl_csi_logger_) {
+        dl_csi_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_csi);
       }
 
       if (dl_beam_logger_) {
@@ -514,10 +522,10 @@ void DoBeamWeights::ComputePartialCsiBeams(size_t tag) {
                         cfg_->BsAntNum(), cfg_->UeAntNum(), false);
 
   float noise = 0;
-  if (cfg_->BeamformingAlgo()) {
+  if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
     noise = phy_stats_->GetNoise(frame_id);
   }
-  ComputePrecoder(mat_csi, cal_sc_vec, noise,
+  ComputePrecoder(frame_id, base_sc_id, mat_csi, cal_sc_vec, noise,
                   ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(base_sc_id)],
                   dl_beam_matrices_[frame_slot][cfg_->GetBeamScId(base_sc_id)]);
 

@@ -38,7 +38,7 @@ size_t CommsLib::FindPilotSeq(const std::vector<std::complex<float>>& iq,
   }
 
   // Equivalent to numpy's sign function
-  auto iq_sign = CommsLib::Csign(std::move(iq));
+  auto iq_sign = CommsLib::Csign(iq);
 
   // Convolution
   auto pilot_corr = CommsLib::Convolve(iq_sign, pilot_conj);
@@ -79,7 +79,7 @@ int CommsLib::FindLts(const std::vector<std::complex<double>>& iq, int seqLen) {
   }
 
   // Equivalent to numpy's sign function
-  auto iq_sign = CommsLib::Csign(std::move(iq));
+  auto iq_sign = CommsLib::Csign(iq);
 
   // Convolution
   auto lts_corr = CommsLib::Convolve(iq_sign, lts_sym_conj);
@@ -507,6 +507,39 @@ MKL_LONG CommsLib::FFT(complex_float* in_out, int fftsize) {
                     DftiErrorMessage(status));
   }
   return status;
+}
+
+void CommsLib::FFTShift(complex_float* in, complex_float* tmp, int fftsize) {
+  std::memcpy(tmp, in + fftsize / 2, sizeof(float) * fftsize);
+  std::memcpy(in + fftsize / 2, in, sizeof(float) * fftsize);
+  std::memcpy(in, tmp, sizeof(float) * fftsize);
+}
+
+std::vector<std::complex<float>> CommsLib::FFTShift(
+    const std::vector<std::complex<float>>& in) {
+  const size_t fft_size = in.size();
+  std::vector<std::complex<float>> out(fft_size);
+  std::vector<std::complex<float>> in_freq_shifted;
+  in_freq_shifted.insert(in_freq_shifted.end(), in.begin() + fft_size / 2,
+                         in.end());
+  in_freq_shifted.insert(in_freq_shifted.end(), in.begin(),
+                         in.begin() + fft_size / 2);
+  std::memcpy(out.data(), in_freq_shifted.data(),
+              fft_size * sizeof(std::complex<float>));
+  return out;
+}
+
+std::vector<complex_float> CommsLib::FFTShift(
+    const std::vector<complex_float>& in) {
+  const size_t fft_size = in.size();
+  std::vector<complex_float> out(fft_size);
+  std::vector<complex_float> in_freq_shifted;
+  in_freq_shifted.insert(in_freq_shifted.end(), in.begin() + fft_size / 2,
+                         in.end());
+  in_freq_shifted.insert(in_freq_shifted.end(), in.begin(),
+                         in.begin() + fft_size / 2);
+  std::memcpy(out.data(), in_freq_shifted.data(), fft_size * sizeof(float) * 2);
+  return out;
 }
 
 float CommsLib::ComputeOfdmSnr(const std::vector<std::complex<float>>& data_t,

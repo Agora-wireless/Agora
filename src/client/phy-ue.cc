@@ -4,12 +4,15 @@
  */
 #include "phy-ue.h"
 
+#include <filesystem>
 #include <memory>
+#include <vector>
 
 #include "packet_txrx_client_radio.h"
 #include "packet_txrx_client_sim.h"
 #include "phy_ldpc_decoder_5gnr.h"
 #include "phy_stats.h"
+#include "recorder_thread.h"
 #include "scrambler.h"
 #include "signal_handler.h"
 #include "utils_ldpc.h"
@@ -17,8 +20,28 @@
 /* Print debug work */
 static constexpr bool kDebugPrintPacketsFromMac = false;
 static constexpr bool kDebugPrintPacketsToMac = false;
+static constexpr size_t kDefaultQueueSize = 36;
 
-static const size_t kDefaultQueueSize = 36;
+//set the number of subcarriers to record DL CSI
+static constexpr size_t kNumRecSc = 4;
+
+//Recording parameters
+static constexpr size_t kRecordFrameInterval = 1;
+#if defined(ENABLE_HDF5)
+static constexpr bool kRecordDownlinkFrame = true;
+
+//set the recording types, can add multiple
+static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
+    kRecorderTypes{Agora_recorder::RecorderWorker::RecorderWorkerTypes::
+                       kRecorderWorkerHdf5};
+#else
+static constexpr bool kRecordDownlinkFrame = false;
+
+//set the recording types, can add multiple
+static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
+    kRecorderTypes{Agora_recorder::RecorderWorker::RecorderWorkerTypes::
+                       kRecorderWorkerMultiFile};
+#endif
 
 PhyUe::PhyUe(Config* config)
     : stats_(std::make_unique<Stats>(config)),
@@ -30,7 +53,6 @@ PhyUe::PhyUe(Config* config)
           config->LdpcConfig(Direction::kDownlink).NumBlocksInSymbol() *
               Roundup<64>(config->NumBytesPerCb(Direction::kDownlink))) {
   srand(time(nullptr));
-
   // TODO take into account the UeAntOffset to allow for multiple PhyUe
   // instances
   this->config_ = config;
@@ -47,9 +69,9 @@ PhyUe::PhyUe(Config* config)
          j < config_->SampsPerSymbol() - config->OfdmTxZeroPostfix(); j++) {
       ue_pilot_vec_.at(i).push_back(std::complex<float>(
           static_cast<float>(config_->UeSpecificPilotT()[i][j].real()) /
-              32768.0f,
+              SHRT_MAX,
           static_cast<float>(config_->UeSpecificPilotT()[i][j].imag()) /
-              32768.0f));
+              SHRT_MAX));
     }
   }
 
@@ -105,24 +127,27 @@ PhyUe::PhyUe(Config* config)
         std::thread(&MacThreadClient::RunEventLoop, mac_thread_.get());
   }
 
-  if (kEnableCsvLog) {
-    for (size_t i = 0; i < csv_loggers_.size(); i++) {
-      csv_loggers_.at(i) =
-          std::make_shared<CsvLog::CsvLogger>(config_->UeRadioId().at(0), i);
-    }
-  }
-
   for (size_t i = 0; i < config_->UeWorkerThreadNum(); i++) {
     auto new_worker = std::make_unique<UeWorker>(
         i, *config_, *stats_, *phy_stats_, complete_queue_, work_queue_,
         *work_producer_token_.get(), ul_bits_buffer_, ul_syms_buffer_,
         modul_buffer_, ifft_buffer_, tx_buffer_, rx_buffer_, csi_buffer_,
         equal_buffer_, non_null_sc_ind_, fft_buffer_, demod_buffer_,
-        decoded_buffer_, ue_pilot_vec_, csv_loggers_.at(CsvLog::kEVMSNR),
-        csv_loggers_.at(CsvLog::kBERSER));
+        decoded_buffer_, ue_pilot_vec_);
 
     new_worker->Start(core_offset_worker);
     workers_.push_back(std::move(new_worker));
+  }
+
+  if (kRecordDownlinkFrame) {
+    auto& new_recorder = recorders_.emplace_back(
+        std::make_unique<Agora_recorder::RecorderThread>(
+            config_, 0, core_offset_worker + config_->UeWorkerThreadNum(),
+            kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntNum() *
+                kDefaultQueueSize,
+            0, config_->UeAntNum(), kRecordFrameInterval, kRecorderTypes,
+            true));
+    new_recorder->Start();
   }
 
   // initilize all kinds of checkers
@@ -170,6 +195,12 @@ PhyUe::~PhyUe() {
     workers_.at(i)->Stop();
   }
   workers_.clear();
+
+  for (size_t i = 0; i < recorders_.size(); i++) {
+    AGORA_LOG_INFO("Waiting for Recording to complete %zu\n", i);
+    recorders_.at(i)->Stop();
+  }
+  recorders_.clear();
 
   if (kEnableMac == true) {
     mac_std_thread_.join();
@@ -239,7 +270,7 @@ void PhyUe::ScheduleDefferedDownlinkSymbols(size_t frame_id) {
     for (size_t ofdm_data = 0; ofdm_data < config_->OfdmDataNum();
          ofdm_data++) {
       auto* csi_buffer_ptr =
-          reinterpret_cast<arma::cx_float*>(csi_buffer_.at(csi_offset).data());
+          reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset]);
 
       csi_buffer_ptr[ofdm_data] /= dl_pilot_symbol_perframe_;
     }
@@ -261,8 +292,8 @@ void PhyUe::ClearCsi(size_t frame_id) {
       const size_t csi_offset = csi_offset_base + user;
       for (size_t ofdm_data = 0u; ofdm_data < config_->OfdmDataNum();
            ofdm_data++) {
-        auto* csi_buffer_ptr = reinterpret_cast<arma::cx_float*>(
-            csi_buffer_.at(csi_offset).data());
+        auto* csi_buffer_ptr =
+            reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset]);
 
         csi_buffer_ptr[ofdm_data] = 0;
       }
@@ -281,6 +312,9 @@ void PhyUe::Stop() {
 
 void PhyUe::Start() {
   PinToCoreWithOffset(ThreadType::kMaster, config_->UeCoreOffset(), 0);
+  if (std::filesystem::is_directory("log") == false) {
+    std::filesystem::create_directory("log");
+  }
 
   Table<complex_float> calib_buffer;
   calib_buffer.Malloc(kFrameWnd, config_->UeAntNum() * config_->OfdmDataNum(),
@@ -330,8 +364,13 @@ void PhyUe::Start() {
 
       switch (event.event_type_) {
         case EventType::kPacketRX: {
-          RxPacket* rx = rx_tag_t(event.tags_[0]).rx_packet_;
+          RxPacket* rx = rx_tag_t(event.tags_[0u]).rx_packet_;
           Packet* pkt = rx->RawPacket();
+
+          if (recorders_.size() == 1) {
+            rx->Use();
+            recorders_.at(0)->DispatchWork(event);
+          }
 
           const size_t frame_id = pkt->frame_id_;
           const size_t symbol_id = pkt->symbol_id_;
@@ -438,12 +477,10 @@ void PhyUe::Start() {
                 fft_dlpilot_counters_.CompleteSymbol(frame_id);
             if (pilot_fft_complete) {
               if (kPrintPhyStats) {
-                this->phy_stats_->PrintDlSnrStats(frame_id, ant_id);
+                this->phy_stats_->PrintDlSnrStats(frame_id);
               }
-              if (kEnableCsvLog) {
-                this->phy_stats_->RecordDlPilotSnr(
-                    csv_loggers_.at(CsvLog::kDLPSNR).get(), frame_id, ant_id);
-              }
+              this->phy_stats_->RecordDlCsi(frame_id, kNumRecSc, csi_buffer_);
+              this->phy_stats_->RecordDlPilotSnr(frame_id);
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
               PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
               ScheduleDefferedDownlinkSymbols(frame_id);
@@ -497,6 +534,15 @@ void PhyUe::Start() {
               this->stats_->MasterSetTsc(TsType::kDemulDone, frame_id);
               PrintPerFrameDone(PrintType::kDemul, frame_id);
               demul_counters_.Reset(frame_id);
+
+              this->phy_stats_->RecordEvm(frame_id);
+              this->phy_stats_->RecordEvmSnr(frame_id);
+              if (kDownlinkHardDemod) {
+                this->phy_stats_->RecordBer(frame_id);
+                this->phy_stats_->RecordSer(frame_id);
+              }
+              this->phy_stats_->ClearEvmBuffer(frame_id);
+
               if (kDownlinkHardDemod == true) {
                 bool finished =
                     FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
@@ -540,7 +586,8 @@ void PhyUe::Start() {
               this->stats_->MasterSetTsc(TsType::kDecodeDone, frame_id);
               PrintPerFrameDone(PrintType::kDecode, frame_id);
               decode_counters_.Reset(frame_id);
-
+              this->phy_stats_->RecordBer(frame_id);
+              this->phy_stats_->RecordSer(frame_id);
               bool finished =
                   FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
               if (finished == true) {
@@ -915,17 +962,15 @@ void PhyUe::InitializeDownlinkBuffers() {
                      Agora_memory::Alignment_t::kAlign64);
 
   // initialize CSI buffer
-  csi_buffer_.resize(config_->UeAntNum() * kFrameWnd);
-  for (auto& i : csi_buffer_) {
-    i.resize(config_->OfdmDataNum());
-
-    for (auto& csi_value : i) {
-      if (config_->Frame().ClientDlPilotSymbols() == 0) {
-        csi_value.re = 1;
-        csi_value.im = 0;
-      } else {
-        csi_value.re = 0;
-        csi_value.im = 0;
+  csi_buffer_.Calloc(config_->UeAntNum() * kFrameWnd, config_->OfdmDataNum(),
+                     Agora_memory::Alignment_t::kAlign64);
+  assert(reinterpret_cast<size_t>(csi_buffer_[0]) % 64 == 0);
+  if (config_->Frame().ClientDlPilotSymbols() == 0) {
+    for (size_t i = 0; i < csi_buffer_.Dim1(); i++) {
+      complex_float* csi_data_sc = csi_buffer_[i];
+      for (size_t j = 0; j < csi_buffer_.Dim2(); j++) {
+        csi_data_sc[j].re = 1.0f;
+        csi_data_sc[j].im = 0.0f;
       }
     }
   }
@@ -945,6 +990,7 @@ void PhyUe::InitializeDownlinkBuffers() {
 void PhyUe::FreeDownlinkBuffers() {
   rx_buffer_.Free();
   fft_buffer_.Free();
+  csi_buffer_.Free();
 }
 
 void PhyUe::PrintPerTaskDone(PrintType print_type, size_t frame_id,

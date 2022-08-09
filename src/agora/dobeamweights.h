@@ -31,7 +31,7 @@ class DoBeamWeights : public Doer {
       PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_,
       PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_,
       PhyStats* in_phy_stats, Stats* stats_manager,
-      std::shared_ptr<CsvLog::MatLogger> csi_logger = {},
+      std::shared_ptr<CsvLog::MatLogger> dl_csi_logger = {},
       std::shared_ptr<CsvLog::MatLogger> dl_beam_logger = {});
   ~DoBeamWeights() override;
 
@@ -58,7 +58,8 @@ class DoBeamWeights : public Doer {
 
   /// Compute the uplink mMIMO detector matrix and/or the downlink
   /// mMIMO precoder using this CSI matrix and calibration buffer
-  float ComputePrecoder(const arma::cx_fmat& mat_csi,
+  float ComputePrecoder(size_t frame_id, size_t cur_sc_id,
+                        const arma::cx_fmat& mat_csi,
                         const arma::cx_fvec& calib_sc_vec, const float noise,
                         complex_float* ul_beam_mem, complex_float* dl_beam_mem);
   void ComputeCalib(size_t frame_id, size_t sc_id, arma::cx_fvec& calib_sc_vec);
@@ -111,7 +112,7 @@ class DoBeamWeights : public Doer {
   arma::uvec ext_ref_id_;
   size_t num_ext_ref_;
 
-  std::shared_ptr<CsvLog::MatLogger> csi_logger_;
+  std::shared_ptr<CsvLog::MatLogger> dl_csi_logger_;
   std::shared_ptr<CsvLog::MatLogger> dl_beam_logger_;
 };
 

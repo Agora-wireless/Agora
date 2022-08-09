@@ -30,7 +30,10 @@ TxRxWorkerHw::TxRxWorkerHw(
       radio_config_(radio_config),
       program_start_ticks_(0),
       freq_ghz_(GetTime::MeasureRdtscFreq()),
-      zeros_(config->SampsPerSymbol(), std::complex<int16_t>(0u, 0u)) {}
+      zeros_(config->SampsPerSymbol(), std::complex<int16_t>(0u, 0u)),
+      first_symbol_(interface_count, true) {
+  InitRxStatus();
+}
 
 TxRxWorkerHw::~TxRxWorkerHw() = default;
 
@@ -89,43 +92,79 @@ void TxRxWorkerHw::DoTxRx() {
         rx_times.at(receive_attempt.interface_).end_ticks_ = rx_time_ticks;
       }
 
-      if (!pkts.empty()) {
+      if (pkts.empty() == false) {
+        bool ignore = false;
         RtAssert(pkts.size() == channels_per_interface_,
                  "Received data but it was the wrong dimension");
-        const size_t rx_symbol_id = pkts.front()->symbol_id_;
+        const size_t rx_symbol_id = pkts.front()->RawPacket()->symbol_id_;
+        const size_t rx_frame_id = pkts.front()->RawPacket()->frame_id_;
 
-        if (unlikely(rx_symbol_id != receive_attempt.symbol_)) {
+        bool is_first = first_symbol_.at(receive_attempt.interface_);
+
+        //This first symbol tracking is only necessary for bad data (at the beginning) for hw_framer mode
+        if (is_first) {
+          //We will ignore the data until we get an acceptable first symbol / frame
+          if ((rx_symbol_id == receive_attempt.symbol_) && (rx_frame_id == 0)) {
+            //Match, don't allow any more incorrect symbol data
+            first_symbol_.at(receive_attempt.interface_) = false;
+            AGORA_LOG_TRACE(
+                "TxRxWorkerHw[%zu]: Interface %zu Matched First Symbol "
+                "%zu:%zu\n",
+                tid_, receive_attempt.interface_, rx_symbol_id,
+                receive_attempt.symbol_);
+          } else {
+            ignore = true;
+            AGORA_LOG_WARN(
+                "TxRxWorkerHw[%zu]: Ignoring Rx Data on Interface %zu (Frame "
+                "%zu, Symbol %zu) - Expected symbol %zu\n",
+                tid_, receive_attempt.interface_, rx_frame_id, rx_symbol_id,
+                receive_attempt.symbol_);
+          }
+        } else if (rx_symbol_id != receive_attempt.symbol_) {
+          //Hard error, getting unexpected data
           AGORA_LOG_ERROR(
-              "TxRxWorkerHw[%zu]: Frame %d - Expected symbol %zu but "
-              "received %zu\n",
-              tid_, pkts.front()->frame_id_, receive_attempt.symbol_,
-              rx_symbol_id);
+              "TxRxWorkerHw[%zu]: Frame %zu - Expected symbol %zu but "
+              "received %zu on interface %zu\n",
+              tid_, rx_frame_id, receive_attempt.symbol_, rx_symbol_id,
+              receive_attempt.interface_);
+          RtAssert(
+              rx_symbol_id == receive_attempt.symbol_,
+              "The expected receive symbol does not match the actual symbol");
         }
 
-        RtAssert(
-            rx_symbol_id == receive_attempt.symbol_,
-            "The expected receive symbol does not match the actual symbol");
+        if (ignore == false) {
+          //Publish the symbols to the scheduler
+          for (auto* packet : pkts) {
+            EventData rx_message(EventType::kPacketRX, rx_tag_t(packet).tag_);
+            NotifyComplete(rx_message);
+          }
 
-        // Symbol received, change the rx interface
-        TxRxWorkerRx::RxParameters successful_receive = receive_attempt;
-        receive_attempt = UpdateRxInterface(successful_receive);
-        AGORA_LOG_TRACE(
-            "TxRxWorkerHw[%zu]: Last Interface %zu - symbol %zu:%zu, next "
-            "interface %zu - symbol %zu\n",
-            tid_, successful_receive.interface_, successful_receive.symbol_,
-            rx_symbol_id, receive_attempt.interface_, receive_attempt.symbol_);
+          // Symbol received, change the rx interface
+          TxRxWorkerRx::RxParameters successful_receive = receive_attempt;
+          receive_attempt = UpdateRxInterface(successful_receive);
+          AGORA_LOG_TRACE(
+              "TxRxWorkerHw[%zu]: Last Interface %zu - symbol %zu:%zu, next "
+              "interface %zu - symbol %zu\n",
+              tid_, successful_receive.interface_, successful_receive.symbol_,
+              rx_symbol_id, receive_attempt.interface_,
+              receive_attempt.symbol_);
 
-        if (kIsWorkerTimingEnabled) {
-          const auto frame_id = pkts.front()->frame_id_;
-          if (frame_id > prev_frame_id) {
-            rx_frame_start_[frame_id % kNumStatsFrames] = rx_time_ticks;
-            prev_frame_id = frame_id;
+          if (kIsWorkerTimingEnabled) {
+            if (static_cast<ssize_t>(rx_frame_id) > prev_frame_id) {
+              rx_frame_start_[rx_frame_id % kNumStatsFrames] = rx_time_ticks;
+              prev_frame_id = rx_frame_id;
+            }
+          }
+
+          PrintRxSymbolTiming(rx_times, rx_frame_id, successful_receive.symbol_,
+                              receive_attempt.symbol_);
+        }  //!ignore
+        else {
+          //Return the Packets (must be in reverse order)
+          for (size_t i = pkts.size(); i > 0; i--) {
+            ReturnRxPacket(*pkts.at(i - 1));
           }
         }
-
-        PrintRxSymbolTiming(rx_times, pkts.front()->frame_id_,
-                            successful_receive.symbol_,
-                            receive_attempt.symbol_);
       }  // if (pkt.size() > 0)
     }    // DoTx(time0) == 0
   }      // Configuration()->Running() == true
@@ -135,110 +174,120 @@ void TxRxWorkerHw::DoTxRx() {
 //RX data, should return channel number of packets || 0
 // global_frame_id will be used and updated
 // global_symbol_id will be used and updated
-std::vector<Packet*> TxRxWorkerHw::DoRx(size_t interface_id,
-                                        size_t& global_frame_id,
-                                        size_t& global_symbol_id) {
+std::vector<RxPacket*> TxRxWorkerHw::DoRx(size_t interface_id,
+                                          size_t& global_frame_id,
+                                          size_t& global_symbol_id) {
   const size_t radio_id = interface_id + interface_offset_;
-  const size_t ant_id = radio_id * channels_per_interface_;
-  const size_t cell_id = Configuration()->CellId().at(radio_id);
-
-  std::vector<size_t> ant_ids(channels_per_interface_);
-  std::vector<void*> samp(channels_per_interface_);
-  std::vector<RxPacket*> memory_tracking;
 
   //Return value
-  std::vector<Packet*> result_packets;
+  std::vector<RxPacket*> result_packets;
 
-  //Allocate memory
-  for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-    RxPacket& rx = GetRxPacket();
-    memory_tracking.push_back(&rx);
-    ant_ids.at(ch) = ant_id + ch;
-    samp.at(ch) = rx.RawPacket()->data_;
-    AGORA_LOG_TRACE("TxRxWorkerHw[%zu]: Using Packet at location %zu\n", tid_,
-                    reinterpret_cast<size_t>(&rx));
-  }
+  auto& rx_info = rx_status_.at(interface_id);
+  const size_t request_samples =
+      Configuration()->SampsPerSymbol() - rx_info.SamplesAvailable();
+  RtAssert(Configuration()->SampsPerSymbol() > rx_info.SamplesAvailable(),
+           "Rx Samples must be > 0");
+
+  auto rx_locations = rx_info.GetRxPtrs();
   long long frame_time;
 
+  Radio::RxFlags out_flags;
   //Ok to read into sample memory for dummy read
-  const int rx_status =
-      radio_config_.RadioRx(radio_id, samp.data(), frame_time);
+  const int rx_status = radio_config_.RadioRx(
+      radio_id, rx_locations, request_samples, out_flags, frame_time);
 
-  //Should be Configuration()->SampsPerSymbol() but adding this check causes issues
   if (rx_status > 0) {
-    // The frame time is returned in the RadioRx call so use it instead of the software tracked value
-    if (Configuration()->HwFramer() == true) {
-      global_frame_id = static_cast<size_t>(frame_time >> 32);
-      global_symbol_id = static_cast<size_t>((frame_time >> 16) & 0xFFFF);
-    }
+    const size_t new_samples = static_cast<size_t>(rx_status);
+    rx_info.Update(new_samples, frame_time);
 
-    const size_t frame_id = global_frame_id;
-    const size_t symbol_id = global_symbol_id;
+    //Check for successful finish
+    if ((new_samples == request_samples) ||
+        (out_flags == Radio::RxFlags::kEndReceive)) {
+      frame_time = rx_info.StartTime();
+      const size_t ant_id = radio_id * channels_per_interface_;
+      const size_t cell_id = Configuration()->CellId().at(radio_id);
 
-    if (static_cast<size_t>(rx_status) != Configuration()->SampsPerSymbol()) {
-      AGORA_LOG_WARN(
-          "TxRxWorkerHw[%zu]: Interface %zu | Radio %zu  - Attempted "
-          "Frame: %zu, Symbol: %zu, RX status = %d is not the expected value\n",
-          tid_, interface_id, interface_id + interface_offset_, frame_id,
-          symbol_id, rx_status);
-    } else {
-      AGORA_LOG_FRAME(
-          "TxRxWorkerHw[%zu]: Interface %zu | Radio %zu  - Attempted "
-          "Frame: %zu, Symbol: %zu, RX status = %d\n",
-          tid_, interface_id, interface_id + interface_offset_, frame_id,
-          symbol_id, rx_status);
-    }
+      //Finished successfully
+      bool invalid_rx_symbol = false;
+      if (Configuration()->HwFramer() == true) {
+        global_frame_id = static_cast<size_t>(frame_time >> 32);
+        const size_t rx_symbol_id =
+            static_cast<size_t>((frame_time >> 16) & 0xFFFF);
 
-    const bool cal_rx =
-        (radio_id != Configuration()->RefRadio(cell_id) &&
-         Configuration()->IsCalUlPilot(global_frame_id, global_symbol_id)) ||
-        (radio_id == Configuration()->RefRadio(cell_id) &&
-         Configuration()->IsCalDlPilot(global_frame_id, global_symbol_id));
-    const bool ignore_rx_data =
-        (Configuration()->HwFramer() == false) &&
-        (!Configuration()->IsPilot(global_frame_id, global_symbol_id) &&
-         !Configuration()->IsUplink(global_frame_id, global_symbol_id) &&
-         !cal_rx);
-
-    // Update global frame_id and symbol_id
-    global_symbol_id++;
-    if (global_symbol_id == Configuration()->Frame().NumTotalSyms()) {
-      global_symbol_id = 0;
-      global_frame_id++;
-    }
-
-    if (ignore_rx_data == false) {
-      for (size_t ant = 0; ant < ant_ids.size(); ant++) {
-        auto* rx_packet = memory_tracking.at(ant);
-        auto* raw_pkt = rx_packet->RawPacket();
-        new (raw_pkt) Packet(frame_id, symbol_id, cell_id, ant_ids.at(ant));
-        result_packets.push_back(raw_pkt);
-
-        // Push kPacketRX event into the queue.
-        EventData rx_message(EventType::kPacketRX, rx_tag_t(*rx_packet).tag_);
-        NotifyComplete(rx_message);
-        memory_tracking.at(ant) = nullptr;
+        if (rx_symbol_id > Configuration()->Frame().NumTotalSyms()) {
+          invalid_rx_symbol = true;
+        } else {
+          global_symbol_id = rx_symbol_id;
+        }
       }
+
+      const size_t frame_id = global_frame_id;
+      const size_t symbol_id = global_symbol_id;
+
+      if (new_samples == request_samples) {
+        RtAssert(
+            rx_info.SamplesAvailable() == Configuration()->SampsPerSymbol(),
+            "Samples Available should match SampsPerSymbol");
+
+        AGORA_LOG_FRAME(
+            "TxRxWorkerHw[%zu]: Interface %zu | Radio %zu  - Attempted "
+            "Frame: %zu, Symbol: %zu, RX status = %d\n",
+            tid_, interface_id, interface_id + interface_offset_, frame_id,
+            symbol_id, rx_status);
+      } else {
+        AGORA_LOG_WARN(
+            "TxRxWorkerHw[%zu]: Interface %zu | Radio %zu  - Attempted "
+            "Frame: %zu, Symbol: %zu, RX samples %zu is less than the desired "
+            "amount %zu\n",
+            tid_, interface_id, interface_id + interface_offset_, frame_id,
+            symbol_id, rx_info.SamplesAvailable(),
+            Configuration()->SampsPerSymbol());
+      }
+
+      const bool cal_rx =
+          (radio_id != Configuration()->RefRadio(cell_id) &&
+           Configuration()->IsCalUlPilot(global_frame_id, global_symbol_id)) ||
+          (radio_id == Configuration()->RefRadio(cell_id) &&
+           Configuration()->IsCalDlPilot(global_frame_id, global_symbol_id));
+      const bool ignore_rx_data =
+          (invalid_rx_symbol == true) ||
+          ((Configuration()->HwFramer() == false) &&
+           (!Configuration()->IsPilot(global_frame_id, global_symbol_id) &&
+            !Configuration()->IsUplink(global_frame_id, global_symbol_id) &&
+            !cal_rx));
+
+      // Update global frame_id and symbol_id
+      global_symbol_id++;
+      if (global_symbol_id == Configuration()->Frame().NumTotalSyms()) {
+        global_symbol_id = 0;
+        global_frame_id++;
+      }
+
+      if (ignore_rx_data == false) {
+        auto packets = rx_info.GetRxPackets();
+        for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+          auto* rx_packet = packets.at(ch);
+          result_packets.emplace_back(rx_packet);
+          auto* raw_pkt = rx_packet->RawPacket();
+          new (raw_pkt) Packet(frame_id, symbol_id, cell_id, ant_id + ch);
+          AGORA_LOG_TRACE(
+              "TxRxWorkerHw[%zu]: Frame %zu Symbol %zu Ant %zu - Radio %zu - "
+              "Received Symbol\n",
+              tid_, frame_id, symbol_id, ant_id + ch, radio_id);
+        }
+      }
+      ResetRxStatus(interface_id, ignore_rx_data);
+    } else if (new_samples > request_samples) {
+      RtAssert(
+          false,
+          "Received more samples than requested - possible memory overrun\n");
     }
+    //new_samples < request_samples (do nothing)
   } else if (rx_status < 0) {
     AGORA_LOG_ERROR(
         "TxRxWorkerHw[%zu]: Interface %zu | Radio %zu - Rx failure RX "
         "status = %d is less than 0\n",
         tid_, interface_id, interface_id + interface_offset_, rx_status);
-  }
-
-  //Free memory from most recent allocated to latest
-  AGORA_LOG_TRACE("TxRxWorkerHw[%zu]: Memory allocation %zu\n", tid_,
-                  memory_tracking.size());
-  for (ssize_t idx = (memory_tracking.size() - 1); idx > -1; idx--) {
-    auto* memory_location = memory_tracking.at(idx);
-    AGORA_LOG_TRACE("TxRxWorkerHw[%zu]: Checking location %zu\n", tid_,
-                    (size_t)memory_location);
-    if (memory_location != nullptr) {
-      AGORA_LOG_TRACE("TxRxWorkerHw[%zu]: Returning Packet at location %zu\n",
-                      tid_, (size_t)memory_location);
-      ReturnRxPacket(*memory_location);
-    }
   }
   return result_packets;
 }
@@ -448,8 +497,7 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
       std::vector<const void*> txbuf(channels_per_interface_);
       if (kDebugDownlink == true) {
         for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-          // Not exactly sure why 0 index was selected here.  Could it be a beacon ant?
-          if (!kBeamsweepData && ant_id != 0) {
+          if (!kBeamsweepData && ant_id != Configuration()->BeaconAnt()) {
             txbuf.at(ch) = zeros_.data();
           } else if (dl_symbol_idx <
                      Configuration()->Frame().ClientDlPilotSymbols()) {
@@ -545,15 +593,15 @@ bool TxRxWorkerHw::IsTxSymbolNext(size_t radio_id, size_t current_symbol) {
   return tx_symbol_next;
 }
 
-int TxRxWorkerHw::GetTxFlags(size_t radio_id, size_t tx_symbol_id) {
-  int tx_flags;
+Radio::TxFlags TxRxWorkerHw::GetTxFlags(size_t radio_id, size_t tx_symbol_id) {
+  Radio::TxFlags tx_flags;
   //Flags == 1   // HAS_TIME
   //Flags == 2;  // HAS_TIME & END_BURST, name me
   const auto tx_again = IsTxSymbolNext(radio_id, tx_symbol_id);
   if (tx_again) {
-    tx_flags = 1;
+    tx_flags = Radio::TxFlags::kTxFlagNone;
   } else {
-    tx_flags = 2;
+    tx_flags = Radio::TxFlags::kEndTransmit;
   }
   return tx_flags;
 }
@@ -683,7 +731,7 @@ void TxRxWorkerHw::PrintRxSymbolTiming(
 long long int TxRxWorkerHw::GetHwTime() {
   long long hw_time = 0;
   if (Configuration()->HwFramer() == false) {
-    constexpr int kBeacontxFlags = 2;  // END BURST
+    constexpr auto kBeacontxFlags = Radio::TxFlags::kEndTransmit;
     // Read some dummy symbols to get the hardware time and then schedule
     // TX/RX accordingly
     const size_t beacon_radio =
@@ -712,6 +760,7 @@ long long int TxRxWorkerHw::GetHwTime() {
     size_t frame_time = Configuration()->SampsPerSymbol() *
                         Configuration()->Frame().NumTotalSyms();
 
+    Radio::RxFlags out_flags;
     std::cout << "Sync BS host and FGPA timestamp..." << std::endl;
 
     //RX / TX all symbols in tx frame delta
@@ -723,8 +772,9 @@ long long int TxRxWorkerHw::GetHwTime() {
       if (frm == 0) {
         const size_t rx_radio_id = interface_offset_;
         while (rx_status < 0) {
-          rx_status =
-              radio_config_.RadioRx(rx_radio_id, samp_buffer, rx_time_bs);
+          rx_status = radio_config_.RadioRx(rx_radio_id, samp_buffer,
+                                            Configuration()->SampsPerSymbol(),
+                                            out_flags, rx_time_bs);
         }
         //First Frame has been rx'd by the first radio
         tx_time_bs = rx_time_bs + frame_time * TX_FRAME_DELTA;
@@ -737,7 +787,9 @@ long long int TxRxWorkerHw::GetHwTime() {
         //Finish rx'ing symbol 0 on remaining radios
         for (size_t radio_id = rx_radio_id + 1;
              radio_id < rx_radio_id + num_interfaces_; radio_id++) {
-          rx_status = radio_config_.RadioRx(radio_id, samp_buffer, rx_time_bs);
+          rx_status = radio_config_.RadioRx(radio_id, samp_buffer,
+                                            Configuration()->SampsPerSymbol(),
+                                            out_flags, rx_time_bs);
           //---------------What to do about errors?
         }
         //Symbol complete
@@ -769,7 +821,9 @@ long long int TxRxWorkerHw::GetHwTime() {
            sym < Configuration()->Frame().NumTotalSyms(); sym++) {
         for (size_t radio_id = interface_offset_;
              radio_id < interface_offset_ + num_interfaces_; radio_id++) {
-          rx_status = radio_config_.RadioRx(radio_id, samp_buffer, rx_time_bs);
+          rx_status = radio_config_.RadioRx(radio_id, samp_buffer,
+                                            Configuration()->SampsPerSymbol(),
+                                            out_flags, rx_time_bs);
           //---------------Check status?
         }
       }
@@ -831,7 +885,7 @@ void TxRxWorkerHw::TxDownlinkZeros(size_t frame_id, size_t radio_id,
           (static_cast<long long>(frame_id) << 32) | (tx_symbol_id << 16);
     }
 
-    const int tx_flags = GetTxFlags(radio_id, tx_symbol_id);
+    const auto tx_flags = GetTxFlags(radio_id, tx_symbol_id);
 
     const int tx_ret =
         radio_config_.RadioTx(radio_id, tx_buffs.data(), tx_flags, frame_time);
@@ -843,4 +897,33 @@ void TxRxWorkerHw::TxDownlinkZeros(size_t frame_id, size_t radio_id,
                 << std::endl;
     }
   }  // end for all symbols
+}
+
+void TxRxWorkerHw::InitRxStatus() {
+  rx_status_.resize(num_interfaces_,
+                    TxRxWorkerRx::RxStatusTracker(channels_per_interface_));
+  std::vector<RxPacket*> rx_packets(channels_per_interface_);
+  for (auto& status : rx_status_) {
+    for (auto& new_packet : rx_packets) {
+      new_packet = &GetRxPacket();
+      AGORA_LOG_TRACE("InitRxStatus[%zu]: Using Packet at location %d\n", tid_,
+                      reinterpret_cast<intptr_t>(new_packet));
+    }
+    //Allocate memory for each interface / channel
+    status.Reset(rx_packets);
+  }
+}
+
+void TxRxWorkerHw::ResetRxStatus(size_t interface, bool reuse_memory) {
+  auto& prev_status = rx_status_.at(interface);
+
+  std::vector<RxPacket*> rx_packets;
+  if (reuse_memory) {
+    rx_packets = rx_status_.at(interface).GetRxPackets();
+  } else {
+    for (size_t packets = 0; packets < prev_status.NumChannels(); packets++) {
+      rx_packets.emplace_back(&GetRxPacket());
+    }
+  }
+  prev_status.Reset(rx_packets);
 }

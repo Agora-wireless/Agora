@@ -3,6 +3,7 @@
  * @brief Implementation file for the digital (baseband) calibration 
  * functions such as sample offset and reciprocity calibration
  */
+#include "logger.h"
 #include "matplotlibcpp.h"
 #include "radio_lib.h"
 namespace plt = matplotlibcpp;
@@ -11,127 +12,160 @@ static constexpr size_t kMaxArraySampleOffset = 10;
 static constexpr bool kReciprocalCalibPlot = false;
 static constexpr bool kPrintCalibrationMats = false;
 static constexpr bool kVerboseCalibration = false;
-static constexpr size_t kRxTimeoutUs = 1000000;
-static constexpr size_t kTxTimeoutUs = 1000000;
-
-std::vector<std::complex<float>> RadioConfig::SnoopSamples(
-    SoapySDR::Device* dev, size_t channel, size_t read_size) {
-  std::vector<uint32_t> samps_int =
-      dev->readRegisters("RX_SNOOPER", channel, read_size);
-  std::vector<std::complex<float>> samps =
-      Utils::Uint32tocfloat(samps_int, "IQ");
-  return samps;
-}
+static constexpr size_t kRefChannel = 0;
 
 auto RadioConfig::TxArrayToRef(
     const std::vector<std::complex<int16_t>>& tx_vec) {
-  size_t ref = cfg_->RefRadio(0);
-  long long tx_time(0);
-  long long rx_time(0);
-  int read_len = tx_vec.size();
-  std::vector<std::vector<std::complex<int16_t>>> dl_buff(cfg_->BfAntNum());
-  std::vector<std::complex<int16_t>> dummybuff(read_len);
-  std::vector<std::complex<int16_t>> zeros(read_len,
-                                           std::complex<int16_t>(0, 0));
+  const size_t ref = cfg_->RefRadio(0);
+  const size_t tx_antennas = cfg_->BfAntNum();
+  const size_t read_samples = tx_vec.size();
+  std::vector<std::vector<std::complex<int16_t>>> dl_buff(
+      tx_antennas, std::vector<std::complex<int16_t>>(
+                       read_samples, std::complex<int16_t>(0, 0)));
+  std::vector<std::vector<std::complex<int16_t>>> dummybuffs(
+      cfg_->NumChannels(), std::vector<std::complex<int16_t>>(read_samples));
+  const std::vector<std::complex<int16_t>> zeros(read_samples,
+                                                 std::complex<int16_t>(0, 0));
 
-  std::vector<const void*> txbuff(2);
-  std::vector<void*> rxbuff(2);
-  if (cfg_->NumChannels() == 2) {
-    rxbuff.at(1) = dummybuff.data();
+  std::vector<const void*> txbuff(cfg_->NumChannels(), zeros.data());
+  std::vector<std::vector<std::complex<int16_t>>*> rx_buffs(
+      cfg_->NumChannels());
+  //Set the rx to scratch memory
+  for (size_t i = 0; i < rx_buffs.size(); i++) {
+    rx_buffs.at(i) = &dummybuffs.at(i);
   }
 
-  for (size_t ant_i = 0; ant_i < cfg_->BfAntNum(); ant_i++) {
+  long long tx_time(0);
+  long long rx_time(0);
+
+  // Send a separate pilot from each antenna (each loop)
+  for (size_t ant_i = 0; ant_i < tx_antennas; ant_i++) {
+    const size_t radio_i = ant_i / cfg_->NumChannels();
+    const size_t current_channel = ant_i % cfg_->NumChannels();
     // set up tx/rx buffers
-    size_t radio_i = ant_i / cfg_->NumChannels();
-    dl_buff.at(ant_i).resize(read_len);
-    rxbuff.at(0) = dl_buff.at(ant_i).data();  // ref always txrx on channel 0
-    txbuff[ant_i % cfg_->NumChannels()] = tx_vec.data();
-    if (cfg_->NumChannels() == 2) {
-      txbuff[1 - (ant_i % 2)] = zeros.data();
+    // ref use fixed channel
+    rx_buffs.at(kRefChannel) = &dl_buff.at(ant_i);
+    txbuff.at(current_channel) = tx_vec.data();
+
+    radios_.at(radio_i)->Activate(Radio::kActivateWaitTrigger, tx_time,
+                                  read_samples);
+    radios_.at(ref)->Activate(Radio::kActivateWaitTrigger, tx_time,
+                              read_samples);
+
+    const auto tx_flags = Radio::TxFlags::kTxWaitTrigger;
+    const auto ret_tx =
+        radios_.at(radio_i)->Tx(txbuff.data(), read_samples, tx_flags, tx_time);
+    if (ret_tx < static_cast<int>(read_samples)) {
+      AGORA_LOG_WARN("Radio %zu Tx Failure with status %d:%zu\n", radio_i,
+                     ret_tx, read_samples);
     }
 
-    // Send a separate pilot from each antenna
-    int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
-    int ret = ba_stn_.at(radio_i)->writeStream(this->tx_streams_.at(radio_i),
-                                               txbuff.data(), read_len,
-                                               tx_flags, tx_time, kTxTimeoutUs);
-    if (ret < (int)read_len) {
-      std::cout << "bad write\n";
-    }
+    //TRIGGER
+    Go();
 
-    int rx_flags_activate = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
-    ret = ba_stn_.at(ref)->activateStream(this->rx_streams_.at(ref),
-                                          rx_flags_activate, rx_time, read_len);
+    auto rx_flags = Radio::RxFlags::kRxFlagNone;
+    int rx_status;
+    do {
+      rx_status =
+          radios_.at(ref)->Rx(rx_buffs, read_samples, rx_flags, rx_time);
 
-    Go();  // trigger
+      if (rx_status > 0) {
+        auto rx_samples = static_cast<size_t>(rx_status);
+        if (rx_samples < read_samples) {
+          AGORA_LOG_WARN("Radio %zu Rx less than requested samples %zu:%zu\n",
+                         radio_i, rx_samples, read_samples);
+        }
+      } else if (rx_status < 0) {
+        AGORA_LOG_ERROR(
+            "Radio %zu Rx Failure with status %d:%zu from ref node %zu\n",
+            radio_i, rx_status, read_samples, ref);
+      }
+    } while (rx_status == 0);
 
-    int rx_flags = 0;
-    ret =
-        ba_stn_.at(ref)->readStream(this->rx_streams_.at(ref), rxbuff.data(),
-                                    read_len, rx_flags, rx_time, kRxTimeoutUs);
-    if (ret < (int)read_len) {
-      std::cout << "bad read (" << ret << ") at node " << ref
-                << " from antenna " << ant_i << std::endl;
-    }
+    radios_.at(radio_i)->Deactivate();
+    radios_.at(ref)->Deactivate();
+    //Reset rx / tx buffers to zeros / dummies
+    rx_buffs.at(kRefChannel) = &dummybuffs.at(current_channel);
+    txbuff.at(current_channel) = zeros.data();
   }
   return dl_buff;
 }
 
 auto RadioConfig::TxRefToArray(
     const std::vector<std::complex<int16_t>>& tx_vec) {
-  size_t num_radios = cfg_->NumRadios() - 1;  // minus ref. node
-  size_t ref = cfg_->RefRadio(0);
-  long long tx_time(0);
-  long long rx_time(0);
+  const size_t num_radios = cfg_->NumRadios();
+  // minus ref. node (last in radio list assumed)
+  const size_t rx_radios = num_radios - 1;
+  const size_t ref = cfg_->RefRadio(0);
+  long long rx_time;
+  long long tx_time{0};
 
-  // Transmitting from only one chain, create a null vector for chainB
-  size_t read_len = tx_vec.size();
+  RtAssert(ref == rx_radios, "Ref radio must be last");
 
-  std::vector<const void*> txbuff(2);
-  txbuff.at(0) = tx_vec.data();
-  if (cfg_->NumChannels() == 2) {
-    std::vector<std::complex<int16_t>> zeros(read_len,
-                                             std::complex<int16_t>(0, 0));
-    txbuff.at(1) = zeros.data();
-  }
-  std::vector<void*> rxbuff(2);
+  // Transmitting from only one channel, create a null vector for all others channel
+  const size_t read_samples = tx_vec.size();
+  const size_t num_channels = cfg_->NumChannels();
+
+  std::vector<std::complex<int16_t>> zeros(read_samples,
+                                           std::complex<int16_t>(0, 0));
+
+  std::vector<const void*> txbuff(cfg_->NumChannels(), zeros.data());
+  txbuff.at(kRefChannel) = tx_vec.data();
 
   // Allocate buffers for uplink directions
-  std::vector<std::vector<std::complex<int16_t>>> ul_buff(cfg_->BfAntNum());
-  std::vector<std::complex<int16_t>> dummybuff(read_len);
-  int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
-  int ret =
-      ba_stn_.at(ref)->writeStream(this->tx_streams_.at(ref), txbuff.data(),
-                                   read_len, tx_flags, tx_time, kTxTimeoutUs);
-  if (ret < (int)read_len) {
-    std::cout << "bad write\n";
-  }
+  std::vector<std::vector<std::complex<int16_t>>> ul_buff(
+      cfg_->BfAntNum(), std::vector<std::complex<int16_t>>(
+                            read_samples, std::complex<int16_t>(0, 0)));
+  std::vector<std::vector<std::complex<int16_t>>*> rx_buffs(num_channels,
+                                                            nullptr);
 
   for (size_t i = 0; i < num_radios; i++) {
-    int rx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
-    ret = ba_stn_.at(i)->activateStream(this->rx_streams_.at(i), rx_flags,
-                                        rx_time, read_len);
+    radios_.at(i)->Activate(Radio::kActivateWaitTrigger, tx_time, read_samples);
   }
 
-  Go();  // Trigger
-
-  int rx_flags = SOAPY_SDR_END_BURST;
-  for (size_t radio_i = 0; radio_i < num_radios; radio_i++) {
-    size_t ant_i = radio_i * cfg_->NumChannels();
-    ul_buff.at(ant_i).resize(read_len);
-    rxbuff.at(0) = ul_buff.at(ant_i).data();
-    if (cfg_->NumChannels() == 2) {
-      ul_buff.at(ant_i + 1).resize(read_len);
-      rxbuff.at(1) = ul_buff.at(ant_i + 1).data();
-    }
-    ret = ba_stn_.at(radio_i)->readStream(this->rx_streams_.at(radio_i),
-                                          rxbuff.data(), read_len, rx_flags,
-                                          rx_time, kRxTimeoutUs);
-    if (ret < (int)read_len) {
-      std::cout << "Bad read (" << ret << ") at node " << radio_i
-                << " from node " << ref << std::endl;
-    }
+  const auto tx_flags = Radio::TxFlags::kTxWaitTrigger;
+  const int tx_status =
+      radios_.at(ref)->Tx(txbuff.data(), read_samples, tx_flags, tx_time);
+  if (tx_status < static_cast<int>(read_samples)) {
+    AGORA_LOG_WARN("Radio %zu Tx Ref Failure with status %d:%zu\n", ref,
+                   tx_status, read_samples);
   }
+
+  //TRIGGER
+  Go();
+
+  auto rx_flags = Radio::RxFlags::kRxFlagNone;
+  for (size_t radio_i = 0; radio_i < rx_radios; radio_i++) {
+    const size_t base_ant = radio_i * num_channels;
+    for (size_t ch = 0; ch < num_channels; ch++) {
+      rx_buffs.at(ch) = &ul_buff.at(base_ant + ch);
+    }
+
+    int rx_status;
+    do {
+      rx_status =
+          radios_.at(radio_i)->Rx(rx_buffs, read_samples, rx_flags, rx_time);
+
+      if (rx_status > 0) {
+        auto rx_samples = static_cast<size_t>(rx_status);
+        if (rx_samples < read_samples) {
+          AGORA_LOG_WARN("Radio %zu Rx less than requested samples %zu:%zu\n",
+                         radio_i, rx_samples, read_samples);
+        }
+      } else if (rx_status < 0) {
+        AGORA_LOG_ERROR(
+            "Radio %zu Rx Failure with status %d:%zu from ref node %zu\n",
+            radio_i, rx_status, read_samples, ref);
+      }
+    } while (rx_status == 0);
+    AGORA_LOG_WARN(
+        "Radio %zu Rx Success with %d:%zu from ref node %zu at time %lld\n",
+        radio_i, rx_status, read_samples, ref, rx_time);
+    radios_.at(radio_i)->Deactivate();
+  }
+
+  //All rx done, deactivate the tx
+  radios_.at(ref)->Deactivate();
   return ul_buff;
 }
 
@@ -147,7 +181,7 @@ bool RadioConfig::FindTimeOffset(
     size_t peak = CommsLib::FindPilotSeq(samps, cfg_->PilotCf32(), seq_len);
     offset[i] = peak < seq_len ? 0 : peak - seq_len;
     if (offset.at(i) == 0) {
-      std::cout << "Invalid uplink pilot offsets" << std::endl;
+      AGORA_LOG_WARN("Invalid uplink pilot offsets\n");
       bad_data = true;
       break;
     }
@@ -156,9 +190,10 @@ bool RadioConfig::FindTimeOffset(
             static_cast<int>(kMaxArraySampleOffset))
 
     {  // make sure offsets are not too
-       // different from each other
-      std::cout << "Difference in uplink pilot offsets exceeds threshold ("
-                << kMaxArraySampleOffset << ")." << std::endl;
+      // different from each other
+      AGORA_LOG_WARN(
+          "Difference in uplink pilot offsets exceeds threshold (%zu)\n",
+          kMaxArraySampleOffset);
       bad_data = true;
       break;
     }
@@ -172,35 +207,38 @@ void RadioConfig::AdjustDelays(std::vector<int> offset) {
   size_t ref_offset = *std::max_element(offset.begin(), offset.end());
   for (size_t i = 0; i < offset.size(); i++) {
     // int delta = cfg_->OfdmTxZeroPrefix() - offset[i];
-    int delta = ref_offset - offset[i];
-    std::cout << "sample_adjusting delay of node " << i << " (offset "
-              << offset[i] << ") by " << delta << std::endl;
-    int iter = delta < 0 ? -delta : delta;
+    const int delta = ref_offset - offset[i];
+    AGORA_LOG_INFO("Sample_adjusting delay of node %zu (offset %d) by %d\n", i,
+                   offset[i], delta);
+    const int iter = delta < 0 ? -delta : delta;
     for (int j = 0; j < iter; j++) {
       if (delta < 0) {
-        ba_stn_[i]->writeSetting("ADJUST_DELAYS", "-1");
+        radios_.at(i)->AdjustDelay("-1");
       } else {
-        ba_stn_[i]->writeSetting("ADJUST_DELAYS", "1");
+        radios_.at(i)->AdjustDelay("1");
       }
     }
   }
 }
 
 void RadioConfig::CalibrateSampleOffset() {
-  size_t num_radios = cfg_->BfAntNum() / cfg_->NumChannels();
+  const size_t num_radios = cfg_->BfAntNum() / cfg_->NumChannels();
 
   size_t n = 0;
   const size_t max_retries = 10;
-  std::cout << "Calibrating with uplink " << std::endl;
+  AGORA_LOG_INFO("Calibrating with uplink\n");
   // Transmit from Ref to Array and Adjust Delays Until Synced
   while (n < max_retries) {
     auto ul_buff = TxRefToArray(cfg_->PilotCi16());
     std::vector<int> ul_offset(cfg_->BfAntNum(), 0);
-    bool bad_data = this->FindTimeOffset(ul_buff, ul_offset);
+    const bool bad_data = this->FindTimeOffset(ul_buff, ul_offset);
     if (bad_data) {
       n++;
+      std::cout << "Time offset returned bad data = " << bad_data << " count "
+                << n << std::endl;
       continue;
     }
+
     std::vector<int> ul_offset_a;
     std::vector<int> ul_offset_b;
     int max_ab_diff = 0;
@@ -210,8 +248,12 @@ void RadioConfig::CalibrateSampleOffset() {
         ul_offset_a.push_back(ul_offset.at(i));
         ul_offset_b.push_back(ul_offset.at(i + 1));
         int ul_offset_diff = std::abs(ul_offset_b.back() - ul_offset_a.back());
-        if (ul_offset_diff > max_ab_diff) max_ab_diff = ul_offset_diff;
-        if (ul_offset_diff < min_ab_diff) min_ab_diff = ul_offset_diff;
+        if (ul_offset_diff > max_ab_diff) {
+          max_ab_diff = ul_offset_diff;
+        }
+        if (ul_offset_diff < min_ab_diff) {
+          min_ab_diff = ul_offset_diff;
+        }
       }
       std::cout << "Rx max chan A & B offset diff: " << max_ab_diff
                 << ", Rx min chan A & B offset diff: " << min_ab_diff
@@ -219,9 +261,9 @@ void RadioConfig::CalibrateSampleOffset() {
     } else {
       ul_offset_a = ul_offset;
     }
-    int ul_max_offset =
+    const int ul_max_offset =
         *std::max_element(ul_offset_a.begin(), ul_offset_a.end());
-    int ul_min_offset =
+    const int ul_min_offset =
         *std::min_element(ul_offset_a.begin(), ul_offset_a.end());
     std::cout << "Max ul_offset: " << ul_max_offset
               << ", Min ul_offset: " << ul_min_offset << std::endl;
@@ -242,10 +284,9 @@ void RadioConfig::CalibrateSampleOffset() {
       RtAssert(pilot_stop < cfg_->SampsPerSymbol(),
                "Pilot samples go beyond received symbol boundary."
                " Consider extending ofdm_tx_zero_postfix parameter!");
-      for (size_t i = 0; i < ul_buff.size(); i++) {
-        std::vector<std::complex<int16_t>> ofdm_samps(
-            ul_buff.at(i).begin() + pilot_start,
-            ul_buff.at(i).begin() + pilot_stop);
+      for (auto& i : ul_buff) {
+        std::vector<std::complex<int16_t>> ofdm_samps(i.begin() + pilot_start,
+                                                      i.begin() + pilot_stop);
         auto ofdm_data = Utils::Cint16ToCfloat32(ofdm_samps);
         float snr_val = CommsLib::ComputeOfdmSnr(
             ofdm_data, cfg_->OfdmDataStart(), cfg_->OfdmDataStop());
@@ -270,16 +311,16 @@ void RadioConfig::CalibrateSampleOffset() {
   if (n >= max_retries) {
     std::cout << "Reached max retries for sample offset calibration (uplink)"
               << std::endl;
-    exit(0);
+    return;
   }
 
   // Transmit from Array to Ref and ensure they are all synced
   n = 0;
-  std::cout << "Calibrating with downlink " << std::endl;
+  AGORA_LOG_INFO("Calibrating with downlink\n");
   while (n < max_retries) {
     auto dl_buff = TxArrayToRef(cfg_->PilotCi16());
     std::vector<int> dl_offset(cfg_->BfAntNum(), 0);
-    bool bad_data = this->FindTimeOffset(dl_buff, dl_offset);
+    const bool bad_data = this->FindTimeOffset(dl_buff, dl_offset);
     if (bad_data) {
       n++;
       continue;
@@ -294,8 +335,12 @@ void RadioConfig::CalibrateSampleOffset() {
         dl_offset_a.push_back(dl_offset.at(i));
         dl_offset_b.push_back(dl_offset.at(i + 1));
         int dl_offset_diff = std::abs(dl_offset_b.back() - dl_offset_a.back());
-        if (dl_offset_diff > max_ab_diff) max_ab_diff = dl_offset_diff;
-        if (dl_offset_diff < min_ab_diff) min_ab_diff = dl_offset_diff;
+        if (dl_offset_diff > max_ab_diff) {
+          max_ab_diff = dl_offset_diff;
+        }
+        if (dl_offset_diff < min_ab_diff) {
+          min_ab_diff = dl_offset_diff;
+        }
       }
       std::cout << "Tx max chan A & B offset diff: " << max_ab_diff
                 << ", Tx min chan A & B offset diff: " << min_ab_diff
@@ -304,8 +349,10 @@ void RadioConfig::CalibrateSampleOffset() {
       dl_offset_a = dl_offset;
     }
 
-    int max_offset = *std::max_element(dl_offset_a.begin(), dl_offset_a.end());
-    int min_offset = *std::min_element(dl_offset_a.begin(), dl_offset_a.end());
+    const int max_offset =
+        *std::max_element(dl_offset_a.begin(), dl_offset_a.end());
+    const int min_offset =
+        *std::min_element(dl_offset_a.begin(), dl_offset_a.end());
     std::cout << "Max dl_offset: " << max_offset
               << ", Min dl_offset: " << min_offset << std::endl;
     if (max_offset - min_offset > 4) {
@@ -313,7 +360,7 @@ void RadioConfig::CalibrateSampleOffset() {
         std::cout << "Downlink offsets mismatch: Try " << n + 1 << std::endl;
       } else {
         std::cout << "Downlink pilot offsets not synced!" << std::endl;
-        exit(0);
+        return;
       }
     } else {
       // measure downlink SNR here
@@ -322,15 +369,14 @@ void RadioConfig::CalibrateSampleOffset() {
                 << std::endl;
       std::cout << "Received SNR from the Reference Node At the Array"
                 << std::endl;
-      size_t pilot_start = min_offset + cfg_->CpLen();
-      size_t pilot_stop = min_offset + cfg_->CpLen() + cfg_->OfdmCaNum();
+      const size_t pilot_start = min_offset + cfg_->CpLen();
+      const size_t pilot_stop = min_offset + cfg_->CpLen() + cfg_->OfdmCaNum();
       RtAssert(pilot_stop < cfg_->SampsPerSymbol(),
                "Received pilot exceeds symbol boundary. Consider extending "
                "ofdm_tx_zero_postfix parameter!");
-      for (size_t i = 0; i < dl_buff.size(); i++) {
-        std::vector<std::complex<int16_t>> ofdm_samps(
-            dl_buff.at(i).begin() + pilot_start,
-            dl_buff.at(i).begin() + pilot_stop);
+      for (auto& i : dl_buff) {
+        std::vector<std::complex<int16_t>> ofdm_samps(i.begin() + pilot_start,
+                                                      i.begin() + pilot_stop);
         auto ofdm_data = Utils::Cint16ToCfloat32(ofdm_samps);
         float snr_val = CommsLib::ComputeOfdmSnr(
             ofdm_data, cfg_->OfdmDataStart(), cfg_->OfdmDataStop());
@@ -354,101 +400,8 @@ void RadioConfig::CalibrateSampleOffset() {
   if (n >= max_retries) {
     std::cout << "Reached max retries for sample offset calibration (downlink)"
               << std::endl;
-    exit(0);
+    return;
   }
-}
-
-bool RadioConfig::InitialCalibLoop() {
-  bool good_calib = false;
-  AllocBuffer1d(&init_calib_dl_processed_,
-                cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
-                Agora_memory::Alignment_t::kAlign64, 1);
-  AllocBuffer1d(&init_calib_ul_processed_,
-                cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
-                Agora_memory::Alignment_t::kAlign64, 1);
-  // initialize init_calib to a matrix of zeros
-  for (size_t i = 0; i < cfg_->OfdmDataNum() * cfg_->BfAntNum(); i++) {
-    init_calib_dl_processed_[i] = 0;
-    init_calib_ul_processed_[i] = 0;
-  }
-
-  calib_meas_num_ = cfg_->InitCalibRepeat();
-  if (calib_meas_num_ != 0u) {
-    init_calib_ul_.Calloc(calib_meas_num_,
-                          cfg_->OfdmDataNum() * cfg_->BfAntNum(),
-                          Agora_memory::Alignment_t::kAlign64);
-    init_calib_dl_.Calloc(calib_meas_num_,
-                          cfg_->OfdmDataNum() * cfg_->BfAntNum(),
-                          Agora_memory::Alignment_t::kAlign64);
-    if (cfg_->Frame().NumDLSyms() > 0) {
-      int iter = 0;
-      int max_iter = 1;
-      std::cout << "Start initial reciprocity calibration..." << std::endl;
-      while (good_calib == false) {
-        good_calib = InitialCalib();
-        iter++;
-        if ((iter == max_iter) && (good_calib == false)) {
-          std::cout << "attempted " << max_iter
-                    << " unsucessful calibration, stopping ..." << std::endl;
-          break;
-        }
-      }
-      if (good_calib == false) {
-        return good_calib;
-      } else {
-        std::cout << "initial calibration successful!" << std::endl;
-      }
-      // process initial measurements
-      arma::cx_fcube calib_dl_cube(cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                   calib_meas_num_, arma::fill::zeros);
-      arma::cx_fcube calib_ul_cube(cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                   calib_meas_num_, arma::fill::zeros);
-      for (size_t i = 0; i < calib_meas_num_; i++) {
-        arma::cx_fmat calib_dl_mat(init_calib_dl_[i], cfg_->OfdmDataNum(),
-                                   cfg_->BfAntNum(), false);
-        arma::cx_fmat calib_ul_mat(init_calib_ul_[i], cfg_->OfdmDataNum(),
-                                   cfg_->BfAntNum(), false);
-        calib_dl_cube.slice(i) = calib_dl_mat;
-        calib_ul_cube.slice(i) = calib_ul_mat;
-        if (kPrintCalibrationMats) {
-          Utils::PrintMat(calib_dl_mat, "calib_dl_mat" + std::to_string(i));
-          Utils::PrintMat(calib_ul_mat, "calib_ul_mat" + std::to_string(i));
-          Utils::PrintMat(calib_dl_mat / calib_ul_mat,
-                          "calib_mat" + std::to_string(i));
-        }
-        if (kRecordCalibrationMats == true) {
-          Utils::SaveMat(calib_dl_mat, "calib_dl_mat.m",
-                         "init_calib_dl_mat" + std::to_string(i),
-                         i > 0 /*append*/);
-          Utils::SaveMat(calib_ul_mat, "calib_ul_mat.m",
-                         "init_calib_ul_mat" + std::to_string(i),
-                         i > 0 /*append*/);
-        }
-      }
-      arma::cx_fmat calib_dl_mean_mat(init_calib_dl_processed_,
-                                      cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                      false);
-      arma::cx_fmat calib_ul_mean_mat(init_calib_ul_processed_,
-                                      cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                      false);
-      calib_dl_mean_mat = arma::mean(calib_dl_cube, 2);  // mean along dim 2
-      calib_ul_mean_mat = arma::mean(calib_ul_cube, 2);  // mean along dim 2
-      if (kPrintCalibrationMats) {
-        Utils::PrintMat(calib_dl_mean_mat, "calib_dl_mat");
-        Utils::PrintMat(calib_ul_mean_mat, "calib_ul_mat");
-        Utils::PrintMat(calib_dl_mean_mat / calib_ul_mean_mat, "calib_mat");
-      }
-      if (kRecordCalibrationMats == true) {
-        Utils::SaveMat(calib_dl_mean_mat, "calib_dl_mat.m",
-                       "init_calib_dl_mat_mean", true /*append*/);
-        Utils::SaveMat(calib_ul_mean_mat, "calib_ul_mat.m",
-                       "init_calib_ul_mat_mean", true /*append*/);
-      }
-    }
-    init_calib_dl_.Free();
-    init_calib_ul_.Free();
-  }
-  return true;
 }
 
 bool RadioConfig::InitialCalib() {
@@ -483,18 +436,6 @@ bool RadioConfig::InitialCalib() {
   }
 
   std::vector<std::complex<int16_t>> dummybuff(read_len);
-  // DrainBuffers();
-
-  //for (size_t i = 0; i < r; i++) {
-  //  for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
-  //    ba_stn_.at(i)->setGain(
-  //        SOAPY_SDR_TX, ch, "PAD",
-  //        ch != 0u ? cfg_->CalibTxGainB() : cfg_->CalibTxGainA());
-  //  }
-  //  ba_stn_.at(i)->writeSetting("TDD_CONFIG", "{\"tdd_enabled\":false}");
-  //  ba_stn_.at(i)->writeSetting("TDD_MODE", "false");
-  //  ba_stn_.at(i)->activateStream(this->tx_streams_.at(i));
-  //}
 
   size_t good_csi_cnt = 0;
   size_t n = 0;
@@ -515,33 +456,26 @@ bool RadioConfig::InitialCalib() {
 
       // Send a separate pilot from each antenna
       for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
-        int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
+        const auto tx_flags = Radio::TxFlags::kEndTransmit;
         size_t retry = 0;
         bool bad_read = false;
         while (retry < max_retries) {
           bad_read = false;
-          int ret = ba_stn_.at(i)->writeStream(
-              this->tx_streams_.at(i), ch > 0 ? txbuff1.data() : txbuff0.data(),
-              read_len, tx_flags, tx_time, kTxTimeoutUs);
+          int ret = radios_.at(i)->Tx(ch > 0 ? txbuff1.data() : txbuff0.data(),
+                                      read_len, tx_flags, tx_time);
           if (ret < (int)read_len) {
             std::cout << "bad write\n";
           }
 
-          int rx_flags_activate = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
-          ret = ba_stn_.at(ref)->activateStream(
-              this->rx_streams_.at(ref), rx_flags_activate, rx_time, read_len);
-
+          radios_.at(ref)->Activate();
           Go();  // trigger
 
-          int rx_flags = SOAPY_SDR_END_BURST;
-          std::vector<void*> rxbuff0(2);
-          rxbuff0.at(0) = buff.at(cfg_->NumChannels() * i + ch).data();
-          if (cfg_->NumChannels() == 2) {
-            rxbuff0.at(1) = dummybuff.data();
-          }
-          ret = ba_stn_.at(ref)->readStream(this->rx_streams_.at(ref),
-                                            rxbuff0.data(), read_len, rx_flags,
-                                            rx_time, kRxTimeoutUs);
+          auto rx_flags = Radio::RxFlags::kRxFlagNone;
+          std::vector<std::vector<std::complex<int16_t>>*> rx_buff(
+              cfg_->NumChannels(), &dummybuff);
+          rx_buff.at(0) = &buff.at(cfg_->NumChannels() * i + ch);
+
+          ret = radios_.at(ref)->Rx(rx_buff, read_len, rx_flags, rx_time);
           if (ret < (int)read_len) {
             std::cout << "bad read (" << ret << ") at node " << ref
                       << " from node " << i << std::endl;
@@ -558,29 +492,26 @@ bool RadioConfig::InitialCalib() {
     }
     // Transmit from Ref Antenna to Beamforming Antennas (Up)
     if (good_csi == true) {
-      int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
+      const auto tx_flags = Radio::TxFlags::kEndTransmit;
       size_t retry = 0;
       bool bad_read = false;
       while (retry < max_retries) {
         bad_read = false;
-        int ret = ba_stn_.at(ref)->writeStream(this->tx_streams_.at(ref),
-                                               txbuff0.data(), read_len,
-                                               tx_flags, tx_time, kTxTimeoutUs);
+        int ret =
+            radios_.at(ref)->Tx(txbuff0.data(), read_len, tx_flags, tx_time);
         if (ret < (int)read_len) {
           std::cout << "bad write\n";
         }
 
         for (size_t i = 0; i < r; i++) {
           if (i != ref) {
-            int rx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
-            ret = ba_stn_.at(i)->activateStream(this->rx_streams_.at(i),
-                                                rx_flags, rx_time, read_len);
+            radios_.at(i)->Activate();
           }
         }
 
         Go();  // Trigger
 
-        int rx_flags = SOAPY_SDR_END_BURST;
+        auto rx_flags = Radio::RxFlags::kRxFlagNone;
         for (size_t i = 0; i < r; i++) {
           if (good_csi == false) {
             break;
@@ -588,14 +519,13 @@ bool RadioConfig::InitialCalib() {
           if (i == ref) {
             continue;
           }
-          std::vector<void*> rxbuff(2);
-          rxbuff.at(0) = buff.at(m + cfg_->NumChannels() * i).data();
-          if (cfg_->NumChannels() == 2) {
-            rxbuff.at(1) = buff.at(m + cfg_->NumChannels() * i + 1).data();
+          std::vector<std::vector<std::complex<int16_t>>*> rx_buff(
+              cfg_->NumChannels());
+          for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
+            rx_buff.at(ch) = &buff.at(m + cfg_->NumChannels() * i + ch);
           }
-          ret = ba_stn_.at(i)->readStream(this->rx_streams_.at(i),
-                                          rxbuff.data(), read_len, rx_flags,
-                                          rx_time, kRxTimeoutUs);
+
+          ret = radios_.at(i)->Rx(rx_buff, read_len, rx_flags, rx_time);
           if (ret < (int)read_len) {
             bad_read = true;
             std::cout << "Bad read (" << ret << ") at node " << i
@@ -617,20 +547,17 @@ bool RadioConfig::InitialCalib() {
     if (good_csi == true) {
       noise_buff.resize(m);
       for (size_t i = 0; i < r; i++) {
-        int rx_flags = SOAPY_SDR_END_BURST;
-        int ret = ba_stn_.at(i)->activateStream(this->rx_streams_.at(i),
-                                                rx_flags, rx_time, read_len);
-        std::vector<void*> rxbuff(2);
-        noise_buff.at(cfg_->NumChannels() * i).resize(read_len);
-        rxbuff.at(0) = noise_buff.at(cfg_->NumChannels() * i).data();
+        auto rx_flags = Radio::RxFlags::kRxFlagNone;
+        radios_.at(i)->Activate();
 
-        if (cfg_->NumChannels() == 2) {
-          noise_buff.at(cfg_->NumChannels() * i + 1).resize(read_len);
-          rxbuff.at(1) = noise_buff.at(cfg_->NumChannels() * i + 1).data();
+        std::vector<std::vector<std::complex<int16_t>>*> rx_buff(
+            cfg_->NumChannels());
+        for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
+          noise_buff.at(cfg_->NumChannels() * i + ch).resize(read_len);
+          rx_buff.at(0) = &noise_buff.at(cfg_->NumChannels() * i + ch);
         }
-        ret = ba_stn_.at(i)->readStream(this->rx_streams_.at(i), rxbuff.data(),
-                                        read_len, rx_flags, rx_time,
-                                        kRxTimeoutUs);
+
+        int ret = radios_.at(i)->Rx(rx_buff, read_len, rx_flags, rx_time);
         if (ret < (int)read_len) {
           good_csi = false;
           std::cout << "bad noise read (" << ret << ") at node " << i

@@ -12,6 +12,7 @@
 
 #include "buffer.h"
 #include "radio_lib.h"
+#include "rx_status_tracker.h"
 #include "txrx_worker.h"
 
 namespace TxRxWorkerRx {
@@ -38,15 +39,14 @@ class TxRxWorkerHw : public TxRxWorker {
                std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
                std::mutex& sync_mutex, std::condition_variable& sync_cond,
                std::atomic<bool>& can_proceed, RadioConfig& radio_config);
-
+  TxRxWorkerHw() = delete;
   ~TxRxWorkerHw() final;
   void DoTxRx() final;
 
  private:
-  TxRxWorkerHw() = delete;
   size_t DoTx(long long time0);
-  std::vector<Packet*> DoRx(size_t interface_id, size_t& global_frame_id,
-                            size_t& global_symbol_id);
+  std::vector<RxPacket*> DoRx(size_t interface_id, size_t& global_frame_id,
+                              size_t& global_symbol_id);
 
   void ScheduleTxInit(size_t frames_to_schedule, long long time0);
   void TxDownlinkZeros(size_t frame_id, size_t radio_id, long long time0);
@@ -56,10 +56,14 @@ class TxRxWorkerHw : public TxRxWorker {
 
   void TxBeaconHw(size_t frame_id, size_t interface_id, long long time0);
   bool IsTxSymbolNext(size_t radio_id, size_t current_symbol);
-  int GetTxFlags(size_t radio_id, size_t tx_symbol_id);
+  Radio::TxFlags GetTxFlags(size_t radio_id, size_t tx_symbol_id);
   long long int GetHwTime();
 
   bool IsRxSymbol(size_t interface, size_t symbol_id);
+
+  //DoRx helper routines
+  void InitRxStatus();
+  void ResetRxStatus(size_t interface, bool reuse_memory);
 
   TxRxWorkerRx::RxParameters UpdateRxInterface(
       const TxRxWorkerRx::RxParameters& last_rx);
@@ -74,5 +78,9 @@ class TxRxWorkerHw : public TxRxWorker {
   const double freq_ghz_;
 
   std::vector<std::complex<int16_t>> zeros_;
+
+  //For each interface.
+  std::vector<TxRxWorkerRx::RxStatusTracker> rx_status_;
+  std::vector<bool> first_symbol_;
 };
 #endif  // TXRX_WORKER_SIM_H_
