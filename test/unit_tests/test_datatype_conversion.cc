@@ -11,7 +11,7 @@
 #include "utils_ldpc.h"
 
 //Should define
-#define DATATYPE_MEMORY_CHECK
+//#define DATATYPE_MEMORY_CHECK
 
 static constexpr size_t kSIMDTestNum = 1024;
 
