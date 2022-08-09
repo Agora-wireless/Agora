@@ -8,7 +8,10 @@
 
 #include "logger.h"
 #include "utils.h"
+
 #if defined(ENABLE_CSV_LOG)
+#include <ctime>
+
 #include "spdlog/async.h"
 #include "spdlog/pattern_formatter.h"
 #include "spdlog/sinks/basic_file_sink.h"
@@ -21,8 +24,16 @@ CsvLogger::CsvLogger(size_t log_id, const std::string& radio_name) {
   if (log_id >= kAllLogs) {
     AGORA_LOG_ERROR("Invalid log id %zu in CsvLogger\n", log_id);
   } else {
+    auto time = std::time(nullptr);
+    auto local_time = *std::localtime(&time);
     const std::string filename =
-        "log/log-" + kCsvName.at(log_id) + "-" + radio_name + ".csv";
+        "files/logs/log-" + std::to_string(1900 + local_time.tm_year) + "-" +
+        std::to_string(1 + local_time.tm_mon) + "-" +
+        std::to_string(local_time.tm_mday) + "-" +
+        std::to_string(local_time.tm_hour) + "-" +
+        std::to_string(local_time.tm_min) + "-" +
+        std::to_string(local_time.tm_sec) + "-" + radio_name + "/log-" +
+        kCsvName.at(log_id) + "-" + radio_name + ".csv";
     std::remove(filename.c_str());  // delete file if already exists
     logger_ = spdlog::create_async_nb<spdlog::sinks::basic_file_sink_mt>(
         kCsvName.at(log_id), filename);
