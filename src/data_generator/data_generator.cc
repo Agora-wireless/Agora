@@ -17,6 +17,7 @@
 #include "comms-lib.h"
 #include "config.h"
 #include "crc.h"
+#include "datatype_conversion.h"
 #include "logger.h"
 #include "memory_manage.h"
 #include "modulation.h"
@@ -32,8 +33,8 @@ static constexpr bool kPrintDownlinkInformationBytes = false;
 
 static float RandFloatFromShort(float min, float max) {
   float rand_val = ((float(rand()) / float(RAND_MAX)) * (max - min)) + min;
-  auto rand_val_ushort = static_cast<short>(rand_val * 32768);
-  rand_val = (float)rand_val_ushort / 32768;
+  auto rand_val_ushort = static_cast<short>(rand_val * kShrtFltConvFactor);
+  rand_val = (float)rand_val_ushort / kShrtFltConvFactor;
   return rand_val;
 }
 
@@ -69,10 +70,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kUplink));
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(
-                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kUplink)) &
-            0xFFFF));
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
+                                pkt->Data(),
+                                cfg_->MacPayloadMaxLength(Direction::kUplink)) &
+                            0xFFFF));
       }
     }
 
@@ -360,10 +361,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kDownlink));
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(
-                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kDownlink)) &
-            0xFFFF));
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(pkt->Data(),
+                                                    cfg_->MacPayloadMaxLength(
+                                                        Direction::kDownlink)) &
+                            0xFFFF));
       }
     }
 
@@ -587,10 +588,11 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         for (size_t k = 0; k < this->cfg_->OfdmCaNum(); k++) {
           tx_symbol[2 * (k + this->cfg_->CpLen() +
                          this->cfg_->OfdmTxZeroPrefix())] =
-              static_cast<short>(32768 * ptr_ifft[k].re);
+              static_cast<short>(kShrtFltConvFactor * ptr_ifft[k].re);
           tx_symbol[2 * (k + this->cfg_->CpLen() +
                          this->cfg_->OfdmTxZeroPrefix()) +
-                    1] = static_cast<short>(32768 * ptr_ifft[k].im);
+                    1] =
+              static_cast<short>(kShrtFltConvFactor * ptr_ifft[k].im);
         }
         for (size_t k = 0; k < (2 * this->cfg_->CpLen()); k++) {
           tx_symbol[2 * this->cfg_->OfdmTxZeroPrefix() + k] =

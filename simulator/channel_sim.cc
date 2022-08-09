@@ -18,13 +18,6 @@ static const bool kPrintDebugTxBs = false;
 static constexpr size_t kUdpMTU = 2048;
 
 //#define CHSIM_DEBUG_MEMORY
-static void ConvertFloatToShortChsim(const float* in_buf, short* out_buf,
-                                     size_t length) {
-  for (size_t i = 0; i < length; i++) {
-    out_buf[i] = static_cast<short>(in_buf[i] * 32768.0f);
-  }
-}
-
 /* Helper classes */
 struct SocketRxBuffer {
   size_t data_size_ = 0;
@@ -613,8 +606,8 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
                ((reinterpret_cast<size_t>(source_data) % 64) == 0),
            "Data Alignment not correct before calling into AVX optimizations");
 #endif
-  ConvertFloatToShortChsim(reinterpret_cast<const float*>(source_data), dst_ptr,
-                           convert_length);
+  ConvertFloatToShort(reinterpret_cast<const float*>(source_data), dst_ptr,
+                      convert_length);
 
   auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf->at(0));
   for (size_t ant_id = 0u; ant_id < max_ant; ant_id++) {
