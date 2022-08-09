@@ -147,13 +147,13 @@ static inline void SimdConvertFloatToShortAVX512(const float* in_buf,
     const __m512i short_int16 = _mm512_packs_epi32(int32_1, int32_2);
     const __m512i shuffled =
         _mm512_permutexvar_epi64(permute_index, short_int16);
-    _mm512_stream_si512(reinterpret_cast<__m256i*>(&out_buf[i + cp_len]),
-                        slice);
+    _mm512_stream_si512(reinterpret_cast<__m512i*>(&out_buf[i + cp_len]),
+                        shuffled);
     // Prepend / Set cyclic prefix
     const size_t repeat_idx = n_elems - cp_len;
     if (i >= repeat_idx) {
-      _mm512_stream_si512(reinterpret_cast<__m256i*>(&out_buf[i - repeat_idx]),
-                          slice);
+      _mm512_stream_si512(reinterpret_cast<__m512i*>(&out_buf[i - repeat_idx]),
+                          shuffled);
     }
   }
 #else
@@ -230,8 +230,8 @@ static inline void ConvertFloatToShort(const float* in_buf, short* out_buf,
                                        size_t scale_down_factor = 1) {
   for (size_t i = 0; i < n_elems; i++) {
     short converted_value;
-    const float scaled_value = static_cast<float>(
-        (in_buf[i] * kConvFactor) / static_cast<float>(scale_down_factor));
+    const float scaled_value =
+        in_buf[i] * (kConvFactor / static_cast<float>(scale_down_factor));
 
     //Saturate the output
     if (scaled_value >= SHRT_MAX) {

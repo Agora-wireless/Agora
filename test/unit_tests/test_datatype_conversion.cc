@@ -137,9 +137,6 @@ TEST(SIMD, int16_to_float) {
   auto* reconstruct = static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64, array_size_bytes));
 
-  std::printf("Elements (%zu) Bytes (%zu:%zu)\n", int16_elements,
-              array_size_bytes, float_array_expanded);
-
   int16_t value = SHRT_MIN;
   const size_t simd_interations =
       (static_cast<size_t>(SHRT_MAX - SHRT_MIN) / int16_elements) + 1;
@@ -186,9 +183,11 @@ TEST(SIMD, int16_to_float) {
 }
 
 TEST(SIMD, int16_to_float_cplen) {
+  const int16_t allowed_error = 1;
   //For avx512 the arrays must be multiples of 512bits
   const size_t test_elements = 128;
   const size_t test_cp_len = 32;
+  //const size_t test_cp_len = 0;
   const size_t test_scale = 2;
   //For avx512 the arrays must be multiples of 512bits
   auto* short_buf = static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
@@ -224,8 +223,9 @@ TEST(SIMD, int16_to_float_cplen) {
     ConvertShortToFloat(short_buf, check_float, test_elements);
     for (size_t j = 0; j < test_elements; j++) {
       if (float_buf[j] != check_float[j]) {
-        std::printf("Value Mismatch ShortToFloat - Simd %f, Conv %f\n",
-                    float_buf[j], check_float[j]);
+        std::printf(
+            "Value Mismatch ShortToFloat[%zu] - Simd %f, Conv %f, Diff %f\n", j,
+            float_buf[j], check_float[j], float_buf[j] - check_float[j]);
       }
     }
 
@@ -235,18 +235,38 @@ TEST(SIMD, int16_to_float_cplen) {
     ConvertFloatToShort(float_buf, check_short, test_elements, test_cp_len,
                         test_scale);
     for (size_t j = 0; j < (test_elements + test_cp_len); j++) {
-      //if (reconstruct[j] != check_short[j]) {
-      std::printf("Value Mismatch FloatToShort - Simd %d, Conv %d\n",
-                  reconstruct[j], check_short[j]);
-      //}
+      const int16_t naive = check_short[j];
+      const int16_t simd = reconstruct[j];
+      if ((naive >= simd + allowed_error) && (naive <= simd - allowed_error)) {
+        std::printf(
+            "Value Mismatch FloatToShort[%zu] - Simd %d, Conv %d, Diff %d\n", j,
+            simd, naive, simd - naive);
+      }
     }
 
-    //Check Output
+    //Check e2e conversions Output
     for (size_t j = 0; j < test_elements; j++) {
       const int16_t orig_vale = short_buf[j] / test_scale;
-      if (orig_vale != reconstruct[j + test_cp_len]) {
-        std::printf("Value Mismatch - Orig %d, Float %f, Conv %d\n", orig_vale,
-                    float_buf[j], reconstruct[j]);
+      const int16_t reconstructed = reconstruct[j + test_cp_len];
+      if ((orig_vale >= reconstructed + allowed_error) &&
+          (orig_vale <= reconstructed - allowed_error)) {
+        std::printf(
+            "Value Mismatch[%zu] - Orig %d, Float %f, Conv %d, Diff %d\n", j,
+            orig_vale, float_buf[j], reconstructed, orig_vale - reconstructed);
+      }
+    }
+
+    for (size_t j = 0; j < test_cp_len; j++) {
+      const int16_t orig_vale =
+          short_buf[j + (test_elements - test_cp_len)] / test_scale;
+      const int16_t reconstructed = reconstruct[j];
+      if ((orig_vale >= reconstructed + allowed_error) &&
+          (orig_vale <= reconstructed - allowed_error)) {
+        std::printf(
+            "Value Mismatch[%zu] CPlen - Orig %d, Float %f, Conv %d, Diff "
+            "%d\n",
+            j, orig_vale, float_buf[j], reconstruct[j],
+            orig_vale - reconstruct[j]);
       }
     }
   }
