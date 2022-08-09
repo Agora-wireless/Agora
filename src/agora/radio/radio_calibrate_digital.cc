@@ -3,9 +3,11 @@
  * @brief Implementation file for the digital (baseband) calibration 
  * functions such as sample offset and reciprocity calibration
  */
+#include "datatype_conversion.h"
 #include "logger.h"
 #include "matplotlibcpp.h"
 #include "radio_lib.h"
+
 namespace plt = matplotlibcpp;
 
 static constexpr size_t kMaxArraySampleOffset = 10;
@@ -577,8 +579,9 @@ bool RadioConfig::InitialCalib() {
         noise[i].resize(read_len);
         std::transform(noise_buff.at(i).begin(), noise_buff.at(i).end(),
                        noise.at(i).begin(), [](std::complex<int16_t> ci) {
-                         return std::complex<float>(ci.real() / 32768.0,
-                                                    ci.imag() / 32768.0);
+                         return std::complex<float>(
+                             ci.real() / kShrtFltConvFactor,
+                             ci.imag() / kShrtFltConvFactor);
                        });
       }
 
@@ -591,13 +594,15 @@ bool RadioConfig::InitialCalib() {
         dn[i].resize(read_len);
         std::transform(buff.at(m + i).begin(), buff.at(m + i).end(),
                        up.at(i).begin(), [](std::complex<int16_t> ci) {
-                         return std::complex<float>(ci.real() / 32768.0,
-                                                    ci.imag() / 32768.0);
+                         return std::complex<float>(
+                             ci.real() / kShrtFltConvFactor,
+                             ci.imag() / kShrtFltConvFactor);
                        });
         std::transform(buff.at(i).begin(), buff.at(i).end(), dn.at(i).begin(),
                        [](std::complex<int16_t> ci) {
-                         return std::complex<float>(ci.real() / 32768.0,
-                                                    ci.imag() / 32768.0);
+                         return std::complex<float>(
+                             ci.real() / kShrtFltConvFactor,
+                             ci.imag() / kShrtFltConvFactor);
                        });
       }
 

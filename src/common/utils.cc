@@ -11,6 +11,8 @@
 #include <list>
 #include <mutex>
 
+#include "datatype_conversion.h"
+
 struct CoreInfo {
   CoreInfo(size_t id, size_t mapped, size_t req, ThreadType type)
       : thread_id_(id),
@@ -213,8 +215,8 @@ std::vector<std::complex<int16_t>> Utils::DoubleToCint16(
   int len = in[0].size();
   std::vector<std::complex<int16_t>> out(len, 0);
   for (int i = 0; i < len; i++) {
-    out[i] = std::complex<int16_t>((int16_t)(in[0][i] * 32768),
-                                   (int16_t)(in[1][i] * 32768));
+    out[i] = std::complex<int16_t>((int16_t)(in[0][i] * kShrtFltConvFactor),
+                                   (int16_t)(in[1][i] * kShrtFltConvFactor));
   }
   return out;
 }
@@ -237,8 +239,8 @@ std::vector<std::complex<float>> Utils::Uint32tocfloat(
     auto arr_hi_int = static_cast<int16_t>(in[i] >> 16);
     auto arr_lo_int = static_cast<int16_t>(in[i] & 0x0FFFF);
 
-    float arr_hi = (float)arr_hi_int / 32768.0;
-    float arr_lo = (float)arr_lo_int / 32768.0;
+    float arr_hi = (float)arr_hi_int / kShrtFltConvFactor;
+    float arr_lo = (float)arr_lo_int / kShrtFltConvFactor;
 
     if (order == "IQ") {
       std::complex<float> csamp(arr_hi, arr_lo);
@@ -254,10 +256,11 @@ std::vector<std::complex<float>> Utils::Uint32tocfloat(
 std::vector<std::complex<float>> Utils::Cint16ToCfloat32(
     const std::vector<std::complex<int16_t>>& in) {
   std::vector<std::complex<float>> samps(in.size());
-  std::transform(
-      in.begin(), in.end(), samps.begin(), [](std::complex<int16_t> ci) {
-        return std::complex<float>(ci.real() / 32768.0, ci.imag() / 32768.0);
-      });
+  std::transform(in.begin(), in.end(), samps.begin(),
+                 [](std::complex<int16_t> ci) {
+                   return std::complex<float>(ci.real() / kShrtFltConvFactor,
+                                              ci.imag() / kShrtFltConvFactor);
+                 });
   return samps;
 }
 
@@ -282,10 +285,10 @@ std::vector<uint32_t> Utils::Cfloat32ToUint32(
     const std::string& order) {
   std::vector<uint32_t> out(in.size(), 0);
   for (size_t i = 0; i < in.size(); i++) {
-    auto re =
-        static_cast<uint16_t>(static_cast<int16_t>(in[i].real() * 32768.0));
-    auto im = static_cast<uint16_t>(
-        static_cast<int16_t>((conj ? -in[i].imag() : in[i].imag()) * 32768));
+    auto re = static_cast<uint16_t>(
+        static_cast<int16_t>(in[i].real() * kShrtFltConvFactor));
+    auto im = static_cast<uint16_t>(static_cast<int16_t>(
+        (conj ? -in[i].imag() : in[i].imag()) * kShrtFltConvFactor));
     if (order == "IQ") {
       out[i] = (uint32_t)re << 16 | im;
     } else if (order == "QI") {
@@ -347,8 +350,8 @@ void Utils::LoadData(const char* filename,
     if (ret < 0) {
       break;
     }
-    data[i] =
-        std::complex<int16_t>(int16_t(real * 32768), int16_t(imag * 32768));
+    data[i] = std::complex<int16_t>(int16_t(real * kShrtFltConvFactor),
+                                    int16_t(imag * kShrtFltConvFactor));
   }
   std::fclose(fp);
 }

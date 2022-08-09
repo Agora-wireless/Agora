@@ -24,6 +24,7 @@
 
 #include <utility>
 
+#include "datatype_conversion.h"
 #include "logger.h"
 #include "utils.h"
 
@@ -591,9 +592,9 @@ std::vector<std::complex<float>> CommsLib::ComposePartialPilotSym(
 void CommsLib::Ifft2tx(const complex_float* in, std::complex<short>* out,
                        size_t N, size_t prefix, size_t cp, float scale) {
   for (size_t j = 0; j < N; j++) {
-    out[prefix + cp + j] =
-        std::complex<int16_t>((int16_t)((in[j].re / scale) * 32768),
-                              (int16_t)((in[j].im / scale) * 32768));
+    out[prefix + cp + j] = std::complex<int16_t>(
+        (int16_t)((in[j].re / scale) * kShrtFltConvFactor),
+        (int16_t)((in[j].im / scale) * kShrtFltConvFactor));
   }
   for (size_t j = 0; j < cp; j++) {
     out[prefix + j] = out[prefix + N + j];

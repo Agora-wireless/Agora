@@ -15,13 +15,14 @@
 #include "utils.h"
 
 #define DATATYPE_MEMORY_CHECK
-static constexpr float kConvFactor = 32768.0f;
+//Needs to be a factor of 2?
+static constexpr float kShrtFltConvFactor = 32768.0f;
 
 ///Produces outputs -1->+0.999
 static inline void ConvertShortToFloat(const short* in_buf, float* out_buf,
                                        size_t n_elems) {
   for (size_t i = 0; i < n_elems; i++) {
-    out_buf[i] = static_cast<float>(in_buf[i]) / kConvFactor;
+    out_buf[i] = static_cast<float>(in_buf[i]) / kShrtFltConvFactor;
   }
 }
 
@@ -30,7 +31,7 @@ static inline void SimdConvertShortToFloatAVX512(const short* in_buf,
                                                  size_t n_elems) {
 #if defined(__AVX512F__)
   const __m512 magic =
-      _mm512_set1_ps(float((1 << 23) + (1 << 15)) / kConvFactor);
+      _mm512_set1_ps(float((1 << 23) + (1 << 15)) / kShrtFltConvFactor);
   const __m512i magic_i = _mm512_castps_si512(magic);
   for (size_t i = 0; i < n_elems; i += 16) {
     /* get input */
@@ -57,7 +58,7 @@ static inline void SimdConvertShortToFloatAVX2(const short* in_buf,
   // https://stackoverflow.com/questions/50597764/convert-signed-short-to-float-in-c-simd
   //Divisior must be power of 2?
   const __m256 magic =
-      _mm256_set1_ps(float((1 << 23) + (1 << 15)) / kConvFactor);
+      _mm256_set1_ps(float((1 << 23) + (1 << 15)) / kShrtFltConvFactor);
   const __m256i magic_i = _mm256_castps_si256(magic);
   for (size_t i = 0; i < n_elems; i += 16) {
     /* get input */
@@ -126,7 +127,7 @@ static inline void SimdConvertFloatToShortAVX512(const float* in_buf,
 #endif
 
   const float scale_factor_float =
-      kConvFactor / static_cast<float>(scale_down_factor);
+      kShrtFltConvFactor / static_cast<float>(scale_down_factor);
   const __m512 scale_factor = _mm512_set1_ps(scale_factor_float);
   const __m512i permute_index = _mm512_setr_epi64(0, 2, 4, 6, 1, 3, 5, 7);
   for (size_t i = 0; i < n_elems; i += kAvx512FloatsPerLoop) {
@@ -183,7 +184,7 @@ static inline void SimdConvertFloatToShortAVX2(const float* in_buf,
 #endif
 
   const float scale_factor_float =
-      kConvFactor / static_cast<float>(scale_down_factor);
+      kShrtFltConvFactor / static_cast<float>(scale_down_factor);
 
   const __m256 scale_factor = _mm256_set1_ps(scale_factor_float);
   //Operates on 2 elements at a time
@@ -223,7 +224,8 @@ static inline void ConvertFloatToShort(const float* in_buf, short* out_buf,
   for (size_t i = 0; i < n_elems; i++) {
     short converted_value;
     const float scaled_value =
-        in_buf[i] * (kConvFactor / static_cast<float>(scale_down_factor));
+        in_buf[i] *
+        (kShrtFltConvFactor / static_cast<float>(scale_down_factor));
 
     //Saturate the output
     if (scaled_value >= SHRT_MAX) {
@@ -279,9 +281,9 @@ static inline void ConvertFloatTo12bitIq(const float* in_buf, uint8_t* out_buf,
   size_t index_short = 0;
   for (size_t i = 0; i < n_elems; i = i + 2) {
     const auto temp_i =
-        static_cast<unsigned short>(in_buf[i] * kConvFactor * 4);
+        static_cast<unsigned short>(in_buf[i] * kShrtFltConvFactor * 4);
     const auto temp_q =
-        static_cast<unsigned short>(in_buf[i + 1] * kConvFactor * 4);
+        static_cast<unsigned short>(in_buf[i + 1] * kShrtFltConvFactor * 4);
     // Take the higher 12 bits and ignore the lower 4 bits
     out_buf[index_short] = (uint8_t)(temp_i >> 4);
     out_buf[index_short + 1] =

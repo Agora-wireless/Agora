@@ -69,9 +69,9 @@ PhyUe::PhyUe(Config* config)
          j < config_->SampsPerSymbol() - config->OfdmTxZeroPostfix(); j++) {
       ue_pilot_vec_.at(i).push_back(std::complex<float>(
           static_cast<float>(config_->UeSpecificPilotT()[i][j].real()) /
-              SHRT_MAX,
+              kShrtFltConvFactor,
           static_cast<float>(config_->UeSpecificPilotT()[i][j].imag()) /
-              SHRT_MAX));
+              kShrtFltConvFactor));
     }
   }
 
