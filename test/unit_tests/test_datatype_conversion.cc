@@ -120,7 +120,6 @@ TEST(SIMD, int16_to_float) {
   const size_t float_eq_elements = array_size_bytes / sizeof(float);
   const size_t float_array_expanded =
       (int16_elements / float_eq_elements) * array_size_bytes;
-  //const size_t float_elements = int16_elements;
   //For avx512 the arrays must be multiples of 512bits
   auto* short_buf = static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64, array_size_bytes));
@@ -187,7 +186,6 @@ TEST(SIMD, int16_to_float_cplen) {
   //For avx512 the arrays must be multiples of 512bits
   const size_t test_elements = 128;
   const size_t test_cp_len = 32;
-  //const size_t test_cp_len = 0;
   const size_t test_scale = 2;
   //For avx512 the arrays must be multiples of 512bits
   auto* short_buf = static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
@@ -208,9 +206,8 @@ TEST(SIMD, int16_to_float_cplen) {
       (test_elements + test_cp_len) * sizeof(short)));
 
   int16_t value = SHRT_MIN;
-  //const size_t simd_interations =
-  //    (static_cast<size_t>(SHRT_MAX - SHRT_MIN) / test_elements) + 1;
-  const size_t simd_interations = 1;
+  const size_t simd_interations =
+      (static_cast<size_t>(SHRT_MAX - SHRT_MIN) / test_elements) + 1;
 
   //Convert to Float
   for (size_t i = 0; i < simd_interations; i++) {
