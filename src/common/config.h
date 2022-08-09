@@ -114,6 +114,7 @@ class Config {
   inline bool SampleCalEn() const { return this->sample_cal_en_; }
   inline bool ImbalanceCalEn() const { return this->imbalance_cal_en_; }
   inline size_t BeamformingAlgo() const { return this->beamforming_algo_; }
+  inline std::string Beamforming() const { return this->beamforming_str_; }
   inline bool ExternalRefNode(size_t id) const {
     return this->external_ref_node_.at(id);
   }

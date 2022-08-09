@@ -1201,9 +1201,11 @@ void Agora::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
         break;
       case (PrintType::kBeam):
         AGORA_LOG_INFO(
-            "Main [frame %zu + %.2f ms]: Completed zero-forcing\n", frame_id,
+            "Main [frame %zu + %.2f ms]: Completed %s beamweight calc\n",
+            frame_id,
             this->stats_->MasterGetDeltaMs(TsType::kBeamDone,
-                                           TsType::kFirstSymbolRX, frame_id));
+                                           TsType::kFirstSymbolRX, frame_id),
+            config_->Beamforming());
         break;
       case (PrintType::kDemul):
         AGORA_LOG_INFO(
