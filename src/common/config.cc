@@ -9,7 +9,6 @@
 
 #include "config.h"
 
-#include <boost/range/algorithm/count.hpp>
 #include <ctime>
 #include <utility>
 
