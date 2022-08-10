@@ -6,13 +6,14 @@
 #include "worker.h"
 
 Worker::Worker(Config* cfg, Stats* stats, PhyStats* phy_stats,
-               MessageInfo* message, Buffer* buffer)
+               MessageInfo* message, Buffer* buffer, FrameInfo* frame)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
       config_(cfg),
       stats_(stats),
       phy_stats_(phy_stats),
       message_(message),
-      buffer_(buffer) {
+      buffer_(buffer),
+      frame_(frame) {
   CreateThreads();
 }
 
@@ -140,10 +141,10 @@ void Worker::WorkerThread(int tid) {
     if (empty_queue == true) {
       empty_queue_itrs++;
       if (empty_queue_itrs == 5) {
-        if (cur_sche_frame_id != cur_proc_frame_id) {
+        if (frame_->cur_sche_frame_id_ != frame_->cur_proc_frame_id_) {
           cur_qid ^= 0x1;
         } else {
-          cur_qid = (cur_sche_frame_id & 0x1);
+          cur_qid = (frame_->cur_sche_frame_id_ & 0x1);
         }
         empty_queue_itrs = 0;
       }

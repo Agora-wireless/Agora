@@ -26,8 +26,8 @@
 #include "symbols.h"
 
 struct SchedInfo {
-  moodycamel::ConcurrentQueue<EventData> concurrent_q;
-  moodycamel::ProducerToken* ptok;
+  moodycamel::ConcurrentQueue<EventData> concurrent_q_;
+  moodycamel::ProducerToken* ptok_;
 };
 
 // Used to communicate between the manager and the worker class
@@ -57,35 +57,39 @@ struct Buffer {
   char* dl_socket_buffer_;
 };
 
-// Not yet utilized
-struct Counter {
-  FrameCounters pilot_fft_counters;
-  FrameCounters uplink_fft_counters;
-  FrameCounters zf_counters;
-  FrameCounters demul_counters;
-  FrameCounters decode_counters;
-  FrameCounters encode_counters;
-  FrameCounters precode_counters;
-  FrameCounters ifft_counters;
-  FrameCounters tx_counters;
-  FrameCounters tomac_counters;
-  FrameCounters mac_to_phy_counters;
-  FrameCounters rc_counters;
-  RxCounters rx_counters;
+// struct Counter {
+//   FrameCounters pilot_fft_counters;
+//   FrameCounters uplink_fft_counters;
+//   FrameCounters zf_counters;
+//   FrameCounters demul_counters;
+//   FrameCounters decode_counters;
+//   FrameCounters encode_counters;
+//   FrameCounters precode_counters;
+//   FrameCounters ifft_counters;
+//   FrameCounters tx_counters;
+//   FrameCounters tomac_counters;
+//   FrameCounters mac_to_phy_counters;
+//   FrameCounters rc_counters;
+//   RxCounters rx_counters;
+// };
+
+struct FrameInfo {
+  size_t cur_sche_frame_id_;
+  size_t cur_proc_frame_id_;
 };
 
 // Fetch the concurrent queue for this event type
 inline moodycamel::ConcurrentQueue<EventData>* GetConq(
     SchedInfo sched_info_arr[kScheduleQueues][kNumEventTypes],
     EventType event_type, size_t qid) {
-  return &sched_info_arr[qid][static_cast<size_t>(event_type)].concurrent_q;
+  return &sched_info_arr[qid][static_cast<size_t>(event_type)].concurrent_q_;
 }
 
 // Fetch the producer token for this event type
 inline moodycamel::ProducerToken* GetPtok(
     SchedInfo sched_info_arr[kScheduleQueues][kNumEventTypes],
     EventType event_type, size_t qid) {
-  return sched_info_arr[qid][static_cast<size_t>(event_type)].ptok;
+  return sched_info_arr[qid][static_cast<size_t>(event_type)].ptok_;
 }
 
 #endif  // HELPER_H_

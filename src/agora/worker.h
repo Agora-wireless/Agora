@@ -28,7 +28,8 @@
 
 class Worker {
  public:
-  explicit Worker(Config*, Stats*, PhyStats*, MessageInfo*, Buffer*);
+  explicit Worker(Config*, Stats*, PhyStats*, MessageInfo*, Buffer*,
+                  FrameInfo*);
   ~Worker();
 
  private:
@@ -44,10 +45,11 @@ class Worker {
   Config* const config_;
   std::vector<std::thread> workers_;
 
-  MessageInfo* message_;
-  Buffer* buffer_;
   Stats* stats_;
   PhyStats* phy_stats_;
+  MessageInfo* message_;
+  Buffer* buffer_;
+  FrameInfo* frame_;
 
   size_t cur_sche_frame_id;
   size_t cur_proc_frame_id;
