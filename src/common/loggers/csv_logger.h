@@ -8,12 +8,9 @@
 #define CSV_LOGGER_H_
 
 #include <array>
-#include <memory>
+#include <string>
 
 #if defined(ENABLE_CSV_LOG)
-#include "spdlog/async.h"
-#include "spdlog/pattern_formatter.h"
-#include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/spdlog.h"
 #endif
 

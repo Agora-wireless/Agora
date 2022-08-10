@@ -1,56 +1,55 @@
 {
-    /* Tested with 20 bs + 1 external ref + 2 ue radios, 1 channel each */
-    "serial_file": "data/anechoic_conf/topology-powder-dl.json",
+    "serial_file": "data/examples/topology-powder-dl.json",
     "cells": 1,
     "channel": "A",
-    "frequency": 3.6e9,
-    "rx_gain_a": 65,
-    "tx_gain_a": 78,
-    "rx_gain_b": 65,
-    "tx_gain_b": 70,
-    "sample_rate": 3.84e6,
+    "frequency": 3.545e9,
+    "rx_gain_a": 70,
+    "tx_gain_a": 81,
+    "rx_gain_b": 70,
+    "tx_gain_b": 81,
+    "sample_rate": 7.68e6,
     "ofdm_tx_zero_prefix": 160,
-    "ofdm_tx_zero_postfix": 160,
+    /* 192 / 160 */
+    "ofdm_tx_zero_postfix": 192,
     "ofdm_rx_zero_prefix_bs": 160,
     "ofdm_rx_zero_prefix_client": 160,
-    "ofdm_rx_zero_prefix_cal_dl": 288,
-    "ofdm_rx_zero_prefix_cal_ul": 168,
+    /* 288 / 324 */
+    "ofdm_rx_zero_prefix_cal_dl": 324,
+    /* 168 / 136 */
+    "ofdm_rx_zero_prefix_cal_ul": 136,
     "cp_size": 32,
     "fft_size": 512,
     "ofdm_data_num": 304,
-    "dl_mcs" : {
-      "modulation": "16QAM",
-      "code_rate": 0.333
+    "demul_block_size": 48,
+    "ue_demul_block_size": 48,
+    "dl_mcs": {
+        "modulation": "16QAM",
+        "code_rate": 0.333
     },
-    "ul_mcs" : {
-      "modulation": "16QAM",
-      "code_rate": 0.333
+    "ul_mcs": {
+        "modulation": "16QAM",
+        "code_rate": 0.333
     },
     "beamsweep": true,
     "beacon_antenna": 0,
     "frame_schedule": [
-        "BGCLGGPPGGDDDG"
+        "BGCLGGPGGDDDG"
     ],
-    "client_dl_pilot_syms": 2,
+    "client_dl_pilot_syms": 1,
     "ue_channel": "A",
     "ue_rx_gain_a": [
-        65,
-        65
+        78
     ],
     "ue_tx_gain_a": [
-        71,
-        73
+        81
     ],
     "ue_rx_gain_b": [
-        65,
-        65
+        78
     ],
     "ue_tx_gain_b": [
-        80,
-        80
+        81
     ],
     "tx_advance": [
-        140,
         140
     ],
     "ue_hw_framer": false,
@@ -59,11 +58,10 @@
     "exclude_cores": [],
     "ue_core_offset": 12,
     "ue_worker_thread_num": 4,
+    "ue_socket_thread_num": 1,
     "core_offset": 16,
     "worker_thread_num": 12,
-    "demul_block_size": 48,
-    "ue_demul_block_size": 48,
-    /* 20 bs radios + 1 ref*/
+    /* 28 bs radios + 1 ref*/
     "socket_thread_num": 4,
-    "max_frame": 5000
+    "max_frame": 10000
 }
