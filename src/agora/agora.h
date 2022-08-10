@@ -147,9 +147,7 @@ class Agora {
 
   MessageInfo message_;
   Buffer buffer_;
-  Counter c;
-  FrameInfo frame_info_;
-  Thread threads_;
+  FrameInfo frame_;
 
   /* Uplink */
   // RX buffer size per socket RX thread

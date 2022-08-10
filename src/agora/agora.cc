@@ -42,12 +42,12 @@ Agora::Agora(Config* const cfg)
   PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0,
                       kEnableCoreReuse, false /* quiet */);
   CheckIncrementScheduleFrame(0, ScheduleProcessingFlags::kProcessingComplete);
-  // Important to set cur_sche_frame_id_ after the call to
+  // Important to set frame_.cur_sche_frame_id_ after the call to
   // CheckIncrementScheduleFrame because it will be incremented however,
   // CheckIncrementScheduleFrame will initialize the schedule tracking variable
   // correctly.
-  cur_sche_frame_id_ = 0;
-  cur_proc_frame_id_ = 0;
+  frame_.cur_sche_frame_id_ = 0;
+  frame_.cur_proc_frame_id_ = 0;
 
   InitializeQueues();
   InitializeUplinkBuffers();
@@ -287,7 +287,7 @@ size_t Agora::FetchEvent(EventData events_list[],
     }
   } else {
     num_events +=
-        message_.complete_task_queue_[(cur_proc_frame_id_ & 0x1)]
+        message_.complete_task_queue_[(frame_.cur_proc_frame_id_ & 0x1)]
             .try_dequeue_bulk(events_list + num_events, max_events_needed);
   }
   return num_events;
@@ -329,12 +329,13 @@ void Agora::Start() {
         case EventType::kPacketRX: {
           Packet* pkt = rx_tag_t(event.tags_[0]).rx_packet_->RawPacket();
 
-          if (pkt->frame_id_ >= ((this->cur_sche_frame_id_ + kFrameWnd))) {
+          if (pkt->frame_id_ >=
+              ((this->frame_.cur_sche_frame_id_ + kFrameWnd))) {
             AGORA_LOG_ERROR(
                 "Error: Received packet for future frame %u beyond "
                 "frame window (= %zu + %zu). This can happen if "
                 "Agora is running slowly, e.g., in debug mode\n",
-                pkt->frame_id_, this->cur_sche_frame_id_, kFrameWnd);
+                pkt->frame_id_, this->frame_.cur_sche_frame_id_, kFrameWnd);
             cfg->Running(false);
             break;
           }
@@ -422,7 +423,7 @@ void Agora::Start() {
 
               // skip Decode when hard demod is enabled
               if (kUplinkHardDemod == true) {
-                assert(this->cur_proc_frame_id_ == frame_id);
+                assert(this->frame_.cur_proc_frame_id_ == frame_id);
                 CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
                 const bool work_finished = this->CheckFrameComplete(frame_id);
                 if (work_finished == true) {
@@ -431,7 +432,7 @@ void Agora::Start() {
               } else {
                 this->demul_counters_.Reset(frame_id);
                 if (cfg->BigstationMode() == false) {
-                  assert(cur_sche_frame_id_ == frame_id);
+                  assert(frame_.cur_sche_frame_id_ == frame_id);
                   CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
                 } else {
                   ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
@@ -462,7 +463,7 @@ void Agora::Start() {
               this->phy_stats_->RecordBer(frame_id);
               this->phy_stats_->RecordSer(frame_id);
               if (kEnableMac == false) {
-                assert(this->cur_proc_frame_id_ == frame_id);
+                assert(this->frame_.cur_proc_frame_id_ == frame_id);
                 const bool work_finished = this->CheckFrameComplete(frame_id);
                 if (work_finished == true) {
                   goto finish;
@@ -493,7 +494,7 @@ void Agora::Start() {
             const bool last_tomac_symbol =
                 this->tomac_counters_.CompleteSymbol(frame_id);
             if (last_tomac_symbol == true) {
-              assert(this->cur_proc_frame_id_ == frame_id);
+              assert(this->frame_.cur_proc_frame_id_ == frame_id);
               // this->stats_->MasterSetTsc(TsType::kMacTXDone, frame_id);
               stats_->PrintPerFrameDone(PrintType::kPacketToMac, frame_id);
               const bool work_finished = this->CheckFrameComplete(frame_id);
@@ -545,7 +546,8 @@ void Agora::Start() {
             // Defer the schedule.  If frames are already deferred or the
             // current received frame is too far off
             if ((this->encode_deferral_.empty() == false) ||
-                (frame_id >= (this->cur_proc_frame_id_ + kScheduleQueues))) {
+                (frame_id >=
+                 (this->frame_.cur_proc_frame_id_ + kScheduleQueues))) {
               if (kDebugDeferral) {
                 AGORA_LOG_INFO("   +++ Deferring encoding of frame %zu\n",
                                frame_id);
@@ -654,7 +656,7 @@ void Agora::Start() {
                 ifft_next_symbol_ = 0;
                 this->stats_->MasterSetTsc(TsType::kIFFTDone, frame_id);
                 stats_->PrintPerFrameDone(PrintType::kIFFT, frame_id);
-                assert(frame_id == this->cur_proc_frame_id_);
+                assert(frame_id == this->frame_.cur_proc_frame_id_);
                 this->CheckIncrementScheduleFrame(frame_id, kDownlinkComplete);
                 const bool work_finished = this->CheckFrameComplete(frame_id);
                 if (work_finished == true) {
@@ -727,8 +729,8 @@ void Agora::Start() {
       // either (a) sufficient packets received for the current frame,
       // or (b) the current frame being updated.
       std::queue<fft_req_tag_t>& cur_fftq =
-          fft_queue_arr_.at(this->cur_sche_frame_id_ % kFrameWnd);
-      const size_t qid = this->cur_sche_frame_id_ & 0x1;
+          fft_queue_arr_.at(this->frame_.cur_sche_frame_id_ % kFrameWnd);
+      const size_t qid = this->frame_.cur_sche_frame_id_ & 0x1;
       if (cur_fftq.size() >= config_->FftBlockSize()) {
         const size_t num_fft_blocks = cur_fftq.size() / config_->FftBlockSize();
         for (size_t i = 0; i < num_fft_blocks; i++) {
@@ -744,14 +746,14 @@ void Agora::Start() {
 
             if (this->fft_created_count_ == 0) {
               this->stats_->MasterSetTsc(TsType::kProcessingStarted,
-                                         this->cur_sche_frame_id_);
+                                         this->frame_.cur_sche_frame_id_);
             }
             this->fft_created_count_++;
             if (this->fft_created_count_ ==
                 rx_counters_.num_rx_pkts_per_frame_) {
               this->fft_created_count_ = 0;
               if (cfg->BigstationMode() == true) {
-                this->CheckIncrementScheduleFrame(cur_sche_frame_id_,
+                this->CheckIncrementScheduleFrame(frame_.cur_sche_frame_id_,
                                                   kUplinkComplete);
               }
             }
@@ -795,9 +797,9 @@ void Agora::InitializeQueues() {
   // Create concurrent queues for each Doer
   for (auto& vec : message_.sched_info_arr_) {
     for (auto& s : vec) {
-      s.concurrent_q =
+      s.concurrent_q_ =
           mt_queue_t(kDefaultWorkerQueueSize * data_symbol_num_perframe);
-      s.ptok = new moodycamel::ProducerToken(s.concurrent_q);
+      s.ptok_ = new moodycamel::ProducerToken(s.concurrent_q_);
     }
   }
 
@@ -819,7 +821,7 @@ void Agora::FreeQueues() {
   // remove tokens for each doer
   for (auto& vec : message_.sched_info_arr_) {
     for (auto& s : vec) {
-      delete s.ptok;
+      delete s.ptok_;
     }
   }
 
@@ -1011,13 +1013,8 @@ void Agora::InitializeThreads() {
   }
 
   // Create workers
-  frame_info_.cur_sche_frame_id = &cur_sche_frame_id_;
-  frame_info_.cur_proc_frame_id = &cur_proc_frame_id_;
-
-  std::printf("Threads requested\n");
-
   worker_ = std::make_unique<Worker>(cfg, stats_.get(), phy_stats_.get(),
-                                     &message_, &buffer_);
+                                     &message_, &buffer_, &frame_);
 
   AGORA_LOG_INFO(
       "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
@@ -1163,7 +1160,7 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
       // Defer the schedule.  If frames are already deferred or the current
       // received frame is too far off
       if ((encode_deferral_.empty() == false) ||
-          (frame_id >= (this->cur_proc_frame_id_ + kScheduleQueues))) {
+          (frame_id >= (this->frame_.cur_proc_frame_id_ + kScheduleQueues))) {
         if (kDebugDeferral) {
           AGORA_LOG_INFO("   +++ Deferring encoding of frame %zu\n", frame_id);
         }
@@ -1246,12 +1243,12 @@ void Agora::GetEqualData(float** ptr, int* size) {
 void Agora::CheckIncrementScheduleFrame(size_t frame_id,
                                         ScheduleProcessingFlags completed) {
   this->schedule_process_flags_ += completed;
-  assert(this->cur_sche_frame_id_ == frame_id);
+  assert(this->frame_.cur_sche_frame_id_ == frame_id);
   unused(frame_id);
 
   if (this->schedule_process_flags_ ==
       static_cast<uint8_t>(ScheduleProcessingFlags::kProcessingComplete)) {
-    this->cur_sche_frame_id_++;
+    this->frame_.cur_sche_frame_id_++;
     this->schedule_process_flags_ = ScheduleProcessingFlags::kNone;
     if (this->config_->Frame().NumULSyms() == 0) {
       this->schedule_process_flags_ += ScheduleProcessingFlags::kUplinkComplete;
@@ -1285,7 +1282,7 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
        ((true == kEnableMac) &&
         (true == this->tomac_counters_.IsLastSymbol(frame_id))))) {
     this->stats_->UpdateStats(frame_id);
-    assert(frame_id == this->cur_proc_frame_id_);
+    assert(frame_id == this->frame_.cur_proc_frame_id_);
     if (true == kUplinkHardDemod) {
       this->demul_counters_.Reset(frame_id);
     }
@@ -1298,7 +1295,7 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
         this->dl_bits_buffer_status_[ue_id][frame_id % kFrameWnd] = 0;
       }
     }
-    this->cur_proc_frame_id_++;
+    this->frame_.cur_proc_frame_id_++;
 
     if (frame_id == (this->config_->FramesToTest() - 1)) {
       finished = true;
@@ -1309,12 +1306,13 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
            (encode < kScheduleQueues) && (!encode_deferral_.empty());
            encode++) {
         const size_t deferred_frame = this->encode_deferral_.front();
-        if (deferred_frame < (this->cur_proc_frame_id_ + kScheduleQueues)) {
+        if (deferred_frame <
+            (this->frame_.cur_proc_frame_id_ + kScheduleQueues)) {
           if (kDebugDeferral) {
             AGORA_LOG_INFO("   +++ Scheduling deferred frame %zu : %zu \n",
-                           deferred_frame, cur_proc_frame_id_);
+                           deferred_frame, frame_.cur_proc_frame_id_);
           }
-          RtAssert(deferred_frame >= this->cur_proc_frame_id_,
+          RtAssert(deferred_frame >= this->frame_.cur_proc_frame_id_,
                    "Error scheduling encoding because deferral frame is less "
                    "than current frame");
           ScheduleDownlinkProcessing(deferred_frame);
