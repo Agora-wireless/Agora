@@ -150,7 +150,7 @@ class Stats {
 
   void PrintPerFrameDone(PrintType print_type, size_t frame_id);
   void PrintPerSymbolDone(PrintType print_type, size_t frame_id,
-                          size_t symbol_id, FrameCounters counters);
+                          size_t symbol_id, FrameCounters counters) const;
   void PrintPerTaskDone(PrintType print_type, size_t frame_id, size_t symbol_id,
                         size_t ant_or_sc_id, FrameCounters counters);
 
