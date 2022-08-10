@@ -28,8 +28,8 @@
 
 class Worker {
  public:
-  explicit Worker(Config*, Stats*, PhyStats*, MessageInfo*, Buffer*,
-                  FrameInfo*);
+  explicit Worker(Config* /*cfg*/, Stats* /*stats*/, PhyStats* /*phy_stats*/, MessageInfo* /*message*/, Buffer* /*buffer*/,
+                  FrameInfo* /*frame*/);
   ~Worker();
 
  private:
@@ -51,8 +51,8 @@ class Worker {
   Buffer* buffer_;
   FrameInfo* frame_;
 
-  size_t cur_sche_frame_id;
-  size_t cur_proc_frame_id;
+  size_t cur_sche_frame_id_;
+  size_t cur_proc_frame_id_;
 
   std::array<std::shared_ptr<CsvLog::MatLogger>, CsvLog::kMatLogs> mat_loggers_;
 };
