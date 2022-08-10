@@ -31,35 +31,31 @@ struct SchedInfo {
 };
 
 struct MessageInfo {
-  moodycamel::ConcurrentQueue<EventData> message_queue;
-  moodycamel::ConcurrentQueue<EventData> mac_request_queue;
-  moodycamel::ConcurrentQueue<EventData> mac_response_queue;
-  moodycamel::ConcurrentQueue<EventData> complete_task_queue[kScheduleQueues];
-  moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads][kScheduleQueues];
-  moodycamel::ProducerToken* rx_ptoks_ptr[kMaxThreads];
-  moodycamel::ProducerToken* tx_ptoks_ptr[kMaxThreads];
+  moodycamel::ConcurrentQueue<EventData> complete_task_queue_[kScheduleQueues];
+  moodycamel::ProducerToken* worker_ptoks_ptr_[kMaxThreads][kScheduleQueues];
+  SchedInfo sched_info_arr_[kScheduleQueues][kNumEventTypes];
 };
 
 struct Buffer {
-  Table<char> socket_buffer;
-  size_t socket_buffer_size;
-  PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffer;
-  Table<complex_float> data_buffer;
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrix;
-  Table<complex_float> equal_buffer;
-  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffer;
-  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> decoded_buffer;
-  Table<complex_float> ue_spec_pilot_buffer;
-  Table<complex_float> dl_ifft_buffer;
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices;
-  Table<complex_float> calib_ul_buffer;
-  Table<complex_float> calib_dl_buffer;
-  Table<complex_float> calib_ul_msum_buffer;
-  Table<complex_float> calib_dl_msum_buffer;
-  Table<int8_t> dl_mod_bits_buffer;
-  Table<int8_t> dl_bits_buffer;
-  Table<int8_t> dl_bits_buffer_status;
-  char* dl_socket_buffer;
+  // Table<char> socket_buffer;
+  // size_t socket_buffer_size;
+  PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffer_;
+  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrix_;
+  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffer_;
+  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> decoded_buffer_;
+  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrix_;
+  Table<complex_float> data_buffer_;
+  Table<complex_float> equal_buffer_;
+  Table<complex_float> ue_spec_pilot_buffer_;
+  Table<complex_float> dl_ifft_buffer_;
+  Table<complex_float> calib_ul_buffer_;
+  Table<complex_float> calib_dl_buffer_;
+  Table<complex_float> calib_ul_msum_buffer_;
+  Table<complex_float> calib_dl_msum_buffer_;
+  Table<int8_t> dl_mod_bits_buffer_;
+  Table<int8_t> dl_bits_buffer_;
+  char* dl_socket_buffer_;
+  // Table<int8_t> dl_bits_buffer_status;
 };
 
 struct Counter {
@@ -79,12 +75,12 @@ struct Counter {
 };
 
 struct FrameInfo {
-  size_t cur_sche_frame_id;
-  size_t cur_proc_frame_id;
-  size_t fft_created_count;
-  std::vector<size_t> fft_cur_frame_for_symbol;
-  std::vector<size_t> encode_cur_frame_for_symbol;
-  std::vector<size_t> ifft_cur_frame_for_symbol;
+  size_t* cur_sche_frame_id;
+  size_t* cur_proc_frame_id;
+  // size_t* fft_created_count;
+  // std::vector<size_t>* fft_cur_frame_for_symbol;
+  // std::vector<size_t>* encode_cur_frame_for_symbol;
+  // std::vector<size_t>* ifft_cur_frame_for_symbol;
 };
 
 struct Thread {
@@ -94,14 +90,14 @@ struct Thread {
 };
 
 // Fetch the concurrent queue for this event type
-moodycamel::ConcurrentQueue<EventData>* GetConq(
+inline moodycamel::ConcurrentQueue<EventData>* GetConq(
     SchedInfo sched_info_arr[kScheduleQueues][kNumEventTypes],
     EventType event_type, size_t qid) {
   return &sched_info_arr[qid][static_cast<size_t>(event_type)].concurrent_q;
 }
 
 // Fetch the producer token for this event type
-moodycamel::ProducerToken* GetPtok(
+inline moodycamel::ProducerToken* GetPtok(
     SchedInfo sched_info_arr[kScheduleQueues][kNumEventTypes],
     EventType event_type, size_t qid) {
   return sched_info_arr[qid][static_cast<size_t>(event_type)].ptok;

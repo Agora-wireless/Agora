@@ -15,6 +15,7 @@
 #include <system_error>
 #include <vector>
 
+#include "agora_helper.h"
 #include "buffer.h"
 #include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"
@@ -34,6 +35,7 @@
 #include "signal_handler.h"
 #include "stats.h"
 #include "utils.h"
+#include "worker.h"
 
 class Agora {
  public:
@@ -119,28 +121,6 @@ class Agora {
   // Send current frame's SNR measurements from PHY to MAC
   void SendSnrReport(EventType event_type, size_t frame_id, size_t symbol_id);
 
-  /// Fetch the concurrent queue for this event type
-  moodycamel::ConcurrentQueue<EventData>* GetConq(EventType event_type,
-                                                  size_t qid) {
-    return &sched_info_arr_[qid][static_cast<size_t>(event_type)].concurrent_q_;
-  }
-
-  /// Fetch the producer token for this event type
-  moodycamel::ProducerToken* GetPtok(EventType event_type, size_t qid) const {
-    return sched_info_arr_[qid][static_cast<size_t>(event_type)].ptok_;
-  }
-
-  /// Return a string containing the sizes of the FFT queues
-  std::string GetFftQueueSizesString() const {
-    std::ostringstream ret;
-    ret << "[";
-    for (size_t i = 0; i < kFrameWnd; i++) {
-      ret << std::to_string(fft_queue_arr_[i].size()) << " ";
-    }
-    ret << "]";
-    return ret.str();
-  }
-
   // Worker thread i runs on core base_worker_core_offset + i
   const size_t base_worker_core_offset_;
 
@@ -162,6 +142,12 @@ class Agora {
   /*****************************************************
    * Buffers
    *****************************************************/
+
+  MessageInfo message_;
+  Buffer buffer_;
+  Counter c;
+  FrameInfo frame_info_;
+  Thread threads_;
 
   /* Uplink */
   // RX buffer size per socket RX thread
@@ -249,24 +235,24 @@ class Agora {
   // 2nd dimension: number of OFDM carriers (including non-data carriers)
   Table<complex_float> dl_ifft_buffer_;
 
-  // Calculated uplink zeroforcing detection matrices. Each matrix has
-  // [number of UEs] rows and [number of antennas] columns.
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices_;
+  // // Calculated uplink zeroforcing detection matrices. Each matrix has
+  // // [number of UEs] rows and [number of antennas] columns.
+  // PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices_;
 
-  // 1st dimension: kFrameWnd
-  // 2nd dimension: number of OFDM data subcarriers * number of antennas
-  Table<complex_float> calib_ul_buffer_;
-  Table<complex_float> calib_dl_buffer_;
-  Table<complex_float> calib_ul_msum_buffer_;
-  Table<complex_float> calib_dl_msum_buffer_;
+  // // 1st dimension: kFrameWnd
+  // // 2nd dimension: number of OFDM data subcarriers * number of antennas
+  // Table<complex_float> calib_ul_buffer_;
+  // Table<complex_float> calib_dl_buffer_;
+  // Table<complex_float> calib_ul_msum_buffer_;
+  // Table<complex_float> calib_dl_msum_buffer_;
 
-  // 1st dimension: kFrameWnd * number of data symbols per frame
-  // 2nd dimension: number of OFDM data subcarriers * number of UEs
-  Table<int8_t> dl_mod_bits_buffer_;
+  // // 1st dimension: kFrameWnd * number of data symbols per frame
+  // // 2nd dimension: number of OFDM data subcarriers * number of UEs
+  // Table<int8_t> dl_mod_bits_buffer_;
 
-  // 1st dimension: kFrameWnd * number of DL data symbols per frame
-  // 2nd dimension: number of OFDM data subcarriers * number of UEs
-  Table<int8_t> dl_bits_buffer_;
+  // // 1st dimension: kFrameWnd * number of DL data symbols per frame
+  // // 2nd dimension: number of OFDM data subcarriers * number of UEs
+  // Table<int8_t> dl_bits_buffer_;
 
   // 1st dimension: number of UEs
   // 2nd dimension: number of OFDM data subcarriers * kFrameWnd
@@ -274,22 +260,18 @@ class Agora {
   // Use different dimensions from dl_bits_buffer_ to avoid cache false sharing
   Table<int8_t> dl_bits_buffer_status_;
 
-  /**
-   * Data for transmission
-   *
-   * Number of downlink socket buffers and status entries:
-   * kFrameWnd * symbol_num_perframe * BS_ANT_NUM
-   *
-   * Size of each downlink socket buffer entry: packet_length bytes
-   * Size of each downlink socket buffer status entry: one integer
-   */
-  char* dl_socket_buffer_;
+  // /**
+  //  * Data for transmission
+  //  *
+  //  * Number of downlink socket buffers and status entries:
+  //  * kFrameWnd * symbol_num_perframe * BS_ANT_NUM
+  //  *
+  //  * Size of each downlink socket buffer entry: packet_length bytes
+  //  * Size of each downlink socket buffer status entry: one integer
+  //  */
+  // char* dl_socket_buffer_;
 
-  struct SchedInfoT {
-    moodycamel::ConcurrentQueue<EventData> concurrent_q_;
-    moodycamel::ProducerToken* ptok_;
-  };
-  SchedInfoT sched_info_arr_[kScheduleQueues][kNumEventTypes];
+  // SchedInfo sched_info_arr_[kScheduleQueues][kNumEventTypes];
 
   // Master thread's message queue for receiving packets
   moodycamel::ConcurrentQueue<EventData> message_queue_;
@@ -301,8 +283,8 @@ class Agora {
   moodycamel::ConcurrentQueue<EventData> mac_response_queue_;
 
   // Master thread's message queue for event completion from Doers;
-  moodycamel::ConcurrentQueue<EventData> complete_task_queue_[kScheduleQueues];
-  moodycamel::ProducerToken* worker_ptoks_ptr_[kMaxThreads][kScheduleQueues];
+  // moodycamel::ConcurrentQueue<EventData> complete_task_queue_[kScheduleQueues];
+  // moodycamel::ProducerToken* worker_ptoks_ptr_[kMaxThreads][kScheduleQueues];
 
   moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
@@ -310,7 +292,6 @@ class Agora {
   uint8_t schedule_process_flags_;
 
   std::queue<size_t> encode_deferral_;
-  std::array<std::shared_ptr<CsvLog::MatLogger>, CsvLog::kMatLogs> mat_loggers_;
 };
 
 #endif  // AGORA_H_
