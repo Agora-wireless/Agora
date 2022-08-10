@@ -94,10 +94,12 @@ class Agora {
   void FreeUplinkBuffers();
   void FreeDownlinkBuffers();
 
+  void HandleEventFft(size_t tag);
+  void UpdateRxCounters(size_t frame_id, size_t symbol_id);
+  void UpdateRanConfig(RanConfig rc);
+
   void SaveDecodeDataToFile(int frame_id);
   void SaveTxDataToFile(int frame_id);
-
-  void HandleEventFft(size_t tag);
 
   void ScheduleSubcarriers(EventType event_type, size_t frame_id,
                            size_t symbol_id);
@@ -158,34 +160,34 @@ class Agora {
   // 2nd dimension: socket buffer size
   Table<char> socket_buffer_;
 
-  // Preliminary CSI buffers. Each buffer has [number of antennas] rows and
-  // [number of OFDM data subcarriers] columns.
-  PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers_;
+  // // Preliminary CSI buffers. Each buffer has [number of antennas] rows and
+  // // [number of OFDM data subcarriers] columns.
+  // PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers_;
 
-  // Data symbols after FFT
-  // 1st dimension: kFrameWnd * uplink data symbols per frame
-  // 2nd dimension: number of antennas * number of OFDM data subcarriers
-  //
-  // 2nd dimension data order: 32 blocks each with 32 subcarriers each:
-  // subcarrier 1 -- 32 of antennas, subcarrier 33 -- 64 of antennas, ...,
-  // subcarrier 993 -- 1024 of antennas.
-  Table<complex_float> data_buffer_;
+  // // Data symbols after FFT
+  // // 1st dimension: kFrameWnd * uplink data symbols per frame
+  // // 2nd dimension: number of antennas * number of OFDM data subcarriers
+  // //
+  // // 2nd dimension data order: 32 blocks each with 32 subcarriers each:
+  // // subcarrier 1 -- 32 of antennas, subcarrier 33 -- 64 of antennas, ...,
+  // // subcarrier 993 -- 1024 of antennas.
+  // Table<complex_float> data_buffer_;
 
-  // Calculated uplink zeroforcing detection matrices. Each matrix has
-  // [number of antennas] rows and [number of UEs] columns.
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices_;
+  // // Calculated uplink zeroforcing detection matrices. Each matrix has
+  // // [number of antennas] rows and [number of UEs] columns.
+  // PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices_;
 
-  // Data after equalization
-  // 1st dimension: kFrameWnd * uplink data symbols per frame
-  // 2nd dimension: number of OFDM data subcarriers * number of UEs
-  Table<complex_float> equal_buffer_;
+  // // Data after equalization
+  // // 1st dimension: kFrameWnd * uplink data symbols per frame
+  // // 2nd dimension: number of OFDM data subcarriers * number of UEs
+  // Table<complex_float> equal_buffer_;
 
-  // Data after demodulation. Each buffer has kMaxModType * number of OFDM
-  // data subcarriers
-  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers_;
+  // // Data after demodulation. Each buffer has kMaxModType * number of OFDM
+  // // data subcarriers
+  // PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers_;
 
-  // Data after LDPC decoding. Each buffer [decoded bytes per UE] bytes.
-  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> decoded_buffer_;
+  // // Data after LDPC decoding. Each buffer [decoded bytes per UE] bytes.
+  // PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> decoded_buffer_;
 
   Table<complex_float> ue_spec_pilot_buffer_;
 

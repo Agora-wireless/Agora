@@ -16,15 +16,7 @@ Worker::Worker(Config* cfg, Stats* stats, PhyStats* phy_stats,
       // frame_info_(frame_info),
       message_(message),
       buffer_(buffer) {
-  std::printf("Testing if all variables are sent correctly\n");
-  std::printf("size of buffer: %d, %zu, %zu\n",
-              buffer_->data_buffer_.IsAllocated(), buffer_->data_buffer_.Dim1(),
-              buffer_->data_buffer_.Dim2());
-  std::printf("size of queue %zu\n",
-              message_->sched_info_arr_[0][0].concurrent_q.size_approx());
-  std::printf("Create thread call\n");
   CreateThreads();
-  std::printf("Done calling CreateThread\n");
 }
 
 Worker::~Worker() {
@@ -58,7 +50,6 @@ void Worker::CreateThreads() {
   AGORA_LOG_SYMBOL("Worker: creating %zu workers\n",
                    config_->WorkerThreadNum());
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
-    std::printf("Worker: %zu\n", i);
     workers_.emplace_back(&Worker::WorkerThread, this, i);
   }
   //   }
