@@ -6,14 +6,11 @@
 #include "worker.h"
 
 Worker::Worker(Config* cfg, Stats* stats, PhyStats* phy_stats,
-               //  MessageInfo* queues, FrameInfo* frame_info,
                MessageInfo* message, Buffer* buffer)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
       config_(cfg),
       stats_(stats),
       phy_stats_(phy_stats),
-      // queues_(queues),
-      // frame_info_(frame_info),
       message_(message),
       buffer_(buffer) {
   CreateThreads();

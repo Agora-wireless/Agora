@@ -30,15 +30,15 @@ struct SchedInfo {
   moodycamel::ProducerToken* ptok;
 };
 
+// Used to communicate between the manager and the worker class
 struct MessageInfo {
   moodycamel::ConcurrentQueue<EventData> complete_task_queue_[kScheduleQueues];
   moodycamel::ProducerToken* worker_ptoks_ptr_[kMaxThreads][kScheduleQueues];
   SchedInfo sched_info_arr_[kScheduleQueues][kNumEventTypes];
 };
 
+// Initialized in manager class and used in worker class
 struct Buffer {
-  // Table<char> socket_buffer;
-  // size_t socket_buffer_size;
   PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffer_;
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrix_;
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffer_;
@@ -55,9 +55,9 @@ struct Buffer {
   Table<int8_t> dl_mod_bits_buffer_;
   Table<int8_t> dl_bits_buffer_;
   char* dl_socket_buffer_;
-  // Table<int8_t> dl_bits_buffer_status;
 };
 
+// Not yet utilized
 struct Counter {
   FrameCounters pilot_fft_counters;
   FrameCounters uplink_fft_counters;
@@ -72,21 +72,6 @@ struct Counter {
   FrameCounters mac_to_phy_counters;
   FrameCounters rc_counters;
   RxCounters rx_counters;
-};
-
-struct FrameInfo {
-  size_t* cur_sche_frame_id;
-  size_t* cur_proc_frame_id;
-  // size_t* fft_created_count;
-  // std::vector<size_t>* fft_cur_frame_for_symbol;
-  // std::vector<size_t>* encode_cur_frame_for_symbol;
-  // std::vector<size_t>* ifft_cur_frame_for_symbol;
-};
-
-struct Thread {
-  std::unique_ptr<PacketTxRx> packet_tx_rx;
-  std::unique_ptr<MacThreadBaseStation> mac_thread;
-  std::thread mac_std_thread;
 };
 
 // Fetch the concurrent queue for this event type
