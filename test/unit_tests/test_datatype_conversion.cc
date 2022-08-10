@@ -183,7 +183,7 @@ TEST(SIMD, int16_to_float_cplen) {
   //For avx512 the arrays must be multiples of 512bits
   const size_t test_elements = 128;
   const size_t test_cp_len = 32;
-  const size_t test_scale = 2;
+  const size_t test_scale = 512;
   //For avx512 the arrays must be multiples of 512bits
   auto* short_buf = static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64, test_elements * sizeof(short)));
