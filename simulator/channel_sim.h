@@ -20,27 +20,24 @@
 #include "gettime.h"
 #include "memory_manage.h"
 #include "signal_handler.h"
+#include "simd_types.h"
 #include "symbols.h"
 #include "udp_client.h"
 #include "udp_server.h"
 
-using AlignedByteVector =
-    std::vector<unsigned char,
-                boost::alignment::aligned_allocator<unsigned char, 64>>;
-
 struct WorkerThreadStorage {
   size_t tid_;
   // Aligned
-  AlignedByteVector* ue_tx_buffer_;
+  SimdAlignByteVector* ue_tx_buffer_;
   arma::cx_fmat* ue_input_matrix_;
   arma::cx_fmat* ue_output_matrix_;
 
   // Aligned
-  AlignedByteVector* bs_tx_buffer_;
+  SimdAlignByteVector* bs_tx_buffer_;
   arma::cx_fmat* bs_input_matrix_;
   arma::cx_fmat* bs_output_matrix_;
 
-  AlignedByteVector* udp_tx_buffer_;
+  SimdAlignByteVector* udp_tx_buffer_;
 };
 
 /**
@@ -80,8 +77,8 @@ class ChannelSim {
 
  private:
   void DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
-            size_t ant_per_socket, uint8_t* tx_buffer,
-            const arma::cx_float* source_data, AlignedByteVector* udp_pkt_buf,
+            size_t ant_per_socket, std::byte* tx_buffer,
+            const arma::cx_float* source_data, SimdAlignByteVector* udp_pkt_buf,
             std::vector<std::unique_ptr<UDPClient>>& udp_clients,
             const std::string& dest_address, size_t dest_port);
 
@@ -99,10 +96,10 @@ class ChannelSim {
   std::unique_ptr<Channel> channel_;
 
   // Data buffer for received symbols from BS antennas (downlink)
-  AlignedByteVector rx_buffer_bs_;
+  SimdAlignByteVector rx_buffer_bs_;
 
   // Data buffer for received symbols from client antennas (uplink)
-  AlignedByteVector rx_buffer_ue_;
+  SimdAlignByteVector rx_buffer_ue_;
 
   // Task Queue for tasks related to incoming BS packets
   moodycamel::ConcurrentQueue<EventData> task_queue_bs_;
