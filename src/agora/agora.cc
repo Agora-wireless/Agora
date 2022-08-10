@@ -21,18 +21,20 @@ Agora::Agora(Config* const cfg)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
       config_(cfg),
       stats_(std::make_unique<Stats>(cfg)),
-      phy_stats_(std::make_unique<PhyStats>(cfg, Direction::kUplink)),
-      csi_buffers_(kFrameWnd, cfg->UeAntNum(),
-                   cfg->BsAntNum() * cfg->OfdmDataNum()),
-      ul_zf_matrices_(kFrameWnd, cfg->OfdmDataNum(),
-                      cfg->BsAntNum() * cfg->UeAntNum()),
-      demod_buffers_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),
-                     kMaxModType * cfg->OfdmDataNum()),
-      decoded_buffer_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),
-                      cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
-                          Roundup<64>(cfg->NumBytesPerCb(Direction::kUplink))),
-      dl_zf_matrices_(kFrameWnd, cfg->OfdmDataNum(),
-                      cfg->UeAntNum() * cfg->BsAntNum()) {
+      phy_stats_(std::make_unique<PhyStats>(cfg, Direction::kUplink)) {
+  buffer_.csi_buffer_.Alloc(kFrameWnd, cfg->UeAntNum(),
+                            cfg->BsAntNum() * cfg->OfdmDataNum());
+  buffer_.ul_zf_matrix_.Alloc(kFrameWnd, cfg->OfdmDataNum(),
+                              cfg->BsAntNum() * cfg->UeAntNum());
+  buffer_.demod_buffer_.Alloc(kFrameWnd, cfg->Frame().NumULSyms(),
+                              cfg->UeAntNum(),
+                              kMaxModType * cfg->OfdmDataNum());
+  buffer_.decoded_buffer_.Alloc(
+      kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),
+      cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
+          Roundup<64>(cfg->NumBytesPerCb(Direction::kUplink)));
+  buffer_.dl_zf_matrix_.Alloc(kFrameWnd, cfg->OfdmDataNum(),
+                              cfg->UeAntNum() * cfg->BsAntNum());
   std::string directory = TOSTRING(PROJECT_DIRECTORY);
   AGORA_LOG_INFO("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
                  directory.c_str(), cfg->FreqGhz());
@@ -62,6 +64,7 @@ Agora::~Agora() {
   FreeDownlinkBuffers();
   stats_.reset();
   phy_stats_.reset();
+  worker_.reset();
   FreeQueues();
 }
 
@@ -127,7 +130,8 @@ void Agora::ScheduleAntennas(EventType event_type, size_t frame_id,
       event.tags_[j] = base_tag.tag_;
       base_tag.ant_id_++;
     }
-    TryEnqueueFallback(GetConq(event_type, qid), GetPtok(event_type, qid),
+    TryEnqueueFallback(GetConq(message_.sched_info_arr_, event_type, qid),
+                       GetPtok(message_.sched_info_arr_, event_type, qid),
                        event);
   }
 }
@@ -162,9 +166,9 @@ void Agora::ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
           "event(s) to worker %zu transmit queue\n",
           frame_id, symbol_id, worker.size(), enqueue_worker_id);
 
-      TryEnqueueBulkFallback(GetConq(EventType::kPacketTX, 0),
-                             tx_ptoks_ptr_[enqueue_worker_id], worker.data(),
-                             worker.size());
+      TryEnqueueBulkFallback(
+          GetConq(message_.sched_info_arr_, EventType::kPacketTX, 0),
+          tx_ptoks_ptr_[enqueue_worker_id], worker.data(), worker.size());
     }
     enqueue_worker_id++;
   }
@@ -210,12 +214,14 @@ void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
                                 block_size * (i * event.num_tags_ + j))
                 .tag_;
       }
-      TryEnqueueFallback(GetConq(event_type, qid), GetPtok(event_type, qid),
+      TryEnqueueFallback(GetConq(message_.sched_info_arr_, event_type, qid),
+                         GetPtok(message_.sched_info_arr_, event_type, qid),
                          event);
     }
   } else {
     for (size_t i = 0; i < num_events; i++) {
-      TryEnqueueFallback(GetConq(event_type, qid), GetPtok(event_type, qid),
+      TryEnqueueFallback(GetConq(message_.sched_info_arr_, event_type, qid),
+                         GetPtok(message_.sched_info_arr_, event_type, qid),
                          EventData(event_type, base_tag.tag_));
       base_tag.sc_id_ += block_size;
     }
@@ -244,7 +250,8 @@ void Agora::ScheduleCodeblocks(EventType event_type, Direction dir,
       event.tags_[j] = base_tag.tag_;
       base_tag.cb_id_++;
     }
-    TryEnqueueFallback(GetConq(event_type, qid), GetPtok(event_type, qid),
+    TryEnqueueFallback(GetConq(message_.sched_info_arr_, event_type, qid),
+                       GetPtok(message_.sched_info_arr_, event_type, qid),
                        event);
   }
 }
@@ -280,8 +287,8 @@ size_t Agora::FetchEvent(EventData events_list[],
     }
   } else {
     num_events +=
-        complete_task_queue_[(cur_proc_frame_id_ & 0x1)].try_dequeue_bulk(
-            events_list + num_events, max_events_needed);
+        message_.complete_task_queue_[(cur_proc_frame_id_ & 0x1)]
+            .try_dequeue_bulk(events_list + num_events, max_events_needed);
   }
   return num_events;
 }
@@ -289,8 +296,8 @@ size_t Agora::FetchEvent(EventData events_list[],
 void Agora::Start() {
   const auto& cfg = this->config_;
 
-  const bool start_status =
-      packet_tx_rx_->StartTxRx(calib_dl_buffer_, calib_ul_buffer_);
+  const bool start_status = packet_tx_rx_->StartTxRx(buffer_.calib_dl_buffer_,
+                                                     buffer_.calib_ul_buffer_);
   // Start packet I/O
   if (start_status == false) {
     this->Stop();
@@ -343,37 +350,37 @@ void Agora::InitializeQueues() {
   int data_symbol_num_perframe = config_->Frame().NumDataSyms();
   message_queue_ =
       mt_queue_t(kDefaultMessageQueueSize * data_symbol_num_perframe);
-  for (auto& c : complete_task_queue_) {
+  for (auto& c : message_.complete_task_queue_) {
     c = mt_queue_t(kDefaultWorkerQueueSize * data_symbol_num_perframe);
   }
   // Create concurrent queues for each Doer
-  for (auto& vec : sched_info_arr_) {
+  for (auto& vec : message_.sched_info_arr_) {
     for (auto& s : vec) {
-      s.concurrent_q_ =
+      s.concurrent_q =
           mt_queue_t(kDefaultWorkerQueueSize * data_symbol_num_perframe);
-      s.ptok_ = new moodycamel::ProducerToken(s.concurrent_q_);
+      s.ptok = new moodycamel::ProducerToken(s.concurrent_q);
     }
   }
 
   for (size_t i = 0; i < config_->SocketThreadNum(); i++) {
     rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(message_queue_);
-    tx_ptoks_ptr_[i] =
-        new moodycamel::ProducerToken(*GetConq(EventType::kPacketTX, 0));
+    tx_ptoks_ptr_[i] = new moodycamel::ProducerToken(
+        *GetConq(message_.sched_info_arr_, EventType::kPacketTX, 0));
   }
 
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
     for (size_t j = 0; j < kScheduleQueues; j++) {
-      worker_ptoks_ptr_[i][j] =
-          new moodycamel::ProducerToken(complete_task_queue_[j]);
+      message_.worker_ptoks_ptr_[i][j] =
+          new moodycamel::ProducerToken(message_.complete_task_queue_[j]);
     }
   }
 }
 
 void Agora::FreeQueues() {
   // remove tokens for each doer
-  for (auto& vec : sched_info_arr_) {
+  for (auto& vec : message_.sched_info_arr_) {
     for (auto& s : vec) {
-      delete s.ptok_;
+      delete s.ptok;
     }
   }
 
@@ -384,7 +391,7 @@ void Agora::FreeQueues() {
 
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
     for (size_t j = 0; j < kScheduleQueues; j++) {
-      delete worker_ptoks_ptr_[i][j];
+      delete message_.worker_ptoks_ptr_[i][j];
     }
   }
 }
@@ -399,14 +406,14 @@ void Agora::InitializeUplinkBuffers() {
   socket_buffer_.Malloc(cfg->SocketThreadNum() /* RX */, socket_buffer_size_,
                         Agora_memory::Alignment_t::kAlign64);
 
-  data_buffer_.Malloc(task_buffer_symbol_num_ul,
-                      cfg->OfdmDataNum() * cfg->BsAntNum(),
-                      Agora_memory::Alignment_t::kAlign64);
+  buffer_.data_buffer_.Malloc(task_buffer_symbol_num_ul,
+                              cfg->OfdmDataNum() * cfg->BsAntNum(),
+                              Agora_memory::Alignment_t::kAlign64);
 
-  equal_buffer_.Malloc(task_buffer_symbol_num_ul,
-                       cfg->OfdmDataNum() * cfg->UeAntNum(),
-                       Agora_memory::Alignment_t::kAlign64);
-  ue_spec_pilot_buffer_.Calloc(
+  buffer_.equal_buffer_.Malloc(task_buffer_symbol_num_ul,
+                               cfg->OfdmDataNum() * cfg->UeAntNum(),
+                               Agora_memory::Alignment_t::kAlign64);
+  buffer_.ue_spec_pilot_buffer_.Calloc(
       kFrameWnd, cfg->Frame().ClientUlPilotSymbols() * cfg->UeAntNum(),
       Agora_memory::Alignment_t::kAlign64);
 
@@ -462,44 +469,45 @@ void Agora::InitializeDownlinkBuffers() {
         config_->BsAntNum() * task_buffer_symbol_num;
     size_t dl_socket_buffer_size =
         config_->DlPacketLength() * dl_socket_buffer_status_size;
-    AllocBuffer1d(&dl_socket_buffer_, dl_socket_buffer_size,
+    AllocBuffer1d(&buffer_.dl_socket_buffer_, dl_socket_buffer_size,
                   Agora_memory::Alignment_t::kAlign64, 0);
 
     size_t dl_bits_buffer_size =
         kFrameWnd * config_->MacBytesNumPerframe(Direction::kDownlink);
-    this->dl_bits_buffer_.Calloc(config_->UeAntNum(), dl_bits_buffer_size,
-                                 Agora_memory::Alignment_t::kAlign64);
+    this->buffer_.dl_bits_buffer_.Calloc(config_->UeAntNum(),
+                                         dl_bits_buffer_size,
+                                         Agora_memory::Alignment_t::kAlign64);
     this->dl_bits_buffer_status_.Calloc(config_->UeAntNum(), kFrameWnd,
                                         Agora_memory::Alignment_t::kAlign64);
 
-    dl_ifft_buffer_.Calloc(config_->BsAntNum() * task_buffer_symbol_num,
-                           config_->OfdmCaNum(),
-                           Agora_memory::Alignment_t::kAlign64);
-    calib_dl_buffer_.Malloc(kFrameWnd,
-                            config_->BfAntNum() * config_->OfdmDataNum(),
-                            Agora_memory::Alignment_t::kAlign64);
-    calib_ul_buffer_.Malloc(kFrameWnd,
-                            config_->BfAntNum() * config_->OfdmDataNum(),
-                            Agora_memory::Alignment_t::kAlign64);
-    calib_dl_msum_buffer_.Malloc(kFrameWnd,
-                                 config_->BfAntNum() * config_->OfdmDataNum(),
-                                 Agora_memory::Alignment_t::kAlign64);
-    calib_ul_msum_buffer_.Malloc(kFrameWnd,
-                                 config_->BfAntNum() * config_->OfdmDataNum(),
-                                 Agora_memory::Alignment_t::kAlign64);
+    buffer_.dl_ifft_buffer_.Calloc(config_->BsAntNum() * task_buffer_symbol_num,
+                                   config_->OfdmCaNum(),
+                                   Agora_memory::Alignment_t::kAlign64);
+    buffer_.calib_dl_buffer_.Malloc(
+        kFrameWnd, config_->BfAntNum() * config_->OfdmDataNum(),
+        Agora_memory::Alignment_t::kAlign64);
+    buffer_.calib_ul_buffer_.Malloc(
+        kFrameWnd, config_->BfAntNum() * config_->OfdmDataNum(),
+        Agora_memory::Alignment_t::kAlign64);
+    buffer_.calib_dl_msum_buffer_.Malloc(
+        kFrameWnd, config_->BfAntNum() * config_->OfdmDataNum(),
+        Agora_memory::Alignment_t::kAlign64);
+    buffer_.calib_ul_msum_buffer_.Malloc(
+        kFrameWnd, config_->BfAntNum() * config_->OfdmDataNum(),
+        Agora_memory::Alignment_t::kAlign64);
     //initialize the calib buffers
     const complex_float complex_init = {0.0f, 0.0f};
     //const complex_float complex_init = {1.0f, 0.0f};
     for (size_t frame = 0u; frame < kFrameWnd; frame++) {
       for (size_t i = 0; i < (config_->OfdmDataNum() * config_->BfAntNum());
            i++) {
-        calib_dl_buffer_[frame][i] = complex_init;
-        calib_ul_buffer_[frame][i] = complex_init;
-        calib_dl_msum_buffer_[frame][i] = complex_init;
-        calib_ul_msum_buffer_[frame][i] = complex_init;
+        buffer_.calib_dl_buffer_[frame][i] = complex_init;
+        buffer_.calib_ul_buffer_[frame][i] = complex_init;
+        buffer_.calib_dl_msum_buffer_[frame][i] = complex_init;
+        buffer_.calib_ul_msum_buffer_[frame][i] = complex_init;
       }
     }
-    dl_mod_bits_buffer_.Calloc(
+    buffer_.dl_mod_bits_buffer_.Calloc(
         task_buffer_symbol_num,
         Roundup<64>(config_->GetOFDMDataNum()) * config_->UeAntNum(),
         Agora_memory::Alignment_t::kAlign64);
@@ -524,35 +532,39 @@ void Agora::InitializeDownlinkBuffers() {
 }
 
 void Agora::InitializeThreads() {
+  const auto& cfg = config_;
   /* Initialize TXRX threads */
   if (kUseArgos || kUseUHD) {
     packet_tx_rx_ = std::make_unique<PacketTxRxRadio>(
         cfg, cfg->CoreOffset() + 1, &message_queue_,
-        GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
-        socket_buffer_, socket_buffer_size_ / cfg->PacketLength(),
-        this->stats_->FrameStart(), dl_socket_buffer_);
+        GetConq(message_.sched_info_arr_, EventType::kPacketTX, 0),
+        rx_ptoks_ptr_, tx_ptoks_ptr_, socket_buffer_,
+        socket_buffer_size_ / cfg->PacketLength(), this->stats_->FrameStart(),
+        buffer_.dl_socket_buffer_);
 #if defined(USE_DPDK)
   } else if (kUseDPDK) {
     packet_tx_rx_ = std::make_unique<PacketTxRxDpdk>(
         cfg, cfg->CoreOffset() + 1, &message_queue_,
-        GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
-        socket_buffer_, socket_buffer_size_ / cfg->PacketLength(),
-        this->stats_->FrameStart(), dl_socket_buffer_);
+        GetConq(message_.sched_info_arr_, EventType::kPacketTX, 0),
+        rx_ptoks_ptr_, tx_ptoks_ptr_, socket_buffer_,
+        socket_buffer_size_ / cfg->PacketLength(), this->stats_->FrameStart(),
+        buffer_.dl_socket_buffer_);
 #endif
   } else {
     /* Default to the simulator */
     packet_tx_rx_ = std::make_unique<PacketTxRxSim>(
         cfg, cfg->CoreOffset() + 1, &message_queue_,
-        GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
-        socket_buffer_, socket_buffer_size_ / cfg->PacketLength(),
-        this->stats_->FrameStart(), dl_socket_buffer_);
+        GetConq(message_.sched_info_arr_, EventType::kPacketTX, 0),
+        rx_ptoks_ptr_, tx_ptoks_ptr_, socket_buffer_,
+        socket_buffer_size_ / cfg->PacketLength(), this->stats_->FrameStart(),
+        buffer_.dl_socket_buffer_);
   }
 
   if (kEnableMac == true) {
     const size_t mac_cpu_core =
         cfg->CoreOffset() + cfg->SocketThreadNum() + cfg->WorkerThreadNum() + 1;
     mac_thread_ = std::make_unique<MacThreadBaseStation>(
-        cfg, mac_cpu_core, decoded_buffer_, &dl_bits_buffer_,
+        cfg, mac_cpu_core, decoded_buffer_, &buffer_.dl_bits_buffer_,
         &dl_bits_buffer_status_, &mac_request_queue_, &mac_response_queue_);
 
     mac_std_thread_ =
@@ -560,7 +572,13 @@ void Agora::InitializeThreads() {
   }
 
   // Create workers
-  worker_ = std::make_unique<Worker>();
+  frame_info_.cur_sche_frame_id = &cur_sche_frame_id_;
+  frame_info_.cur_proc_frame_id = &cur_proc_frame_id_;
+
+  std::printf("Threads requested\n");
+
+  worker_ = std::make_unique<Worker>(cfg, stats_.get(), phy_stats_.get(),
+                                     &message_, &buffer_);
 
   AGORA_LOG_INFO(
       "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
@@ -573,22 +591,22 @@ void Agora::InitializeThreads() {
 
 void Agora::FreeUplinkBuffers() {
   socket_buffer_.Free();
-  data_buffer_.Free();
-  equal_buffer_.Free();
-  ue_spec_pilot_buffer_.Free();
+  buffer_.data_buffer_.Free();
+  buffer_.equal_buffer_.Free();
+  buffer_.ue_spec_pilot_buffer_.Free();
 }
 
 void Agora::FreeDownlinkBuffers() {
   if (config_->Frame().NumDLSyms() > 0) {
-    FreeBuffer1d(&dl_socket_buffer_);
+    FreeBuffer1d(&buffer_.dl_socket_buffer_);
 
-    dl_ifft_buffer_.Free();
-    calib_dl_buffer_.Free();
-    calib_ul_buffer_.Free();
-    calib_dl_msum_buffer_.Free();
-    calib_ul_msum_buffer_.Free();
-    dl_mod_bits_buffer_.Free();
-    dl_bits_buffer_.Free();
+    buffer_.dl_ifft_buffer_.Free();
+    buffer_.calib_dl_buffer_.Free();
+    buffer_.calib_ul_buffer_.Free();
+    buffer_.calib_dl_msum_buffer_.Free();
+    buffer_.calib_ul_msum_buffer_.Free();
+    buffer_.dl_mod_bits_buffer_.Free();
+    buffer_.dl_bits_buffer_.Free();
     dl_bits_buffer_status_.Free();
   }
 }
@@ -627,7 +645,7 @@ void Agora::SaveTxDataToFile(UNUSED int frame_id) {
     for (size_t ant_id = 0; ant_id < cfg->BsAntNum(); ant_id++) {
       size_t offset = total_data_symbol_id * cfg->BsAntNum() + ant_id;
       auto* pkt = reinterpret_cast<Packet*>(
-          &dl_socket_buffer_[offset * cfg->DlPacketLength()]);
+          &buffer_.dl_socket_buffer_[offset * cfg->DlPacketLength()]);
       short* socket_ptr = pkt->data_;
       std::fwrite(socket_ptr, cfg->SampsPerSymbol() * 2, sizeof(short), fp);
     }

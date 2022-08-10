@@ -352,6 +352,7 @@ endif()
 
 set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/agora.cc
+  src/agora/worker.cc
   src/agora/dofft.cc
   src/agora/doifft.cc
   src/agora/dozf.cc
