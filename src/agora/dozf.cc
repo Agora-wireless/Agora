@@ -23,6 +23,7 @@ DoZF::DoZF(Config* config, int tid,
            PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
            PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
            PhyStats* in_phy_stats, Stats* stats_manager,
+           std::shared_ptr<CsvLog::MatLogger> ul_csi_logger,
            std::shared_ptr<CsvLog::MatLogger> dl_csi_logger,
            std::shared_ptr<CsvLog::MatLogger> dl_zf_logger)
     : Doer(config, tid),
@@ -34,6 +35,7 @@ DoZF::DoZF(Config* config, int tid,
       ul_zf_matrices_(ul_zf_matrices),
       dl_zf_matrices_(dl_zf_matrices),
       phy_stats_(in_phy_stats),
+      ul_csi_logger_(std::move(ul_csi_logger)),
       dl_csi_logger_(std::move(dl_csi_logger)),
       dl_zf_logger_(std::move(dl_zf_logger)) {
   duration_stat_ = stats_manager->GetDurationStat(DoerType::kZF, tid);
@@ -99,6 +101,9 @@ float DoZF::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
                             const arma::cx_fvec& calib_sc_vec,
                             complex_float* ul_zf_mem,
                             complex_float* dl_zf_mem) {
+  if (kEnableMatLog && ul_csi_logger_) {
+    ul_csi_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_csi);
+  }
   arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(ul_zf_mem),
                           cfg_->UeAntNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_zf_tmp;
