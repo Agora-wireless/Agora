@@ -17,6 +17,26 @@
 //Needs to be a factor of 2?
 static constexpr float kShrtFltConvFactor = 32768.0f;
 
+#if defined(__AVX512F__)
+constexpr size_t kAvx512Bits = 512;
+constexpr size_t kAvx512Bytes = kAvx512Bits / 8;
+constexpr size_t kAvx512FloatsPerInstr = kAvx512Bytes / sizeof(float);
+//2 because of the 32->16 ints
+constexpr size_t kAvx512FloatsPerLoop = kAvx512FloatsPerInstr * 2;
+constexpr size_t kAvx512ShortsPerInstr = kAvx512Bytes / sizeof(short);
+//Half because read->expand->use 512 instr
+constexpr size_t kAvx512ShortsPerLoop = kAvx512ShortsPerInstr / 2;
+#endif
+
+constexpr size_t kAvx2Bits = 256;
+constexpr size_t kAvx2Bytes = kAvx2Bits / 8;
+constexpr size_t kAvx2FloatsPerInstr = kAvx2Bytes / sizeof(float);
+//2 because of the 32->16 ints
+constexpr size_t kAvx2FloatsPerLoop = kAvx2FloatsPerInstr * 2;
+constexpr size_t kAvx2ShortsPerInstr = kAvx2Bytes / sizeof(short);
+//Half because read->expand->use 256 instr
+constexpr size_t kAvx2ShortsPerLoop = kAvx2ShortsPerInstr / 2;
+
 ///Produces outputs -1->+0.999
 static inline void ConvertShortToFloat(const short* in_buf, float* out_buf,
                                        size_t n_elems) {
@@ -33,19 +53,21 @@ static inline void SimdConvertShortToFloatAVX512(const short* in_buf,
   const __m512 magic =
       _mm512_set1_ps(float((1 << 23) + (1 << 15)) / kShrtFltConvFactor);
   const __m512i magic_i = _mm512_castps_si512(magic);
-  for (size_t i = 0; i < n_elems; i += 16) {
-    /* get input */
+  for (size_t i = 0; i < n_elems; i += kAvx512ShortsPerLoop) {
+    // Load shorts with 1/2 instr so we have room for expansion
 	const __m256i val = unaligned
-                      ? _mm256_loadu_si256((__m256i*)(in_buf + i))
-                      : _mm256_load_si256((__m256i*)(in_buf + i));  // port 2,3
-    /* interleave with 0x0000 */
-    __m512i val_unpacked = _mm512_cvtepu16_epi32(val);  // port 5
+                      ? _mm256_loadu_si256(reinterpret_cast<const __m256i*>(in_buf + i))
+                      : _mm256_load_si256(reinterpret_cast<const __m256i*>((in_buf + i));  // port 2,3
+        reinterpret_cast<const __m256i*>(in_buf + i));  // port 2,3
+    // Expand and  interleave with 0x0000
+    const __m512i val_unpacked = _mm512_cvtepu16_epi32(val);  // port 5
     /* convert by xor-ing and subtracting magic value:
      * VPXOR avoids port5 bottlenecks on Intel CPUs before SKL */
-    __m512i val_f_int = _mm512_xor_si512(val_unpacked, magic_i);  // port 0,1,5
-    __m512 val_f = _mm512_castsi512_ps(val_f_int);   // no instruction
-    __m512 converted = _mm512_sub_ps(val_f, magic);  // port 1,5 ?
-    _mm512_store_ps(out_buf + i, converted);         // port 2,3,4,7
+    const __m512i val_f_int =
+        _mm512_xor_si512(val_unpacked, magic_i);           // port 0,1,5
+    const __m512 val_f = _mm512_castsi512_ps(val_f_int);   // no instruction
+    const __m512 converted = _mm512_sub_ps(val_f, magic);  // port 1,5 ?
+    _mm512_store_ps(out_buf + i, converted);               // port 2,3,4,7
   }
 #else
   unused(in_buf);
@@ -62,31 +84,20 @@ static inline void SimdConvertShortToFloatAVX2(const short* in_buf,
   const __m256 magic =
       _mm256_set1_ps(float((1 << 23) + (1 << 15)) / kShrtFltConvFactor);
   const __m256i magic_i = _mm256_castps_si256(magic);
-  for (size_t i = 0; i < n_elems; i += 16) {
-    /* get input */
+  for (size_t i = 0; i < n_elems; i += kAvx2ShortsPerLoop) {
     const __m128i val = unaligned
-                      ? _mm_loadu_si128((__m128i*)(in_buf + i))
-                      : _mm_load_si128((__m128i*)(in_buf + i));  // port 2,3
+                      ? _mm_loadu_si128(reinterpret_cast<const __m128i*>(in_buf + i))
+                      : _mm_load_si128(reinterpret_cast<const __m128i*>(in_buf + i));  // port 2,3
 
-    const __m128i val1 = unaligned 
-                      ? _mm_loadu_si128((__m128i*)(in_buf + i + 8))
-                      : _mm_load_si128((__m128i*)(in_buf + i + 8));
-
-    /* interleave with 0x0000 */
-    __m256i val_unpacked = _mm256_cvtepu16_epi32(val);  // port 5
+    // expand to 32bits and interleave with 0x0000
+    const __m256i val_unpacked = _mm256_cvtepu16_epi32(val);  // port 5
     /* convert by xor-ing and subtracting magic value:
      * VPXOR avoids port5 bottlenecks on Intel CPUs before SKL */
-    __m256i val_f_int = _mm256_xor_si256(val_unpacked, magic_i);  // port 0,1,5
-    __m256 val_f = _mm256_castsi256_ps(val_f_int);   // no instruction
-    __m256 converted = _mm256_sub_ps(val_f, magic);  // port 1,5 ?
-    _mm256_store_ps(out_buf + i, converted);         // port 2,3,4,7
-
-    __m256i val_unpacked1 = _mm256_cvtepu16_epi32(val1);  // port 5
-    __m256i val_f_int1 =
-        _mm256_xor_si256(val_unpacked1, magic_i);      // port 0,1,5
-    __m256 val_f1 = _mm256_castsi256_ps(val_f_int1);   // no instruction
-    __m256 converted1 = _mm256_sub_ps(val_f1, magic);  // port 1,5 ?
-    _mm256_store_ps(out_buf + i + 8, converted1);      // port 2,3,4,7
+    const __m256i val_f_int =
+        _mm256_xor_si256(val_unpacked, magic_i);           // port 0,1,5
+    const __m256 val_f = _mm256_castsi256_ps(val_f_int);   // no instruction
+    const __m256 converted = _mm256_sub_ps(val_f, magic);  // port 1,5 ?
+    _mm256_store_ps(out_buf + i, converted);               // port 2,3,4,7
   }
 }
 
@@ -98,8 +109,8 @@ static inline void SimdConvertShortToFloat(const short* in_buf, float* out_buf,
                                            size_t n_elems) {
 #if defined(DATATYPE_MEMORY_CHECK)
   RtAssert(((n_elems % 16) == 0) &&
-               ((reinterpret_cast<size_t>(in_buf) % 64) == 0) &&
-               ((reinterpret_cast<size_t>(out_buf) % 64) == 0),
+               ((reinterpret_cast<intptr_t>(in_buf) % 64) == 0) &&
+               ((reinterpret_cast<intptr_t>(out_buf) % 64) == 0),
            "Data Alignment not correct before calling into AVX optimizations");
 #endif
 
@@ -111,29 +122,23 @@ static inline void SimdConvertShortToFloat(const short* in_buf, float* out_buf,
 }
 
 // Convert a float array [in_buf] to a short array [out_buf]. Input array must
-// have [n_elems] elements. Output array must have [n_elems + cp_len] elements.
+// have [n_elems] elements. Output array must have [n_elems + n_prefix] elements.
 // in_buf and out_buf must be 64-byte aligned
 // n_elems must be a multiple of 16 for AVX512
 // scale_down_factor is used for scaling down values in the input array
 static inline void SimdConvertFloatToShortAVX512(const float* in_buf,
                                                  short* out_buf, size_t n_elems,
-                                                 size_t cp_len,
+                                                 size_t n_prefix,
                                                  size_t scale_down_factor) {
 #if defined(__AVX512F__)
-  constexpr size_t kAvx512Bits = 512;
-  constexpr size_t kAvx512Bytes = kAvx512Bits / 8;
-  constexpr size_t kAvx512FloatsPerInstr = kAvx512Bytes / sizeof(float);
-  //2 because of the 32->16 ints
-  constexpr size_t kAvx512FloatsPerLoop = kAvx512FloatsPerInstr * 2;
 #if defined(DATATYPE_MEMORY_CHECK)
   constexpr size_t kAvx512ShortPerInstr = kAvx512Bytes / sizeof(short);
   RtAssert(((n_elems % kAvx512FloatsPerInstr) == 0) &&
-               ((cp_len % kAvx512ShortPerInstr) == 0) &&
-               ((reinterpret_cast<size_t>(in_buf) % kAvx512Bytes) == 0) &&
-               ((reinterpret_cast<size_t>(out_buf) % kAvx512Bytes) == 0),
+               ((n_prefix % kAvx512ShortPerInstr) == 0) &&
+               ((reinterpret_cast<intptr_t>(in_buf) % kAvx512Bytes) == 0) &&
+               ((reinterpret_cast<intptr_t>(out_buf) % kAvx512Bytes) == 0),
            "Data Alignment not correct before calling into AVX optimizations");
 #endif
-
   const float scale_factor_float =
       kShrtFltConvFactor / static_cast<float>(scale_down_factor);
   const __m512 scale_factor = _mm512_set1_ps(scale_factor_float);
@@ -148,10 +153,10 @@ static inline void SimdConvertFloatToShortAVX512(const float* in_buf,
     const __m512i short_int16 = _mm512_packs_epi32(int32_1, int32_2);
     const __m512i shuffled =
         _mm512_permutexvar_epi64(permute_index, short_int16);
-    _mm512_stream_si512(reinterpret_cast<__m512i*>(&out_buf[i + cp_len]),
+    _mm512_stream_si512(reinterpret_cast<__m512i*>(&out_buf[i + n_prefix]),
                         shuffled);
     // Prepend / Set cyclic prefix
-    const size_t repeat_idx = n_elems - cp_len;
+    const size_t repeat_idx = n_elems - n_prefix;
     if (i >= repeat_idx) {
       _mm512_stream_si512(reinterpret_cast<__m512i*>(&out_buf[i - repeat_idx]),
                           shuffled);
@@ -161,31 +166,25 @@ static inline void SimdConvertFloatToShortAVX512(const float* in_buf,
   unused(in_buf);
   unused(out_buf);
   unused(n_elems);
-  unused(cp_len);
+  unused(n_prefix);
   unused(scale_down_factor);
   throw std::runtime_error("AVX512 is not supported");
 #endif
 }
 
 // Convert a float array [in_buf] to a short array [out_buf]. Input array must
-// have [n_elems] elements. Output array must have [n_elems + cp_len] elements.
+// have [n_elems] elements. Output array must have [n_elems + n_prefix] elements.
 // in_buf and out_buf must be 64-byte aligned
 // n_elems must be a multiple of 8 for AVX2
 // scale_down_factor is used for scaling down values in the input array
 static inline void SimdConvertFloatToShortAVX2(const float* in_buf,
                                                short* out_buf, size_t n_elems,
-                                               size_t cp_len,
+                                               size_t n_prefix,
                                                size_t scale_down_factor) {
-  constexpr size_t kAvx2Bits = 256;
-  constexpr size_t kAvx2Bytes = kAvx2Bits / 8;
-  constexpr size_t kAvx2FloatsPerInstr = kAvx2Bytes / sizeof(float);
-  //2 because of the 32->16 ints
-  constexpr size_t kAvx2FloatsPerLoop = kAvx2FloatsPerInstr * 2;
-
 #if defined(DATATYPE_MEMORY_CHECK)
   constexpr size_t kAvx2ShortPerInstr = kAvx2Bytes / sizeof(short);
   RtAssert(((n_elems % kAvx2FloatsPerLoop) == 0) &&
-               ((cp_len % kAvx2ShortPerInstr) == 0) &&
+               ((n_prefix % kAvx2ShortPerInstr) == 0) &&
                ((reinterpret_cast<intptr_t>(in_buf) % kAvx2Bytes) == 0) &&
                ((reinterpret_cast<intptr_t>(out_buf) % kAvx2Bytes) == 0),
            "Data Alignment not correct before calling into AVX optimizations");
@@ -197,7 +196,6 @@ static inline void SimdConvertFloatToShortAVX2(const float* in_buf,
   const __m256 scale_factor = _mm256_set1_ps(scale_factor_float);
   //Operates on 2 elements at a time
   for (size_t i = 0; i < n_elems; i += kAvx2FloatsPerLoop) {
-    //std::printf("SimdConvertFloatToShortAVX2 - i = %zu\n", i);
     const __m256 in1 = _mm256_load_ps(&in_buf[i]);
     //Grab the next value, and interate over 2 values
     const __m256 in2 = _mm256_load_ps(&in_buf[i + kAvx2FloatsPerInstr]);
@@ -210,11 +208,11 @@ static inline void SimdConvertFloatToShortAVX2(const float* in_buf,
     const __m256i short_ints = _mm256_packs_epi32(integer1, integer2);
     //packing shuffles groups of 4 floats
     const __m256i slice = _mm256_permute4x64_epi64(short_ints, 0xD8);
-    // _mm256_store_si256 or _mm256_stream_si256 (cache vs non-temperal) offset by cp_len
-    _mm256_stream_si256(reinterpret_cast<__m256i*>(&out_buf[i + cp_len]),
+    // _mm256_store_si256 or _mm256_stream_si256 (cache vs non-temperal) offset by n_prefix
+    _mm256_stream_si256(reinterpret_cast<__m256i*>(&out_buf[i + n_prefix]),
                         slice);
     // Prepend / Set cyclic prefix
-    const size_t repeat_idx = n_elems - cp_len;
+    const size_t repeat_idx = n_elems - n_prefix;
     if (i >= repeat_idx) {
       _mm256_stream_si256(reinterpret_cast<__m256i*>(&out_buf[i - repeat_idx]),
                           slice);
@@ -223,11 +221,12 @@ static inline void SimdConvertFloatToShortAVX2(const float* in_buf,
 }
 
 // Convert a float array [in_buf] to a short array [out_buf]. Input array must
-// have [n_elems] elements. Output array must have [n_elems + cp_len] elements.
+// have [n_elems] elements. Output array must have [n_elems + n_prefix] elements.
 // in_buf and out_buf must be 64-byte aligned
+// n_prefix prepends the output with the last n_prefix values
 // scale_down_factor is used for scaling down values in the input array
 static inline void ConvertFloatToShort(const float* in_buf, short* out_buf,
-                                       size_t n_elems, size_t cp_len = 0,
+                                       size_t n_elems, size_t n_prefix = 0,
                                        size_t scale_down_factor = 1) {
   for (size_t i = 0; i < n_elems; i++) {
     short converted_value;
@@ -243,34 +242,50 @@ static inline void ConvertFloatToShort(const float* in_buf, short* out_buf,
     } else {
       converted_value = static_cast<short>(scaled_value);
     }
-    out_buf[i + cp_len] = converted_value;
+    out_buf[i + n_prefix] = converted_value;
   }
   //Prepend with last cp len
-  for (size_t i = 0; i < cp_len; i++) {
+  for (size_t i = 0; i < n_prefix; i++) {
     out_buf[i] = out_buf[i + n_elems];
   }
 }
 
 // Convert a float array [in_buf] to a short array [out_buf]. Input array must
-// have [n_elems] elements. Output array must have [n_elems + cp_len] elements.
+// have [n_elems] elements. Output array must have [n_elems + n_prefix] elements.
 // in_buf and out_buf must be 64-byte aligned
 // n_elems must be a multiple of 8 for AVX2 and 16 for AVX512
 // scale_down_factor is used for scaling down values in the input array
 static inline void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
-                                           size_t n_elems, size_t cp_len,
-                                           size_t scale_down_factor) {
+                                           size_t n_elems, size_t n_prefix = 0,
+                                           size_t scale_down_factor = 1) {
 #if defined(DATATYPE_MEMORY_CHECK)
   RtAssert(((n_elems % 16) == 0) &&
-               ((reinterpret_cast<size_t>(in_buf) % 64) == 0) &&
-               ((reinterpret_cast<size_t>(out_buf) % 64) == 0),
+               ((reinterpret_cast<intptr_t>(in_buf) % 64) == 0) &&
+               ((reinterpret_cast<intptr_t>(out_buf) % 64) == 0),
            "Data Alignment not correct before calling into AVX optimizations");
 #endif
 
 #if defined(__AVX512F__)
-  SimdConvertFloatToShortAVX512(in_buf, out_buf, n_elems, cp_len,
+  //ConvertFloatToShort(in_buf, out_buf, n_elems, n_prefix, scale_down_factor);
+  SimdConvertFloatToShortAVX512(in_buf, out_buf, n_elems, n_prefix,
                                 scale_down_factor);
 #else
-  SimdConvertFloatToShortAVX2(in_buf, out_buf, n_elems, cp_len,
+  SimdConvertFloatToShortAVX2(in_buf, out_buf, n_elems, n_prefix,
+                              scale_down_factor);
+#endif
+}
+
+//Assumes complex float == float float
+static inline void SimdConvertCxFloatToCxShort(
+    const std::complex<float>* in_buf, std::complex<short>* out_buf,
+    size_t n_elems, size_t n_prefix, size_t scale_down_factor) {
+  auto* in = reinterpret_cast<const float*>(in_buf);
+  auto* out = reinterpret_cast<short*>(out_buf);
+#if defined(__AVX512F__)
+  SimdConvertFloatToShortAVX512(in, out, n_elems * 2, n_prefix * 2,
+                                scale_down_factor);
+#else
+  SimdConvertFloatToShortAVX2(in, out, n_elems * 2, n_prefix * 2,
                               scale_down_factor);
 #endif
 }
@@ -327,8 +342,8 @@ static inline void Convert12bitIqTo16bitIq(uint8_t* in_buf, uint16_t* out_buf,
                                            size_t n_elems) {
 #if defined(DATATYPE_MEMORY_CHECK)
   RtAssert(((n_elems % 16) == 0) &&
-               ((reinterpret_cast<size_t>(in_buf) % 32) == 0) &&
-               ((reinterpret_cast<size_t>(out_buf) % 32) == 0),
+               ((reinterpret_cast<intptr_t>(in_buf) % 32) == 0) &&
+               ((reinterpret_cast<intptr_t>(out_buf) % 32) == 0),
            "Convert12bitIqTo16bitIq: Data Alignment not correct before calling "
            "into AVX optimizations");
 #endif

@@ -274,11 +274,11 @@ void* ChannelSim::TaskThread(size_t tid) {
 
   size_t tx_buffer_ue_size =
       dl_data_plus_beacon_symbols_ * cfg_->UeAntNum() * payload_length_;
-  AlignedByteVector tx_buffer_ue(tx_buffer_ue_size);
+  SimdAlignByteVector tx_buffer_ue(tx_buffer_ue_size);
 
   size_t tx_buffer_bs_size =
       ul_data_plus_pilot_symbols_ * cfg_->BsAntNum() * payload_length_;
-  AlignedByteVector tx_buffer_bs(tx_buffer_bs_size);
+  SimdAlignByteVector tx_buffer_bs(tx_buffer_bs_size);
 
   void* bs_input_float_storage = PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64,
@@ -313,7 +313,7 @@ void* ChannelSim::TaskThread(size_t tid) {
       cfg_->SampsPerSymbol(), cfg_->BsAntNum(), false, true);
   ue_output_matrix.zeros(cfg_->SampsPerSymbol(), cfg_->BsAntNum());
 
-  AlignedByteVector udp_tx_buffer(cfg_->PacketLength());
+  SimdAlignByteVector udp_tx_buffer(cfg_->PacketLength());
 
   WorkerThreadStorage thread_store;
   thread_store.tid_ = tid;
@@ -591,9 +591,9 @@ void* ChannelSim::UeRxLoop(size_t tid) {
 
 /// Warning: Threads are sharing these sender sockets.
 void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
-                      size_t ant_per_socket, uint8_t* tx_buffer,
+                      size_t ant_per_socket, std::byte* tx_buffer,
                       const arma::cx_float* source_data,
-                      AlignedByteVector* udp_pkt_buf,
+                      SimdAlignByteVector* udp_pkt_buf,
                       std::vector<std::unique_ptr<UDPClient>>& udp_clients,
                       const std::string& dest_address, size_t dest_port) {
   // The 2 is from complex float -> float
@@ -619,8 +619,10 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
     // Can remove this with some changes
     std::memcpy(pkt->data_, &tx_buffer[ant_id * payload_length_],
                 payload_length_);
-    udp_clients.at(socket)->Send(dest_address, dest_port + socket,
-                                 udp_pkt_buf->data(), udp_pkt_buf->size());
+    udp_clients.at(socket)->Send(
+        dest_address, dest_port + socket,
+        reinterpret_cast<const uint8_t*>(udp_pkt_buf->data()),
+        udp_pkt_buf->size());
     // Assumes blocking
   }
 }

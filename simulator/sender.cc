@@ -549,10 +549,8 @@ void Sender::InitIqFromFile(const std::string& filename) {
                             reinterpret_cast<uint8_t*>(iq_data_short_[i]),
                             expected_count);
     } else {
-      for (size_t j = 0; j < expected_count; j++) {
-        iq_data_short_[i][j] =
-            static_cast<unsigned short>(iq_data_float[i][j] * 32768);
-      }
+      SimdConvertFloatToShort(iq_data_float[i], iq_data_short_[i],
+                              expected_count);
     }
   }
   std::fclose(fp);
