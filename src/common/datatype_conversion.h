@@ -142,7 +142,7 @@ static inline void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
 static inline void ConvertFloatTo12bitIq(const float* in_buf, uint8_t* out_buf,
                                          size_t n_elems) {
 #if defined(DATATYPE_MEMORY_CHECK)
-  RtAssert(((n_elems % 2) == 0) &&
+  RtAssert((n_elems % 2) == 0,
            "ConvertFloatTo12bitIq n_elems not multiple of 2");
 #endif
   size_t index_short = 0;

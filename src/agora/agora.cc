@@ -1205,7 +1205,7 @@ void Agora::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
             frame_id,
             this->stats_->MasterGetDeltaMs(TsType::kBeamDone,
                                            TsType::kFirstSymbolRX, frame_id),
-            config_->Beamforming());
+            config_->Beamforming().c_str());
         break;
       case (PrintType::kDemul):
         AGORA_LOG_INFO(
