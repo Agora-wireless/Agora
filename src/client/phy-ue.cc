@@ -70,7 +70,7 @@ PhyUe::PhyUe(Config* config)
         (config->OfdmTxZeroPostfix() + config->OfdmTxZeroPrefix());
     auto& ue_pilot_f = ue_pilot_vec_.at(i);
     ue_pilot_f.resize(pilot_len_samples);
-    SimdConvertShortToFloat(
+    ConvertShortToFloat(
         reinterpret_cast<const short*>(
             &config_->UeSpecificPilotT()[i][config->OfdmTxZeroPrefix()]),
         reinterpret_cast<float*>(ue_pilot_f.data()), pilot_len_samples * 2);
