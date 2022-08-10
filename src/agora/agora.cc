@@ -897,7 +897,8 @@ void Agora::Worker(int tid) {
       calib_ul_buffer_, this->calib_dl_msum_buffer_,
       this->calib_ul_msum_buffer_, this->ul_zf_matrices_, this->dl_zf_matrices_,
       this->phy_stats_.get(), this->stats_.get(),
-      mat_loggers_.at(CsvLog::kDLCSI), mat_loggers_.at(CsvLog::kDLZF));
+      mat_loggers_.at(CsvLog::kULCSI), mat_loggers_.at(CsvLog::kDLCSI),
+      mat_loggers_.at(CsvLog::kDLZF));
 
   auto compute_fft = std::make_unique<DoFFT>(
       this->config_, tid, this->data_buffer_, this->csi_buffers_,
@@ -1017,7 +1018,8 @@ void Agora::WorkerZf(int tid) {
       config_, tid, csi_buffers_, calib_dl_buffer_, calib_ul_buffer_,
       calib_dl_msum_buffer_, calib_ul_msum_buffer_, ul_zf_matrices_,
       dl_zf_matrices_, this->phy_stats_.get(), this->stats_.get(),
-      mat_loggers_.at(CsvLog::kDLCSI), mat_loggers_.at(CsvLog::kDLZF)));
+      mat_loggers_.at(CsvLog::kULCSI), mat_loggers_.at(CsvLog::kDLCSI),
+      mat_loggers_.at(CsvLog::kDLZF)));
 
   while (this->config_->Running() == true) {
     compute_zf->TryLaunch(*GetConq(EventType::kZF, 0), complete_task_queue_[0],
