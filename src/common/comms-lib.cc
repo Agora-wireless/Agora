@@ -591,7 +591,7 @@ std::vector<std::complex<float>> CommsLib::ComposePartialPilotSym(
 
 void CommsLib::Ifft2tx(const complex_float* in, std::complex<short>* out,
                        size_t N, size_t prefix, size_t cp, float scale) {
-  ConvertFloatToShort(reinterpret_cast<const float*>(&in),
+  ConvertFloatToShort(reinterpret_cast<const float*>(in),
                       reinterpret_cast<short*>(&out[prefix]), N * 2, cp * 2,
                       scale);
 }
@@ -601,7 +601,7 @@ std::vector<std::complex<float>> CommsLib::Modulate(
   std::vector<std::complex<float>> out(in.size());
   if (type == kQpsk) {
     float qpsk_table[2][4];  // = init_qpsk();
-    float scale = 1 / sqrt(2);
+    float scale = 1 / std::sqrt(2);
     float mod_qpsk[2] = {-scale, scale};
     for (int i = 0; i < 4; i++) {
       qpsk_table[0][i] = mod_qpsk[i / 2];
@@ -625,7 +625,7 @@ std::vector<std::complex<float>> CommsLib::Modulate(
       qam16_table[1][i] = mod_16qam[i % 4];
     }
     for (size_t i = 0; i < in.size(); i++) {
-      if (in[i] >= 0 and in[i] < 16) {
+      if (in[i] >= 0 && in[i] < 16) {
         out[i] =
             std::complex<float>(qam16_table[0][in[i]], qam16_table[1][in[i]]);
       } else {
@@ -643,7 +643,7 @@ std::vector<std::complex<float>> CommsLib::Modulate(
       qam64_table[1][i] = mod_64qam[i % 8];
     }
     for (size_t i = 0; i < in.size(); i++) {
-      if (in[i] >= 0 and in[i] < 64) {
+      if (in[i] >= 0 && in[i] < 64) {
         out[i] =
             std::complex<float>(qam64_table[0][in[i]], qam64_table[1][in[i]]);
       } else {

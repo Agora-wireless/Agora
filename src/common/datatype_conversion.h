@@ -132,7 +132,7 @@ static inline void SimdConvertShortToFloat(const short* in_buf, float* out_buf,
 static inline void SimdConvertFloatToShortAVX512(const float* in_buf,
                                                  short* out_buf, size_t n_elems,
                                                  size_t n_prefix,
-                                                 size_t scale_down_factor) {
+                                                 float scale_down_factor) {
 #if defined(__AVX512F__)
 #if defined(DATATYPE_MEMORY_CHECK)
   constexpr size_t kAvx512ShortPerInstr = kAvx512Bytes / sizeof(short);
@@ -142,8 +142,7 @@ static inline void SimdConvertFloatToShortAVX512(const float* in_buf,
                ((reinterpret_cast<intptr_t>(out_buf) % kAvx512Bytes) == 0),
            "Data Alignment not correct before calling into AVX optimizations");
 #endif
-  const float scale_factor_float =
-      kShrtFltConvFactor / static_cast<float>(scale_down_factor);
+  const float scale_factor_float = kShrtFltConvFactor / scale_down_factor;
   const __m512 scale_factor = _mm512_set1_ps(scale_factor_float);
   const __m512i permute_index = _mm512_setr_epi64(0, 2, 4, 6, 1, 3, 5, 7);
   for (size_t i = 0; i < n_elems; i += kAvx512FloatsPerLoop) {
@@ -183,7 +182,7 @@ static inline void SimdConvertFloatToShortAVX512(const float* in_buf,
 static inline void SimdConvertFloatToShortAVX2(const float* in_buf,
                                                short* out_buf, size_t n_elems,
                                                size_t n_prefix,
-                                               size_t scale_down_factor) {
+                                               float scale_down_factor) {
 #if defined(DATATYPE_MEMORY_CHECK)
   constexpr size_t kAvx2ShortPerInstr = kAvx2Bytes / sizeof(short);
   RtAssert(((n_elems % kAvx2FloatsPerLoop) == 0) &&
@@ -193,8 +192,7 @@ static inline void SimdConvertFloatToShortAVX2(const float* in_buf,
            "Data Alignment not correct before calling into AVX optimizations");
 #endif
 
-  const float scale_factor_float =
-      kShrtFltConvFactor / static_cast<float>(scale_down_factor);
+  const float scale_factor_float = kShrtFltConvFactor / scale_down_factor;
 
   const __m256 scale_factor = _mm256_set1_ps(scale_factor_float);
   //Operates on 2 elements at a time
@@ -230,12 +228,11 @@ static inline void SimdConvertFloatToShortAVX2(const float* in_buf,
 // scale_down_factor is used for scaling down values in the input array
 static inline void ConvertFloatToShort(const float* in_buf, short* out_buf,
                                        size_t n_elems, size_t n_prefix = 0,
-                                       size_t scale_down_factor = 1) {
+                                       float scale_down_factor = 1.0f) {
   for (size_t i = 0; i < n_elems; i++) {
     short converted_value;
     const float scaled_value =
-        in_buf[i] *
-        (kShrtFltConvFactor / static_cast<float>(scale_down_factor));
+        in_buf[i] * (kShrtFltConvFactor / scale_down_factor);
 
     //Saturate the output
     if (scaled_value >= SHRT_MAX) {
@@ -260,7 +257,7 @@ static inline void ConvertFloatToShort(const float* in_buf, short* out_buf,
 // scale_down_factor is used for scaling down values in the input array
 static inline void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
                                            size_t n_elems, size_t n_prefix = 0,
-                                           size_t scale_down_factor = 1) {
+                                           float scale_down_factor = 1.0f) {
 #if defined(DATATYPE_MEMORY_CHECK)
   RtAssert(((n_elems % 16) == 0) &&
                ((reinterpret_cast<intptr_t>(in_buf) % 64) == 0) &&
@@ -281,7 +278,7 @@ static inline void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
 //Assumes complex float == float float
 static inline void SimdConvertCxFloatToCxShort(
     const std::complex<float>* in_buf, std::complex<short>* out_buf,
-    size_t n_elems, size_t n_prefix, size_t scale_down_factor) {
+    size_t n_elems, size_t n_prefix, float scale_down_factor) {
   auto* in = reinterpret_cast<const float*>(in_buf);
   auto* out = reinterpret_cast<short*>(out_buf);
 #if defined(__AVX512F__)
