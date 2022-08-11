@@ -42,12 +42,12 @@ void Worker::WorkerThread(int tid) {
   PinToCoreWithOffset(ThreadType::kWorker, base_worker_core_offset_, tid);
 
   /* Initialize operators */
-  auto compute_zf = std::make_unique<DoZF>(
+  auto compute_zf = std::make_unique<DoBeamWeights>(
       this->config_, tid, buffer_->csi_buffer_, buffer_->calib_dl_buffer_,
       buffer_->calib_ul_buffer_, buffer_->calib_dl_msum_buffer_,
-      buffer_->calib_ul_msum_buffer_, buffer_->ul_zf_matrix_,
-      buffer_->dl_zf_matrix_, phy_stats_, stats_,
-      mat_loggers_.at(CsvLog::kDLCSI), mat_loggers_.at(CsvLog::kDLZF));
+      buffer_->calib_ul_msum_buffer_, buffer_->ul_beam_matrix_,
+      buffer_->dl_beam_matrix_, phy_stats_, stats_,
+      mat_loggers_.at(CsvLog::kDLCSI), mat_loggers_.at(CsvLog::kDlBeam));
 
   auto compute_fft = std::make_unique<DoFFT>(
       config_, tid, buffer_->data_buffer_, buffer_->csi_buffer_,
@@ -59,7 +59,7 @@ void Worker::WorkerThread(int tid) {
                                buffer_->dl_socket_buffer_, stats_);
 
   auto compute_precode = std::make_unique<DoPrecode>(
-      config_, tid, buffer_->dl_zf_matrix_, buffer_->dl_ifft_buffer_,
+      config_, tid, buffer_->dl_beam_matrix_, buffer_->dl_ifft_buffer_,
       buffer_->dl_mod_bits_buffer_, stats_);
 
   auto compute_encoding = std::make_unique<DoEncode>(
@@ -74,7 +74,7 @@ void Worker::WorkerThread(int tid) {
                                  buffer_->decoded_buffer_, phy_stats_, stats_);
 
   auto compute_demul = std::make_unique<DoDemul>(
-      config_, tid, buffer_->data_buffer_, buffer_->ul_zf_matrix_,
+      config_, tid, buffer_->data_buffer_, buffer_->ul_beam_matrix_,
       buffer_->ue_spec_pilot_buffer_, buffer_->equal_buffer_,
       buffer_->demod_buffer_, phy_stats_, stats_);
 
@@ -83,7 +83,7 @@ void Worker::WorkerThread(int tid) {
   ///*************************
   computers_vec.push_back(compute_zf.get());
   computers_vec.push_back(compute_fft.get());
-  events_vec.push_back(EventType::kZF);
+  events_vec.push_back(EventType::kBeam);
   events_vec.push_back(EventType::kFFT);
 
   if (config_->Frame().NumULSyms() > 0) {

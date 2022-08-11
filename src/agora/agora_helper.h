@@ -38,10 +38,10 @@ struct MessageInfo {
 // Initialized in manager class and used in worker class
 struct Buffer {
   PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffer_;
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrix_;
+  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrix_;
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffer_;
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> decoded_buffer_;
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrix_;
+  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_beam_matrix_;
   Table<complex_float> data_buffer_;
   Table<complex_float> equal_buffer_;
   Table<complex_float> ue_spec_pilot_buffer_;
