@@ -168,7 +168,7 @@ class Agora {
   // Counters related to various modules
   FrameCounters pilot_fft_counters_;
   FrameCounters uplink_fft_counters_;
-  FrameCounters zf_counters_;
+  FrameCounters beam_counters_;
   FrameCounters demul_counters_;
   FrameCounters decode_counters_;
   FrameCounters encode_counters_;
@@ -179,7 +179,7 @@ class Agora {
   FrameCounters mac_to_phy_counters_;
   FrameCounters rc_counters_;
   RxCounters rx_counters_;
-  size_t zf_last_frame_ = SIZE_MAX;
+  size_t beam_last_frame_ = SIZE_MAX;
   size_t rc_last_frame_ = SIZE_MAX;
   size_t ifft_next_symbol_ = 0;
 

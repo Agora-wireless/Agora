@@ -17,7 +17,6 @@
   "sample_rate": 5e6,
   "demul_block_size": 48,
   "cp_size": 0,
-  "modulation": "16QAM",
   "fft_size": 2048,
   "ofdm_data_num": 1200,
   "ofdm_pilot_spacing": 16,
@@ -29,13 +28,17 @@
   "ofdm_rx_zero_prefix_client": 0,
   "ofdm_rx_zero_prefix_cal_ul": 0,
   "ofdm_rx_zero_prefix_cal_dl": 0,
-  /* LDPC settings */
-  "Zc": 72,
-  "base_graph": 1,
-  "earlyTermination": true,
-  "decoderIter": 5,
-  "nRows": 46,
+  /* Modulation and Coding settings */
+  "ul_mcs" : {
+    "modulation": "16QAM",
+    "code_rate": 0.333
+  },
+  "dl_mcs" : {
+    "modulation": "16QAM",
+    "code_rate": 0.333
+  },
   /* General settings */
+  "beamforming" " "ZF",
   "beamsweep": false,
   "beacon_antenna": 0,
   "calibrate_digital": false,
