@@ -13,7 +13,7 @@
 
 #include "utils.h"
 
-#define DATATYPE_MEMORY_CHECK
+//#define DATATYPE_MEMORY_CHECK
 
 // Convert a short array [in_buf] to a float array [out_buf]. Each array must
 // have [n_elems] elements.
