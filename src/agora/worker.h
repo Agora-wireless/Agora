@@ -7,6 +7,7 @@
 #define WORKER_H_
 
 #include "agora_helper.h"
+#include "concurrent_queue_wrapper.h"
 #include "csv_logger.h"
 #include "dodecode.h"
 #include "dodemul.h"
@@ -20,7 +21,8 @@
 
 class Worker {
  public:
-  explicit Worker(Config* /*cfg*/, Stats* /*stats*/, PhyStats* /*phy_stats*/, MessageInfo* /*message*/, Buffer* /*buffer*/,
+  explicit Worker(Config* /*cfg*/, Stats* /*stats*/, PhyStats* /*phy_stats*/,
+                  MessageInfo* /*message*/, Buffer* /*buffer*/,
                   FrameInfo* /*frame*/);
   ~Worker();
 
