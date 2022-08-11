@@ -26,15 +26,15 @@ Agora::Agora(Config* const cfg)
       phy_stats_(std::make_unique<PhyStats>(cfg, Direction::kUplink)),
       csi_buffers_(kFrameWnd, cfg->UeAntNum(),
                    cfg->BsAntNum() * cfg->OfdmDataNum()),
-      ul_zf_matrices_(kFrameWnd, cfg->OfdmDataNum(),
-                      cfg->BsAntNum() * cfg->UeAntNum()),
+      ul_beam_matrices_(kFrameWnd, cfg->OfdmDataNum(),
+                        cfg->BsAntNum() * cfg->UeAntNum()),
       demod_buffers_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),
                      kMaxModType * cfg->OfdmDataNum()),
       decoded_buffer_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),
                       cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
                           Roundup<64>(cfg->NumBytesPerCb(Direction::kUplink))),
-      dl_zf_matrices_(kFrameWnd, cfg->OfdmDataNum(),
-                      cfg->UeAntNum() * cfg->BsAntNum()) {
+      dl_beam_matrices_(kFrameWnd, cfg->OfdmDataNum(),
+                        cfg->UeAntNum() * cfg->BsAntNum()) {
   std::string directory = TOSTRING(PROJECT_DIRECTORY);
   AGORA_LOG_INFO("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
                  directory.c_str(), cfg->FreqGhz());
@@ -148,7 +148,7 @@ void Agora::ScheduleDownlinkProcessing(size_t frame_id) {
   size_t num_pilot_symbols = config_->Frame().ClientDlPilotSymbols();
 
   for (size_t i = 0; i < num_pilot_symbols; i++) {
-    if (zf_last_frame_ == frame_id) {
+    if (beam_last_frame_ == frame_id) {
       ScheduleSubcarriers(EventType::kPrecode, frame_id,
                           config_->Frame().GetDLSymbol(i));
     } else {
@@ -239,19 +239,19 @@ void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
       num_events = config_->DemulEventsPerSymbol();
       block_size = config_->DemulBlockSize();
       break;
-    case EventType::kZF:
-      num_events = config_->ZfEventsPerSymbol();
-      block_size = config_->ZfBlockSize();
+    case EventType::kBeam:
+      num_events = config_->BeamEventsPerSymbol();
+      block_size = config_->BeamBlockSize();
       break;
     default:
       assert(false);
   }
 
   size_t qid = (frame_id & 0x1);
-  if (event_type == EventType::kZF) {
+  if (event_type == EventType::kBeam) {
     EventData event;
     event.event_type_ = event_type;
-    event.num_tags_ = config_->ZfBatchSize();
+    event.num_tags_ = config_->BeamBatchSize();
     size_t num_blocks = num_events / event.num_tags_;
     size_t num_remainder = num_events % event.num_tags_;
     if (num_remainder > 0) {
@@ -392,19 +392,20 @@ void Agora::Start() {
           }
         } break;
 
-        case EventType::kZF: {
+        case EventType::kBeam: {
           for (size_t tag_id = 0; (tag_id < event.num_tags_); tag_id++) {
             const size_t frame_id = gen_tag_t(event.tags_[tag_id]).frame_id_;
-            PrintPerTaskDone(PrintType::kZF, frame_id, 0,
-                             zf_counters_.GetTaskCount(frame_id));
-            const bool last_zf_task = this->zf_counters_.CompleteTask(frame_id);
-            if (last_zf_task == true) {
-              this->stats_->MasterSetTsc(TsType::kZFDone, frame_id);
-              zf_last_frame_ = frame_id;
-              PrintPerFrameDone(PrintType::kZF, frame_id);
-              this->zf_counters_.Reset(frame_id);
-              if (kPrintZfStats) {
-                this->phy_stats_->PrintZfStats(frame_id);
+            PrintPerTaskDone(PrintType::kBeam, frame_id, 0,
+                             beam_counters_.GetTaskCount(frame_id));
+            const bool last_beam_task =
+                this->beam_counters_.CompleteTask(frame_id);
+            if (last_beam_task == true) {
+              this->stats_->MasterSetTsc(TsType::kBeamDone, frame_id);
+              beam_last_frame_ = frame_id;
+              PrintPerFrameDone(PrintType::kBeam, frame_id);
+              this->beam_counters_.Reset(frame_id);
+              if (kPrintBeamStats) {
+                this->phy_stats_->PrintBeamStats(frame_id);
               }
 
               for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
@@ -423,7 +424,7 @@ void Agora::Start() {
                                       cfg->Frame().GetDLSymbol(i));
                 }
               }
-            }  // end if (zf_counters_.last_task(frame_id) == true)
+            }  // end if (beam_counters_.last_task(frame_id) == true)
           }
         } break;
 
@@ -607,7 +608,7 @@ void Agora::Start() {
               this->encode_cur_frame_for_symbol_.at(
                   cfg->Frame().GetDLSymbolIdx(symbol_id)) = frame_id;
               // If precoder of the current frame exists
-              if (zf_last_frame_ == frame_id) {
+              if (beam_last_frame_ == frame_id) {
                 ScheduleSubcarriers(EventType::kPrecode, frame_id, symbol_id);
               }
               PrintPerSymbolDone(PrintType::kEncode, frame_id, symbol_id);
@@ -824,7 +825,7 @@ void Agora::HandleEventFft(size_t tag) {
       if ((config_->Frame().IsRecCalEnabled() == false) ||
           ((config_->Frame().IsRecCalEnabled() == true) &&
            (this->rc_last_frame_ == frame_id))) {
-        // If CSI of all UEs is ready, schedule ZF/prediction
+        // If CSI of all UEs is ready, schedule Beam/prediction
         const bool last_pilot_fft =
             pilot_fft_counters_.CompleteSymbol(frame_id);
         if (last_pilot_fft == true) {
@@ -838,7 +839,7 @@ void Agora::HandleEventFft(size_t tag) {
           if (kEnableMac == true) {
             SendSnrReport(EventType::kSNRReport, frame_id, symbol_id);
           }
-          ScheduleSubcarriers(EventType::kZF, frame_id, 0);
+          ScheduleSubcarriers(EventType::kBeam, frame_id, 0);
         }
       }
     }
@@ -853,7 +854,7 @@ void Agora::HandleEventFft(size_t tag) {
 
       PrintPerSymbolDone(PrintType::kFFTData, frame_id, symbol_id);
       // If precoder exist, schedule demodulation
-      if (zf_last_frame_ == frame_id) {
+      if (beam_last_frame_ == frame_id) {
         ScheduleSubcarriers(EventType::kDemul, frame_id, symbol_id);
       }
       const bool last_uplink_fft =
@@ -892,12 +893,12 @@ void Agora::Worker(int tid) {
   PinToCoreWithOffset(ThreadType::kWorker, base_worker_core_offset_, tid);
 
   /* Initialize operators */
-  auto compute_zf = std::make_unique<DoZF>(
+  auto compute_beam = std::make_unique<DoBeamWeights>(
       this->config_, tid, this->csi_buffers_, calib_dl_buffer_,
       calib_ul_buffer_, this->calib_dl_msum_buffer_,
-      this->calib_ul_msum_buffer_, this->ul_zf_matrices_, this->dl_zf_matrices_,
-      this->phy_stats_.get(), this->stats_.get(),
-      mat_loggers_.at(CsvLog::kDLCSI), mat_loggers_.at(CsvLog::kDLZF));
+      this->calib_ul_msum_buffer_, this->ul_beam_matrices_,
+      this->dl_beam_matrices_, this->phy_stats_.get(), this->stats_.get(),
+      mat_loggers_.at(CsvLog::kDLCSI), mat_loggers_.at(CsvLog::kDlBeam));
 
   auto compute_fft = std::make_unique<DoFFT>(
       this->config_, tid, this->data_buffer_, this->csi_buffers_,
@@ -910,7 +911,7 @@ void Agora::Worker(int tid) {
                                this->dl_socket_buffer_, this->stats_.get());
 
   auto compute_precode = std::make_unique<DoPrecode>(
-      this->config_, tid, this->dl_zf_matrices_, this->dl_ifft_buffer_,
+      this->config_, tid, this->dl_beam_matrices_, this->dl_ifft_buffer_,
       this->dl_mod_bits_buffer_, this->stats_.get());
 
   auto compute_encoding = std::make_unique<DoEncode>(
@@ -925,16 +926,16 @@ void Agora::Worker(int tid) {
       this->phy_stats_.get(), this->stats_.get());
 
   auto compute_demul = std::make_unique<DoDemul>(
-      this->config_, tid, this->data_buffer_, this->ul_zf_matrices_,
+      this->config_, tid, this->data_buffer_, this->ul_beam_matrices_,
       this->ue_spec_pilot_buffer_, this->equal_buffer_, this->demod_buffers_,
       this->phy_stats_.get(), this->stats_.get());
 
   std::vector<Doer*> computers_vec;
   std::vector<EventType> events_vec;
   ///*************************
-  computers_vec.push_back(compute_zf.get());
+  computers_vec.push_back(compute_beam.get());
   computers_vec.push_back(compute_fft.get());
-  events_vec.push_back(EventType::kZF);
+  events_vec.push_back(EventType::kBeam);
   events_vec.push_back(EventType::kFFT);
 
   if (config_->Frame().NumULSyms() > 0) {
@@ -1009,19 +1010,19 @@ void Agora::WorkerFft(int tid) {
   }
 }
 
-void Agora::WorkerZf(int tid) {
-  PinToCoreWithOffset(ThreadType::kWorkerZF, base_worker_core_offset_, tid);
+void Agora::WorkerBeam(int tid) {
+  PinToCoreWithOffset(ThreadType::kWorkerBeam, base_worker_core_offset_, tid);
 
-  /* Initialize ZF operator */
-  auto compute_zf(std::make_unique<DoZF>(
+  /* Initialize Beam operator */
+  auto compute_beam(std::make_unique<DoBeamWeights>(
       config_, tid, csi_buffers_, calib_dl_buffer_, calib_ul_buffer_,
-      calib_dl_msum_buffer_, calib_ul_msum_buffer_, ul_zf_matrices_,
-      dl_zf_matrices_, this->phy_stats_.get(), this->stats_.get(),
-      mat_loggers_.at(CsvLog::kDLCSI), mat_loggers_.at(CsvLog::kDLZF)));
+      calib_dl_msum_buffer_, calib_ul_msum_buffer_, ul_beam_matrices_,
+      dl_beam_matrices_, this->phy_stats_.get(), this->stats_.get(),
+      mat_loggers_.at(CsvLog::kDLCSI), mat_loggers_.at(CsvLog::kDlBeam)));
 
   while (this->config_->Running() == true) {
-    compute_zf->TryLaunch(*GetConq(EventType::kZF, 0), complete_task_queue_[0],
-                          worker_ptoks_ptr_[tid][0]);
+    compute_beam->TryLaunch(*GetConq(EventType::kBeam, 0),
+                            complete_task_queue_[0], worker_ptoks_ptr_[tid][0]);
   }
 }
 
@@ -1029,13 +1030,13 @@ void Agora::WorkerDemul(int tid) {
   PinToCoreWithOffset(ThreadType::kWorkerDemul, base_worker_core_offset_, tid);
 
   std::unique_ptr<DoDemul> compute_demul(
-      new DoDemul(config_, tid, data_buffer_, ul_zf_matrices_,
+      new DoDemul(config_, tid, data_buffer_, ul_beam_matrices_,
                   ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_,
                   this->phy_stats_.get(), this->stats_.get()));
 
   /* Initialize Precode operator */
   std::unique_ptr<DoPrecode> compute_precode(
-      new DoPrecode(config_, tid, dl_zf_matrices_, dl_ifft_buffer_,
+      new DoPrecode(config_, tid, dl_beam_matrices_, dl_ifft_buffer_,
                     dl_mod_bits_buffer_, this->stats_.get()));
 
   assert(false);
@@ -1086,16 +1087,16 @@ void Agora::CreateThreads() {
       workers_.emplace_back(&Agora::WorkerFft, this, i);
     }
     for (size_t i = cfg->FftThreadNum();
-         i < cfg->FftThreadNum() + cfg->ZfThreadNum(); i++) {
-      workers_.emplace_back(&Agora::WorkerZf, this, i);
+         i < cfg->FftThreadNum() + cfg->BeamThreadNum(); i++) {
+      workers_.emplace_back(&Agora::WorkerBeam, this, i);
     }
-    for (size_t i = cfg->FftThreadNum() + cfg->ZfThreadNum();
-         i < cfg->FftThreadNum() + cfg->ZfThreadNum() + cfg->DemulThreadNum();
+    for (size_t i = cfg->FftThreadNum() + cfg->BeamThreadNum();
+         i < cfg->FftThreadNum() + cfg->BeamThreadNum() + cfg->DemulThreadNum();
          i++) {
       workers_.emplace_back(&Agora::WorkerDemul, this, i);
     }
     for (size_t i =
-             cfg->FftThreadNum() + cfg->ZfThreadNum() + cfg->DemulThreadNum();
+             cfg->FftThreadNum() + cfg->BeamThreadNum() + cfg->DemulThreadNum();
          i < cfg->WorkerThreadNum(); i++) {
       workers_.emplace_back(&Agora::WorkerDecode, this, i);
     }
@@ -1198,11 +1199,13 @@ void Agora::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
             this->stats_->MasterGetUsSince(TsType::kRCAllRX, frame_id) /
                 1000.0);
         break;
-      case (PrintType::kZF):
-        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed zero-forcing\n",
-                       frame_id,
-                       this->stats_->MasterGetDeltaMs(
-                           TsType::kZFDone, TsType::kFirstSymbolRX, frame_id));
+      case (PrintType::kBeam):
+        AGORA_LOG_INFO(
+            "Main [frame %zu + %.2f ms]: Completed %s beamweight calc\n",
+            frame_id,
+            this->stats_->MasterGetDeltaMs(TsType::kBeamDone,
+                                           TsType::kFirstSymbolRX, frame_id),
+            config_->Beamforming().c_str());
         break;
       case (PrintType::kDemul):
         AGORA_LOG_INFO(
@@ -1287,7 +1290,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             frame_id, symbol_id,
             this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
             uplink_fft_counters_.GetSymbolCount(frame_id) + 1,
-            static_cast<int>(zf_last_frame_ == frame_id));
+            static_cast<int>(beam_last_frame_ == frame_id));
         break;
       case (PrintType::kDemul):
         AGORA_LOG_INFO(
@@ -1356,9 +1359,10 @@ void Agora::PrintPerTaskDone(PrintType print_type, size_t frame_id,
                              size_t symbol_id, size_t ant_or_sc_id) {
   if (kDebugPrintPerTaskDone == true) {
     switch (print_type) {
-      case (PrintType::kZF):
-        AGORA_LOG_INFO("Main thread: ZF done frame: %zu, subcarrier %zu\n",
-                       frame_id, ant_or_sc_id);
+      case (PrintType::kBeam):
+        AGORA_LOG_INFO(
+            "Main thread: Beamweights done frame: %zu, subcarrier %zu\n",
+            frame_id, ant_or_sc_id);
         break;
       case (PrintType::kRC):
         AGORA_LOG_INFO("Main thread: RC done frame: %zu, subcarrier %zu\n",
@@ -1507,7 +1511,7 @@ void Agora::InitializeUplinkBuffers() {
 
   rc_counters_.Init(cfg->BsAntNum());
 
-  zf_counters_.Init(cfg->ZfEventsPerSymbol());
+  beam_counters_.Init(cfg->BeamEventsPerSymbol());
 
   demul_counters_.Init(cfg->Frame().NumULSyms(), cfg->DemulEventsPerSymbol());
 
@@ -1531,7 +1535,7 @@ void Agora::InitializeDownlinkBuffers() {
     size_t dl_socket_buffer_size =
         config_->DlPacketLength() * dl_socket_buffer_status_size;
     AllocBuffer1d(&dl_socket_buffer_, dl_socket_buffer_size,
-                  Agora_memory::Alignment_t::kAlign64, 0);
+                  Agora_memory::Alignment_t::kAlign64, 1);
 
     size_t dl_bits_buffer_size =
         kFrameWnd * config_->MacBytesNumPerframe(Direction::kDownlink);

@@ -1,9 +1,9 @@
 /**
- * @file dozf.cc
- * @brief Implementation file for the DoZf class.  Zero forcing for one
+ * @file dobeamweights.cc
+ * @brief Implementation file for the DoBeamWeights class.  Calculates Precoder/Detector  for one
  * subcarrier.
  */
-#include "dozf.h"
+#include "dobeamweights.h"
 
 #include "concurrent_queue_wrapper.h"
 #include "doer.h"
@@ -14,29 +14,30 @@ static constexpr bool kUseSIMDGather = true;
 static constexpr bool kUseInverseForZF = true;
 static constexpr bool kUseUlZfForDownlink = true;
 
-DoZF::DoZF(Config* config, int tid,
-           PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
-           Table<complex_float>& calib_dl_buffer,
-           Table<complex_float>& calib_ul_buffer,
-           Table<complex_float>& calib_dl_msum_buffer,
-           Table<complex_float>& calib_ul_msum_buffer,
-           PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
-           PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
-           PhyStats* in_phy_stats, Stats* stats_manager,
-           std::shared_ptr<CsvLog::MatLogger> dl_csi_logger,
-           std::shared_ptr<CsvLog::MatLogger> dl_zf_logger)
+DoBeamWeights::DoBeamWeights(
+    Config* config, int tid,
+    PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
+    Table<complex_float>& calib_dl_buffer,
+    Table<complex_float>& calib_ul_buffer,
+    Table<complex_float>& calib_dl_msum_buffer,
+    Table<complex_float>& calib_ul_msum_buffer,
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices,
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices,
+    PhyStats* in_phy_stats, Stats* stats_manager,
+    std::shared_ptr<CsvLog::MatLogger> dl_csi_logger,
+    std::shared_ptr<CsvLog::MatLogger> dl_beam_logger)
     : Doer(config, tid),
       csi_buffers_(csi_buffers),
       calib_dl_buffer_(calib_dl_buffer),
       calib_ul_buffer_(calib_ul_buffer),
       calib_dl_msum_buffer_(calib_dl_msum_buffer),
       calib_ul_msum_buffer_(calib_ul_msum_buffer),
-      ul_zf_matrices_(ul_zf_matrices),
-      dl_zf_matrices_(dl_zf_matrices),
+      ul_beam_matrices_(ul_beam_matrices),
+      dl_beam_matrices_(dl_beam_matrices),
       phy_stats_(in_phy_stats),
       dl_csi_logger_(std::move(dl_csi_logger)),
-      dl_zf_logger_(std::move(dl_zf_logger)) {
-  duration_stat_ = stats_manager->GetDurationStat(DoerType::kZF, tid);
+      dl_beam_logger_(std::move(dl_beam_logger)) {
+  duration_stat_ = stats_manager->GetDurationStat(DoerType::kBeam, tid);
   pred_csi_buffer_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::kAlign64,
@@ -77,45 +78,63 @@ DoZF::DoZF(Config* config, int tid,
   }
 }
 
-DoZF::~DoZF() {
+DoBeamWeights::~DoBeamWeights() {
   std::free(pred_csi_buffer_);
   std::free(csi_gather_buffer_);
   calib_sc_vec_ptr_.reset();
   std::free(calib_gather_buffer_);
 }
 
-EventData DoZF::Launch(size_t tag) {
+EventData DoBeamWeights::Launch(size_t tag) {
   if (cfg_->FreqOrthogonalPilot()) {
-    ZfFreqOrthogonal(tag);
+    ComputePartialCsiBeams(tag);
   } else {
-    ZfTimeOrthogonal(tag);
+    ComputeFullCsiBeams(tag);
   }
 
-  return EventData(EventType::kZF, tag);
+  return EventData(EventType::kBeam, tag);
 }
 
-float DoZF::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
-                            const arma::cx_fmat& mat_csi,
-                            const arma::cx_fvec& calib_sc_vec,
-                            complex_float* ul_zf_mem,
-                            complex_float* dl_zf_mem) {
-  arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(ul_zf_mem),
-                          cfg_->UeAntNum(), cfg_->BsAntNum(), false);
-  arma::cx_fmat mat_ul_zf_tmp;
-  if (kUseInverseForZF) {
-    try {
-      mat_ul_zf_tmp = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
-    } catch (std::runtime_error&) {
-      AGORA_LOG_WARN(
-          "Failed to invert channel matrix, falling back to pinv()\n");
-      arma::pinv(mat_ul_zf_tmp, mat_csi, 1e-2, "dc");
-    }
-  } else {
-    arma::pinv(mat_ul_zf_tmp, mat_csi, 1e-2, "dc");
+float DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
+                                     const arma::cx_fmat& mat_csi,
+                                     const arma::cx_fvec& calib_sc_vec,
+                                     const float noise,
+                                     complex_float* ul_beam_mem,
+                                     complex_float* dl_beam_mem) {
+  arma::cx_fmat mat_ul_beam(reinterpret_cast<arma::cx_float*>(ul_beam_mem),
+                            cfg_->UeAntNum(), cfg_->BsAntNum(), false);
+  arma::cx_fmat mat_ul_beam_tmp;
+  switch (cfg_->BeamformingAlgo()) {
+    case CommsLib::BeamformingAlgorithm::kZF:
+      if (kUseInverseForZF) {
+        try {
+          mat_ul_beam_tmp =
+              arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
+        } catch (std::runtime_error&) {
+          AGORA_LOG_WARN(
+              "Failed to invert channel matrix, falling back to pinv()\n");
+          arma::pinv(mat_ul_beam_tmp, mat_csi, 1e-2, "dc");
+        }
+      } else {
+        arma::pinv(mat_ul_beam_tmp, mat_csi, 1e-2, "dc");
+      }
+      break;
+    case CommsLib::BeamformingAlgorithm::kMMSE:
+      mat_ul_beam_tmp =
+          arma::inv_sympd(mat_csi.t() * mat_csi +
+                          noise * arma::eye<arma::cx_fmat>(cfg_->UeAntNum(),
+                                                           cfg_->UeAntNum())) *
+          mat_csi.t();
+      break;
+    case CommsLib::BeamformingAlgorithm::kMRC:
+      mat_ul_beam_tmp = mat_csi.t();
+      break;
+    default:
+      AGORA_LOG_ERROR("Beamforming algorithm is not implemented!");
   }
 
   if (cfg_->Frame().NumDLSyms() > 0) {
-    arma::cx_fmat mat_dl_zf_tmp;
+    arma::cx_fmat mat_dl_beam_tmp;
     if (kUseUlZfForDownlink == true) {
       // With orthonormal calib matrix:
       // pinv(calib * csi) = pinv(csi)*inv(calib)
@@ -123,56 +142,74 @@ float DoZF::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
       // magnitude info away by taking the sign of the calibration matrix
       // Inv is already acheived by UL over DL division outside this function
       arma::cx_fmat inv_calib_mat = arma::diagmat(arma::sign(calib_sc_vec));
-      mat_dl_zf_tmp = mat_ul_zf_tmp * inv_calib_mat;
+      mat_dl_beam_tmp = mat_ul_beam_tmp * inv_calib_mat;
     } else {
-      arma::cx_fmat mat_dl_csi = arma::diagmat(calib_sc_vec) * mat_csi;
+      arma::cx_fmat mat_dl_csi = inv(arma::diagmat(calib_sc_vec)) * mat_csi;
       if (kEnableMatLog && dl_csi_logger_) {
         dl_csi_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_csi);
       }
-      if (kUseInverseForZF) {
-        try {
-          mat_dl_zf_tmp =
-              arma::inv_sympd(mat_dl_csi.t() * mat_dl_csi) * mat_dl_csi.t();
-        } catch (std::runtime_error&) {
-          arma::pinv(mat_dl_zf_tmp, mat_dl_csi, 1e-2, "dc");
-        }
-      } else {
-        arma::pinv(mat_dl_zf_tmp, mat_dl_csi, 1e-2, "dc");
+      switch (cfg_->BeamformingAlgo()) {
+        case CommsLib::BeamformingAlgorithm::kZF:
+          if (kUseInverseForZF) {
+            try {
+              mat_dl_beam_tmp =
+                  arma::inv_sympd(mat_dl_csi.t() * mat_dl_csi) * mat_dl_csi.t();
+            } catch (std::runtime_error&) {
+              AGORA_LOG_WARN(
+                  "Failed to invert channel matrix, falling back to pinv()\n");
+              arma::pinv(mat_dl_beam_tmp, mat_csi, 1e-2, "dc");
+            }
+          } else {
+            arma::pinv(mat_dl_beam_tmp, mat_csi, 1e-2, "dc");
+          }
+          break;
+        case CommsLib::BeamformingAlgorithm::kMMSE:
+          mat_dl_beam_tmp =
+              arma::inv_sympd(mat_dl_csi.t() * mat_dl_csi +
+                              noise * arma::eye<arma::cx_fmat>(
+                                          cfg_->UeAntNum(), cfg_->UeAntNum())) *
+              mat_dl_csi.t();
+          break;
+        case CommsLib::BeamformingAlgorithm::kMRC:
+          mat_dl_beam_tmp = mat_dl_csi.t();
+          break;
+        default:
+          AGORA_LOG_ERROR("Beamforming algorithm is not implemented!");
       }
     }
     // We should be scaling the beamforming matrix, so the IFFT
     // output can be scaled with OfdmCaNum() across all antennas.
     // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
-    const float scale = 1 / (abs(mat_dl_zf_tmp).max());
-    mat_dl_zf_tmp = mat_dl_zf_tmp * scale;
+    const float scale = 1 / (abs(mat_dl_beam_tmp).max());
+    mat_dl_beam_tmp = mat_dl_beam_tmp * scale;
 
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
       if (cfg_->ExternalRefNode(i)) {
         // Zero out all antennas on the reference radio
-        mat_dl_zf_tmp.insert_cols(
+        mat_dl_beam_tmp.insert_cols(
             (cfg_->RefRadio(i) * cfg_->NumChannels()),
             arma::cx_fmat(cfg_->UeAntNum(), cfg_->NumChannels(),
                           arma::fill::zeros));
       }
     }
-    arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(dl_zf_mem),
-                            cfg_->BsAntNum(), cfg_->UeAntNum(), false);
-    mat_dl_zf = mat_dl_zf_tmp.st();
-    if (kEnableMatLog && dl_zf_logger_) {
-      dl_zf_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_zf);
+    arma::cx_fmat mat_dl_beam(reinterpret_cast<arma::cx_float*>(dl_beam_mem),
+                              cfg_->BsAntNum(), cfg_->UeAntNum(), false);
+    mat_dl_beam = mat_dl_beam_tmp.st();
+    if (kEnableMatLog && dl_beam_logger_) {
+      dl_beam_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_beam);
     }
   }
   for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {
     if (cfg_->ExternalRefNode(i) == true) {
-      mat_ul_zf_tmp.insert_cols(
+      mat_ul_beam_tmp.insert_cols(
           (cfg_->RefRadio(i) * cfg_->NumChannels()),
           arma::cx_fmat(cfg_->UeAntNum(), cfg_->NumChannels(),
                         arma::fill::zeros));
     }
   }
-  mat_ul_zf = mat_ul_zf_tmp;
+  mat_ul_beam = mat_ul_beam_tmp;
   float rcond = -1;
-  if (kPrintZfStats) {
+  if (kPrintBeamStats) {
     rcond = arma::rcond(mat_csi.t() * mat_csi);
   }
   return rcond;
@@ -180,8 +217,8 @@ float DoZF::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
 
 // Called for each frame_id / sc_id
 // Updates calib_sc_vec
-void DoZF::ComputeCalib(size_t frame_id, size_t sc_id,
-                        arma::cx_fvec& calib_sc_vec) {
+void DoBeamWeights::ComputeCalib(size_t frame_id, size_t sc_id,
+                                 arma::cx_fvec& calib_sc_vec) {
   const size_t frames_to_complete = cfg_->RecipCalFrameCnt();
   if (cfg_->Frame().IsRecCalEnabled() && (frame_id >= frames_to_complete)) {
     const size_t cal_slot_current = cfg_->RecipCalIndex(frame_id);
@@ -237,7 +274,8 @@ void DoZF::ComputeCalib(size_t frame_id, size_t sc_id,
 
       if (sc_id == 0) {
         AGORA_LOG_TRACE(
-            "DoZF[%d]: (Frame %zu, sc_id %zu), ComputeCalib updating calib at "
+            "DoBeamWeights[%d]: (Frame %zu, sc_id %zu), ComputeCalib updating "
+            "calib at "
             "slot %zu : prev %zu, old %zu\n",
             tid_, frame_id, sc_id, cal_slot_complete, cal_slot_prev,
             cal_slot_old);
@@ -338,7 +376,7 @@ static inline void TransposeGather(size_t cur_sc_id, float* src, float*& dst,
   }
 }
 
-void DoZF::ZfTimeOrthogonal(size_t tag) {
+void DoBeamWeights::ComputeFullCsiBeams(size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t base_sc_id = gen_tag_t(tag).sc_id_;
   const size_t frame_slot = frame_id % kFrameWnd;
@@ -347,7 +385,7 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
                 frame_id, base_sc_id);
   }
   size_t num_subcarriers =
-      std::min(cfg_->ZfBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
+      std::min(cfg_->BeamBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
 
   // Handle each subcarrier one by one
   for (size_t i = 0; i < num_subcarriers; i++) {
@@ -385,12 +423,30 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
     double start_tsc3 = GetTime::WorkerRdtsc();
     duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
 
-    auto rcond = ComputePrecoder(frame_id, cur_sc_id, mat_csi, cal_sc_vec,
-                                 ul_zf_matrices_[frame_slot][cur_sc_id],
-                                 dl_zf_matrices_[frame_slot][cur_sc_id]);
-    if (kPrintZfStats) {
+    float noise = 0;
+    if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
+      noise = phy_stats_->GetNoise(frame_id);
+    }
+    auto rcond =
+        ComputePrecoder(frame_id, cur_sc_id, mat_csi, cal_sc_vec, noise,
+                        ul_beam_matrices_[frame_slot][cur_sc_id],
+                        dl_beam_matrices_[frame_slot][cur_sc_id]);
+    if (kPrintBeamStats) {
       phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
     }
+    if (kEnableMatLog) {
+      if (dl_csi_logger_) {
+        dl_csi_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_csi);
+      }
+
+      if (dl_beam_logger_) {
+        arma::cx_fmat mat_dl_beam(reinterpret_cast<arma::cx_float*>(
+                                      dl_beam_matrices_[frame_slot][cur_sc_id]),
+                                  cfg_->BsAntNum(), cfg_->UeAntNum(), false);
+        dl_beam_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_beam);
+      }
+    }
+
     duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
     duration_stat_->task_count_++;
     duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;
@@ -400,7 +456,7 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
   }
 }
 
-void DoZF::ZfFreqOrthogonal(size_t tag) {
+void DoBeamWeights::ComputePartialCsiBeams(size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t base_sc_id = gen_tag_t(tag).sc_id_;
   const size_t frame_slot = frame_id % kFrameWnd;
@@ -465,9 +521,13 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
   arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer_),
                         cfg_->BsAntNum(), cfg_->UeAntNum(), false);
 
-  ComputePrecoder(frame_id, base_sc_id, mat_csi, cal_sc_vec,
-                  ul_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)],
-                  dl_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)]);
+  float noise = 0;
+  if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
+    noise = phy_stats_->GetNoise(frame_id);
+  }
+  ComputePrecoder(frame_id, base_sc_id, mat_csi, cal_sc_vec, noise,
+                  ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(base_sc_id)],
+                  dl_beam_matrices_[frame_slot][cfg_->GetBeamScId(base_sc_id)]);
 
   duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
   duration_stat_->task_count_++;
@@ -480,7 +540,7 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
 
 // Currently unused
 /*
-void DoZF::Predict(size_t tag)
+void DoBeamWeights::Predict(size_t tag)
 {
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t base_sc_id = gen_tag_t(tag).sc_id;
@@ -499,7 +559,7 @@ void DoZF::Predict(size_t tag)
     // for the next frame
     compute_precoder(mat_input,
         cfg_->GetCalibBuffer(calib_buffer_, frame_id, base_sc_id),
-        cfg_->get_ul_zf_mat(ul_zf_buffer_, frame_id + 1, base_sc_id),
-        cfg_->get_dl_zf_mat(dl_zf_buffer_, frame_id + 1, base_sc_id));
+        cfg_->get_ul_beam_mat(ul_beam_buffer_, frame_id + 1, base_sc_id),
+        cfg_->get_dl_beam_mat(dl_beam_buffer_, frame_id + 1, base_sc_id));
 }
 */
