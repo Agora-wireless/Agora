@@ -16,10 +16,8 @@
 #include <vector>
 
 #include "buffer.h"
-#include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"
 #include "config.h"
-#include "mac_thread_basestation.h"
 #include "memory_manage.h"
 #include "packet_txrx.h"
 #include "stats.h"
@@ -77,19 +75,5 @@ struct FrameInfo {
   size_t cur_sche_frame_id_;
   size_t cur_proc_frame_id_;
 };
-
-// Fetch the concurrent queue for this event type
-inline moodycamel::ConcurrentQueue<EventData>* GetConq(
-    SchedInfo sched_info_arr[kScheduleQueues][kNumEventTypes],
-    EventType event_type, size_t qid) {
-  return &sched_info_arr[qid][static_cast<size_t>(event_type)].concurrent_q_;
-}
-
-// Fetch the producer token for this event type
-inline moodycamel::ProducerToken* GetPtok(
-    SchedInfo sched_info_arr[kScheduleQueues][kNumEventTypes],
-    EventType event_type, size_t qid) {
-  return sched_info_arr[qid][static_cast<size_t>(event_type)].ptok_;
-}
 
 #endif  // HELPER_H_
