@@ -10,14 +10,14 @@ static constexpr bool kUseSIMDGather = true;
 
 DoDemul::DoDemul(
     Config* config, int tid, Table<complex_float>& data_buffer,
-    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices,
     Table<complex_float>& ue_spec_pilot_buffer,
     Table<complex_float>& equal_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
     PhyStats* in_phy_stats, Stats* stats_manager)
     : Doer(config, tid),
       data_buffer_(data_buffer),
-      ul_zf_matrices_(ul_zf_matrices),
+      ul_beam_matrices_(ul_beam_matrices),
       ue_spec_pilot_buffer_(ue_spec_pilot_buffer),
       equal_buffer_(equal_buffer),
       demod_buffers_(demod_buffers),
@@ -214,19 +214,19 @@ EventData DoDemul::Launch(size_t tag) {
       auto* data_ptr = reinterpret_cast<arma::cx_float*>(
           &data_gather_buffer_[j * cfg_->BsAntNum()]);
       // size_t start_tsc2 = worker_rdtsc();
-      auto* ul_zf_ptr = reinterpret_cast<arma::cx_float*>(
-          ul_zf_matrices_[frame_slot][cfg_->GetZfScId(cur_sc_id)]);
+      auto* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
+          ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
 
       size_t start_tsc2 = GetTime::WorkerRdtsc();
 #if USE_MKL_JIT
-      mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_zf_ptr, (MKL_Complex8*)data_ptr,
-                     (MKL_Complex8*)equal_ptr);
+      mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_beam_ptr,
+                     (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
 #else
       arma::cx_fmat mat_data(data_ptr, cfg_->BsAntNum(), 1, false);
 
-      arma::cx_fmat mat_ul_zf(ul_zf_ptr, cfg_->UeAntNum(), cfg_->BsAntNum(),
-                              false);
-      mat_equaled = mat_ul_zf * mat_data;
+      arma::cx_fmat mat_ul_beam(ul_beam_ptr, cfg_->UeAntNum(), cfg_->BsAntNum(),
+                                false);
+      mat_equaled = mat_ul_beam * mat_data;
 #endif
 
       if (symbol_idx_ul <

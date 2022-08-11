@@ -10,12 +10,12 @@ static constexpr bool kUseSpatialLocality = true;
 
 DoPrecode::DoPrecode(
     Config* in_config, int in_tid,
-    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices,
     Table<complex_float>& in_dl_ifft_buffer,
     Table<int8_t>& dl_encoded_or_raw_data /* Encoded if LDPC is enabled */,
     Stats* in_stats_manager)
     : Doer(in_config, in_tid),
-      dl_zf_matrices_(dl_zf_matrices),
+      dl_beam_matrices_(dl_beam_matrices),
       dl_ifft_buffer_(in_dl_ifft_buffer),
       dl_raw_data_(dl_encoded_or_raw_data) {
   duration_stat_ =
@@ -184,7 +184,7 @@ void DoPrecode::LoadInputData(size_t symbol_idx_dl,
 void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
                                size_t sc_id_in_block) {
   auto* precoder_ptr = reinterpret_cast<arma::cx_float*>(
-      dl_zf_matrices_[frame_slot][cfg_->GetZfScId(sc_id)]);
+      dl_beam_matrices_[frame_slot][cfg_->GetBeamScId(sc_id)]);
   auto* data_ptr = reinterpret_cast<arma::cx_float*>(
       modulated_buffer_temp_ +
       (kUseSpatialLocality

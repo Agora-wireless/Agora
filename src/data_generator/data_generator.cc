@@ -268,12 +268,15 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       csi_matrices[j][i].im = csi.im * sqrt2_norm;
     }
   }
+  arma::arma_rng::set_seed_random();
 
   // Generate RX data received by base station after going through channels
   Table<complex_float> rx_data_all_symbols;
-  rx_data_all_symbols.Calloc(this->cfg_->Frame().NumTotalSyms(),
-                             this->cfg_->OfdmCaNum() * this->cfg_->BsAntNum(),
-                             Agora_memory::Alignment_t::kAlign64);
+  rx_data_all_symbols.Calloc(
+      this->cfg_->Frame().NumTotalSyms(),
+      this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum(),
+      Agora_memory::Alignment_t::kAlign64);
+  size_t data_start = this->cfg_->CpLen() + this->cfg_->OfdmTxZeroPrefix();
   auto* ifft_shift_tmp =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::kAlign64,
@@ -284,22 +287,21 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         this->cfg_->OfdmCaNum(), this->cfg_->UeAntNum(), false);
     arma::cx_fmat mat_output(
         reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
-        this->cfg_->OfdmCaNum(), this->cfg_->BsAntNum(), false);
+        this->cfg_->SampsPerSymbol(), this->cfg_->BsAntNum(), false);
 
     for (size_t j = 0; j < this->cfg_->OfdmCaNum(); j++) {
       arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_matrices[j]),
                             this->cfg_->BsAntNum(), this->cfg_->UeAntNum());
-      mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
-      for (size_t k = 0; k < this->cfg_->BsAntNum(); k++) {
-        arma::cx_float noise(RandFloatFromShort(-1, 1),
-                             RandFloatFromShort(-1, 1));
-        noise *= this->cfg_->NoiseLevel() * sqrt2_norm;
-        mat_output.at(j, k) += noise;
-      }
+      mat_output.row(j + data_start) = mat_input_data.row(j) * mat_csi.st();
     }
+    arma::cx_fmat noise_mat(size(mat_output));
+    noise_mat.set_real(arma::randn<arma::fmat>(size(real(mat_output))));
+    noise_mat.set_imag(arma::randn<arma::fmat>(size(real(mat_output))));
+    mat_output += (noise_mat * this->cfg_->NoiseLevel() * sqrt2_norm);
     for (size_t j = 0; j < this->cfg_->BsAntNum(); j++) {
       auto* this_ofdm_symbol =
-          rx_data_all_symbols[i] + j * this->cfg_->OfdmCaNum();
+          rx_data_all_symbols[i] + j * this->cfg_->SampsPerSymbol() +
+          this->cfg_->CpLen() + this->cfg_->OfdmTxZeroPrefix();
       CommsLib::FFTShift(this_ofdm_symbol, ifft_shift_tmp,
                          this->cfg_->OfdmCaNum());
       CommsLib::IFFT(this_ofdm_symbol, this->cfg_->OfdmCaNum(), false);
@@ -313,7 +315,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   FILE* fp_rx = std::fopen(filename_rx.c_str(), "wb");
   for (size_t i = 0; i < this->cfg_->Frame().NumTotalSyms(); i++) {
     auto* ptr = reinterpret_cast<float*>(rx_data_all_symbols[i]);
-    std::fwrite(ptr, this->cfg_->OfdmCaNum() * this->cfg_->BsAntNum() * 2,
+    std::fwrite(ptr, this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum() * 2,
                 sizeof(float), fp_rx);
   }
   std::fclose(fp_rx);
@@ -593,7 +595,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         for (size_t k = 0; k < (2 * this->cfg_->CpLen()); k++) {
           tx_symbol[2 * this->cfg_->OfdmTxZeroPrefix() + k] =
               tx_symbol[2 * (this->cfg_->OfdmTxZeroPrefix() +
-                             this->cfg_->OfdmCaNum())];
+                             this->cfg_->OfdmCaNum()) +
+                        k];
         }
 
         const size_t tx_zero_postfix_offset =
