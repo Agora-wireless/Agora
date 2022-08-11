@@ -223,6 +223,8 @@ Config::Config(std::string jsonfilename)
   sample_cal_en_ = tdd_conf.value("calibrate_digital", false);
   imbalance_cal_en_ = tdd_conf.value("calibrate_analog", false);
   init_calib_repeat_ = tdd_conf.value("init_calib_repeat", 0);
+  beamforming_str_ = tdd_conf.value("beamforming", "ZF");
+  beamforming_algo_ = kBeamformingStr.at(beamforming_str_);
 
   RtAssert(sample_cal_en_ == false,
            "Digital / Sample offset calibration is not supported at this time");
@@ -524,8 +526,8 @@ Config::Config(std::string jsonfilename)
   fft_thread_num_ = tdd_conf.value("fft_thread_num", 5);
   demul_thread_num_ = tdd_conf.value("demul_thread_num", 5);
   decode_thread_num_ = tdd_conf.value("decode_thread_num", 10);
-  zf_thread_num_ = worker_thread_num_ - fft_thread_num_ - demul_thread_num_ -
-                   decode_thread_num_;
+  beam_thread_num_ = worker_thread_num_ - fft_thread_num_ - demul_thread_num_ -
+                     decode_thread_num_;
 
   demul_block_size_ = tdd_conf.value("demul_block_size", 48);
   RtAssert(demul_block_size_ % kSCsPerCacheline == 0,
@@ -536,10 +538,11 @@ Config::Config(std::string jsonfilename)
       "Demodulation block size must be a multiple of transpose block size");
   demul_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / demul_block_size_;
 
-  zf_batch_size_ = tdd_conf.value("zf_batch_size", 1);
-  zf_block_size_ =
-      freq_orthogonal_pilot_ ? ue_ant_num_ : tdd_conf.value("zf_block_size", 1);
-  zf_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / zf_block_size_;
+  beam_batch_size_ = tdd_conf.value("beam_batch_size", 1);
+  beam_block_size_ = freq_orthogonal_pilot_
+                         ? ue_ant_num_
+                         : tdd_conf.value("beam_block_size", 1);
+  beam_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / beam_block_size_;
 
   fft_block_size_ = tdd_conf.value("fft_block_size", 1);
   fft_block_size_ = std::max(fft_block_size_, num_channels_);
@@ -634,8 +637,8 @@ Config::Config(std::string jsonfilename)
       "\t%zu uplink data symbols per frame, %zu downlink data symbols "
       "per frame,\n"
       "\t%zu OFDM subcarriers (%zu data subcarriers),\n"
-      "\tUL modulation %s, DL modulation %s,\n\t%zu UL codeblocks per "
-      "symbol, "
+      "\tUL modulation %s, DL modulation %s, Beamforming %s, \n"
+      "\t%zu UL codeblocks per symbol, "
       "%zu UL bytes per code block,\n"
       "\t%zu DL codeblocks per symbol, %zu DL bytes per code block,\n"
       "\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame,\n"
@@ -653,11 +656,12 @@ Config::Config(std::string jsonfilename)
       "All UEs Network Traffic Avg (Mbps): %.3f\n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, ul_modulation_.c_str(),
-      dl_modulation_.c_str(), ul_ldpc_config_.NumBlocksInSymbol(),
-      ul_num_bytes_per_cb_, dl_ldpc_config_.NumBlocksInSymbol(),
-      dl_num_bytes_per_cb_, ul_mac_data_bytes_num_perframe_,
-      ul_mac_bytes_num_perframe_, dl_mac_data_bytes_num_perframe_,
-      dl_mac_bytes_num_perframe_, this->GetFrameDurationSec() * 1e6,
+      dl_modulation_.c_str(), beamforming_str_.c_str(),
+      ul_ldpc_config_.NumBlocksInSymbol(), ul_num_bytes_per_cb_,
+      dl_ldpc_config_.NumBlocksInSymbol(), dl_num_bytes_per_cb_,
+      ul_mac_data_bytes_num_perframe_, ul_mac_bytes_num_perframe_,
+      dl_mac_data_bytes_num_perframe_, dl_mac_bytes_num_perframe_,
+      this->GetFrameDurationSec() * 1e6,
       (ul_mac_data_bytes_num_perframe_ * 8.0f) /
           (this->GetFrameDurationSec() * 1e6),
       (dl_mac_data_bytes_num_perframe_ * 8.0f) /
@@ -1499,6 +1503,7 @@ void Config::Print() const {
               << "Beamsweep " << beamsweep_ << std::endl
               << "Sample Cal En: " << sample_cal_en_ << std::endl
               << "Imbalance Cal: " << imbalance_cal_en_ << std::endl
+              << "Beamforming: " << beamforming_str_ << std::endl
               << "Bs Channel: " << channel_ << std::endl
               << "Ue Channel: " << ue_channel_ << std::endl
               << "Max Frames: " << frames_to_test_ << std::endl

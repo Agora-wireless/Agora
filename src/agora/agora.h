@@ -19,13 +19,13 @@
 #include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"
 #include "config.h"
+#include "dobeamweights.h"
 #include "dodecode.h"
 #include "dodemul.h"
 #include "doencode.h"
 #include "dofft.h"
 #include "doifft.h"
 #include "doprecode.h"
-#include "dozf.h"
 #include "mac_thread_basestation.h"
 #include "mat_logger.h"
 #include "memory_manage.h"
@@ -84,7 +84,7 @@ class Agora {
                                    ScheduleProcessingFlags completed);
 
   void WorkerFft(int tid);
-  void WorkerZf(int tid);
+  void WorkerBeam(int tid);
   void WorkerDemul(int tid);
   void WorkerDecode(int tid);
   void Worker(int tid);
@@ -201,7 +201,7 @@ class Agora {
 
   // Calculated uplink zeroforcing detection matrices. Each matrix has
   // [number of antennas] rows and [number of UEs] columns.
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices_;
+  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrices_;
 
   // Data after equalization
   // 1st dimension: kFrameWnd * uplink data symbols per frame
@@ -220,7 +220,7 @@ class Agora {
   // Counters related to various modules
   FrameCounters pilot_fft_counters_;
   FrameCounters uplink_fft_counters_;
-  FrameCounters zf_counters_;
+  FrameCounters beam_counters_;
   FrameCounters demul_counters_;
   FrameCounters decode_counters_;
   FrameCounters encode_counters_;
@@ -231,7 +231,7 @@ class Agora {
   FrameCounters mac_to_phy_counters_;
   FrameCounters rc_counters_;
   RxCounters rx_counters_;
-  size_t zf_last_frame_ = SIZE_MAX;
+  size_t beam_last_frame_ = SIZE_MAX;
   size_t rc_last_frame_ = SIZE_MAX;
   size_t ifft_next_symbol_ = 0;
 
@@ -265,7 +265,7 @@ class Agora {
 
   // Calculated uplink zeroforcing detection matrices. Each matrix has
   // [number of UEs] rows and [number of antennas] columns.
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices_;
+  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_beam_matrices_;
 
   // 1st dimension: kFrameWnd
   // 2nd dimension: number of OFDM data subcarriers * number of antennas
