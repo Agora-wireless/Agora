@@ -536,7 +536,7 @@ void Stats::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
 }
 
 void Stats::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
-                               size_t symbol_id, FrameCounters counters) {
+                               size_t symbol_id, FrameCounters counters) const {
   if (kDebugPrintPerSymbolDone == true) {
     switch (print_type) {
       case (PrintType::kFFTPilots):
