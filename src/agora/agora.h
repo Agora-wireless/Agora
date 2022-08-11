@@ -6,34 +6,8 @@
 #ifndef AGORA_H_
 #define AGORA_H_
 
-#include <unistd.h>
-
-#include <algorithm>
-#include <iostream>
-#include <memory>
-#include <queue>
-#include <system_error>
-#include <vector>
-
 #include "agora_helper.h"
-#include "buffer.h"
-#include "concurrent_queue_wrapper.h"
-#include "concurrentqueue.h"
-#include "config.h"
-#include "dodecode.h"
-#include "dodemul.h"
-#include "doencode.h"
-#include "dofft.h"
-#include "doifft.h"
-#include "doprecode.h"
-#include "dozf.h"
-#include "mac_thread_basestation.h"
-#include "mat_logger.h"
-#include "memory_manage.h"
-#include "packet_txrx.h"
-#include "phy_stats.h"
 #include "signal_handler.h"
-#include "stats.h"
 #include "utils.h"
 #include "worker.h"
 
