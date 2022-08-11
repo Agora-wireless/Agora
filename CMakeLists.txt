@@ -380,7 +380,7 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/agora.cc
   src/agora/dofft.cc
   src/agora/doifft.cc
-  src/agora/dozf.cc
+  src/agora/dobeamweights.cc
   src/agora/dodemul.cc
   src/agora/doprecode.cc
   src/agora/dodecode.cc

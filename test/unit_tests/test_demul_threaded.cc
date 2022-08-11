@@ -40,9 +40,9 @@ void MasterToWorkerDynamicMaster(
       uint32_t symbol_id =
           (i / cfg->DemulEventsPerSymbol()) % cfg->Frame().NumULSyms();
       size_t base_sc_id =
-          (i % cfg->DemulEventsPerSymbol()) * cfg->ZfBlockSize();
+          (i % cfg->DemulEventsPerSymbol()) * cfg->BeamBlockSize();
       event_queue.enqueue(EventData(
-          EventType::kZF,
+          EventType::kBeam,
           gen_tag_t::FrmSymSc(frame_id, cfg->Frame().GetULSymbol(symbol_id),
                               base_sc_id)
               .tag_));
@@ -65,7 +65,7 @@ void MasterToWorkerDynamicWorker(
     moodycamel::ConcurrentQueue<EventData>& event_queue,
     moodycamel::ConcurrentQueue<EventData>& complete_task_queue,
     moodycamel::ProducerToken* ptok, Table<complex_float>& data_buffer,
-    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices,
     Table<complex_float>& ue_spec_pilot_buffer,
     Table<complex_float>& equal_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_,
@@ -79,14 +79,14 @@ void MasterToWorkerDynamicWorker(
   }
 
   auto compute_demul = std::make_unique<DoDemul>(
-      cfg, worker_id, data_buffer, ul_zf_matrices, ue_spec_pilot_buffer,
+      cfg, worker_id, data_buffer, ul_beam_matrices, ue_spec_pilot_buffer,
       equal_buffer, demod_buffers_, phy_stats, stats);
 
   size_t start_tsc = GetTime::Rdtsc();
   size_t num_tasks = 0;
   EventData req_event;
   size_t max_frame_id_wo_offset =
-      (kMaxTestNum - 1) / (cfg->OfdmDataNum() / cfg->ZfBlockSize());
+      (kMaxTestNum - 1) / (cfg->OfdmDataNum() / cfg->BeamBlockSize());
   for (size_t i = 0; i < kMaxItrNum; i++) {
     if (event_queue.try_dequeue(req_event)) {
       num_tasks++;
@@ -132,8 +132,8 @@ TEST(TestDemul, VaryingConfig) {
   data_buffer.RandAllocCxFloat(cfg->Frame().NumULSyms() * kFrameWnd,
                                kMaxAntennas * kMaxDataSCs,
                                Agora_memory::Alignment_t::kAlign64);
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(kMaxAntennas *
-                                                                kMaxUEs);
+  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrices(kMaxAntennas *
+                                                                  kMaxUEs);
   equal_buffer.Calloc(cfg->Frame().NumULSyms() * kFrameWnd,
                       kMaxDataSCs * kMaxUEs,
                       Agora_memory::Alignment_t::kAlign64);
@@ -144,7 +144,7 @@ TEST(TestDemul, VaryingConfig) {
       kFrameWnd, cfg->Frame().NumTotalSyms(), cfg->UeAntNum(),
       kMaxModType * cfg->OfdmDataNum());
   std::printf(
-      "Size of [data_buffer, ul_zf_matrices, equal_buffer, "
+      "Size of [data_buffer, ul_beam_matrices, equal_buffer, "
       "ue_spec_pilot_buffer, demod_soft_buffer]: [%.1f %.1f %.1f %.1f %.1f] "
       "MB\n",
       cfg->Frame().NumULSyms() * kFrameWnd * kMaxAntennas * kMaxDataSCs * 4 *
@@ -167,7 +167,7 @@ TEST(TestDemul, VaryingConfig) {
     threads.emplace_back(MasterToWorkerDynamicWorker, cfg.get(), i,
                          std::ref(event_queue), std::ref(complete_task_queue),
                          ptoks[i], std::ref(data_buffer),
-                         std::ref(ul_zf_matrices), std::ref(equal_buffer),
+                         std::ref(ul_beam_matrices), std::ref(equal_buffer),
                          std::ref(ue_spec_pilot_buffer),
                          std::ref(demod_buffers), phy_stats.get(), stats.get());
   }

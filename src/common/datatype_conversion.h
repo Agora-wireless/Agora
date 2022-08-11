@@ -23,10 +23,10 @@
 // https://stackoverflow.com/questions/50597764/convert-signed-short-to-float-in-c-simd
 static inline void SimdConvertShortToFloat(const short* in_buf, float* out_buf,
                                            size_t n_elems) {
+  bool unaligned = ((reinterpret_cast<size_t>(in_buf) % 64) > 0);
 #if defined(DATATYPE_MEMORY_CHECK)
-  RtAssert(((n_elems % 16) == 0) &&
-               ((reinterpret_cast<size_t>(in_buf) % 64) == 0) &&
-               ((reinterpret_cast<size_t>(out_buf) % 64) == 0),
+  RtAssert(((n_elems % 16) == 0), "Number of elements not a multiplier of 16");
+  RtAssert(((reinterpret_cast<size_t>(out_buf) % 64) == 0),
            "Data Alignment not correct before calling into AVX optimizations");
 #endif
 
@@ -35,7 +35,9 @@ static inline void SimdConvertShortToFloat(const short* in_buf, float* out_buf,
   const __m512i magic_i = _mm512_castps_si512(magic);
   for (size_t i = 0; i < n_elems; i += 16) {
     /* get input */
-    __m256i val = _mm256_load_si256((__m256i*)(in_buf + i));  // port 2,3
+    __m256i val = unaligned
+                      ? _mm256_loadu_si256((__m256i*)(in_buf + i))
+                      : _mm256_load_si256((__m256i*)(in_buf + i));  // port 2,3
     /* interleave with 0x0000 */
     __m512i val_unpacked = _mm512_cvtepu16_epi32(val);  // port 5
     /* convert by xor-ing and subtracting magic value:
@@ -50,9 +52,12 @@ static inline void SimdConvertShortToFloat(const short* in_buf, float* out_buf,
   const __m256i magic_i = _mm256_castps_si256(magic);
   for (size_t i = 0; i < n_elems; i += 16) {
     /* get input */
-    __m128i val = _mm_load_si128((__m128i*)(in_buf + i));  // port 2,3
+    __m128i val = unaligned
+                      ? _mm_loadu_si128((__m128i*)(in_buf + i))
+                      : _mm_load_si128((__m128i*)(in_buf + i));  // port 2,3
 
-    __m128i val1 = _mm_load_si128((__m128i*)(in_buf + i + 8));
+    __m128i val1 = unaligned ? _mm_loadu_si128((__m128i*)(in_buf + i + 8))
+                             : _mm_load_si128((__m128i*)(in_buf + i + 8));
     /* interleave with 0x0000 */
     __m256i val_unpacked = _mm256_cvtepu16_epi32(val);  // port 5
     /* convert by xor-ing and subtracting magic value:
@@ -137,7 +142,7 @@ static inline void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
 static inline void ConvertFloatTo12bitIq(const float* in_buf, uint8_t* out_buf,
                                          size_t n_elems) {
 #if defined(DATATYPE_MEMORY_CHECK)
-  RtAssert(((n_elems % 2) == 0) &&
+  RtAssert((n_elems % 2) == 0,
            "ConvertFloatTo12bitIq n_elems not multiple of 2");
 #endif
   size_t index_short = 0;
@@ -435,5 +440,4 @@ static inline void SimdConvertFloat32ToFloat16(float* out_buf,
   }
 #endif
 }
-
 #endif  // DATATYPE_CONVERSION_INC_

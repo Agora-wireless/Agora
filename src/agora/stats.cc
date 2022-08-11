@@ -12,7 +12,7 @@ Stats::Stats(const Config* const cfg)
     : config_(cfg),
       task_thread_num_(cfg->WorkerThreadNum()),
       fft_thread_num_(cfg->FftThreadNum()),
-      zf_thread_num_(cfg->ZfThreadNum()),
+      beam_thread_num_(cfg->BeamThreadNum()),
       demul_thread_num_(cfg->DemulThreadNum()),
       decode_thread_num_(cfg->DecodeThreadNum()),
       freq_ghz_(cfg->FreqGhz()),
@@ -163,9 +163,9 @@ void Stats::SaveToFile() {
     std::fprintf(fp_debug,
                  "Pilot RX by socket threads (= reference time), "
                  "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
-                 "kZFDone, kPrecodeDone, kIFFTDone, kEncodeDone, kDemulDone, "
+                 "kBeamDone, kPrecodeDone, kIFFTDone, kEncodeDone, kDemulDone, "
                  "kDecodeDone, kRXDone, time in CSI, time in "
-                 "FFT, time in ZF, time in Demul, time in Decode\n");
+                 "FFT, time in Beamweights, time in Demul, time in Decode\n");
 
     for (size_t frame = 0; frame < total_stat_frames; frame++) {
       const size_t i = (first_frame_idx + frame) % kNumStatsFrames;
@@ -182,7 +182,7 @@ void Stats::SaveToFile() {
           MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
           MasterGetUsFromRef(TsType::kPilotAllRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kFFTPilotsDone, i, ref_tsc),
-          MasterGetUsFromRef(TsType::kZFDone, i, ref_tsc),
+          MasterGetUsFromRef(TsType::kBeamDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kPrecodeDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kIFFTDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kEncodeDone, i, ref_tsc),
@@ -191,7 +191,7 @@ void Stats::SaveToFile() {
           MasterGetUsFromRef(TsType::kRXDone, i, ref_tsc),
           this->doer_us_.at(static_cast<size_t>(DoerType::kCSI)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kFFT)).at(i),
-          this->doer_us_.at(static_cast<size_t>(DoerType::kZF)).at(i),
+          this->doer_us_.at(static_cast<size_t>(DoerType::kBeam)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kDemul)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kDecode)).at(i));
     }
@@ -199,7 +199,7 @@ void Stats::SaveToFile() {
     std::fprintf(fp_debug,
                  "Pilot RX by socket threads (= reference time), "
                  "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
-                 "kZFDone, kPrecodeDone, kIFFTDone, kEncodeDone, kRXDone\n");
+                 "kBeamDone, kPrecodeDone, kIFFTDone, kEncodeDone, kRXDone\n");
     for (size_t frame = 0; frame < total_stat_frames; frame++) {
       const size_t i = (first_frame_idx + frame) % kNumStatsFrames;
       size_t ref_tsc = SIZE_MAX;
@@ -213,7 +213,7 @@ void Stats::SaveToFile() {
           MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
           MasterGetUsFromRef(TsType::kPilotAllRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kFFTPilotsDone, i, ref_tsc),
-          MasterGetUsFromRef(TsType::kZFDone, i, ref_tsc),
+          MasterGetUsFromRef(TsType::kBeamDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kPrecodeDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kIFFTDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kEncodeDone, i, ref_tsc),
@@ -225,8 +225,8 @@ void Stats::SaveToFile() {
         fp_debug,
         "Pilot RX by socket threads (= reference time), "
         "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
-        "kZFDone, kDemulDone, kDecodeDone, kRXDone, time in CSI, time in "
-        "FFT, time in ZF, time in Demul, time in Decode\n");
+        "kBeamDone, kDemulDone, kDecodeDone, kRXDone, time in CSI, time in "
+        "FFT, time in Beamweights, time in Demul, time in Decode\n");
     for (size_t frame = 0; frame < total_stat_frames; frame++) {
       const size_t i = (first_frame_idx + frame) % kNumStatsFrames;
       size_t ref_tsc = SIZE_MAX;
@@ -242,13 +242,13 @@ void Stats::SaveToFile() {
           MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
           MasterGetUsFromRef(TsType::kPilotAllRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kFFTPilotsDone, i, ref_tsc),
-          MasterGetUsFromRef(TsType::kZFDone, i, ref_tsc),
+          MasterGetUsFromRef(TsType::kBeamDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kDemulDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kDecodeDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kRXDone, i, ref_tsc),
           this->doer_us_.at(static_cast<size_t>(DoerType::kCSI)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kFFT)).at(i),
-          this->doer_us_.at(static_cast<size_t>(DoerType::kZF)).at(i),
+          this->doer_us_.at(static_cast<size_t>(DoerType::kBeam)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kDemul)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kDecode)).at(i));
     }
@@ -270,10 +270,10 @@ void Stats::SaveToFile() {
     RtAssert(fp_debug_detailed != nullptr,
              std::string("Open file failed ") + std::to_string(errno));
     // Print the header
-    std::fprintf(
-        fp_debug_detailed,
-        "fft_0, fft_1, fft_2, zf_0, zf_1, zf_2, demul_0, demul_1, demul_2, "
-        "decode_0, decode_1, decode_2\n");
+    std::fprintf(fp_debug_detailed,
+                 "fft_0, fft_1, fft_2, beam_0, beam_1, beam_2, demul_0, "
+                 "demul_1, demul_2, "
+                 "decode_0, decode_1, decode_2\n");
 
     for (size_t frame = 0; frame < total_stat_frames; frame++) {
       const size_t i = (first_frame_idx + frame) % kNumStatsFrames;
@@ -298,13 +298,13 @@ void Stats::SaveToFile() {
               this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kCSI))
                   .at(2)
                   .at(i),
-          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kZF))
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kBeam))
               .at(0)
               .at(i),
-          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kZF))
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kBeam))
               .at(1)
               .at(i),
-          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kZF))
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kBeam))
               .at(2)
               .at(i),
           this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kDemul))
@@ -355,9 +355,9 @@ void Stats::PrintSummary() {
         (static_cast<double>(
             num_tasks.at(static_cast<size_t>(DoerType::kCSI)))) /
         (this->config_->BsAntNum() * this->config_->Frame().NumPilotSyms());
-    double zf_frames = (static_cast<double>(
-                           num_tasks.at(static_cast<size_t>(DoerType::kZF)))) /
-                       this->config_->ZfEventsPerSymbol();
+    double beam_frames = (static_cast<double>(num_tasks.at(
+                             static_cast<size_t>(DoerType::kBeam)))) /
+                         this->config_->BeamEventsPerSymbol();
 
     if (config_->Frame().NumDLSyms() > 0) {
       double precode_frames =
@@ -377,8 +377,9 @@ void Stats::PrintSummary() {
       std::printf("CSI (%zu, %.2f), ",
                   num_tasks.at(static_cast<size_t>(DoerType::kCSI)),
                   csi_frames);
-      std::printf("ZF (%zu, %.2f), ",
-                  num_tasks.at(static_cast<size_t>(DoerType::kZF)), zf_frames);
+      std::printf("Beamweights (%zu, %.2f), ",
+                  num_tasks.at(static_cast<size_t>(DoerType::kBeam)),
+                  beam_frames);
       std::printf("Encode (%zu, %.2f), ",
                   num_tasks.at(static_cast<size_t>(DoerType::kEncode)),
                   encode_frames);
@@ -409,8 +410,9 @@ void Stats::PrintSummary() {
       std::printf("CSI (%zu, %.2f), ",
                   num_tasks.at(static_cast<size_t>(DoerType::kCSI)),
                   csi_frames);
-      std::printf("ZF (%zu, %.2f), ",
-                  num_tasks.at(static_cast<size_t>(DoerType::kZF)), zf_frames);
+      std::printf("Beamweights (%zu, %.2f), ",
+                  num_tasks.at(static_cast<size_t>(DoerType::kBeam)),
+                  beam_frames);
       std::printf("FFT (%zu, %.2f), ",
                   num_tasks.at(static_cast<size_t>(DoerType::kFFT)),
                   fft_frames);

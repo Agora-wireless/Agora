@@ -10,6 +10,7 @@ namespace plt = matplotlibcpp;
 
 static constexpr size_t kMaxArraySampleOffset = 10;
 static constexpr bool kReciprocalCalibPlot = false;
+static constexpr bool kPrintCalibrationMats = false;
 static constexpr bool kVerboseCalibration = false;
 static constexpr size_t kRefChannel = 0;
 
