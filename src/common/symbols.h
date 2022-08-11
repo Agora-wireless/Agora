@@ -38,7 +38,7 @@ static constexpr inline bool IsPowerOfTwo(T x) {
 
 enum class Direction : int { kDownlink, kUplink };
 
-// TODO: Merge EventType and DoerType into WorkType
+/// \todo Merge EventType and DoerType into WorkType
 enum class EventType : int {
   kPacketRX,
   kFFT,
@@ -121,7 +121,7 @@ enum ScheduleProcessingFlags : uint8_t {
 };
 
 // Moved from Agora class
-// TODO: need organization
+/// \todo need organization
 static const size_t kDefaultMessageQueueSize = 512;
 static const size_t kDefaultWorkerQueueSize = 256;
 // Max number of worker threads allowed
@@ -332,7 +332,7 @@ static constexpr size_t kMacBaseLocalPort = 8180;
 
 // Agora sends control information over an out-of-band control channel
 // to each UE #i, at port kBaseClientPort + i
-// TODO: need to generalize for hostname, port pairs for each client
+/// \todo need to generalize for hostname, port pairs for each client
 static constexpr size_t kMacBaseClientPort = 7070;
 
 // Number of subcarriers in a partial transpose block

@@ -317,7 +317,8 @@ void Agora::Start() {
   while ((config_->Running() == true) &&
          (SignalHandler::GotExitSignal() == false)) {
     // Get a batch of events
-    size_t num_events = FetchEvent(events_list, is_turn_to_dequeue_from_io);
+    size_t const num_events =
+        FetchEvent(events_list, is_turn_to_dequeue_from_io);
     is_turn_to_dequeue_from_io = !is_turn_to_dequeue_from_io;
 
     // Handle each event

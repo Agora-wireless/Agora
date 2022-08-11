@@ -25,32 +25,11 @@ Worker::~Worker() {
 }
 
 void Worker::CreateThreads() {
-  //   if (config_->BigstationMode() == true) {
-  //     for (size_t i = 0; i < config_->FftThreadNum(); i++) {
-  //       workers_.emplace_back(&Worker::WorkerFft, this, i);
-  //     }
-  //     for (size_t i = config_->FftThreadNum();
-  //          i < config_->FftThreadNum() + config_->ZfThreadNum(); i++) {
-  //       workers_.emplace_back(&Worker::WorkerZf, this, i);
-  //     }
-  //     for (size_t i = config_->FftThreadNum() + config_->ZfThreadNum();
-  //          i < config_->FftThreadNum() + config_->ZfThreadNum() +
-  //                  config_->DemulThreadNum();
-  //          i++) {
-  //       workers_.emplace_back(&Worker::WorkerDemul, this, i);
-  //     }
-  //     for (size_t i = config_->FftThreadNum() + config_->ZfThreadNum() +
-  //                     config_->DemulThreadNum();
-  //          i < config_->WorkerThreadNum(); i++) {
-  //       workers_.emplace_back(&Worker::WorkerDecode, this, i);
-  //     }
-  //   } else {
   AGORA_LOG_SYMBOL("Worker: creating %zu workers\n",
                    config_->WorkerThreadNum());
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
     workers_.emplace_back(&Worker::WorkerThread, this, i);
   }
-  //   }
 
   if (kEnableMatLog) {
     for (size_t i = 0; i < mat_loggers_.size(); i++) {
