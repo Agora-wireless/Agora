@@ -266,7 +266,6 @@ static inline void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
 #endif
 
 #if defined(__AVX512F__)
-  //ConvertFloatToShort(in_buf, out_buf, n_elems, n_prefix, scale_down_factor);
   SimdConvertFloatToShortAVX512(in_buf, out_buf, n_elems, n_prefix,
                                 scale_down_factor);
 #else
