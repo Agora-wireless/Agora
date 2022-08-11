@@ -55,10 +55,11 @@ static inline void SimdConvertShortToFloatAVX512(const short* in_buf,
   const __m512i magic_i = _mm512_castps_si512(magic);
   for (size_t i = 0; i < n_elems; i += kAvx512ShortsPerLoop) {
     // Load shorts with 1/2 instr so we have room for expansion
-	const __m256i val = unaligned
-                      ? _mm256_loadu_si256(reinterpret_cast<const __m256i*>(in_buf + i))
-                      : _mm256_load_si256(reinterpret_cast<const __m256i*>(in_buf + i));  // port 2,3
-        reinterpret_cast<const __m256i*>(in_buf + i));  // port 2,3
+    // port 2,3
+    const __m256i val =
+        unaligned
+            ? _mm256_loadu_si256(reinterpret_cast<const __m256i*>(in_buf + i))
+            : _mm256_load_si256(reinterpret_cast<const __m256i*>(in_buf + i));
     // Expand and  interleave with 0x0000
     const __m512i val_unpacked = _mm512_cvtepu16_epi32(val);  // port 5
     /* convert by xor-ing and subtracting magic value:
@@ -85,10 +86,11 @@ static inline void SimdConvertShortToFloatAVX2(const short* in_buf,
       _mm256_set1_ps(float((1 << 23) + (1 << 15)) / kShrtFltConvFactor);
   const __m256i magic_i = _mm256_castps_si256(magic);
   for (size_t i = 0; i < n_elems; i += kAvx2ShortsPerLoop) {
-    const __m128i val = unaligned
-                      ? _mm_loadu_si128(reinterpret_cast<const __m128i*>(in_buf + i))
-                      : _mm_load_si128(reinterpret_cast<const __m128i*>(in_buf + i));  // port 2,3
-
+    // port 2,3
+    const __m128i val =
+        unaligned
+            ? _mm_loadu_si128(reinterpret_cast<const __m128i*>(in_buf + i))
+            : _mm_load_si128(reinterpret_cast<const __m128i*>(in_buf + i));
 
     // expand to 32bits and interleave with 0x0000
     const __m256i val_unpacked = _mm256_cvtepu16_epi32(val);  // port 5
