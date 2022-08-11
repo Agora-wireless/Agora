@@ -1243,25 +1243,18 @@ void Config::GenData() {
   }
 
   // Find normalization factor through searching for max value in IFFT results
-  float max_val = CommsLib::FindMaxAbs(ul_iq_ifft, this->frame_.NumULSyms(),
-                                       this->ue_ant_num_ * this->ofdm_ca_num_);
-  float cur_max_val =
-      CommsLib::FindMaxAbs(dl_iq_ifft, this->frame_.NumDLSyms(),
-                           this->ue_ant_num_ * this->ofdm_ca_num_);
+  float max_val = CommsLib::FindMaxAbs(ue_pilot_ifft, this->ue_ant_num_,
+                                       this->ofdm_ca_num_);
+  float cur_max_val = CommsLib::FindMaxAbs(pilot_ifft, this->ofdm_ca_num_);
   if (cur_max_val > max_val) {
     max_val = cur_max_val;
   }
-  cur_max_val = CommsLib::FindMaxAbs(ue_pilot_ifft, this->ue_ant_num_,
-                                     this->ofdm_ca_num_);
-  if (cur_max_val > max_val) {
-    max_val = cur_max_val;
-  }
-  cur_max_val = CommsLib::FindMaxAbs(pilot_ifft, this->ofdm_ca_num_);
-  if (cur_max_val > max_val) {
-    max_val = cur_max_val;
-  }
-
-  this->scale_ = 2 * max_val;  // additional 2^2 (6dB) power backoff
+  // additional 10 dB power backoff
+  // Zadoff-Chu (ZC) has good PAPR characteristics
+  // So we can use the max_val in the ZC-based pilots
+  // as the average power and calculate the scaling to
+  // be 10 times as that.
+  this->scale_ = 10.f * max_val;
 
   // Generate time domain symbols for downlink
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
@@ -1304,6 +1297,18 @@ void Config::GenData() {
   CommsLib::Ifft2tx(pilot_ifft,
                     (std::complex<int16_t>*)this->pilot_ci16_.data(),
                     ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
+  if (kDebugPrintPilot == true) {
+    std::printf("pilot_t=[");
+    for (size_t j = 0; j < this->ofdm_ca_num_; j++) {
+      std::printf("%2.4f+%2.4fi ", pilot_ifft[j].re, pilot_ifft[j].im);
+    }
+    std::printf("]\n");
+    std::printf("pilot_int_t=[");
+    for (size_t j = 0; j < this->samps_per_symbol_; j++) {
+      std::printf("%d+%di ", pilot_ci16_[j].real(), pilot_ci16_[j].imag());
+    }
+    std::printf("]\n");
+  }
 
   for (size_t i = 0; i < ofdm_ca_num_; i++) {
     this->pilot_cf32_.emplace_back(pilot_ifft[i].re / scale_,

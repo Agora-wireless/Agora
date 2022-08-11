@@ -660,6 +660,19 @@ void UeWorker::DoIfft(size_t tag) {
   auto* temp_buff = reinterpret_cast<complex_float*>(temp_fft_buf.data());
   CommsLib::FFTShift(ifft_buff, temp_buff, config_.OfdmCaNum());
   CommsLib::IFFT(ifft_buff, config_.OfdmCaNum(), false);
+  bool clipping = false;
+  for (size_t i = 0; i < config_.OfdmCaNum(); i++) {
+    float sample_val_re = ifft_buff[i].re / config_.Scale();
+    float sample_val_im = ifft_buff[i].im / config_.Scale();
+    if (sample_val_re >= 1 || sample_val_im >= 1) {
+      clipping = true;
+      break;
+    }
+  }
+  if (clipping) {
+    AGORA_LOG_WARN("Clipping occured in Frame %zu, Symbol %zu, Antenna %zu\n",
+                   frame_id, symbol_id, ant_id);
+  }
 
   const size_t tx_offset = buff_offset * config_.PacketLength();
   char* cur_tx_buffer = &tx_buffer_[tx_offset];
