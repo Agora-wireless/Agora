@@ -15,6 +15,11 @@ static constexpr bool kUseInverseForZF = true;
 // static constexpr bool kUseUlZfForDownlink = true; // mag info thrown off, but yielded better BER...
 static constexpr bool kUseUlZfForDownlink = false; // more accurate matrix pinv [fixed]
 
+enum AsmVersion { ASMv1, ASMv2 };
+static constexpr enum AsmVersion kAsmVersion = ASMv2;
+static constexpr size_t N_OFF = 0;  // num of OFF antennas among all BS antennas
+static constexpr bool kPrintEffGain = true;
+
 DoZF::DoZF(Config* config, int tid,
            PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
            Table<complex_float>& calib_dl_buffer,
@@ -174,17 +179,18 @@ float DoZF::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     // output can be scaled with OfdmCaNum() across all antennas.
     // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
 
-    // ============== ORIGINAL NORMALIZATION ===========================
+    if (kAsmVersion == ASMv1) {
+      // ======A LOCAL NORMALIZATION:========================================
+      mat_dl_zf_tmp /= arma::conv_to<arma::cx_fmat>::from(
+          arma::square(arma::abs(mat_dl_zf_tmp)));
+      // ====================================================================
+      // continues below for loc + glb norm.
+    }
+
+    // ============== ORIGINAL (Global) NORMALIZATION =====================
     const float scale = 1 / (abs(mat_dl_zf_tmp).max());
     mat_dl_zf_tmp = mat_dl_zf_tmp * scale;  // at least one radio is transmit at the maximum (<=1)
     // ==================================================================
-
-    // ======A LOCAL NORMALIZATION:========================================
-    //mat_dl_zf_tmp /= arma::square(arma::conv_to<arma::cx_fmat>::from(arma::abs(mat_dl_zf_tmp)));
-      //COMMENT OUT below for loc + glb norm.
-    //const float scale = 1 / (abs(mat_dl_zf_tmp).max());
-    //mat_dl_zf_tmp = mat_dl_zf_tmp * scale;
-    // ====================================================================
 
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
       if (cfg_->ExternalRefNode(i)) {
@@ -203,7 +209,6 @@ float DoZF::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     for (size_t i = 1; i < cube_dl_zf.n_slices; i++) {
       cube_dl_zf.slice(i) = cube_dl_zf.slice(0);
     }
-    constexpr size_t N_OFF = 0; // num of OFF antennas among all BS antennas
     arma::fvec vec_eff_gain(cube_dl_zf.n_slices);
     for (size_t i = 0; i < cube_dl_zf.n_slices; i++) {
       arma::uvec offidx = arma::randperm(cfg_->BfAntNum(), N_OFF);
@@ -217,11 +222,16 @@ float DoZF::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     }
     const float min_eff_gain = arma::min(vec_eff_gain);
     for (size_t i = 0; i < cube_dl_zf.n_slices; i++) {
-      cube_dl_zf.slice(i).col(0) *= min_eff_gain / vec_eff_gain(i);
-      arma::fmat eff_gain = arma::abs(
-          mat_dl_csi.st() * cube_dl_zf.slice(i).rows(0, cube_dl_zf.n_rows - 2));
-      if (frame_id == 100) {
-         AGORA_LOG_INFO("sc=%zu, eff_gain=%f\n", cur_sc_id, eff_gain(0,0));
+      if (kAsmVersion == ASMv2) {
+        cube_dl_zf.slice(i).col(0) *= min_eff_gain / vec_eff_gain(i);
+      } else {
+        unused(min_eff_gain);
+      }
+      if (kPrintEffGain && frame_id == 100) {
+        arma::fmat eff_gain = arma::abs(
+            mat_dl_csi.st() * cube_dl_zf.slice(i).rows(0, cfg_->BfAntNum() - 1));
+        AGORA_LOG_INFO("slot=%zu, sc=%zu, eff_gain=%f\n", i, cur_sc_id,
+                       eff_gain(0, 0));
       }
     }
     // std::cout << "check default mat_dl_zf:" <<std::endl
