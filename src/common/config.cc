@@ -500,14 +500,14 @@ Config::Config(std::string jsonfilename)
   const std::string ul_present_str = (frame_.NumULSyms() > 0 ? "uplink-" : "");
   const std::string dl_present_str =
       (frame_.NumDLSyms() > 0 ? "downlink-" : "");
+  timestamp_ = std::to_string(1900 + local_time.tm_year) + "-" +
+               std::to_string(1 + local_time.tm_mon) + "-" +
+               std::to_string(local_time.tm_mday) + "-" +
+               std::to_string(local_time.tm_hour) + "-" +
+               std::to_string(local_time.tm_min) + "-" +
+               std::to_string(local_time.tm_sec) + "_";
   std::string filename = "trace-" + ul_present_str + dl_present_str +
-                         std::to_string(1900 + local_time.tm_year) + "-" +
-                         std::to_string(1 + local_time.tm_mon) + "-" +
-                         std::to_string(local_time.tm_mday) + "-" +
-                         std::to_string(local_time.tm_hour) + "-" +
-                         std::to_string(local_time.tm_min) + "-" +
-                         std::to_string(local_time.tm_sec) + "_" +
-                         std::to_string(num_cells_) + "_" +
+                         timestamp_ + std::to_string(num_cells_) + "_" +
                          std::to_string(BsAntNum()) + "x" +
                          std::to_string(UeAntTotal()) + ".hdf5";
   trace_file_ = tdd_conf.value("trace_file", filename);
