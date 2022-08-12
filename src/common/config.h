@@ -523,6 +523,7 @@ class Config {
   }
   inline const std::string& ConfigFilename() const { return config_filename_; }
   inline const std::string& TraceFilename() const { return trace_file_; }
+  inline const std::string& Timestamp() const { return timestamp_; }
 
  private:
   void Print() const;
@@ -849,5 +850,6 @@ class Config {
   bool fft_in_rru_;  // If true, the RRU does FFT instead of Agora
   const std::string config_filename_;
   std::string trace_file_;
+  std::string timestamp_;
 };
 #endif /* CONFIG_HPP_ */
