@@ -69,6 +69,8 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
                          Agora_memory::Alignment_t::kAlign64);
   ul_pilot_snr_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
                        Agora_memory::Alignment_t::kAlign64);
+  bs_noise_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
+                   Agora_memory::Alignment_t::kAlign64);
   calib_pilot_snr_.Calloc(kFrameWnd, 2 * cfg->BsAntNum(),
                           Agora_memory::Alignment_t::kAlign64);
   csi_cond_.Calloc(kFrameWnd, cfg->OfdmDataNum(),
@@ -76,7 +78,7 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
 
   if (kEnableCsvLog) {
     for (size_t i = 0; i < csv_loggers_.size(); i++) {
-      csv_loggers_.at(i) = std::make_shared<CsvLog::CsvLogger>(
+      csv_loggers_.at(i) = std::make_unique<CsvLog::CsvLogger>(
           i, config_->Timestamp(),
           dir_ == Direction::kUplink ? "BS" : config_->UeRadioName().at(0));
     }
@@ -197,6 +199,7 @@ void PhyStats::PrintUlSnrStats(size_t frame_id) {
   for (size_t i = 0; i < config_->UeAntNum(); i++) {
     float max_snr = FLT_MIN;
     float min_snr = FLT_MAX;
+    size_t min_snr_id = 0;
     const float* frame_snr =
         &ul_pilot_snr_[frame_id % kFrameWnd][i * config_->BsAntNum()];
     for (size_t j = 0; j < config_->BsAntNum(); j++) {
@@ -208,6 +211,7 @@ void PhyStats::PrintUlSnrStats(size_t frame_id) {
       }
       if (frame_snr[j] < min_snr) {
         min_snr = frame_snr[j];
+        min_snr_id = j;
       }
       if (frame_snr[j] > max_snr) {
         max_snr = frame_snr[j];
@@ -221,6 +225,9 @@ void PhyStats::PrintUlSnrStats(size_t frame_id) {
     }
     ss << "User " << i << ": [" << min_snr << "," << max_snr << "]"
        << " ";
+    if (max_snr - min_snr > 20 && min_snr < 0) {
+      ss << "(Possible bad antenna " << min_snr_id << ") ";
+    }
   }
   ss << std::endl;
   AGORA_LOG_INFO("%s", ss.str().c_str());
@@ -416,9 +423,12 @@ void PhyStats::UpdateUlPilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
       arma::mean(fft_abs_mag.rows(0, config_->OfdmDataStart() - 1)));
   const float noise_per_sc2 = arma::as_scalar(arma::mean(
       fft_abs_mag.rows(config_->OfdmDataStop(), config_->OfdmCaNum() - 1)));
-  const float noise =
+  // Full band noise power
+  const float fb_noise =
       config_->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
-  const float snr = (rssi - noise) / noise;
+  const float snr = (rssi - fb_noise) / fb_noise;
+  bs_noise_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
+      fb_noise / config_->OfdmCaNum();
   ul_pilot_snr_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
       (10.0f * std::log10(snr));
 }
@@ -445,11 +455,11 @@ void PhyStats::UpdateDlPilotSnr(size_t frame_id, size_t symbol_id,
   dl_pilot_noise_[frame_slot][idx_offset] = noise;
 }
 
-void PhyStats::PrintZfStats(size_t frame_id) {
+void PhyStats::PrintBeamStats(size_t frame_id) {
   const size_t frame_slot = frame_id % kFrameWnd;
   [[maybe_unused]] std::stringstream ss;
   ss << "Frame " << frame_id
-     << " ZF matrix inverse condition number range: " << std::fixed
+     << " Beamweight matrix inverse condition number range: " << std::fixed
      << std::setw(5) << std::setprecision(2);
   arma::fvec cond_vec(csi_cond_[frame_slot], config_->OfdmDataNum(), false);
   float max_cond = 0;
@@ -536,4 +546,11 @@ void PhyStats::UpdateUncodedBitErrors(size_t ue_id, size_t offset,
 void PhyStats::UpdateUncodedBits(size_t ue_id, size_t offset,
                                  size_t new_bits_num) {
   uncoded_bits_count_[ue_id][offset] += new_bits_num;
+}
+
+float PhyStats::GetNoise(size_t frame_id) {
+  arma::fvec noise_vec(bs_noise_[frame_id % kFrameWnd],
+                       config_->BsAntNum() * config_->UeAntNum(), false);
+
+  return arma::as_scalar(arma::mean(noise_vec));
 }

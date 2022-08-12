@@ -21,13 +21,13 @@ constexpr size_t kSCs = 304;
 constexpr size_t kBSAnts = 8;
 constexpr size_t kUEAnts = 1;
 
-class MatLogger : public CsvLogger {
+class BfMatLogger : public CsvLogger {
  public:
-  MatLogger(size_t mat_log_id, const std::string& timestamp,
+  BfMatLogger(size_t mat_log_id, const std::string& timestamp,
             const std::string& radio_name);
   bool UpdateMatBuf(const size_t frame_id, const size_t sc_id,
                     const arma::cx_fmat& mat_in);
-  ~MatLogger();
+  ~BfMatLogger();
 
  private:
   void SaveMatBuf();
