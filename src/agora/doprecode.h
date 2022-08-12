@@ -22,7 +22,7 @@
 class DoPrecode : public Doer {
  public:
   DoPrecode(Config* in_config, int in_tid,
-            PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_,
+            PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_,
             Table<complex_float>& in_dl_ifft_buffer,
             Table<int8_t>& dl_encoded_or_raw_data, Stats* in_stats_manager);
   ~DoPrecode() override;
@@ -61,7 +61,7 @@ class DoPrecode : public Doer {
   void PrecodingPerSc(size_t frame_slot, size_t sc_id, size_t sc_id_in_block);
 
  private:
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_;
+  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_;
   Table<complex_float>& dl_ifft_buffer_;
   Table<int8_t>& dl_raw_data_;
   Table<float> qam_table_;

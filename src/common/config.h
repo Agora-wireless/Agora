@@ -113,6 +113,8 @@ class Config {
   inline bool Beamsweep() const { return this->beamsweep_; }
   inline bool SampleCalEn() const { return this->sample_cal_en_; }
   inline bool ImbalanceCalEn() const { return this->imbalance_cal_en_; }
+  inline size_t BeamformingAlgo() const { return this->beamforming_algo_; }
+  inline std::string Beamforming() const { return this->beamforming_str_; }
   inline bool ExternalRefNode(size_t id) const {
     return this->external_ref_node_.at(id);
   }
@@ -197,16 +199,16 @@ class Config {
   inline size_t FftThreadNum() const { return this->fft_thread_num_; }
   inline size_t DemulThreadNum() const { return this->demul_thread_num_; }
   inline size_t DecodeThreadNum() const { return this->decode_thread_num_; }
-  inline size_t ZfThreadNum() const { return this->zf_thread_num_; }
+  inline size_t BeamThreadNum() const { return this->beam_thread_num_; }
   inline size_t DemulBlockSize() const { return this->demul_block_size_; }
 
   inline size_t DemulEventsPerSymbol() const {
     return this->demul_events_per_symbol_;
   }
-  inline size_t ZfBlockSize() const { return this->zf_block_size_; }
-  inline size_t ZfBatchSize() const { return this->zf_batch_size_; }
-  inline size_t ZfEventsPerSymbol() const {
-    return this->zf_events_per_symbol_;
+  inline size_t BeamBlockSize() const { return this->beam_block_size_; }
+  inline size_t BeamBatchSize() const { return this->beam_batch_size_; }
+  inline size_t BeamEventsPerSymbol() const {
+    return this->beam_events_per_symbol_;
   }
   inline size_t FftBlockSize() const { return this->fft_block_size_; }
 
@@ -437,7 +439,7 @@ class Config {
 
   /// Return the subcarrier ID to which we should refer to for the zeroforcing
   /// matrices of subcarrier [sc_id].
-  inline size_t GetZfScId(size_t sc_id) const {
+  inline size_t GetBeamScId(size_t sc_id) const {
     return this->freq_orthogonal_pilot_ ? sc_id - (sc_id % ue_num_) : sc_id;
   }
 
@@ -682,6 +684,8 @@ class Config {
   bool beamsweep_;
   bool sample_cal_en_;
   bool imbalance_cal_en_;
+  size_t beamforming_algo_;
+  std::string beamforming_str_;
   std::vector<bool> external_ref_node_;
   std::string channel_;
   std::string ue_channel_;
@@ -692,7 +696,7 @@ class Config {
   size_t fft_thread_num_;
   size_t demul_thread_num_;
   size_t decode_thread_num_;
-  size_t zf_thread_num_;
+  size_t beam_thread_num_;
 
   size_t ue_core_offset_;
   size_t ue_worker_thread_num_;
@@ -703,11 +707,11 @@ class Config {
   size_t demul_events_per_symbol_;  // Derived from demul_block_size
 
   // Number of OFDM data subcarriers handled in one doZF function call
-  size_t zf_block_size_;
+  size_t beam_block_size_;
 
   // Number of doZF function call handled in on event
-  size_t zf_batch_size_;
-  size_t zf_events_per_symbol_;  // Derived from zf_block_size
+  size_t beam_batch_size_;
+  size_t beam_events_per_symbol_;  // Derived from beam_block_size
 
   // Number of antennas handled in one FFT event
   size_t fft_block_size_;
