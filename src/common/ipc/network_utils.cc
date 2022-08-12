@@ -228,7 +228,7 @@ std::string GetLocalAddressFromScope(size_t scope_id) {
 void PrintAddressInfo(const ::addrinfo *print_info) {
   for (const ::addrinfo *rp = print_info; rp != nullptr; rp = rp->ai_next) {
     const int family = rp->ai_family;
-    AGORA_LOG_INFO(
+    AGORA_LOG_TRACE(
         "PrintAddressInfo: Found address with family : %s (%d) type %d, "
         "protocol %d, flags %d\n",
         (family == AF_PACKET)  ? "AF_PACKET"
@@ -243,10 +243,10 @@ void PrintAddressInfo(const ::addrinfo *print_info) {
       [[maybe_unused]] auto *family_ptr =
           &((sockaddr_in *)rp->ai_addr)->sin_family;
       [[maybe_unused]] char address_buffer[INET_ADDRSTRLEN];
-      AGORA_LOG_INFO("Ipv4 Address:  %s, Port %d, Family %d \n",
-                     ::inet_ntop(family, address_ptr, address_buffer,
-                                 sizeof(address_buffer)),
-                     ntohs(*port_ptr), *family_ptr);
+      AGORA_LOG_TRACE("Ipv4 Address:  %s, Port %d, Family %d \n",
+                      ::inet_ntop(family, address_ptr, address_buffer,
+                                  sizeof(address_buffer)),
+                      ntohs(*port_ptr), *family_ptr);
     } else if (family == AF_INET6) {
       [[maybe_unused]] auto *address_ptr =
           &((sockaddr_in6 *)rp->ai_addr)->sin6_addr;
@@ -255,10 +255,10 @@ void PrintAddressInfo(const ::addrinfo *print_info) {
       [[maybe_unused]] auto *family_ptr =
           &((sockaddr_in6 *)rp->ai_addr)->sin6_family;
       [[maybe_unused]] char address_buffer[INET6_ADDRSTRLEN];
-      AGORA_LOG_INFO("Ipv6 Address:  %s Port %d, Family %d \n",
-                     ::inet_ntop(family, address_ptr, address_buffer,
-                                 sizeof(address_buffer)),
-                     ntohs(*port_ptr), *family_ptr);
+      AGORA_LOG_TRACE("Ipv6 Address:  %s Port %d, Family %d \n",
+                      ::inet_ntop(family, address_ptr, address_buffer,
+                                  sizeof(address_buffer)),
+                      ntohs(*port_ptr), *family_ptr);
     } else {
       AGORA_LOG_ERROR(
           "PrintAddressInfo: Found address with unsupported family %d\n",

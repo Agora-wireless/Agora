@@ -17,7 +17,7 @@
 // and caches remote addrinfo mappings
 class UDPComm {
  public:
-  static constexpr bool kDebugPrintUdpInit = true;
+  static constexpr bool kDebugPrintUdpInit = false;
   static constexpr bool kDebugPrintUdpSend = false;
   static constexpr bool kDebugPrintUdpRecv = false;
   explicit UDPComm(std::string local_addr, uint16_t local_port,
