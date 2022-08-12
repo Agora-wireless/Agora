@@ -367,8 +367,8 @@ void* Sender::WorkerThread(int tid) {
   //Setting up the source port.  Each radio has a unique source port id
   for (size_t radio_number = radio_lo; radio_number <= radio_hi;
        radio_number++) {
-    udp_clients.emplace_back(
-        std::make_unique<UDPClient>(cfg_->BsRruPort() + radio_number));
+    udp_clients.emplace_back(std::make_unique<UDPClient>(
+        cfg_->BsRruAddr(), cfg_->BsRruPort() + radio_number));
   }
 #endif
 

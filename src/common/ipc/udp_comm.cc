@@ -58,11 +58,10 @@ UDPComm::UDPComm(std::string local_addr, std::string local_port,
         sock_fd_ = -1;
       } else {  //Success
         if (kDebugPrintUdpInit) {
-          auto family = check->ai_family;
+          const auto family = check->ai_family;
           AGORA_LOG_INFO(
               "UDPComm: Using address with family : %s (%d) type %d, "
-              "protocol "
-              "%d, flags %d\n",
+              "protocol %d, flags %d\n",
               (family == AF_PACKET)  ? "AF_PACKET"
               : (family == AF_INET)  ? "AF_INET"
               : (family == AF_INET6) ? "AF_INET6"
@@ -177,11 +176,9 @@ UDPComm::UDPComm(std::string local_addr, std::string local_port,
     }
   }
 
-  if (kDebugPrintUdpInit) {
-    AGORA_LOG_INFO("UDPComm socket %d created %s : %s requested port %s\n",
-                   sock_fd_, local_addr.c_str(), bound_port.c_str(),
-                   local_port.c_str());
-  }
+  AGORA_LOG_INFO("UDPComm socket %d created %s : %s requested port %s\n",
+                 sock_fd_, local_addr.c_str(), bound_port.c_str(),
+                 local_port.c_str());
 }
 
 UDPComm::~UDPComm() {
@@ -216,7 +213,7 @@ ssize_t UDPComm::Connect(const std::string& remote_address,
   auto remote_address_info =
       agora_comm::GetAddressInfo(remote_address, remote_port);
   if (kDebugPrintUdpInit) {
-    //agora_comm::PrintAddressInfo(remote_address_info);
+    agora_comm::PrintAddressInfo(remote_address_info);
   }
 
   if (remote_address_info == nullptr) {
