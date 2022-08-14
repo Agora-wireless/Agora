@@ -1,10 +1,10 @@
 /**
- * @file datatype-conversion.inc
+ * @file datatype-conversion.h
  * @brief SIMD functions for converting between data types
  */
 
-#ifndef DATATYPE_CONVERSION_INC_
-#define DATATYPE_CONVERSION_INC_
+#ifndef DATATYPE_CONVERSION_H_
+#define DATATYPE_CONVERSION_H_
 
 #include <emmintrin.h>
 #include <immintrin.h>
@@ -49,7 +49,15 @@ static inline void SimdConvertShortToFloatAVX512(const short* in_buf,
                                                  float* out_buf,
                                                  size_t n_elems) {
 #if defined(__AVX512F__)
-  const bool unaligned = ((reinterpret_cast<size_t>(in_buf) % 64) > 0);
+#if defined(DATATYPE_MEMORY_CHECK)
+  RtAssert(((n_elems % kAvx512ShortsPerLoop) == 0) &&
+               ((reinterpret_cast<intptr_t>(in_buf) % kAvx512Bytes) == 0) &&
+               ((reinterpret_cast<intptr_t>(out_buf) % kAvx512Bytes) == 0),
+           "Data Alignment not correct before calling into AVX optimizations");
+#endif
+
+  const bool unaligned =
+      ((reinterpret_cast<intptr_t>(in_buf) % kAvx512Bytes) > 0);
   const __m512 magic =
       _mm512_set1_ps(float((1 << 23) + (1 << 15)) / kShrtFltConvFactor);
   const __m512i magic_i = _mm512_castps_si512(magic);
@@ -80,7 +88,14 @@ static inline void SimdConvertShortToFloatAVX512(const short* in_buf,
 
 static inline void SimdConvertShortToFloatAVX2(const short* in_buf,
                                                float* out_buf, size_t n_elems) {
-  bool unaligned = ((reinterpret_cast<size_t>(in_buf) % 32) > 0);
+#if defined(DATATYPE_MEMORY_CHECK)
+  RtAssert(((n_elems % kAvx2ShortsPerLoop) == 0) &&
+               ((reinterpret_cast<intptr_t>(in_buf) % kAvx2Bytes) == 0) &&
+               ((reinterpret_cast<intptr_t>(out_buf) % kAvx2Bytes) == 0),
+           "Data Alignment not correct before calling into AVX optimizations");
+#endif
+  const bool unaligned =
+      ((reinterpret_cast<intptr_t>(in_buf) % kAvx2Bytes) > 0);
   //Divisior must be power of 2?
   const __m256 magic =
       _mm256_set1_ps(float((1 << 23) + (1 << 15)) / kShrtFltConvFactor);
@@ -110,13 +125,6 @@ static inline void SimdConvertShortToFloatAVX2(const short* in_buf,
 // n_elems must be a multiple of 16
 static inline void SimdConvertShortToFloat(const short* in_buf, float* out_buf,
                                            size_t n_elems) {
-#if defined(DATATYPE_MEMORY_CHECK)
-  RtAssert(((n_elems % 16) == 0) &&
-               ((reinterpret_cast<intptr_t>(in_buf) % 64) == 0) &&
-               ((reinterpret_cast<intptr_t>(out_buf) % 64) == 0),
-           "Data Alignment not correct before calling into AVX optimizations");
-#endif
-
 #if defined(__AVX512F__)
   return SimdConvertShortToFloatAVX512(in_buf, out_buf, n_elems);
 #else
@@ -258,13 +266,6 @@ static inline void ConvertFloatToShort(const float* in_buf, short* out_buf,
 static inline void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
                                            size_t n_elems, size_t n_prefix = 0,
                                            float scale_down_factor = 1.0f) {
-#if defined(DATATYPE_MEMORY_CHECK)
-  RtAssert(((n_elems % 16) == 0) &&
-               ((reinterpret_cast<intptr_t>(in_buf) % 64) == 0) &&
-               ((reinterpret_cast<intptr_t>(out_buf) % 64) == 0),
-           "Data Alignment not correct before calling into AVX optimizations");
-#endif
-
 #if defined(__AVX512F__)
   SimdConvertFloatToShortAVX512(in_buf, out_buf, n_elems, n_prefix,
                                 scale_down_factor);
@@ -341,8 +342,8 @@ static inline void Convert12bitIqTo16bitIq(uint8_t* in_buf, uint16_t* out_buf,
                                            size_t n_elems) {
 #if defined(DATATYPE_MEMORY_CHECK)
   RtAssert(((n_elems % 16) == 0) &&
-               ((reinterpret_cast<intptr_t>(in_buf) % 32) == 0) &&
-               ((reinterpret_cast<intptr_t>(out_buf) % 32) == 0),
+               ((reinterpret_cast<intptr_t>(in_buf) % kAvx2Bytes) == 0) &&
+               ((reinterpret_cast<intptr_t>(out_buf) % kAvx2Bytes) == 0),
            "Convert12bitIqTo16bitIq: Data Alignment not correct before calling "
            "into AVX optimizations");
 #endif
@@ -548,8 +549,8 @@ static inline void SimdConvertFloat16ToFloat32(float* out_buf,
                                                size_t n_elems) {
 #if defined(DATATYPE_MEMORY_CHECK)
   RtAssert(((n_elems % 16) == 0) &&
-               ((reinterpret_cast<size_t>(in_buf) % 32) == 0) &&
-               ((reinterpret_cast<size_t>(out_buf) % 32) == 0),
+               ((reinterpret_cast<intptr_t>(in_buf) % 64) == 0) &&
+               ((reinterpret_cast<intptr_t>(out_buf) % 64) == 0),
            "SimdConvertFloat16ToFloat32: Data Alignment not correct before "
            "calling into AVX optimizations");
 #endif
@@ -577,8 +578,8 @@ static inline void SimdConvertFloat32ToFloat16(float* out_buf,
                                                size_t n_elems) {
 #if defined(DATATYPE_MEMORY_CHECK)
   RtAssert(((n_elems % 16) == 0) &&
-               ((reinterpret_cast<size_t>(in_buf) % 32) == 0) &&
-               ((reinterpret_cast<size_t>(out_buf) % 32) == 0),
+               ((reinterpret_cast<intptr_t>(in_buf) % 64) == 0) &&
+               ((reinterpret_cast<intptr_t>(out_buf) % 64) == 0),
            "SimdConvertFloat32ToFloat16: Data Alignment not correct before "
            "calling into AVX optimizations");
 #endif
@@ -597,4 +598,4 @@ static inline void SimdConvertFloat32ToFloat16(float* out_buf,
   }
 #endif
 }
-#endif  // DATATYPE_CONVERSION_INC_
+#endif  // DATATYPE_CONVERSION_H_
