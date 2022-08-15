@@ -1,5 +1,5 @@
 {
-    "serial_file": "data/examples/topology-powder-dl.json",
+    "serial_file": "files/topology/topology-powder-dl.json",
     "cells": 1,
     "channel": "A",
     "frequency": 3.545e9,

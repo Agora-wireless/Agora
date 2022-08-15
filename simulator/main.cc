@@ -16,7 +16,7 @@ int main(int argc, char const* argv[]) {
     delay = strtol(argv[3], nullptr, 10);
     conf_file = std::string(argv[4]);
   } else {
-    conf_file = cur_directory + "/data/tddconfig-sim-dl.json";
+    conf_file = cur_directory + "/files/config/ci/tddconfig-sim-dl.json";
     thread_num = 4;
     core_offset = 22;
     delay = 5000;

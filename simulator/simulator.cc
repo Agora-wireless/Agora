@@ -121,8 +121,9 @@ void Simulator::Start() {
   }        // end of while
   this->Stop();
   sender_.reset();
-  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string filename = cur_directory + "/data/timeresult_simulator.txt";
+  const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+  const std::string filename =
+      cur_directory + "/files/experiment/timeresult_simulator.txt";
   FILE* fp = std::fopen(filename.c_str(), "w");
   if (fp == nullptr) {
     std::printf("open file failed\n");
