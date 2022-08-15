@@ -497,9 +497,9 @@ void Agora::Start() {
           const size_t ue_id = rx_mac_tag_t(event.tags_[0u]).tid_;
           const size_t radio_buf_id = rx_mac_tag_t(event.tags_[0u]).offset_;
           const auto* pkt = reinterpret_cast<const MacPacketPacked*>(
-              &buffer_->dl_bits_buffer_[ue_id][radio_buf_id *
-                                               config_->MacBytesNumPerframe(
-                                                   Direction::kDownlink)]);
+              &buffer_->GetDlBitsBuffer(
+                  ue_id)[radio_buf_id *
+                         config_->MacBytesNumPerframe(Direction::kDownlink)]);
 
           AGORA_LOG_INFO("Agora: frame %d @ offset %zu %zu @ location %zu\n",
                          pkt->Frame(), ue_id, radio_buf_id,
@@ -1099,7 +1099,7 @@ void Agora::SaveDecodeDataToFile(int frame_id) {
 
   for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
     for (size_t j = 0; j < cfg->UeAntNum(); j++) {
-      int8_t* ptr = buffer_->decoded_buffer_[(frame_id % kFrameWnd)][i][j];
+      int8_t* ptr = buffer_->GetDecodedBuffer(frame_id % kFrameWnd, i, j);
       std::fwrite(ptr, num_decoded_bytes, sizeof(uint8_t), fp);
     }
   }
@@ -1120,7 +1120,8 @@ void Agora::SaveTxDataToFile(UNUSED int frame_id) {
     for (size_t ant_id = 0; ant_id < cfg->BsAntNum(); ant_id++) {
       size_t offset = total_data_symbol_id * cfg->BsAntNum() + ant_id;
       auto* pkt = reinterpret_cast<Packet*>(
-          &buffer_->dl_socket_buffer_[offset * cfg->DlPacketLength()]);
+          &buffer_->GetDlSocketBuffer()[offset * cfg->DlPacketLength()]);
+      //dl_socket_buffer_[offset * cfg->DlPacketLength()]);
       short* socket_ptr = pkt->data_;
       std::fwrite(socket_ptr, cfg->SampsPerSymbol() * 2, sizeof(short), fp);
     }
@@ -1132,7 +1133,7 @@ void Agora::GetEqualData(float** ptr, int* size) {
   const auto& cfg = config_;
   auto offset = cfg->GetTotalDataSymbolIdxUl(
       max_equaled_frame_, cfg->Frame().ClientUlPilotSymbols());
-  *ptr = (float*)&buffer_->equal_buffer_[offset][0];
+  *ptr = (float*)&buffer_->GetEqualBuffer(offset)[0];
   *size = cfg->UeAntNum() * cfg->OfdmDataNum() * 2;
 }
 void Agora::CheckIncrementScheduleFrame(size_t frame_id,
@@ -1186,7 +1187,9 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
     this->ifft_counters_.Reset(frame_id);
     this->tx_counters_.Reset(frame_id);
     if (config_->Frame().NumDLSyms() > 0) {
-      this->buffer_->ResetDLBufferStatus(frame_id);
+      for (size_t ue_id = 0; ue_id < config_->UeAntNum(); ue_id++) {
+        this->buffer_->SetDlBitsBufferStatus(0, ue_id, frame_id % kFrameWnd);
+      }
     }
     this->frame_.cur_proc_frame_id_++;
 
