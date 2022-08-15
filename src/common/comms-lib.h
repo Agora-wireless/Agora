@@ -21,8 +21,8 @@
 #include <iostream>
 #include <vector>
 
-#include "buffer.h"
 #include "memory_manage.h"
+#include "message.h"
 #include "mkl_dfti.h"
 
 static const std::map<std::string, size_t> kBeamformingStr{

@@ -7,9 +7,9 @@
 #include <cmath>
 #include <iostream>
 
-#include "buffer.h"
 #include "gettime.h"
 #include "memory_manage.h"
+#include "message.h"
 #include "symbols.h"
 
 #define BPSK_LEVEL M_SQRT1_2

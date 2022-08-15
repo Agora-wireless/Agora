@@ -9,10 +9,10 @@
 
 #include <memory>
 
-#include "buffer.h"
 #include "config.h"
 #include "doer.h"
 #include "memory_manage.h"
+#include "message.h"
 #include "scrambler.h"
 #include "stats.h"
 

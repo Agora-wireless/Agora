@@ -12,7 +12,7 @@
 #include <thread>
 #include <vector>
 
-#include "buffer.h"
+#include "message.h"
 #include "comms-lib.h"
 #include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"
