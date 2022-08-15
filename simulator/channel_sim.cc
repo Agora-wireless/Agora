@@ -16,6 +16,7 @@ static const bool kPrintDebugTxUser = false;
 static const bool kPrintDebugTxBs = false;
 
 static constexpr size_t kUdpMTU = 2048;
+static constexpr size_t kDequeueBulkSize = 5;
 
 //#define CHSIM_DEBUG_MEMORY
 /* Helper classes */
