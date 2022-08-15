@@ -22,8 +22,7 @@
 #include "signal_handler.h"
 #include "simd_types.h"
 #include "symbols.h"
-#include "udp_client.h"
-#include "udp_server.h"
+#include "udp_comm.h"
 
 struct WorkerThreadStorage {
   size_t tid_;
@@ -79,9 +78,7 @@ class ChannelSim {
   void DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
             size_t ant_per_socket, std::byte* tx_buffer,
             const arma::cx_float* source_data, SimdAlignByteVector* udp_pkt_buf,
-            std::vector<std::unique_ptr<UDPClient>>& udp_clients,
-            const std::string& dest_address, size_t dest_port);
-
+            std::vector<std::unique_ptr<UDPComm>>& udp_clients);
 
   // BS-facing sockets
   std::vector<std::unique_ptr<UDPComm>> bs_comm_;
