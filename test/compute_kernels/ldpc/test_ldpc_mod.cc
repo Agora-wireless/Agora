@@ -18,6 +18,7 @@
 #include "comms-lib.h"
 #include "config.h"
 #include "data_generator.h"
+#include "datatype_conversion.h"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.h"
@@ -46,8 +47,8 @@ float RandFloatFromShort(float min, float max) {
       ((static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) *
        (max - min)) +
       min;
-  auto rand_val_ushort = static_cast<short>(rand_val * 32768);
-  rand_val = (float)rand_val_ushort / 32768;
+  auto rand_val_ushort = static_cast<short>(rand_val * kShrtFltConvFactor);
+  rand_val = (float)rand_val_ushort / kShrtFltConvFactor;
   return rand_val;
 }
 

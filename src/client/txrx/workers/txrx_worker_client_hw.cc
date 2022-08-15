@@ -7,9 +7,9 @@
 #include "txrx_worker_client_hw.h"
 
 #include <cassert>
-#include <climits>
 #include <complex>
 
+#include "datatype_conversion.h"
 #include "logger.h"
 
 static constexpr bool kDebugBeaconChannels = false;
@@ -19,8 +19,6 @@ static constexpr size_t kReSyncRetryCount = 100u;
 static constexpr float kBeaconDetectWindow = 2.33f;
 static constexpr size_t kBeaconsToStart = 2;
 static constexpr bool kPrintClientBeaconSNR = true;
-
-static constexpr float kShortMaxFloat = SHRT_MAX;
 
 TxRxWorkerClientHw::TxRxWorkerClientHw(
     size_t core_offset, size_t tid, size_t interface_count,
@@ -606,14 +604,16 @@ ssize_t TxRxWorkerClientHw::FindSyncBeacon(
     float noise_power = 0;
     for (size_t i = 0; i < Configuration()->BeaconLen(); i++) {
       const size_t power_idx = sync_index - i;
-      const std::complex<float> power_value = (std::complex<float>(
-          static_cast<float>(check_data[power_idx].real()) / kShortMaxFloat,
-          static_cast<float>(check_data[power_idx].imag()) / kShortMaxFloat));
-
       const size_t noise_idx = sync_index + i + 1;
-      const std::complex<float> noise_value = (std::complex<float>(
-          static_cast<float>(check_data[noise_idx].real()) / kShortMaxFloat,
-          static_cast<float>(check_data[noise_idx].imag()) / kShortMaxFloat));
+      std::complex<float> power_value;
+      std::complex<float> noise_value;
+      ConvertShortToFloat(
+          reinterpret_cast<const short*>(&check_data[power_idx]),
+          reinterpret_cast<float*>(&power_value), 2);
+
+      ConvertShortToFloat(
+          reinterpret_cast<const short*>(&check_data[noise_idx]),
+          reinterpret_cast<float*>(&noise_value), 2);
 
       sig_power += std::pow(std::abs(power_value), 2);
       noise_power += std::pow(std::abs(noise_value), 2);
