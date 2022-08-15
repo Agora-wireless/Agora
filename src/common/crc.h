@@ -17,7 +17,7 @@
 
 #include <iostream>
 
-#include "buffer.h"
+#include "message.h"
 
 // Generating polynomial
 // G_CRC_24_A(D) = [D24 + D23 + D18 + D17 + D14 + D11 + D10 + D7 + D6 + D5 + D4

@@ -6,9 +6,10 @@
 #ifndef AGORA_H_
 #define AGORA_H_
 
-#include "agora_helper.h"
+#include "buffer.h"
 #include "concurrent_queue_wrapper.h"
 #include "mac_thread_basestation.h"
+#include "packet_txrx.h"
 #include "signal_handler.h"
 #include "utils.h"
 #include "worker.h"

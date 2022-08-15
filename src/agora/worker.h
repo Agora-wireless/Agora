@@ -6,7 +6,7 @@
 #ifndef WORKER_H_
 #define WORKER_H_
 
-#include "agora_helper.h"
+#include "buffer.h"
 #include "concurrent_queue_wrapper.h"
 #include "csv_logger.h"
 #include "dobeamweights.h"

@@ -9,11 +9,11 @@
 #include <iostream>
 #include <vector>
 
-#include "buffer.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "doer.h"
 #include "gettime.h"
+#include "message.h"
 #include "modulation.h"
 #include "phy_stats.h"
 #include "stats.h"

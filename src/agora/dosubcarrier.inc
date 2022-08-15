@@ -10,7 +10,7 @@
 #include <iostream>
 #include <vector>
 
-#include "buffer.h"
+#include "message.h"
 #include "comms-lib.h"
 #include "concurrentqueue.h"
 #include "config.h"
