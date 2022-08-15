@@ -22,7 +22,7 @@
 class Worker {
  public:
   explicit Worker(Config* /*cfg*/, Stats* /*stats*/, PhyStats* /*phy_stats*/,
-                  MessageInfo* /*message*/, Buffer* /*buffer*/,
+                  MessageInfo* /*message*/, AgoraBuffer* /*agora_buffer*/,
                   FrameInfo* /*frame*/);
   ~Worker();
 
@@ -38,7 +38,7 @@ class Worker {
   Stats* stats_;
   PhyStats* phy_stats_;
   MessageInfo* message_;
-  Buffer* buffer_;
+  AgoraBuffer* buffer_;
   FrameInfo* frame_;
 
   size_t cur_sche_frame_id_;

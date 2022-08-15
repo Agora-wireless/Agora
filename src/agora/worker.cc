@@ -6,7 +6,7 @@
 #include "worker.h"
 
 Worker::Worker(Config* cfg, Stats* stats, PhyStats* phy_stats,
-               MessageInfo* message, Buffer* buffer, FrameInfo* frame)
+               MessageInfo* message, AgoraBuffer* buffer, FrameInfo* frame)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
       config_(cfg),
       stats_(stats),
