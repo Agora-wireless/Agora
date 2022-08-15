@@ -7,7 +7,7 @@
 ###############################################################################
 
 input_filepath="files/config/ci"
-output_filepath="files"
+output_filepath="files/log"
 
 # Check that all required executables are present
 exe_list="build/user build/data_generator build/chsim build/agora ${input_filepath}/chsim.json"
@@ -47,8 +47,8 @@ pkill -INT user
 pkill -INT agora
 
 sleep 1
-grep ".*bit errors (BER).*" test_user_output.txt > ${output_filepath}/test_output.txt
-grep ".*bit errors (BER).*" test_agora_output.txt >> ${output_filepath}/test_output.txt
+grep ".*bit errors (BER).*" ${output_filepath}/test_user_output.txt > ${output_filepath}/test_output.txt
+grep ".*bit errors (BER).*" ${output_filepath}/test_agora_output.txt >> ${output_filepath}/test_output.txt
 grep ".*bit errors (BER).*" ${output_filepath}/test_output.txt
 echo "=================================================="
 
