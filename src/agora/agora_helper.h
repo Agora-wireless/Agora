@@ -136,12 +136,22 @@ class AgoraBuffer {
     }
   }
 
+  // Get functions
   size_t GetSocketBufferSize() { return this->socket_buffer_size_; }
 
-  void ResetDLBufferStatus(size_t frame_id) {
-    for (size_t ue_id = 0; ue_id < config_->UeAntNum(); ue_id++) {
-      this->dl_bits_buffer_status_[ue_id][frame_id % kFrameWnd] = 0;
-    }
+  int8_t* GetDecodedBuffer(size_t x, size_t y, size_t z) {
+    return this->decoded_buffer_[x][y][z];
+  }
+
+  int8_t* GetDlBitsBuffer(size_t x) { return this->dl_bits_buffer_[x]; }
+
+  char* GetDlSocketBuffer() { return this->dl_socket_buffer_; }
+
+  complex_float* GetEqualBuffer(size_t x) { return this->equal_buffer_[x]; }
+
+  // Set functions
+  void SetDlBitsBufferStatus(int8_t value, size_t x, size_t y) {
+    this->dl_bits_buffer_status_[x][y] = value;
   }
 
   // Delete copy constructor and copy assignment
