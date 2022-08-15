@@ -520,7 +520,7 @@ Config::Config(std::string jsonfilename)
   const std::string dl_present_str =
       (frame_.NumDLSyms() > 0 ? "downlink-" : "");
   std::string filename =
-      kLogFilepath + "trace -" + ul_present_str + dl_present_str +
+      kLogFilepath + "trace-" + ul_present_str + dl_present_str +
       std::to_string(1900 + local_time.tm_year) + "-" +
       std::to_string(1 + local_time.tm_mon) + "-" +
       std::to_string(local_time.tm_mday) + "-" +
