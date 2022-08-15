@@ -31,6 +31,14 @@ static constexpr bool kPrintDlModData = false;
 static constexpr bool kPrintUplinkInformationBytes = false;
 static constexpr bool kPrintDownlinkInformationBytes = false;
 
+///Output files
+static const std::string kUlDataPrefix = "orig_ul_data_";
+static const std::string kUlLdpcDataPrefix = "LDPC_orig_ul_data_";
+static const std::string kDlDataPrefix = "orig_dl_data_";
+static const std::string kDlLdpcDataPrefix = "LDPC_orig_dl_data_";
+static const std::string kRxLdpcPrefix = "LDPC_rx_data_";
+static const std::string kDlTxPrefix = "LDPC_dl_tx_data_";
+
 static float RandFloatFromShort(float min, float max) {
   float rand_val = ((float(rand()) / float(RAND_MAX)) * (max - min)) + min;
   const auto rand_val_short = static_cast<short>(rand_val * kShrtFltConvFactor);
@@ -39,6 +47,10 @@ static float RandFloatFromShort(float min, float max) {
 }
 
 void DataGenerator::DoDataGeneration(const std::string& directory) {
+  //Make sure the directory exists
+  if (std::filesystem::is_directory(directory) == false) {
+    std::filesystem::create_directory(directory);
+  }
   srand(time(nullptr));
   auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
   std::unique_ptr<DoCRC> crc_obj = std::make_unique<DoCRC>();
@@ -70,18 +82,17 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kUplink));
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(
-                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kUplink)) &
-            0xFFFF));
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
+                                pkt->Data(),
+                                cfg_->MacPayloadMaxLength(Direction::kUplink)) &
+                            0xFFFF));
       }
     }
 
     {
       const std::string filename_input =
-          directory + "/data/orig_ul_data_" +
-          std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
-          std::to_string(this->cfg_->UeAntNum()) + ".bin";
+          directory + kUlDataPrefix + std::to_string(this->cfg_->OfdmCaNum()) +
+          "_ant" + std::to_string(this->cfg_->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving uplink MAC data to %s\n", filename_input.c_str());
       FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
       for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
@@ -142,7 +153,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
     {
       const std::string filename_input =
-          directory + "/data/LDPC_orig_ul_data_" +
+          directory + kUlLdpcDataPrefix +
           std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
           std::to_string(this->cfg_->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving raw uplink data (using LDPC) to %s\n",
@@ -309,9 +320,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     }
   }
 
-  std::string filename_rx = directory + "/data/LDPC_rx_data_" +
-                            std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
-                            std::to_string(this->cfg_->BsAntNum()) + ".bin";
+  const std::string filename_rx =
+      directory + kRxLdpcPrefix + std::to_string(this->cfg_->OfdmCaNum()) +
+      "_ant" + std::to_string(this->cfg_->BsAntNum()) + ".bin";
   AGORA_LOG_INFO("Saving rx data to %s\n", filename_rx.c_str());
   FILE* fp_rx = std::fopen(filename_rx.c_str(), "wb");
   for (size_t i = 0; i < this->cfg_->Frame().NumTotalSyms(); i++) {
@@ -361,18 +372,17 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kDownlink));
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(
-                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kDownlink)) &
-            0xFFFF));
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(pkt->Data(),
+                                                    cfg_->MacPayloadMaxLength(
+                                                        Direction::kDownlink)) &
+                            0xFFFF));
       }
     }
 
     {
       const std::string filename_input =
-          directory + "/data/orig_dl_data_" +
-          std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
-          std::to_string(this->cfg_->UeAntNum()) + ".bin";
+          directory + kDlDataPrefix + std::to_string(this->cfg_->OfdmCaNum()) +
+          "_ant" + std::to_string(this->cfg_->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving downlink MAC data to %s\n",
                      filename_input.c_str());
       FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
@@ -439,7 +449,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     {
       // Save downlink information bytes to file
       const std::string filename_input =
-          directory + "/data/LDPC_orig_dl_data_" +
+          directory + kDlLdpcDataPrefix +
           std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
           std::to_string(this->cfg_->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving raw dl data (using LDPC) to %s\n",
@@ -610,9 +620,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     }
 
     std::string filename_dl_tx =
-        directory + "/data/LDPC_dl_tx_data_" +
-        std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
-        std::to_string(this->cfg_->BsAntNum()) + ".bin";
+        directory + kDlTxPrefix + std::to_string(this->cfg_->OfdmCaNum()) +
+        "_ant" + std::to_string(this->cfg_->BsAntNum()) + ".bin";
     AGORA_LOG_INFO("Saving dl tx data to %s\n", filename_dl_tx.c_str());
     FILE* fp_dl_tx = std::fopen(filename_dl_tx.c_str(), "wb");
     for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {

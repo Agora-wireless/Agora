@@ -17,10 +17,7 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
       socket_rx_thread_num_(in_task_thread_num),
       socket_tx_thread_num_(in_task_thread_num),
       core_offset_(in_core_offset) {
-  std::string directory = TOSTRING(PROJECT_DIRECTORY);
-
   if (kDebugPrintSimSetup) {
-    std::printf("PROJECT_DIRECTORY: %s\n", directory.c_str());
     std::printf("Simulator: Main thread: on core %d\n", sched_getcpu());
     // setenv("MKL_THREADING_LAYER", "sequential", true /* overwrite */);
     // std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER")

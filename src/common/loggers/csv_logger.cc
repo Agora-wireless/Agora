@@ -9,6 +9,8 @@
 #include "logger.h"
 #include "utils.h"
 #if defined(ENABLE_CSV_LOG)
+#include <filesystem>
+
 #include "spdlog/async.h"
 #include "spdlog/pattern_formatter.h"
 #include "spdlog/sinks/basic_file_sink.h"
@@ -21,6 +23,9 @@ CsvLogger::CsvLogger(size_t log_id, const std::string& radio_name) {
   if (log_id >= kAllLogs) {
     AGORA_LOG_ERROR("Invalid log id %zu in CsvLogger\n", log_id);
   } else {
+    if (std::filesystem::is_directory("files/log") == false) {
+      std::filesystem::create_directory("files/log");
+    }
     const std::string filename =
         "log/log-" + kCsvName.at(log_id) + "-" + radio_name + ".csv";
     std::remove(filename.c_str());  // delete file if already exists

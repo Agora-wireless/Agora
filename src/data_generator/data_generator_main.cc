@@ -21,12 +21,14 @@ static constexpr bool kPrintDownlinkInformationBytes = false;
 
 DEFINE_string(profile, "random",
               "The profile of the input user bytes (e.g., 'random', '123')");
-DEFINE_string(conf_file,
-              TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
-              "Agora config filename");
+DEFINE_string(
+    conf_file,
+    TOSTRING(PROJECT_DIRECTORY) "/files/examples/ci/tddconfig-sim-both.json",
+    "Agora config filename");
 
 int main(int argc, char* argv[]) {
-  const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+  const std::string output_directory =
+      TOSTRING(PROJECT_DIRECTORY) "/files/experiment/";
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   gflags::SetVersionString(GetAgoraProjectVersion());
   AGORA_LOG_INIT();
@@ -47,7 +49,7 @@ int main(int argc, char* argv[]) {
                  cfg->FreqOrthogonalPilot() ? "frequency" : "time");
 
   AGORA_LOG_INFO("DataGenerator: Generating encoded and modulated data\n");
-  data_generator->DoDataGeneration(cur_directory);
+  data_generator->DoDataGeneration(output_directory);
   AGORA_LOG_SHUTDOWN();
   return 0;
 }

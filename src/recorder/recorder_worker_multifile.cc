@@ -5,6 +5,8 @@
 
 #include "recorder_worker_multifile.h"
 
+#include <string>
+
 #include "logger.h"
 #include "utils.h"
 
@@ -66,7 +68,7 @@ int RecorderWorkerMultiFile::Record(const Packet* pkt) {
 
       if (is_data) {
         const std::string fname_rxdata =
-            "rxdata_" + pkt_id + "_" + short_serial + ".bin";
+            kOutputFilePath + "rxdata_" + pkt_id + "_" + short_serial + ".bin";
         FILE* fp_rxdata = std::fopen(fname_rxdata.c_str(), "wb");
         if (fp_rxdata == nullptr) {
           throw std::runtime_error(
@@ -77,7 +79,8 @@ int RecorderWorkerMultiFile::Record(const Packet* pkt) {
                     fp_rxdata);
         std::fclose(fp_rxdata);
         ///Tx data
-        const std::string fname_txdata = "txdata_" + pkt_id + ".bin";
+        const std::string fname_txdata =
+            kOutputFilePath + "txdata_" + pkt_id + ".bin";
         FILE* fp_txdata = std::fopen(fname_txdata.c_str(), "wb");
         if (fp_txdata == nullptr) {
           throw std::runtime_error(
@@ -90,7 +93,7 @@ int RecorderWorkerMultiFile::Record(const Packet* pkt) {
         std::fclose(fp_txdata);
       } else {
         const std::string fname_rxpilot =
-            "rxpilot_" + pkt_id + "_" + short_serial + ".bin";
+            kOutputFilePath + "rxpilot_" + pkt_id + "_" + short_serial + ".bin";
         FILE* fp_rxpilot = std::fopen(fname_rxpilot.c_str(), "wb");
         if (fp_rxpilot == nullptr) {
           throw std::runtime_error(
@@ -101,7 +104,8 @@ int RecorderWorkerMultiFile::Record(const Packet* pkt) {
                     fp_rxpilot);
         std::fclose(fp_rxpilot);
         ///Tx pilot
-        const std::string fname_txpilot = "txpilot_" + pkt_id + ".bin";
+        const std::string fname_txpilot =
+            kOutputFilePath + "txpilot_" + pkt_id + ".bin";
         FILE* fp_txpilot = std::fopen(fname_txpilot.c_str(), "wb");
         if (fp_txpilot == nullptr) {
           throw std::runtime_error(

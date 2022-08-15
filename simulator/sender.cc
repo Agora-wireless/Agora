@@ -565,8 +565,9 @@ void Sender::CreateWorkerThreads(size_t num_workers) {
 }
 
 void Sender::WriteStatsToFile(size_t tx_frame_count) const {
-  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string filename = cur_directory + "/files/experiment/tx_result.txt";
+  const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+  const std::string filename =
+      cur_directory + "/files/experiment/tx_result.txt";
   std::printf("Printing sender results to file \"%s\"...\n", filename.c_str());
   FILE* fp_debug = std::fopen(filename.c_str(), "w");
   RtAssert(fp_debug != nullptr, "Failed to open stats file");

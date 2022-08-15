@@ -181,24 +181,24 @@ We describe how to get the uplink and downlink demos working. Below XX can be re
     * For USRP-based RRU and UEs, pass `-DRADIO_TYPE=SOAPY_UHD` to cmake
     * Run `make -j` to recompile the code.
  * Run the UE code on the server connected to the Iris UEs
-   * For Iris UEs, run the pyfaros tool in the `data` directory as follows:
+   * For Iris UEs, run the pyfaros tool in the `files/topology` directory as follows:
      <pre>
      $ python3 -m pyfaros.discover --json-out
      </pre>
      This will output a file named `topology.json` with all the discoverable serial IDs included.
-   * Modify `data/topology.json` by adding/removing serials of client Irises you'd like to include
+   * Modify `files/topology/topology.json` by adding/removing serials of client Irises you'd like to include
      from your setup.
-   * For USRP-based RRU and UEs, modify the existing `data/topology.json` and enter the appropriate IDs.
-   * Run `./build/data_generator --conf_file data/XX-hw.json` to generate required data files.
-   * Run `./build/user --conf_file data/XX-hw.json`.
+   * For USRP-based RRU and UEs, modify the existing `files/topology/topology.json` and enter the appropriate IDs.
+   * Run `./build/data_generator --conf_file files/config/XX-hw.json` to generate required data files.
+   * Run `./build/user --conf_file files/config/XX-hw.json`.
  * Run Agora on the server connected to the Faros RRU
-   * scp over the generated file `data/LDPC_orig_XX_data_512_ant2.bin` from the client
-     machine to the server's `data` directory.
+   * scp over the generated file `files/experiment/LDPC_orig_XX_data_512_ant2.bin` from the client
+     machine to the server's `files/experiment` directory.
    * Rebuild the code
      * Run `make -j` to compile the code.
-   * For Faros RRU, use the pyfaros tool the same as with the UEs to generate a new `data/topology.json`
-   * Modify `data/topology.json` by adding/removing serials of your RRU Irises, and the hub.
-   * Run `./build/agora --conf_file data/XX-hw.json`.
+   * For Faros RRU, use the pyfaros tool the same as with the UEs to generate a new `files/topology/topology.json`
+   * Modify `files/topology/topology.json` by adding/removing serials of your RRU Irises, and the hub.
+   * Run `./build/agora --conf_file files/config/XX-hw.json`.
 
 ## Running performance test
 To test the real-time performance of Agora for processing 64x16 MU-MIMO with 20 MHz bandwidth and 64QAM modulation, we recommend using two servers 

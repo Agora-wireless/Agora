@@ -10,6 +10,7 @@
 #include "config.h"
 
 #include <ctime>
+#include <filesystem>
 #include <utility>
 
 #include "logger.h"
@@ -22,6 +23,15 @@ static constexpr size_t kMacAlignmentBytes = 64u;
 static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
+
+static const std::string kLogFilepath =
+    TOSTRING(PROJECT_DIRECTORY) "/files/log/";
+static const std::string kExperimentFilepath =
+    TOSTRING(PROJECT_DIRECTORY) "/files/experiment/";
+static const std::string kUlDataFilePrefix =
+    kExperimentFilepath + "LDPC_orig_ul_data_";
+static const std::string kDlDataFilePrefix =
+    kExperimentFilepath + "LDPC_orig_dl_data_";
 
 Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -494,6 +504,14 @@ Config::Config(std::string jsonfilename)
     cl_tx_advance_.assign(tx_advance.begin(), tx_advance.end());
   }
 
+  if (std::filesystem::is_directory(kExperimentFilepath) == false) {
+    std::filesystem::create_directory(kExperimentFilepath);
+  }
+
+  if (std::filesystem::is_directory(kLogFilepath) == false) {
+    std::filesystem::create_directory(kLogFilepath);
+  }
+
   // set trace file path
   auto time = std::time(nullptr);
   auto local_time = *std::localtime(&time);
@@ -501,16 +519,16 @@ Config::Config(std::string jsonfilename)
   const std::string ul_present_str = (frame_.NumULSyms() > 0 ? "uplink-" : "");
   const std::string dl_present_str =
       (frame_.NumDLSyms() > 0 ? "downlink-" : "");
-  std::string filename = "trace-" + ul_present_str + dl_present_str +
-                         std::to_string(1900 + local_time.tm_year) + "-" +
-                         std::to_string(1 + local_time.tm_mon) + "-" +
-                         std::to_string(local_time.tm_mday) + "-" +
-                         std::to_string(local_time.tm_hour) + "-" +
-                         std::to_string(local_time.tm_min) + "-" +
-                         std::to_string(local_time.tm_sec) + "_" +
-                         std::to_string(num_cells_) + "_" +
-                         std::to_string(BsAntNum()) + "x" +
-                         std::to_string(UeAntTotal()) + ".hdf5";
+  std::string filename =
+      kLogFilepath + "trace -" + ul_present_str + dl_present_str +
+      std::to_string(1900 + local_time.tm_year) + "-" +
+      std::to_string(1 + local_time.tm_mon) + "-" +
+      std::to_string(local_time.tm_mday) + "-" +
+      std::to_string(local_time.tm_hour) + "-" +
+      std::to_string(local_time.tm_min) + "-" +
+      std::to_string(local_time.tm_sec) + "_" + std::to_string(num_cells_) +
+      "_" + std::to_string(BsAntNum()) + "x" + std::to_string(UeAntTotal()) +
+      ".hdf5";
   trace_file_ = tdd_conf.value("trace_file", filename);
 
   // Agora configurations
@@ -1005,11 +1023,10 @@ void Config::GenData() {
     }
   }
 #else
-  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   if (this->frame_.NumUlDataSyms() > 0) {
-    std::string ul_data_file = cur_directory + "/data/LDPC_orig_ul_data_" +
-                               std::to_string(this->ofdm_ca_num_) + "_ant" +
-                               std::to_string(this->ue_ant_total_) + ".bin";
+    const std::string ul_data_file =
+        kUlDataFilePrefix + std::to_string(this->ofdm_ca_num_) + "_ant" +
+        std::to_string(this->ue_ant_total_) + ".bin";
     AGORA_LOG_SYMBOL("Config: Reading raw ul data from %s\n",
                      ul_data_file.c_str());
     FILE* fd = std::fopen(ul_data_file.c_str(), "rb");
@@ -1055,9 +1072,9 @@ void Config::GenData() {
   }
 
   if (this->frame_.NumDlDataSyms() > 0) {
-    std::string dl_data_file = cur_directory + "/data/LDPC_orig_dl_data_" +
-                               std::to_string(this->ofdm_ca_num_) + "_ant" +
-                               std::to_string(this->ue_ant_total_) + ".bin";
+    const std::string dl_data_file =
+        kDlDataFilePrefix + std::to_string(this->ofdm_ca_num_) + "_ant" +
+        std::to_string(this->ue_ant_total_) + ".bin";
 
     AGORA_LOG_SYMBOL("Config: Reading raw dl data from %s\n",
                      dl_data_file.c_str());

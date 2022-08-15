@@ -25,7 +25,6 @@ DEFINE_uint64(
 int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   gflags::SetVersionString(GetAgoraProjectVersion());
-  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = FLAGS_conf_file;
   AGORA_LOG_INIT();
 
