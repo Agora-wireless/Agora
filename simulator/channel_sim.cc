@@ -16,32 +16,8 @@ static const bool kPrintDebugTxUser = false;
 static const bool kPrintDebugTxBs = false;
 
 static constexpr size_t kUdpMTU = 2048;
-static constexpr size_t kDequeueBulkSize = 5;
 
 //#define CHSIM_DEBUG_MEMORY
-
-static void ConvertFloatToShort(const float* in_buf, short* out_buf,
-                                size_t length) {
-  /*
-  for (size_t i = 0; i < length; i += 16) {
-      __m256 data1 = _mm256_load_ps(in_buf + i);
-      __m256 data2 = _mm256_load_ps(in_buf + i + 8);
-      __m256i integer1 = _mm256_cvtps_epi32(data1);
-      __m256i integer2 = _mm256_cvtps_epi32(data2);
-      integer1 = _mm256_packs_epi32(integer1, integer2);
-      integer1 = _mm256_permute4x64_epi64(integer1, 0xD8);
-      _mm256_stream_si256(
-          (__m256i*)&out_buf[i], integer1);
-  }
-  for (size_t i = length / 16; i < length; i++) {
-      out_buf[i] = (short)(in_buf[i] * 32768.f);
-  }
-  */
-  for (size_t i = 0; i < length; i++) {
-    out_buf[i] = static_cast<short>(in_buf[i] * 32768.0f);
-  }
-}
-
 /* Helper classes */
 struct SocketRxBuffer {
   size_t data_size_ = 0;
@@ -294,11 +270,11 @@ void* ChannelSim::TaskThread(size_t tid) {
 
   size_t tx_buffer_ue_size =
       dl_data_plus_beacon_symbols_ * cfg_->UeAntNum() * payload_length_;
-  AlignedByteVector tx_buffer_ue(tx_buffer_ue_size);
+  SimdAlignByteVector tx_buffer_ue(tx_buffer_ue_size);
 
   size_t tx_buffer_bs_size =
       ul_data_plus_pilot_symbols_ * cfg_->BsAntNum() * payload_length_;
-  AlignedByteVector tx_buffer_bs(tx_buffer_bs_size);
+  SimdAlignByteVector tx_buffer_bs(tx_buffer_bs_size);
 
   void* bs_input_float_storage = PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64,
@@ -333,7 +309,7 @@ void* ChannelSim::TaskThread(size_t tid) {
       cfg_->SampsPerSymbol(), cfg_->BsAntNum(), false, true);
   ue_output_matrix.zeros(cfg_->SampsPerSymbol(), cfg_->BsAntNum());
 
-  AlignedByteVector udp_tx_buffer(cfg_->PacketLength());
+  SimdAlignByteVector udp_tx_buffer(cfg_->PacketLength());
 
   WorkerThreadStorage thread_store;
   thread_store.tid_ = tid;
@@ -615,7 +591,7 @@ void* ChannelSim::UeRxLoop(size_t tid) {
 void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
                       size_t ant_per_socket, std::byte* tx_buffer,
                       const arma::cx_float* source_data,
-                      AlignedByteVector* udp_pkt_buf,
+                      SimdAlignByteVector* udp_pkt_buf,
                       std::vector<std::unique_ptr<UDPComm>>& udp_senders) {
   // The 2 is from complex float -> float
   const size_t convert_length = (2 * cfg_->SampsPerSymbol() * max_ant);
@@ -627,11 +603,8 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
                ((reinterpret_cast<size_t>(source_data) % 64) == 0),
            "Data Alignment not correct before calling into AVX optimizations");
 #endif
-
   ConvertFloatToShort(reinterpret_cast<const float*>(source_data), dst_ptr,
                       convert_length);
-  // SimdConvertFloatToShort(reinterpret_cast<const float*>(source_data),
-  // dst_ptr, convert_length, 0, 1);
 
   auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf->at(0));
   for (size_t ant_id = 0u; ant_id < max_ant; ant_id++) {

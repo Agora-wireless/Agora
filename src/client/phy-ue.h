@@ -23,6 +23,7 @@
 #include "packet_txrx.h"
 #include "phy_stats.h"
 #include "recorder_thread.h"
+#include "simd_types.h"
 #include "stats.h"
 #include "ue_worker.h"
 
@@ -187,7 +188,7 @@ class PhyUe {
    * First dimension: data_symbol_num_perframe * kFrameWnd
    * Second dimension: OFDM_CA_NUM * UE_NUM
    */
-  std::vector<myVec> equal_buffer_;
+  std::vector<SimdAlignCxFltVector> equal_buffer_;
 
   // Data after demodulation. Each buffer has kMaxModType * number of OFDM
   // data subcarriers
