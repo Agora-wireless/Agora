@@ -1,4 +1,5 @@
 #include "agora.h"
+#include "datatype_conversion.h"
 #include "gflags/gflags.h"
 #include "logger.h"
 
@@ -130,9 +131,9 @@ unsigned int CheckCorrectnessDl(Config const* const cfg) {
     for (size_t ant = 0; ant < bs_ant_num; ant++) {
       sum_diff = 0;
       for (size_t sc = 0; sc < (samps_per_symbol * 2); sc++) {
-        size_t offset = (bs_ant_num * i) + ant;
-        float diff =
-            fabs((raw_data[offset][sc] - tx_data[offset][sc]) / 32768.0);
+        const size_t offset = (bs_ant_num * i) + ant;
+        const float diff = std::fabs(
+            (raw_data[offset][sc] - tx_data[offset][sc]) / kShrtFltConvFactor);
         sum_diff += diff;
         if (kDebugPrintDlCorr) {
           if (i == 0) {

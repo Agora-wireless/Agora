@@ -12,6 +12,7 @@
 #include "phy_ldpc_decoder_5gnr.h"
 #include "phy_stats.h"
 #include "scrambler.h"
+#include "simd_types.h"
 #include "utils_ldpc.h"
 
 /* Print debug work */
@@ -33,8 +34,8 @@ UeWorker::UeWorker(
     Table<int8_t>& encoded_buffer, Table<complex_float>& modul_buffer,
     Table<complex_float>& ifft_buffer, char* const tx_buffer,
     Table<char>& rx_buffer, Table<complex_float>& csi_buffer,
-    std::vector<myVec>& equal_buffer, std::vector<size_t>& non_null_sc_ind,
-    Table<complex_float>& fft_buffer,
+    std::vector<SimdAlignCxFltVector>& equal_buffer,
+    std::vector<size_t>& non_null_sc_ind, Table<complex_float>& fft_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
     std::vector<std::vector<std::complex<float>>>& ue_pilot_vec)

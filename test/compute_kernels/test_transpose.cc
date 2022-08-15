@@ -5,7 +5,6 @@
 #include <immintrin.h>
 
 #include <armadillo>
-#include <boost/align/aligned_allocator.hpp>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
@@ -13,21 +12,17 @@
 #include <iostream>
 #include <vector>
 
-#define OFDM 1024
-#define BS_ANT 96
-#define K 4
+#include "simd_types.h"
 
-#define LOOP_NUM 1e4
+#define OFDM (1024)
+#define BS_ANT (96)
+#define K (4)
+#define LOOP_NUM (1e4)
 
 struct complex_float {
   float real;
   float imag;
 };
-
-// typedef std::vector<complex_float> myVec;
-typedef std::vector<complex_float,
-                    boost::alignment::aligned_allocator<complex_float, 128>>
-    myVec;
 
 typedef arma::cx_float COMPLEX;
 
@@ -56,8 +51,8 @@ void saveData(char* filename, complex_float* ptr, int row, int col) {
 int main(int argc, char** argv) {
   srand(0);
   std::printf("test\n");
-  myVec buffer;
-  myVec buffer_trans;
+  SimdAlignCxFltVector buffer;
+  SimdAlignCxFltVector buffer_trans;
   buffer.resize(BS_ANT * OFDM);
   buffer_trans.resize(BS_ANT * OFDM);
   for (int i = 0; i < BS_ANT; i++) {
@@ -71,7 +66,7 @@ int main(int argc, char** argv) {
 
   saveData("data.txt", buffer.data(), BS_ANT, OFDM);
 
-  myVec precoder;
+  SimdAlignCxFltVector precoder;
   precoder.resize(K * BS_ANT);
   for (int i = 0; i < K * BS_ANT; i++) {
     precoder[i].real = (rand() % 65536) / (float)65536;
@@ -79,7 +74,7 @@ int main(int argc, char** argv) {
     // precoder[i].real = 1.f;
     // precoder[i].imag = 0.f;
   }
-  myVec result;
+  SimdAlignCxFltVector result;
   result.resize(K);
 
   saveData("precoder.txt", precoder.data(), K, BS_ANT);
@@ -217,7 +212,7 @@ int main(int argc, char** argv) {
 
   flushCache();
   begin = std::chrono::system_clock::now();
-  myVec temp_buffer;
+  SimdAlignCxFltVector temp_buffer;
   temp_buffer.resize(BS_ANT);
   for (int i = 0; i < LOOP_NUM; ++i) {
     for (int c1 = 0; c1 < OFDM; c1++) {
