@@ -78,7 +78,7 @@ static void ClassFunctioWrapper(TxRxWorkerDpdk* context) {
 void TxRxWorkerDpdk::Start() {
   rte_eal_wait_lcore(tid_);
   AGORA_LOG_TRACE("TxRxWorkerDpdk[%zu]: starting\n", tid_);
-  int status = rte_eal_remote_launch(
+  const int status = rte_eal_remote_launch(
       (lcore_function_t*)(ClassFunctioWrapper<&TxRxWorkerDpdk::DoTxRx>), this,
       tid_);
   AGORA_LOG_INFO("TxRxWorkerDpdk[%zu]: started on dpdk managed l_core\n", tid_);
