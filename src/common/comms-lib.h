@@ -52,7 +52,7 @@ class CommsLib {
   explicit CommsLib(std::string);
   ~CommsLib();
 
-  static std::vector<std::vector<double>> GetSequence(int N, int type);
+  static std::vector<std::vector<double>> GetSequence(size_t seq_len, int type);
   static std::vector<std::complex<float>> Modulate(
       const std::vector<int8_t>& in, int type);
   static std::vector<int> GetDataSc(int fftSize);
