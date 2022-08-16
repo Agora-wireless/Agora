@@ -19,7 +19,44 @@ function inspect_agora_results(dataset_filename, verbose)
     cp_len = double(h5readatt(dataset_filename, group_id, 'CP_LEN'));
     total_dl_symbols = double(h5readatt(dataset_filename, group_id, 'DL_SLOTS'));
     dl_pilot_symbols = double(h5readatt(dataset_filename, group_id, 'DL_PILOT_SLOTS'));
-    beacon_syms = 1;
+
+    %Choose the Beacon data
+    dataset_id = '/BeaconData';
+
+    %Display Info
+    if verbose == "true"
+        h5disp(dataset_filename,strcat(group_id,dataset_id));
+    end
+    %Generate a int16 array
+    rx_beacon_hdf5 = h5read(dataset_filename, strcat(group_id,dataset_id));
+    % Dimensions  [Samples, Ant, Symbol, Cells, Frame]
+    total_frames = size(rx_beacon_hdf5, 5);
+    total_users = size(rx_beacon_hdf5, 2);
+    %Convert to double and scale
+    rx_beacon_scaled_double = double(rx_beacon_hdf5) ./ double(intmax('int16'));
+    clear rx_beacon_hdf5;
+    %Convert to complex double
+    % Samples x User x Symbol
+    rx_beacon_cxdouble = complex(rx_beacon_scaled_double(1:2:end, :, :, :), rx_beacon_scaled_double(2:2:end,:, :, :));
+    rx_beacon_rssi = process_beacon(rx_beacon_cxdouble, tx_zero_prefix_len);
+    clear rx_beacon_scaled_double;
+
+    experiment = 'MU-MIMO';
+    if total_users == 1
+        experiment = 'SU-MIMO';
+    end
+
+    % New (Beacon RSSI)
+    figure('Name', 'Beacon');
+    plot(rx_beacon_rssi.')
+    axis([0 total_frames -50 0]);
+    ylabel('Beacon RSSI (dB)')
+    xlabel('Frame')
+    title(['Rx Beacon Power in ' experiment ' Experiment'])
+
+    if total_dl_symbols == 0
+        return
+    end
 
     %Choose the downlink data
     dataset_id = '/DownlinkData';
@@ -48,28 +85,6 @@ function inspect_agora_results(dataset_filename, verbose)
     configs = [samples_per_slot tx_zero_prefix_len data_size data_start data_stop fft_size cp_len ...
     total_dl_symbols dl_pilot_symbols total_users];
 
-    %Choose the Beacon data
-    dataset_id = '/BeaconData';
-
-    % Dimensions  [Samples, Ant, Symbol, Cells, Frame]
-    start = [1 1 1 1 1];
-    count = [(samples_per_slot * 2) total_users beacon_syms 1 total_frames];
-    %Display Info
-    if verbose == "true"
-        h5disp(dataset_filename,strcat(group_id,dataset_id));
-    end
-    %Generate a int16 array
-    rx_beacon_hdf5 = h5read(dataset_filename, strcat(group_id,dataset_id), start, count);
-    %Convert to double and scale
-    rx_beacon_scaled_double = double(rx_beacon_hdf5) ./ double(intmax('int16'));
-    clear rx_beacon_hdf5;
-    %Convert to complex double
-    % Samples x User x Symbol
-    rx_beacon_cxdouble = complex(rx_beacon_scaled_double(1:2:end, :, :, :), rx_beacon_scaled_double(2:2:end,:, :, :));
-    rx_beacon_rssi = process_beacon(rx_beacon_cxdouble, tx_zero_prefix_len);
-    clear rx_beacon_scaled_double;
-    clear start count;
-
     dataset_id = '/TxPilot';
     %*2 for complex type (native float)
     total_samples = data_size * 2;
@@ -96,7 +111,7 @@ function inspect_agora_results(dataset_filename, verbose)
     % Samples (complex) x User Ant x Downlink Data Symbol Id
     tx_data_cxdouble = tx_syms_cxdouble(:, :, dl_pilot_symbols + 1:end);
     clear start count total_samples tx_data_hdf5 dataset_id;
-    clear beacon_syms cp_len data_size data_start data_stop dl_pilot_symbols samples_per_slot tx_zero_prefix_len total_dl_symbols fft_size;
+    clear cp_len data_size data_start data_stop dl_pilot_symbols samples_per_slot tx_zero_prefix_len total_dl_symbols fft_size;
 
     evm = zeros(total_users, total_frames);
     snr = zeros(total_users, total_frames);
@@ -104,11 +119,6 @@ function inspect_agora_results(dataset_filename, verbose)
         [~, ~, evm(:, i), snr(:, i)] = process_rx_frame(configs, tx_pilot_cxdouble, tx_data_cxdouble, rx_pilot_cxdouble(:, :, :, i), rx_data_cxdouble(:, :, :, i));
     end
     clear configs tx_pilot_cxdouble tx_data_cxdouble rx_pilot_cxdouble rx_data_cxdouble;
-
-    experiment = 'MU-MIMO';
-    if total_users == 1
-        experiment = 'SU-MIMO';
-    end
 
     %Plot SNR & EVM Results
     figure('Name', ['File ' dataset_filename]);
@@ -125,12 +135,5 @@ function inspect_agora_results(dataset_filename, verbose)
     axis([0 total_frames 0 4 * max(mean(evm, 2))]);
     ylabel('EVM (%)')
 
-    % New (Beacon RSSI)
-    figure('Name', 'Beacon');
-    plot(rx_beacon_rssi.')
-    axis([0 total_frames -50 0]);
-    ylabel('Beacon RSSI (dB)')
-    xlabel('Frame')
-    title(['Rx Beacon Power in ' experiment ' Experiment'])
     clear rx_beacon_cxdouble rx_syms_cxdouble tx_syms_cxdouble total_users ;
 end
