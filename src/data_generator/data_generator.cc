@@ -658,7 +658,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   tx_data_all_symbols.Free();
   rx_data_all_symbols.Free();
   ue_specific_pilot.Free();
-  delete[] ifft_shift_tmp;
+  std::free(ifft_shift_tmp);
   delete[] ul_scrambler_buffer;
   delete[] dl_scrambler_buffer;
 }
