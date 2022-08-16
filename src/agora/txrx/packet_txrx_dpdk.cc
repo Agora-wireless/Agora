@@ -146,8 +146,11 @@ bool PacketTxRxDpdk::CreateWorker(size_t tid, size_t interface_count,
 
   //interface_count = number of ports (logical) to monitor
   //interface_offset = starting port (logical)
-  // 1 to skip main core, 0 to disable wrap
-  const unsigned int thread_l_core = rte_get_next_lcore(tid, 1, 0);
+  unsigned int thread_l_core = tid;
+  for (size_t lcore_idx = 0; lcore_idx <= tid; lcore_idx++) {
+    // 1 to skip main core, 0 to disable wrap
+    thread_l_core = rte_get_next_lcore(thread_l_core, 1, 0);
+  }
 
   // Verify the lcore id is enabled (should have be inited with proper id)
   const int enabled = rte_lcore_is_enabled(thread_l_core);
