@@ -19,6 +19,7 @@ function inspect_agora_results(dataset_filename, verbose)
     cp_len = double(h5readatt(dataset_filename, group_id, 'CP_LEN'));
     total_dl_symbols = double(h5readatt(dataset_filename, group_id, 'DL_SLOTS'));
     dl_pilot_symbols = double(h5readatt(dataset_filename, group_id, 'DL_PILOT_SLOTS'));
+    cl_sdr_id = h5readatt(dataset_filename, group_id, 'CL_SDR_ID');
 
     %Choose the Beacon data
     dataset_id = '/BeaconData';
@@ -48,11 +49,13 @@ function inspect_agora_results(dataset_filename, verbose)
 
     % New (Beacon RSSI)
     figure('Name', 'Beacon');
-    plot(rx_beacon_rssi.')
+    set(gca,'FontSize',18);
+    plot(rx_beacon_rssi.', 'LineWidth',2)
     axis([0 total_frames -50 0]);
     ylabel('Beacon RSSI (dB)')
     xlabel('Frame')
     title(['Rx Beacon Power in ' experiment ' Experiment'])
+    legend(cl_sdr_id)
 
     if total_dl_symbols == 0
         return
@@ -115,23 +118,29 @@ function inspect_agora_results(dataset_filename, verbose)
 
     evm = zeros(total_users, total_frames);
     snr = zeros(total_users, total_frames);
+    rf_snr = zeros(total_users, total_frames);
     for i=1:total_frames
-        [~, ~, evm(:, i), snr(:, i)] = process_rx_frame(configs, tx_pilot_cxdouble, tx_data_cxdouble, rx_pilot_cxdouble(:, :, :, i), rx_data_cxdouble(:, :, :, i));
+        [~, ~, evm(:, i), snr(:, i), rf_snr(:, i)] = process_rx_frame(configs, tx_pilot_cxdouble, tx_data_cxdouble, rx_pilot_cxdouble(:, :, :, i), rx_data_cxdouble(:, :, :, i));
     end
     clear configs tx_pilot_cxdouble tx_data_cxdouble rx_pilot_cxdouble rx_data_cxdouble;
 
     %Plot SNR & EVM Results
     figure('Name', ['File ' dataset_filename]);
-    tiledlayout(2,1)
+    tiledlayout(3,1)
     % Top (SNR)
     nexttile;
-    plot(snr.');
-    ylabel('SNR (dB)')
+    set(gca,'FontSize',18);
+    plot(rf_snr.', 'LineWidth',2);
+    ylabel('Pilot SNR (dB)')
     title([experiment ' Beamforming SNR & EVM plots'])
+    legend(cl_sdr_id)
+    nexttile;
+    plot(snr.', 'LineWidth',2);
+    ylabel('EVM SNR (dB)')
     %axis([0 inf -1 1]);
     %Bottom (EVM)
     nexttile;
-    plot(evm.');
+    plot(evm.', 'LineWidth',2);
     axis([0 total_frames 0 4 * max(mean(evm, 2))]);
     ylabel('EVM (%)')
 

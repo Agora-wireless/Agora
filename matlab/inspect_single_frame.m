@@ -100,7 +100,7 @@ function inspect_single_frame(dataset_filename, inspect_frame, verbose)
 
     clear dataset_filename group_id;
     clear beacon_syms cp_len data_size data_start data_stop dl_pilot_symbols samples_per_slot tx_zero_prefix_len total_dl_symbols fft_size;
-    [demul_data, data_sc_idx, evm, snr] = process_rx_frame(configs, tx_pilot_cxdouble, tx_data_cxdouble, rx_pilot_cxdouble, rx_data_cxdouble);
+    [demul_data, data_sc_idx, evm, snr, rf_snr] = process_rx_frame(configs, tx_pilot_cxdouble, tx_data_cxdouble, rx_pilot_cxdouble, rx_data_cxdouble);
     clear configs tx_pilot_cxdouble rx_pilot_cxdouble rx_data_cxdouble;
 
     %Plot Rx waveform
@@ -122,7 +122,7 @@ function inspect_single_frame(dataset_filename, inspect_frame, verbose)
 
     for u=1:total_users
         rx_cnstl = demul_data(data_sc_idx, : , u);
-        tx_cnstl = tx_data_cxdouble(data_sc_idx, :, u);
+        tx_cnstl = tx_data_cxdouble(data_sc_idx, u, :);
         figure('Name', ['Constellation [User ', num2str(u), ']']);
         pt_size = 15;
         scatter(real(rx_cnstl(:)), imag(rx_cnstl(:)),pt_size,'r','filled');
@@ -136,6 +136,7 @@ function inspect_single_frame(dataset_filename, inspect_frame, verbose)
     precision = 3;
     disp(['Frame Inspect: ', num2str(inspect_frame)]);
     disp(['Beacon RSSI (dB): ', mat2str(rx_beacon_rssi.', precision)]);
-    disp(['SNR: ', mat2str(snr, precision)]);
-    disp(['EVM: ', mat2str(evm, precision)]);
+    disp(['Pilot SNR (dB): ', mat2str(rf_snr, precision)]);
+    disp(['EVM SNR (dB): ', mat2str(snr, precision)]);
+    disp(['EVM (%): ', mat2str(evm, precision)]);
 end
