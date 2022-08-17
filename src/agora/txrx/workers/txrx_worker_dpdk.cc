@@ -330,8 +330,8 @@ bool TxRxWorkerDpdk::Filter(rte_mbuf* packet, uint16_t port_id,
       rte_eth_macaddr_get(port_id, &bond_mac_addr);
       arp_hdr->arp_opcode = rte_cpu_to_be_16(RTE_ARP_OP_REPLY);
       // Switch src and dst data and set bonding MAC
-      rte_ether_addr_copy(&eth_hdr->s_addr, &eth_hdr->d_addr);
-      rte_ether_addr_copy(&bond_mac_addr, &eth_hdr->s_addr);
+      rte_ether_addr_copy(&eth_hdr->src_addr, &eth_hdr->dst_addr);
+      rte_ether_addr_copy(&bond_mac_addr, &eth_hdr->src_addr);
       rte_ether_addr_copy(&arp_hdr->arp_data.arp_sha,
                           &arp_hdr->arp_data.arp_tha);
       arp_hdr->arp_data.arp_tip = arp_hdr->arp_data.arp_sip;

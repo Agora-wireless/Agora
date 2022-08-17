@@ -15,8 +15,9 @@ static constexpr size_t kJumboFrameSize = 9000;
 
 inline rte_eth_conf PortConfDefault() {
   rte_eth_conf port_conf = rte_eth_conf();
-  port_conf.rxmode.max_rx_pkt_len = kJumboFrameMaxSize;
-  port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
+  port_conf.rxmode.max_lro_pkt_size = kJumboFrameMaxSize;
+  port_conf.rxmode.mtu = kJumboFrameMaxSize;
+  //port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
   return port_conf;
 }
 
@@ -104,9 +105,9 @@ int DpdkTransport::NicInit(uint16_t port, rte_mempool* mbuf_pool,
     port_conf.txmode.offloads |= DEV_TX_OFFLOAD_MBUF_FAST_FREE;
   }
 
-  port_conf.rxmode.max_rx_pkt_len =
-      RTE_MIN(RTE_MIN(dev_info.max_rx_pktlen, port_conf.rxmode.max_rx_pkt_len),
-              pkt_len);
+  port_conf.rxmode.max_lro_pkt_size = RTE_MIN(
+      RTE_MIN(dev_info.max_rx_pktlen, port_conf.rxmode.max_lro_pkt_size),
+      pkt_len);
   // port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
 
   retval = rte_eth_dev_configure(port, rx_rings, tx_rings, &port_conf);
@@ -384,9 +385,9 @@ rte_mbuf* DpdkTransport::AllocUdp(rte_mempool* mbuf_pool,
 
   rte_ether_hdr* eth_hdr = rte_pktmbuf_mtod(tx_buf, rte_ether_hdr*);
   eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
-  std::memcpy(eth_hdr->s_addr.addr_bytes, src_mac_addr.addr_bytes,
+  std::memcpy(eth_hdr->src_addr.addr_bytes, src_mac_addr.addr_bytes,
               RTE_ETHER_ADDR_LEN);
-  std::memcpy(eth_hdr->d_addr.addr_bytes, dst_mac_addr.addr_bytes,
+  std::memcpy(eth_hdr->dst_addr.addr_bytes, dst_mac_addr.addr_bytes,
               RTE_ETHER_ADDR_LEN);
 
   auto* ip_h = (rte_ipv4_hdr*)((char*)eth_hdr + sizeof(rte_ether_hdr));
@@ -424,8 +425,9 @@ void DpdkTransport::DpdkInit(uint16_t core_offset, size_t thread_num) {
         core_list + "," + std::to_string(GetPhysicalCoreId(core_offset + i));
   }
   // n: channels, m: maximum memory in megabytes
-  const char* rte_argv[] = {"txrx",        "-l", core_list.c_str(),
-                            "--log-level", "0",  nullptr};
+  const char* rte_argv[] = {"txrx",        "-l",           core_list.c_str(),
+                            "--log-level", "lib.eal:info", "--legacy-mem",
+                            nullptr};
   int rte_argc = static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
 
   // Initialize DPDK environment
