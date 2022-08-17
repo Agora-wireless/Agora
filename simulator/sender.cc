@@ -129,12 +129,14 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
                                cfg->PacketLength()) != 0) {
       rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_ids_.at(i));
     }
-
     std::memcpy(&server_mac_addr_[i], parsed_mac, sizeof(ether_addr));
 
     ret = rte_eth_macaddr_get(port_ids_.at(i), &sender_mac_addr_[i]);
     RtAssert(ret == 0, "Cannot get MAC address of the port");
     std::printf("Number of DPDK cores: %d\n", rte_lcore_count());
+
+    printf("Sending IP(MAC): From %s To %s(%s)\n", cfg->BsRruAddr().c_str(),
+           cfg->BsServerAddr().c_str(), ether_ntoa(parsed_mac));
   }
 
 #endif
@@ -483,6 +485,8 @@ void* Sender::WorkerThread(int tid) {
       }
 
 #if defined(USE_DPDK)
+      std::printf("Thread %d rte_eth_tx_burst(), queue %zu num_tags: %zu\n",
+                  tid, queue_id, num_tags);
       size_t nb_tx_new =
           rte_eth_tx_burst(port_id, queue_id, tx_mbufs, num_tags);
       if (unlikely(nb_tx_new != num_tags)) {
