@@ -10,8 +10,8 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
-#include <cstddef>
 #include <atomic>
+#include <cstddef>
 #include <string>
 #include <vector>
 
