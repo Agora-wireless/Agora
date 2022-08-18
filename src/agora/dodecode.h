@@ -18,9 +18,7 @@
 
 class DoDecode : public Doer {
  public:
-  DoDecode(Config* in_config, int in_tid,
-           PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
-           PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffers,
+  DoDecode(Config* in_config, int in_tid, AgoraBuffer* buffer,
            PhyStats* in_phy_stats, Stats* in_stats_manager);
   ~DoDecode() override;
 
@@ -28,8 +26,7 @@ class DoDecode : public Doer {
 
  private:
   int16_t* resp_var_nodes_;
-  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_;
-  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffers_;
+  AgoraBuffer* buffer_;
   PhyStats* phy_stats_;
   DurationStat* duration_stat_;
   std::unique_ptr<AgoraScrambler::Scrambler> scrambler_;

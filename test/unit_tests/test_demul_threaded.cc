@@ -64,12 +64,8 @@ void MasterToWorkerDynamicWorker(
     Config* cfg, size_t worker_id,
     moodycamel::ConcurrentQueue<EventData>& event_queue,
     moodycamel::ConcurrentQueue<EventData>& complete_task_queue,
-    moodycamel::ProducerToken* ptok, Table<complex_float>& data_buffer,
-    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices,
-    Table<complex_float>& ue_spec_pilot_buffer,
-    Table<complex_float>& equal_buffer,
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_,
-    PhyStats* phy_stats, Stats* stats) {
+    moodycamel::ProducerToken* ptok, AgoraBuffer* buffer, PhyStats* phy_stats,
+    Stats* stats) {
   PinToCoreWithOffset(ThreadType::kWorker, cfg->CoreOffset() + 1, worker_id);
 
   // Wait for all threads (including master) to start runnung
@@ -78,9 +74,8 @@ void MasterToWorkerDynamicWorker(
     // Wait
   }
 
-  auto compute_demul = std::make_unique<DoDemul>(
-      cfg, worker_id, data_buffer, ul_beam_matrices, ue_spec_pilot_buffer,
-      equal_buffer, demod_buffers_, phy_stats, stats);
+  auto compute_demul =
+      std::make_unique<DoDemul>(cfg, worker_id, buffer, phy_stats, stats);
 
   size_t start_tsc = GetTime::Rdtsc();
   size_t num_tasks = 0;
@@ -126,23 +121,10 @@ TEST(TestDemul, VaryingConfig) {
     ptok = new moodycamel::ProducerToken(complete_task_queue);
   }
 
-  Table<complex_float> data_buffer;
-  Table<complex_float> ue_spec_pilot_buffer;
-  Table<complex_float> equal_buffer;
-  data_buffer.RandAllocCxFloat(cfg->Frame().NumULSyms() * kFrameWnd,
-                               kMaxAntennas * kMaxDataSCs,
-                               Agora_memory::Alignment_t::kAlign64);
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrices(kMaxAntennas *
-                                                                  kMaxUEs);
-  equal_buffer.Calloc(cfg->Frame().NumULSyms() * kFrameWnd,
-                      kMaxDataSCs * kMaxUEs,
-                      Agora_memory::Alignment_t::kAlign64);
-  ue_spec_pilot_buffer.Calloc(kFrameWnd,
-                              cfg->Frame().ClientUlPilotSymbols() * kMaxUEs,
-                              Agora_memory::Alignment_t::kAlign64);
-  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers(
-      kFrameWnd, cfg->Frame().NumTotalSyms(), cfg->UeAntNum(),
-      kMaxModType * cfg->OfdmDataNum());
+  auto buffer = std::make_unique<AgoraBuffer>(cfg.get());
+  auto stats = std::make_unique<Stats>(cfg.get());
+  auto phy_stats = std::make_unique<PhyStats>(cfg.get(), Direction::kUplink);
+
   std::printf(
       "Size of [data_buffer, ul_beam_matrices, equal_buffer, "
       "ue_spec_pilot_buffer, demod_soft_buffer]: [%.1f %.1f %.1f %.1f %.1f] "
@@ -157,19 +139,13 @@ TEST(TestDemul, VaryingConfig) {
       cfg->Frame().NumULSyms() * kFrameWnd * kMaxModType * kMaxDataSCs *
           kMaxUEs * 1.0f / 1024 / 1024);
 
-  auto stats = std::make_unique<Stats>(cfg.get());
-  auto phy_stats = std::make_unique<PhyStats>(cfg.get(), Direction::kUplink);
-
   std::vector<std::thread> threads;
   threads.emplace_back(MasterToWorkerDynamicMaster, cfg.get(),
                        std::ref(event_queue), std::ref(complete_task_queue));
   for (size_t i = 0; i < kNumWorkers; i++) {
     threads.emplace_back(MasterToWorkerDynamicWorker, cfg.get(), i,
                          std::ref(event_queue), std::ref(complete_task_queue),
-                         ptoks[i], std::ref(data_buffer),
-                         std::ref(ul_beam_matrices), std::ref(equal_buffer),
-                         std::ref(ue_spec_pilot_buffer),
-                         std::ref(demod_buffers), phy_stats.get(), stats.get());
+                         ptoks[i], buffer.get(), phy_stats.get(), stats.get());
   }
 
   for (auto& thread : threads) {
@@ -179,10 +155,6 @@ TEST(TestDemul, VaryingConfig) {
   for (auto& ptok : ptoks) {
     delete ptok;
   }
-
-  data_buffer.Free();
-  ue_spec_pilot_buffer.Free();
-  equal_buffer.Free();
 }
 
 int main(int argc, char** argv) {

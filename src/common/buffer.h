@@ -29,14 +29,14 @@ class AgoraBuffer {
                     cfg->BsAntNum() * cfg->OfdmDataNum()),
         ul_beam_matrix_(kFrameWnd, cfg->OfdmDataNum(),
                         cfg->BsAntNum() * cfg->UeAntNum()),
+        dl_beam_matrix_(kFrameWnd, cfg->OfdmDataNum(),
+                        cfg->UeAntNum() * cfg->BsAntNum()),
         demod_buffer_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),
                       kMaxModType * cfg->OfdmDataNum()),
         decoded_buffer_(
             kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),
             cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
                 Roundup<64>(cfg->NumBytesPerCb(Direction::kUplink))),
-        dl_beam_matrix_(kFrameWnd, cfg->OfdmDataNum(),
-                        cfg->UeAntNum() * cfg->BsAntNum()),
         config_(cfg),
         socket_buffer_size_(cfg->PacketLength() * cfg->BsAntNum() * kFrameWnd *
                             cfg->Frame().NumTotalSyms()) {
@@ -137,22 +137,46 @@ class AgoraBuffer {
 
   // Get functions
   size_t GetSocketBufferSize() { return this->socket_buffer_size_; }
-
+  complex_float* GetCsiBuffer(size_t x, size_t y) {
+    return this->csi_buffer_[x][y];
+  }
+  complex_float* GetUlBeamMatrix(size_t x, size_t y) {
+    return this->ul_beam_matrix_[x][y];
+  }
+  complex_float* GetDlBeamMatrix(size_t x, size_t y) {
+    return this->dl_beam_matrix_[x][y];
+  }
+  int8_t* GetDemodBuffer(size_t x, size_t y, size_t z) {
+    return this->demod_buffer_[x][y][z];
+  }
   int8_t* GetDecodedBuffer(size_t x, size_t y, size_t z) {
     return this->decoded_buffer_[x][y][z];
   }
-
-  int8_t* GetDlBitsBuffer(size_t x) { return this->dl_bits_buffer_[x]; }
-
-  char* GetDlSocketBuffer() { return this->dl_socket_buffer_; }
-
+  complex_float* GetDataBuffer(size_t x) { return this->data_buffer_[x]; }
   complex_float* GetEqualBuffer(size_t x) { return this->equal_buffer_[x]; }
+  complex_float* GetUeSpecPilotBuffer(size_t x) {
+    return this->ue_spec_pilot_buffer_[x];
+  }
+  complex_float* GetDlIfftBuffer(size_t x) { return this->dl_ifft_buffer_[x]; }
   complex_float* GetCalibUlBuffer(size_t x) {
     return this->calib_ul_buffer_[x];
   }
   complex_float* GetCalibDlBuffer(size_t x) {
     return this->calib_dl_buffer_[x];
   }
+  complex_float* GetCalibUlMsumBuffer(size_t x) {
+    return this->calib_ul_msum_buffer_[x];
+  }
+  complex_float* GetCalibDlMsumBuffer(size_t x) {
+    return this->calib_dl_msum_buffer_[x];
+  }
+  int8_t* GetDlModBitsBuffer(size_t x) { return this->dl_mod_bits_buffer_[x]; }
+
+  int8_t* GetDlBitsBuffer(size_t x) { return this->dl_bits_buffer_[x]; }
+  int8_t* GetDlBitsBufferStatus(size_t x) {
+    return this->dl_bits_buffer_status_[x];
+  }
+  char* GetDlSocketBuffer() { return this->dl_socket_buffer_; }
 
   // Set functions
   void SetDlBitsBufferStatus(int8_t value, size_t x, size_t y) {
@@ -165,9 +189,9 @@ class AgoraBuffer {
 
   PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffer_;
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrix_;
+  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_beam_matrix_;
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffer_;
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> decoded_buffer_;
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_beam_matrix_;
   Table<char> socket_buffer_;
   Table<complex_float> data_buffer_;
   Table<complex_float> equal_buffer_;
