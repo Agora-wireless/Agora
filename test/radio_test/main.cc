@@ -12,9 +12,10 @@
 #include "signal_handler.h"
 #include "version_config.h"
 
-DEFINE_string(conf_file,
-              TOSTRING(PROJECT_DIRECTORY) "/data/ul-one-vulture.json",
-              "Config filename");
+DEFINE_string(
+    conf_file,
+    TOSTRING(PROJECT_DIRECTORY) "/files/config/examples/ul-one-vulture.json",
+    "Config filename");
 
 DEFINE_uint32(rx_symbols, 10,
               "The number of symbols to receive before the program terminates");

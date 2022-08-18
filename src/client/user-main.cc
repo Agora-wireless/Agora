@@ -12,7 +12,7 @@
 #include "version_config.h"
 
 DEFINE_string(conf_file,
-              TOSTRING(PROJECT_DIRECTORY) "/data/userconfig_512.json",
+              TOSTRING(PROJECT_DIRECTORY) "/files/config/ci/chsim.json",
               "Config filename");
 
 int main(int argc, char* argv[]) {

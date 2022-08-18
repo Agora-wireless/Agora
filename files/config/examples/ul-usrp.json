@@ -1,0 +1,37 @@
+{
+    "serial_file": "files/topology/bs-usrp-addr.txt",
+    "cells": 1,
+    "channel": "AB",
+    "frequency": 3.6e9,
+    "rx_gain_a": 20,
+    "tx_gain_a": 20,
+    "rx_gain_b": 20,
+    "tx_gain_b": 20,
+    "sample_rate": 5e6,
+    "ofdm_tx_zero_prefix": 160,
+    "ofdm_tx_zero_postfix": 160,
+    "ofdm_rx_zero_prefix_bs": 220,
+    "ofdm_rx_zero_prefix_client": 240,
+    "cp_size": 32,
+    "fft_size": 512,
+    "ofdm_data_num": 304,
+    "Zc": 18,
+    "beamsweep": true,
+    "beacon_antenna": 0,
+    "modulation": "16QAM",
+    "frame_schedule": [
+        "BGGGGGPGGGUUUG"
+    ],
+    "client_ul_pilot_syms": 2,
+    "demul_block_size": 48,
+    "core_offset": 10,
+    "worker_thread_num": 2,
+    "socket_thread_num": 1,
+    "hw_framer": false,
+    "tx_advance": [
+        78
+    ],
+    "ue_core_offset": 0,
+    "ue_worker_thread_num": 2,
+    "ue_socket_thread_num": 1
+}

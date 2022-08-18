@@ -8,6 +8,14 @@
 
 #include "logger.h"
 
+static const std::string kProjectDir = TOSTRING(PROJECT_DIRECTORY);
+static const std::string kStatsOutputFilePath =
+    kProjectDir + "/files/experiment/";
+static const std::string kStatsDataFilename =
+    kStatsOutputFilePath + "timeresult.txt";
+static const std::string kStatsDetailedDataFilename =
+    kStatsOutputFilePath + "timeresult_detail.txt";
+
 Stats::Stats(const Config* const cfg)
     : config_(cfg),
       task_thread_num_(cfg->WorkerThreadNum()),
@@ -140,10 +148,9 @@ void Stats::UpdateStats(size_t frame_id) {
 }
 
 void Stats::SaveToFile() {
-  const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  const std::string filename = cur_directory + "/data/timeresult.txt";
-  AGORA_LOG_INFO("Stats: Saving master timestamps to %s\n", filename.c_str());
-  FILE* fp_debug = std::fopen(filename.c_str(), "w");
+  AGORA_LOG_INFO("Stats: Saving master timestamps to %s\n",
+                 kStatsDataFilename.c_str());
+  FILE* fp_debug = std::fopen(kStatsDataFilename.c_str(), "w");
   RtAssert(fp_debug != nullptr,
            std::string("Open file failed ") + std::to_string(errno));
 
@@ -261,12 +268,11 @@ void Stats::SaveToFile() {
   std::fclose(fp_debug);
 
   if (kIsWorkerTimingEnabled == true) {
-    std::string filename_detailed =
-        cur_directory + "/data/timeresult_detail.txt";
     AGORA_LOG_INFO("Stats: Printing detailed results to %s\n",
-                   filename_detailed.c_str());
+                   kStatsDetailedDataFilename.c_str());
 
-    FILE* fp_debug_detailed = std::fopen(filename_detailed.c_str(), "w");
+    FILE* fp_debug_detailed =
+        std::fopen(kStatsDetailedDataFilename.c_str(), "w");
     RtAssert(fp_debug_detailed != nullptr,
              std::string("Open file failed ") + std::to_string(errno));
     // Print the header
