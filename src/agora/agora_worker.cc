@@ -1,12 +1,13 @@
 /**
- * @file worker.cc
- * @brief Implementation file for the main worker class
+ * @file agora_worker.cc
+ * @brief Implementation file for the main Agora worker class
  */
 
-#include "worker.h"
+#include "agora_worker.h"
 
-Worker::Worker(Config* cfg, Stats* stats, PhyStats* phy_stats,
-               MessageInfo* message, AgoraBuffer* buffer, FrameInfo* frame)
+AgoraWorker::AgoraWorker(Config* cfg, Stats* stats, PhyStats* phy_stats,
+                         MessageInfo* message, AgoraBuffer* buffer,
+                         FrameInfo* frame)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
       config_(cfg),
       stats_(stats),
@@ -17,18 +18,18 @@ Worker::Worker(Config* cfg, Stats* stats, PhyStats* phy_stats,
   CreateThreads();
 }
 
-Worker::~Worker() {
+AgoraWorker::~AgoraWorker() {
   for (auto& worker_thread : workers_) {
     AGORA_LOG_SYMBOL("Agora: Joining worker thread\n");
     worker_thread.join();
   }
 }
 
-void Worker::CreateThreads() {
+void AgoraWorker::CreateThreads() {
   AGORA_LOG_SYMBOL("Worker: creating %zu workers\n",
                    config_->WorkerThreadNum());
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
-    workers_.emplace_back(&Worker::WorkerThread, this, i);
+    workers_.emplace_back(&AgoraWorker::WorkerThread, this, i);
   }
 
   if (kEnableMatLog) {
@@ -38,7 +39,7 @@ void Worker::CreateThreads() {
   }
 }
 
-void Worker::WorkerThread(int tid) {
+void AgoraWorker::WorkerThread(int tid) {
   PinToCoreWithOffset(ThreadType::kWorker, base_worker_core_offset_, tid);
 
   /* Initialize operators */

@@ -936,8 +936,8 @@ void Agora::InitializeThreads() {
   }
 
   // Create workers
-  worker_ = std::make_unique<Worker>(cfg, stats_.get(), phy_stats_.get(),
-                                     &message_, buffer_.get(), &frame_);
+  worker_ = std::make_unique<AgoraWorker>(cfg, stats_.get(), phy_stats_.get(),
+                                          &message_, buffer_.get(), &frame_);
 
   AGORA_LOG_INFO(
       "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
