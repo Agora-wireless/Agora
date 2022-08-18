@@ -1,4 +1,4 @@
-//#if defined(USE_DPDK)
+#if defined(USE_DPDK)
 
 #include "dpdk_transport.h"
 
@@ -482,4 +482,4 @@ rte_mempool* DpdkTransport::CreateMempool(size_t num_ports,
   return mbuf_pool;
 }
 
-//#endif  // USE_DPDK
+#endif  // USE_DPDK
