@@ -928,8 +928,7 @@ void Agora::InitializeThreads() {
     const size_t mac_cpu_core =
         cfg->CoreOffset() + cfg->SocketThreadNum() + cfg->WorkerThreadNum() + 1;
     mac_thread_ = std::make_unique<MacThreadBaseStation>(
-        cfg, mac_cpu_core, buffer_->decoded_buffer_, &buffer_->dl_bits_buffer_,
-        &buffer_->dl_bits_buffer_status_, &mac_request_queue_,
+        cfg, mac_cpu_core, buffer_.get(), &mac_request_queue_,
         &mac_response_queue_);
 
     mac_std_thread_ =

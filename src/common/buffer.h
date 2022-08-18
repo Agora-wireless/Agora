@@ -25,7 +25,10 @@
 class AgoraBuffer {
  public:
   explicit AgoraBuffer(Config* const cfg)
-      : csi_buffer_(kFrameWnd, cfg->UeAntNum(),
+      : config_(cfg),
+        socket_buffer_size_(cfg->PacketLength() * cfg->BsAntNum() * kFrameWnd *
+                            cfg->Frame().NumTotalSyms()),
+        csi_buffer_(kFrameWnd, cfg->UeAntNum(),
                     cfg->BsAntNum() * cfg->OfdmDataNum()),
         ul_beam_matrix_(kFrameWnd, cfg->OfdmDataNum(),
                         cfg->BsAntNum() * cfg->UeAntNum()),
@@ -36,10 +39,7 @@ class AgoraBuffer {
         decoded_buffer_(
             kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),
             cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
-                Roundup<64>(cfg->NumBytesPerCb(Direction::kUplink))),
-        config_(cfg),
-        socket_buffer_size_(cfg->PacketLength() * cfg->BsAntNum() * kFrameWnd *
-                            cfg->Frame().NumTotalSyms()) {
+                Roundup<64>(cfg->NumBytesPerCb(Direction::kUplink))) {
     this->AllocateTables(cfg);
   }
 
@@ -187,28 +187,31 @@ class AgoraBuffer {
   AgoraBuffer(AgoraBuffer const&) = delete;
   AgoraBuffer& operator=(AgoraBuffer const&) = delete;
 
+  // TX RX Buffers
+  // Direct access is allowed for packetTXRX classes
+  Table<char> socket_buffer_;
+  char* dl_socket_buffer_;
+  Table<complex_float> calib_ul_buffer_;
+  Table<complex_float> calib_dl_buffer_;
+
+ private:
+  Config* const config_;
+  const size_t socket_buffer_size_;
+
   PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffer_;
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrix_;
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_beam_matrix_;
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffer_;
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> decoded_buffer_;
-  Table<char> socket_buffer_;
   Table<complex_float> data_buffer_;
   Table<complex_float> equal_buffer_;
   Table<complex_float> ue_spec_pilot_buffer_;
   Table<complex_float> dl_ifft_buffer_;
-  Table<complex_float> calib_ul_buffer_;
-  Table<complex_float> calib_dl_buffer_;
   Table<complex_float> calib_ul_msum_buffer_;
   Table<complex_float> calib_dl_msum_buffer_;
   Table<int8_t> dl_mod_bits_buffer_;
   Table<int8_t> dl_bits_buffer_;
   Table<int8_t> dl_bits_buffer_status_;
-  char* dl_socket_buffer_;
-
- private:
-  Config* const config_;
-  const size_t socket_buffer_size_;
 };
 
 struct SchedInfo {
