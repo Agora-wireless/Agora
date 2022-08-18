@@ -5,19 +5,14 @@
 #ifndef DOIFFT_H_
 #define DOIFFT_H_
 
-#include <armadillo>
-#include <iostream>
-#include <vector>
+#include <cstddef>
 
-#include "concurrentqueue.h"
+#include "buffer.h"
 #include "config.h"
 #include "doer.h"
-#include "gettime.h"
 #include "message.h"
 #include "mkl_dfti.h"
-#include "phy_stats.h"
 #include "stats.h"
-#include "symbols.h"
 
 class DoIFFT : public Doer {
  public:

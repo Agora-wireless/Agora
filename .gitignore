@@ -30,9 +30,6 @@ build/*
 *.sql
 *.sqlite
 tags
-data/timeresult.txt
-data/timeresult_detail.txt
-data/tx_result.txt
 out
 files/experiment/*
 

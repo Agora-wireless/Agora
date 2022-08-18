@@ -5,18 +5,16 @@
 #ifndef MESSAGE_H_
 #define MESSAGE_H_
 
+#include <array>
 #include <atomic>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
 #include <sstream>
-#include <vector>
+#include <string>
 
-#include "memory_manage.h"
 #include "ran_config.h"
 #include "symbols.h"
-
-/* boost is required for aligned memory allocation (for SIMD instructions) */
-#include <boost/align/aligned_allocator.hpp>
-
-#include "common_typedef_sdk.h"
 
 // A generic tag type for Agora tasks. The tag for a particular task will
 // have only a subset of the fields initialized.
@@ -267,7 +265,7 @@ struct MacPacketHeaderPacked {
   uint16_t ue_id_;
   uint16_t datalen_;  // length of payload in bytes or array data[]
   uint16_t crc_;      // 16 bits CRC over calculated for the data[] array
-#if ENABLE_RB_IND
+#if defined(ENABLE_RB_IND)
   RBIndicator rb_indicator_;  // RAN scheduling details for PHY
 #endif
 };

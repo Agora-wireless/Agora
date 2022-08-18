@@ -6,21 +6,13 @@
 #ifndef BUFFER_H_
 #define BUFFER_H_
 
-#include <unistd.h>
-
-#include <algorithm>
-#include <iostream>
-#include <memory>
-#include <queue>
-#include <system_error>
-#include <vector>
+#include <cstddef>
 
 #include "concurrentqueue.h"
 #include "config.h"
 #include "memory_manage.h"
-#include "message.h"
-#include "stats.h"
 #include "symbols.h"
+#include "utils.h"
 
 class AgoraBuffer {
  public:
