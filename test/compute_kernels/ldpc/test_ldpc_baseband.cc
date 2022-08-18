@@ -32,9 +32,10 @@ static constexpr float kSnrLevels[15] = {-5, -2.5, 0,  2.5,  5,  7.5,  10, 12.5,
                                          15, 17.5, 20, 22.5, 25, 27.5, 30};
 DEFINE_string(profile, "random",
               "The profile of the input user bytes (e.g., 'random', '123')");
-DEFINE_string(conf_file,
-              TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
-              "Agora config filename");
+DEFINE_string(
+    conf_file,
+    TOSTRING(PROJECT_DIRECTORY) "/files/config/ci/tddconfig-sim-ul.json",
+    "Agora config filename");
 
 int main(int argc, char* argv[]) {
   unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();

@@ -1,6 +1,6 @@
 {
   /* Tested with 21 bs radios and 2 ue radios */
-  "serial_file": "data/examples/topology-meb.json",
+  "serial_file": "files/topology/topology-meb.json",
   "cells": 1,
   "channel": "AB",
   "frequency": 3.5475e9,
