@@ -1,10 +1,10 @@
 /**
- * @file worker.h
- * @brief Declaration file for the main worker class
+ * @file agora_worker.h
+ * @brief Declaration file for the main Agora worker class
  */
 
-#ifndef WORKER_H_
-#define WORKER_H_
+#ifndef AGORA_WORKER_H_
+#define AGORA_WORKER_H_
 
 #include "buffer.h"
 #include "concurrent_queue_wrapper.h"
@@ -19,12 +19,12 @@
 #include "mat_logger.h"
 #include "phy_stats.h"
 
-class Worker {
+class AgoraWorker {
  public:
-  explicit Worker(Config* /*cfg*/, Stats* /*stats*/, PhyStats* /*phy_stats*/,
-                  MessageInfo* /*message*/, AgoraBuffer* /*agora_buffer*/,
-                  FrameInfo* /*frame*/);
-  ~Worker();
+  explicit AgoraWorker(Config* /*cfg*/, Stats* /*stats*/,
+                       PhyStats* /*phy_stats*/, MessageInfo* /*message*/,
+                       AgoraBuffer* /*agora_buffer*/, FrameInfo* /*frame*/);
+  ~AgoraWorker();
 
  private:
   void WorkerThread(int tid);
@@ -47,4 +47,4 @@ class Worker {
   std::array<std::shared_ptr<CsvLog::MatLogger>, CsvLog::kMatLogs> mat_loggers_;
 };
 
-#endif  // WORKER_H_
+#endif  // AGORA_WORKER_H_

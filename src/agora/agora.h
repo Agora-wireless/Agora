@@ -6,13 +6,13 @@
 #ifndef AGORA_H_
 #define AGORA_H_
 
+#include "agora_worker.h"
 #include "buffer.h"
 #include "concurrent_queue_wrapper.h"
 #include "mac_thread_basestation.h"
 #include "packet_txrx.h"
 #include "signal_handler.h"
 #include "utils.h"
-#include "worker.h"
 
 class Agora {
  public:
@@ -104,7 +104,7 @@ class Agora {
   size_t fft_created_count_;
   size_t max_equaled_frame_ = SIZE_MAX;
   std::unique_ptr<PacketTxRx> packet_tx_rx_;
-  std::unique_ptr<Worker> worker_;
+  std::unique_ptr<AgoraWorker> worker_;
 
   // The thread running MAC layer functions
   std::unique_ptr<MacThreadBaseStation> mac_thread_;
