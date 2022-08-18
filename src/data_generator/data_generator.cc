@@ -37,6 +37,7 @@ static constexpr size_t kSounderDataFrameNum = 1;
 ///Output files
 static const std::string kUlDataPrefix = "orig_ul_data_";
 static const std::string kUlLdpcDataPrefix = "LDPC_orig_ul_data_";
+static const std::string kUlSounderDataPrefix = "ul_data_b_";
 static const std::string kDlDataPrefix = "orig_dl_data_";
 static const std::string kDlLdpcDataPrefix = "LDPC_orig_dl_data_";
 static const std::string kRxLdpcPrefix = "LDPC_rx_data_";
@@ -210,7 +211,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       }
       for (size_t i = 0; i < this->cfg_->UeNum(); i++) {
         const std::string filename_input =
-            directory + "/data/ul_data_b_" +
+            directory + kUlSounderDataPrefix +
             this->cfg_->Modulation(Direction::kUplink) + "_" +
             std::to_string(this->cfg_->OfdmDataNum()) + "_" +
             std::to_string(this->cfg_->OfdmCaNum()) + "_" +
