@@ -12,17 +12,14 @@
 #ifndef COMMSLIB_H_
 #define COMMSLIB_H_
 
-#include <immintrin.h>
-#include <unistd.h>
-
-#include <algorithm>
+#include <cmath>
 #include <complex>
-#include <fstream>
-#include <iostream>
+#include <map>
+#include <string>
 #include <vector>
 
+#include "avxintrin.h"
 #include "memory_manage.h"
-#include "message.h"
 #include "mkl_dfti.h"
 
 static const std::map<std::string, size_t> kBeamformingStr{

@@ -5,34 +5,20 @@
 #ifndef DOBEAMWEIGHTS_H_
 #define DOBEAMWEIGHTS_H_
 
-#include <armadillo>
-#include <iostream>
+#include <memory>
 
-#include "concurrentqueue.h"
-#include "config.h"
-#include "doer.h"
-#include "gettime.h"
-#include "mat_logger.h"
+#include "armadillo"
+#include "buffer.h"
 #include "message.h"
 #include "phy_stats.h"
 #include "stats.h"
-#include "symbols.h"
-#include "utils.h"
 
 class DoBeamWeights : public Doer {
  public:
-  DoBeamWeights(
-      Config* in_config, int tid, AgoraBuffer* buffer,
-      // PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
-      // Table<complex_float>& calib_dl_buffer,
-      // Table<complex_float>& calib_ul_buffer,
-      // Table<complex_float>& calib_dl_msum_buffer,
-      // Table<complex_float>& calib_ul_msum_buffer,
-      // PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_,
-      // PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_,
-      PhyStats* in_phy_stats, Stats* stats_manager,
-      std::shared_ptr<CsvLog::MatLogger> dl_csi_logger = {},
-      std::shared_ptr<CsvLog::MatLogger> dl_beam_logger = {});
+  DoBeamWeights(Config* in_config, int tid, AgoraBuffer* buffer,
+                PhyStats* in_phy_stats, Stats* stats_manager,
+                std::shared_ptr<CsvLog::MatLogger> dl_csi_logger = {},
+                std::shared_ptr<CsvLog::MatLogger> dl_beam_logger = {});
   ~DoBeamWeights() override;
 
   /**

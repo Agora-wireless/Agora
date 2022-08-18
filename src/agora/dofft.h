@@ -5,15 +5,12 @@
 #ifndef DOFFT_H_
 #define DOFFT_H_
 
-#include <armadillo>
-#include <iostream>
-#include <vector>
+#include <complex>
+#include <cstddef>
 
 #include "buffer.h"
-#include "concurrentqueue.h"
 #include "config.h"
 #include "doer.h"
-#include "gettime.h"
 #include "message.h"
 #include "mkl_dfti.h"
 #include "phy_stats.h"
