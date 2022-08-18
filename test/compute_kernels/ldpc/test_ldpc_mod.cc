@@ -18,6 +18,7 @@
 #include "comms-lib.h"
 #include "config.h"
 #include "data_generator.h"
+#include "datatype_conversion.h"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.h"
@@ -33,9 +34,10 @@ static constexpr float kSnrLevels[15] = {-5, -2.5, 0,  2.5,  5,  7.5,  10, 12.5,
                                          15, 17.5, 20, 22.5, 25, 27.5, 30};
 DEFINE_string(profile, "random",
               "The profile of the input user bytes (e.g., 'random', '123')");
-DEFINE_string(conf_file,
-              TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
-              "Agora config filename");
+DEFINE_string(
+    conf_file,
+    TOSTRING(PROJECT_DIRECTORY) "/files/config/ci/tddconfig-sim-ul.json",
+    "Agora config filename");
 
 float RandFloat(float min, float max) {
   return ((float(rand()) / float(RAND_MAX)) * (max - min)) + min;
@@ -46,8 +48,8 @@ float RandFloatFromShort(float min, float max) {
       ((static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) *
        (max - min)) +
       min;
-  auto rand_val_ushort = static_cast<short>(rand_val * 32768);
-  rand_val = (float)rand_val_ushort / 32768;
+  auto rand_val_ushort = static_cast<short>(rand_val * kShrtFltConvFactor);
+  rand_val = (float)rand_val_ushort / kShrtFltConvFactor;
   return rand_val;
 }
 

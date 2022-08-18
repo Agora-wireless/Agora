@@ -99,7 +99,7 @@ void MasterToWorkerDynamicWorker(
 /// when BsAntNum() varies in runtime
 TEST(TestZF, VaryingConfig) {
   static constexpr size_t kNumIters = 10000;
-  auto cfg = std::make_unique<Config>("data/tddconfig-sim-ul.json");
+  auto cfg = std::make_unique<Config>("files/config/ci/tddconfig-sim-ul.json");
   cfg->GenData();
 
   auto event_queue = moodycamel::ConcurrentQueue<EventData>(2 * kNumIters);

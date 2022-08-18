@@ -18,11 +18,8 @@
 #include "doifft_client.h"
 #include "message.h"
 #include "mkl_dfti.h"
+#include "simd_types.h"
 #include "stats.h"
-
-static const size_t kVectorAlignment = 64;
-using myVec = std::vector<complex_float, boost::alignment::aligned_allocator<
-                                             complex_float, kVectorAlignment>>;
 
 class UeWorker {
  public:
@@ -35,8 +32,8 @@ class UeWorker {
       Table<int8_t>& encoded_buffer, Table<complex_float>& modul_buffer,
       Table<complex_float>& ifft_buffer, char* const tx_buffer,
       Table<char>& rx_buffer, Table<complex_float>& csi_buffer,
-      std::vector<myVec>& equal_buffer, std::vector<size_t>& non_null_sc_ind,
-      Table<complex_float>& fft_buffer,
+      std::vector<SimdAlignCxFltVector>& equal_buffer,
+      std::vector<size_t>& non_null_sc_ind, Table<complex_float>& fft_buffer,
       PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer,
       PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
       std::vector<std::vector<std::complex<float>>>& ue_pilot_vec);
@@ -147,7 +144,7 @@ class UeWorker {
   // Downlink
   Table<char>& rx_buffer_;
   Table<complex_float>& csi_buffer_;
-  std::vector<myVec>& equal_buffer_;
+  std::vector<SimdAlignCxFltVector>& equal_buffer_;
   std::vector<size_t>& non_null_sc_ind_;
   Table<complex_float>& fft_buffer_;
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer_;

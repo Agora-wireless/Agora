@@ -12,6 +12,8 @@
 
 namespace Agora_recorder {
 
+static const std::string kOutputFilePath = "files/experiment/";
+
 class RecorderWorker {
  public:
   enum RecorderWorkerTypes { kRecorderWorkerMultiFile, kRecorderWorkerHdf5 };

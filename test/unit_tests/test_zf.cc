@@ -10,7 +10,7 @@
 /// Measure performance of zeroforcing
 TEST(TestZF, Perf) {
   static constexpr size_t kNumIters = 10000;
-  auto cfg = std::make_unique<Config>("data/tddconfig-sim-ul.json");
+  auto cfg = std::make_unique<Config>("files/config/ci/tddconfig-sim-ul.json");
   cfg->GenData();
 
   int tid = 0;
