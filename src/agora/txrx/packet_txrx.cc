@@ -10,6 +10,7 @@
 
 static constexpr size_t kNotifyWaitMs = 100;
 static constexpr size_t kWorkerStartWaitMs = 10;
+static constexpr size_t kWorkerStartWaitMsMax = 5000;
 
 PacketTxRx::PacketTxRx(AgoraTxRx::TxRxTypes type, Config* const cfg,
                        size_t core_offset,
@@ -147,9 +148,15 @@ bool PacketTxRx::StartTxRx(Table<complex_float>& calib_dl_buffer,
                   worker_threads_.size());
   for (auto& worker : worker_threads_) {
     worker->Start();
+    size_t waited_ms = 0;
     while (worker->Started() == false) {
       std::this_thread::sleep_for(
           std::chrono::milliseconds(kWorkerStartWaitMs));
+      waited_ms += kWorkerStartWaitMs;
+      if (waited_ms >= kWorkerStartWaitMsMax) {
+        throw std::runtime_error(
+            "TxRx worker did not start in reasonable time");
+      }
     }
     AGORA_LOG_TRACE("PacketTxRx: worker %zu has started \n", worker->Id());
   }

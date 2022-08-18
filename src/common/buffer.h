@@ -244,11 +244,11 @@ using fft_req_tag_t = rx_tag_t;
 #pragma pack(push, 1)
 struct MacPacketHeaderPacked {
  public:
-  inline const uint16_t &Frame() const { return frame_id_; }
-  inline const uint16_t &Symbol() const { return symbol_id_; }
-  inline const uint16_t &Ue() const { return ue_id_; }
-  inline const uint16_t &Crc() const { return crc_; }
-  inline const uint16_t &PayloadLength() const { return datalen_; }
+  inline uint16_t Frame() const { return frame_id_; }
+  inline uint16_t Symbol() const { return symbol_id_; }
+  inline uint16_t Ue() const { return ue_id_; }
+  inline uint16_t Crc() const { return crc_; }
+  inline uint16_t PayloadLength() const { return datalen_; }
 
   // Modifiers
   inline void Set(const uint16_t &f, const uint16_t &s, const uint16_t &u,
@@ -276,13 +276,11 @@ struct MacPacketPacked {
  public:
   static constexpr size_t kHeaderSize = sizeof(MacPacketHeaderPacked);
 
-  inline const uint16_t &Frame() const { return header_.Frame(); }
-  inline const uint16_t &Symbol() const { return header_.Symbol(); }
-  inline const uint16_t &Ue() const { return header_.Ue(); }
-  inline const uint16_t &Crc() const { return header_.Crc(); }
-  inline const uint16_t &PayloadLength() const {
-    return header_.PayloadLength();
-  }
+  inline uint16_t Frame() const { return header_.Frame(); }
+  inline uint16_t Symbol() const { return header_.Symbol(); }
+  inline uint16_t Ue() const { return header_.Ue(); }
+  inline uint16_t Crc() const { return header_.Crc(); }
+  inline uint16_t PayloadLength() const { return header_.PayloadLength(); }
   inline const unsigned char *Data() const { return data_; };
 
   // Modifiers
