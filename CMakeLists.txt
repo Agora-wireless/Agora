@@ -402,6 +402,7 @@ add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 set(CLIENT_SOURCES
   src/client/doifft_client.cc
   src/client/dodecode_client.cc
+  src/client/doencode_client.cc
   src/client/client_radio.cc
   src/client/ue_worker.cc
   src/client/phy-ue.cc

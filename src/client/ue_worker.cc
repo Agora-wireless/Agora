@@ -92,7 +92,7 @@ void UeWorker::TaskThread(size_t core_offset) {
   AGORA_LOG_INFO("UeWorker[%zu]: started\n", tid_);
   PinToCoreWithOffset(ThreadType::kWorker, core_offset, tid_);
 
-  auto encoder = std::make_unique<DoEncode>(
+  auto encoder = std::make_unique<DoEncodeClient>(
       &config_, (int)tid_, Direction::kUplink,
       (kEnableMac == true) ? ul_bits_buffer_ : config_.UlBits(),
       (kEnableMac == true) ? kFrameWnd : 1, encoded_buffer_, &stats_);
@@ -517,7 +517,7 @@ void UeWorker::DoDecodeUe(DoDecodeClient* decoder, size_t tag) {
 //////////////////////////////////////////////////////////
 //                   UPLINK Operations                //
 //////////////////////////////////////////////////////////
-void UeWorker::DoEncodeUe(DoEncode* encoder, size_t tag) {
+void UeWorker::DoEncodeUe(DoEncodeClient* encoder, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ant_id = gen_tag_t(tag).ue_id_;

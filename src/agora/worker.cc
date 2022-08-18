@@ -43,40 +43,24 @@ void Worker::WorkerThread(int tid) {
 
   /* Initialize operators */
   auto compute_zf = std::make_unique<DoBeamWeights>(
-      this->config_, tid, buffer_->csi_buffer_, buffer_->calib_dl_buffer_,
-      buffer_->calib_ul_buffer_, buffer_->calib_dl_msum_buffer_,
-      buffer_->calib_ul_msum_buffer_, buffer_->ul_beam_matrix_,
-      buffer_->dl_beam_matrix_, phy_stats_, stats_,
+      this->config_, tid, buffer_, phy_stats_, stats_,
       mat_loggers_.at(CsvLog::kDLCSI), mat_loggers_.at(CsvLog::kDlBeam));
-
-  auto compute_fft = std::make_unique<DoFFT>(
-      config_, tid, buffer_->data_buffer_, buffer_->csi_buffer_,
-      buffer_->calib_dl_buffer_, buffer_->calib_ul_buffer_, phy_stats_, stats_);
+  auto compute_fft =
+      std::make_unique<DoFFT>(config_, tid, buffer_, phy_stats_, stats_);
 
   // // Downlink workers
-  auto compute_ifft =
-      std::make_unique<DoIFFT>(config_, tid, buffer_->dl_ifft_buffer_,
-                               buffer_->dl_socket_buffer_, stats_);
-
-  auto compute_precode = std::make_unique<DoPrecode>(
-      config_, tid, buffer_->dl_beam_matrix_, buffer_->dl_ifft_buffer_,
-      buffer_->dl_mod_bits_buffer_, stats_);
-
-  auto compute_encoding = std::make_unique<DoEncode>(
-      config_, tid, Direction::kDownlink,
-      (kEnableMac == true) ? buffer_->dl_bits_buffer_ : config_->DlBits(),
-      (kEnableMac == true) ? kFrameWnd : 1, buffer_->dl_mod_bits_buffer_,
-      stats_);
+  auto compute_ifft = std::make_unique<DoIFFT>(config_, tid, buffer_, stats_);
+  auto compute_precode =
+      std::make_unique<DoPrecode>(config_, tid, buffer_, stats_);
+  auto compute_encoding =
+      std::make_unique<DoEncode>(config_, tid, Direction::kDownlink, buffer_,
+                                 (kEnableMac == true) ? kFrameWnd : 1, stats_);
 
   // Uplink workers
   auto compute_decoding =
-      std::make_unique<DoDecode>(config_, tid, buffer_->demod_buffer_,
-                                 buffer_->decoded_buffer_, phy_stats_, stats_);
-
-  auto compute_demul = std::make_unique<DoDemul>(
-      config_, tid, buffer_->data_buffer_, buffer_->ul_beam_matrix_,
-      buffer_->ue_spec_pilot_buffer_, buffer_->equal_buffer_,
-      buffer_->demod_buffer_, phy_stats_, stats_);
+      std::make_unique<DoDecode>(config_, tid, buffer_, phy_stats_, stats_);
+  auto compute_demul =
+      std::make_unique<DoDemul>(config_, tid, buffer_, phy_stats_, stats_);
 
   std::vector<Doer*> computers_vec;
   std::vector<EventType> events_vec;
