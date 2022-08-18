@@ -5,6 +5,8 @@
 
 #include "agora_worker.h"
 
+#include "logger.h"
+
 AgoraWorker::AgoraWorker(Config* cfg, Stats* stats, PhyStats* phy_stats,
                          MessageInfo* message, AgoraBuffer* buffer,
                          FrameInfo* frame)

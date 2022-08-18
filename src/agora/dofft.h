@@ -9,6 +9,7 @@
 #include <cstddef>
 
 #include "buffer.h"
+#include "common_typedef_sdk.h"
 #include "config.h"
 #include "doer.h"
 #include "message.h"

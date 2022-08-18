@@ -5,8 +5,12 @@
  */
 #include "dobeamweights.h"
 
+#include "comms-lib.h"
 #include "concurrent_queue_wrapper.h"
 #include "doer.h"
+#include "gettime.h"
+#include "logger.h"
+#include "message.h"
 
 static constexpr bool kUseSIMDGather = true;
 // Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.

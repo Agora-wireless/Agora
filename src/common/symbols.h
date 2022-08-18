@@ -25,7 +25,7 @@ static constexpr size_t kFrameWnd = 40;
 #if __INTEL_MKL__ >= 2020 || (__INTEL_MKL__ == 2019 && __INTEL_MKL_UPDATE__ > 3)
 #define USE_MKL_JIT (1)
 #else
-#define USE_MKL_JIT (0)
+#undef USE_MKL_JIT
 #endif
 
 #define ENABLE_RB_IND (0)

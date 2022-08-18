@@ -13,7 +13,11 @@
 #include <filesystem>
 #include <utility>
 
+#include "comms-lib.h"
+#include "gettime.h"
 #include "logger.h"
+#include "message.h"
+#include "modulation.h"
 #include "scrambler.h"
 #include "utils_ldpc.h"
 

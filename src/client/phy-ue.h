@@ -12,6 +12,7 @@
 #include <thread>
 #include <vector>
 
+#include "common_typedef_sdk.h"
 #include "comms-lib.h"
 #include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"
