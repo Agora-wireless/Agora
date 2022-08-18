@@ -54,16 +54,16 @@ Agora is compatable with and accelerated by the DPDK library.
      Most DPDK installations will require you to run under sudo permissions. 
    * To generate data file, first return to the base directory (`cd ..`), then run
    <pre>
-   $ ./build/data_generator --conf_file data/tddconfig-sim-ul.json
+   $ ./build/data_generator --conf_file files/config/ci/tddconfig-sim-ul.json
    </pre>
    * To start Agora with uplink configuration, on one machine, run 
    <pre>
-   $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/agora --conf_file data/tddconfig-sim-ul.json
+   $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/agora --conf_file files/config/ci/tddconfig-sim-ul.json
    </pre>
     
    * To start the emulated RRU with uplink configuration, on another machine, run
    <pre>
-   $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/sender --num_threads=2 --core_offset=1 --frame_duration=5000 --enable_slow_start=1 --conf_file=data/tddconfig-sim-ul.json --server_mac_addr=00:00:00:00:00:00
+   $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/sender --num_threads=2 --core_offset=1 --frame_duration=5000 --enable_slow_start=1 --conf_file=files/config/ci/tddconfig-sim-ul.json --server_mac_addr=00:00:00:00:00:00
    </pre>
    Change the MAC address in `--server_mac_addr=` to the MAC address of the NIC used by Agora. 
    

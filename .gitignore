@@ -30,8 +30,7 @@ build/*
 *.sql
 *.sqlite
 tags
-data/timeresult.txt
-data/timeresult_detail.txt
+files/experiment/*
 
 # OS generated files #
 ######################

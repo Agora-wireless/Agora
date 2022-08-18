@@ -1,4 +1,4 @@
-fid = fopen('../data/timeresult.txt');
+fid = fopen('../files/experiment/timeresult.txt');
 
 % 1. Pilot RX by socket threads (= reference time), 
 % 2. kPilotRX, 3. kProcessingStarted, 4. kPilotAllRX, 5. kFFTDone, 6. kZFDone,
