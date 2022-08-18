@@ -8,6 +8,7 @@
 #define PACKETTXRX_CLIENT_RADIO_H_
 
 #include "client_radio.h"
+#include "common_typedef_sdk.h"
 #include "packet_txrx.h"
 
 /**

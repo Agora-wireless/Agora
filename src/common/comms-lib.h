@@ -18,7 +18,8 @@
 #include <string>
 #include <vector>
 
-#include "avxintrin.h"
+#include "common_typedef_sdk.h"
+#include "immintrin.h"
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 

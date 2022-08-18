@@ -8,7 +8,12 @@
 #include <memory>
 #include <utility>
 
+#include "comms-lib.h"
 #include "datatype_conversion.h"
+#include "gettime.h"
+#include "logger.h"
+#include "message.h"
+#include "modulation.h"
 #include "phy_ldpc_decoder_5gnr.h"
 #include "phy_stats.h"
 #include "scrambler.h"

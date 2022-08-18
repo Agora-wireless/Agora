@@ -9,6 +9,9 @@
 
 #include "armadillo"
 #include "buffer.h"
+#include "common_typedef_sdk.h"
+#include "doer.h"
+#include "mat_logger.h"
 #include "message.h"
 #include "phy_stats.h"
 #include "stats.h"

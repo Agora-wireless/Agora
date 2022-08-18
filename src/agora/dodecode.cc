@@ -6,6 +6,8 @@
 #include "dodecode.h"
 
 #include "concurrent_queue_wrapper.h"
+#include "gettime.h"
+#include "message.h"
 #include "phy_ldpc_decoder_5gnr.h"
 
 static constexpr bool kPrintLLRData = false;

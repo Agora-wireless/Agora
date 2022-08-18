@@ -8,6 +8,9 @@
 
 #include "concurrent_queue_wrapper.h"
 #include "encoder.h"
+#include "gettime.h"
+#include "logger.h"
+#include "message.h"
 #include "phy_ldpc_decoder_5gnr.h"
 
 static constexpr bool kPrintEncodedData = false;

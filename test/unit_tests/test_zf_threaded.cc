@@ -7,6 +7,7 @@
 #include "config.h"
 #include "dobeamweights.h"
 #include "gettime.h"
+#include "message.h"
 #include "utils.h"
 
 static constexpr size_t kNumWorkers = 14;

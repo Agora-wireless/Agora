@@ -8,9 +8,11 @@
 
 #include <cstddef>
 
+#include "common_typedef_sdk.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "memory_manage.h"
+#include "message.h"
 #include "symbols.h"
 #include "utils.h"
 

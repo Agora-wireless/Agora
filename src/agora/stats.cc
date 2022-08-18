@@ -6,6 +6,7 @@
 
 #include <typeinfo>
 
+#include "gettime.h"
 #include "logger.h"
 
 static const std::string kProjectDir = TOSTRING(PROJECT_DIRECTORY);

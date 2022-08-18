@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 
+#include "common_typedef_sdk.h"
 #include "framestats.h"
 #include "ldpc_config.h"
 #include "memory_manage.h"

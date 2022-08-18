@@ -13,6 +13,7 @@
 #include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"
+#include "message.h"
 #include "symbols.h"
 
 static constexpr size_t kMaxStatBreakdown = 4;

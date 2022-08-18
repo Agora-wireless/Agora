@@ -7,6 +7,7 @@
 #define MEMORY_MANAGE_H_
 
 #include <array>
+#include <cassert>
 #include <complex>
 #include <cstddef>
 #include <cstdlib>

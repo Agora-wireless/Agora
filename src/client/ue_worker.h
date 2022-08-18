@@ -10,6 +10,7 @@
 #include <thread>
 #include <vector>
 
+#include "common_typedef_sdk.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "csv_logger.h"

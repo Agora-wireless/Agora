@@ -11,8 +11,13 @@
 #if defined(USE_DPDK)
 #include "packet_txrx_dpdk.h"
 #endif
+#include "gettime.h"
+#include "logger.h"
+#include "message.h"
+#include "modulation.h"
 #include "packet_txrx_radio.h"
 #include "packet_txrx_sim.h"
+#include "signal_handler.h"
 
 static const bool kDebugPrintPacketsFromMac = false;
 static const bool kDebugDeferral = true;

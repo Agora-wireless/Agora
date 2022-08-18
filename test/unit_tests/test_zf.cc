@@ -5,6 +5,7 @@
 #include "config.h"
 #include "dobeamweights.h"
 #include "gettime.h"
+#include "message.h"
 #include "utils.h"
 
 /// Measure performance of zeroforcing
