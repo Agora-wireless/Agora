@@ -1,5 +1,5 @@
 {
-  "serial_file": "data/examples/topology-vulture-ul.json",
+  "serial_file": "files/topology/topology-vulture-ul.json",
   "cells": 1,
   "calibrate_digital": false,
   "calibrate_analog": false,

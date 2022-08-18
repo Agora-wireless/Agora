@@ -98,7 +98,7 @@ class MainWindow(QtGui.QMainWindow):
 
 if __name__ == '__main__':
 
-    filename = "data/bs-ul-hw.json"
+    filename = "files/experiment/bs-ul-hw.json"
     #cfg = Config(filename)
     nusers = 4
     data_len = 48

@@ -1,4 +1,4 @@
-fid = fopen('../data/timeresult_detail.txt');
+fid = fopen('../files/experiment/timeresult_detail.txt');
 % fid = fopen('result/timeresult_bigstation_newsender_smp.txt');
 % fid = fopen('result/timeresult_bigstation3.txt');
 %  fid = fopen('result_newsender/timeresult_25core.txt');

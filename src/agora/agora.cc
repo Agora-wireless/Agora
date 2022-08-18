@@ -19,6 +19,13 @@ static const bool kDebugDeferral = true;
 static const size_t kDefaultMessageQueueSize = 512;
 static const size_t kDefaultWorkerQueueSize = 256;
 
+static const std::string kProjectDirectory = TOSTRING(PROJECT_DIRECTORY);
+static const std::string kOutputFilepath =
+    kProjectDirectory + "/files/experiment/";
+static const std::string kTxDataFilename = kOutputFilepath + "tx_data.bin";
+static const std::string kDecodeDataFilename =
+    kOutputFilepath + "decode_data.bin";
+
 Agora::Agora(Config* const cfg)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
       config_(cfg),
@@ -35,9 +42,8 @@ Agora::Agora(Config* const cfg)
                           Roundup<64>(cfg->NumBytesPerCb(Direction::kUplink))),
       dl_beam_matrices_(kFrameWnd, cfg->OfdmDataNum(),
                         cfg->UeAntNum() * cfg->BsAntNum()) {
-  std::string directory = TOSTRING(PROJECT_DIRECTORY);
   AGORA_LOG_INFO("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
-                 directory.c_str(), cfg->FreqGhz());
+                 kProjectDirectory.c_str(), cfg->FreqGhz());
 
   PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0,
                       kEnableCoreReuse, false /* quiet */);
@@ -1623,10 +1629,8 @@ void Agora::SaveDecodeDataToFile(int frame_id) {
       cfg->NumBytesPerCb(Direction::kUplink) *
       cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
 
-  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string filename = cur_directory + "/data/decode_data.bin";
-  AGORA_LOG_INFO("Saving decode data to %s\n", filename.c_str());
-  FILE* fp = std::fopen(filename.c_str(), "wb");
+  AGORA_LOG_INFO("Saving decode data to %s\n", kDecodeDataFilename.c_str());
+  FILE* fp = std::fopen(kDecodeDataFilename.c_str(), "wb");
 
   for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
     for (size_t j = 0; j < cfg->UeAntNum(); j++) {
@@ -1639,11 +1643,9 @@ void Agora::SaveDecodeDataToFile(int frame_id) {
 
 void Agora::SaveTxDataToFile(UNUSED int frame_id) {
   const auto& cfg = config_;
-
-  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string filename = cur_directory + "/data/tx_data.bin";
-  AGORA_LOG_INFO("Saving Frame %d TX data to %s\n", frame_id, filename.c_str());
-  FILE* fp = std::fopen(filename.c_str(), "wb");
+  AGORA_LOG_INFO("Saving Frame %d TX data to %s\n", frame_id,
+                 kTxDataFilename.c_str());
+  FILE* fp = std::fopen(kTxDataFilename.c_str(), "wb");
 
   for (size_t i = 0; i < cfg->Frame().NumDLSyms(); i++) {
     size_t total_data_symbol_id = cfg->GetTotalDataSymbolIdxDl(frame_id, i);
