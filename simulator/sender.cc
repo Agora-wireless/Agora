@@ -133,7 +133,7 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
 
     ret = rte_eth_macaddr_get(port_ids_.at(i), &sender_mac_addr_[i]);
     RtAssert(ret == 0, "Cannot get MAC address of the port");
-    std::printf("Number of DPDK cores: %d\n", rte_lcore_count());
+    AGORA_LOG_INFO("Number of DPDK cores: %d\n", rte_lcore_count());
 
     printf("Sending IP(MAC): From %s To %s(%s)\n", cfg->BsRruAddr().c_str(),
            cfg->BsServerAddr().c_str(), ether_ntoa(parsed_mac));
@@ -245,9 +245,10 @@ void* Sender::MasterThread(int /*unused*/) {
       packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_]++;
 
       if (kDebugPrintSender == true) {
-        std::printf("Sender: Checking symbol %d : %zu : %zu\n", ctag.symbol_id_,
-                    comp_frame_slot,
-                    packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_]);
+        AGORA_LOG_INFO(
+            "Sender: Checking symbol %d : %zu : %zu\n", ctag.symbol_id_,
+            comp_frame_slot,
+            packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_]);
       }
       // Check to see if the current symbol is finished
       if (packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_] ==
@@ -258,7 +259,7 @@ void* Sender::MasterThread(int /*unused*/) {
         size_t next_symbol_id = FindNextSymbol((ctag.symbol_id_ + 1));
         unsigned symbol_delay = next_symbol_id - ctag.symbol_id_;
         if (kDebugPrintSender) {
-          std::printf(
+          AGORA_LOG_INFO(
               "Sender: Finishing symbol %d, Next Symbol: %zu, Total Symbols: "
               "%zu, delaying %d\n",
               ctag.symbol_id_, next_symbol_id, cfg_->Frame().NumTotalSyms(),
@@ -281,7 +282,7 @@ void* Sender::MasterThread(int /*unused*/) {
           next_symbol_id = FindNextSymbol(0);
           if ((kDebugSenderReceiver == true) ||
               (kDebugPrintPerFrameDone == true)) {
-            std::printf(
+            AGORA_LOG_INFO(
                 "Sender: Tx frame %d in %.2f ms, next frame %zu, start symbol "
                 "%zu\n",
                 ctag.frame_id_, (frame_end_us - frame_start_us) / 1000.0,
@@ -314,7 +315,7 @@ void* Sender::MasterThread(int /*unused*/) {
       }
     }  // end (ret > 0)
   }
-  std::printf("Sender main thread exit\n");
+  AGORA_LOG_INFO("Sender main thread exit\n");
   WriteStatsToFile(cfg_->FramesToTest());
   return nullptr;
 }
@@ -361,8 +362,8 @@ void* Sender::WorkerThread(int tid) {
 #if defined(USE_DPDK)
   uint16_t port_id = port_ids_.at(tid % cfg_->DpdkNumPorts());
   const size_t queue_id = tid / cfg_->DpdkNumPorts();
-  std::printf("Sender worker[%d]: using port %u, queue %zu\n", tid, port_id,
-              queue_id);
+  AGORA_LOG_INFO("Sender worker[%d]: using port %u, queue %zu\n", tid, port_id,
+                 queue_id);
   rte_mbuf* tx_mbufs[kDequeueBulkSize];
 #else
   // Make a client / socket for each interface (simular to radio behavior)
@@ -414,7 +415,9 @@ void* Sender::WorkerThread(int tid) {
         tx_mbufs[tag_id] = DpdkTransport::AllocUdp(
             mbuf_pool_, sender_mac_addr_[port_id], server_mac_addr_[port_id],
             bs_rru_addr_, bs_server_addr_, this->cfg_->BsRruPort() + tid,
-            this->cfg_->BsServerPort() + tid, this->cfg_->PacketLength());
+            this->cfg_->BsServerPort() + tid, this->cfg_->PacketLength(),
+            (uint16_t(tag.frame_id_ & 0xffff) << 8) |
+                uint16_t(tag.symbol_id_ & 0xffff));
         pkt = reinterpret_cast<Packet*>(
             rte_pktmbuf_mtod(tx_mbufs[tag_id], uint8_t*) + kPayloadOffset);
 #else
@@ -422,7 +425,7 @@ void* Sender::WorkerThread(int tid) {
 #endif
 
         if ((kDebugPrintSender == true)) {
-          std::printf(
+          AGORA_LOG_INFO(
               "Sender worker [%d]: processing frame %d symbol %d, type %d\n",
               tid, tag.frame_id_, tag.symbol_id_,
               static_cast<int>(cfg_->GetSymbolType(tag.symbol_id_)));
@@ -451,8 +454,8 @@ void* Sender::WorkerThread(int tid) {
                    cfg_->PacketLength());
 #endif
 
-        if (kDebugSenderReceiver == true) {
-          std::printf(
+        if (kDebugSenderReceiver) {
+          AGORA_LOG_INFO(
               "Thread %d (tag = %s) transmit frame %d, symbol %d, ant %d, size "
               "%zu, dest port %zu, TX time: %.3f us\n",
               tid, gen_tag_t(tag).ToString().c_str(), pkt->frame_id_,
@@ -469,10 +472,11 @@ void* Sender::WorkerThread(int tid) {
           const double byte_len = cfg_->PacketLength() * ant_num_this_thread *
                                   max_symbol_id * 1000.f;
           const double diff = end - begin;
-          std::printf("Thread %zu send %zu frames in %f secs, tput %f Mbps\n",
-                      (size_t)tid,
-                      total_tx_packets / (ant_num_this_thread * max_symbol_id),
-                      diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
+          AGORA_LOG_INFO(
+              "Thread %zu send %zu frames in %f secs, tput %f Mbps\n",
+              (size_t)tid,
+              total_tx_packets / (ant_num_this_thread * max_symbol_id),
+              diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
           begin = GetTime::GetTimeUs();
           total_tx_packets_rolling = 0;
         }
@@ -485,12 +489,13 @@ void* Sender::WorkerThread(int tid) {
       }
 
 #if defined(USE_DPDK)
-      std::printf("Thread %d rte_eth_tx_burst(), queue %zu num_tags: %zu\n",
-                  tid, queue_id, num_tags);
-      size_t nb_tx_new =
+      //1 queue id oer worker?  What if a worker will need to handle multiple tx queues?
+      AGORA_LOG_INFO("Thread %d rte_eth_tx_burst(), queue %zu num_tags: %zu\n",
+                     tid, queue_id, num_tags);
+      const size_t nb_tx_new =
           rte_eth_tx_burst(port_id, queue_id, tx_mbufs, num_tags);
       if (unlikely(nb_tx_new != num_tags)) {
-        std::printf(
+        AGORA_LOG_INFO(
             "Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, "
             "num_tags: %zu\n",
             tid, nb_tx_new, num_tags);
@@ -572,7 +577,8 @@ void Sender::WriteStatsToFile(size_t tx_frame_count) const {
   const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   const std::string filename =
       cur_directory + "/files/experiment/tx_result.txt";
-  std::printf("Printing sender results to file \"%s\"...\n", filename.c_str());
+  AGORA_LOG_INFO("Printing sender results to file \"%s\"...\n",
+                 filename.c_str());
   FILE* fp_debug = std::fopen(filename.c_str(), "w");
   RtAssert(fp_debug != nullptr, "Failed to open stats file");
   for (size_t i = 0; i < tx_frame_count; i++) {

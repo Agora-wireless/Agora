@@ -74,13 +74,13 @@ int DpdkTransport::NicInit(uint16_t port, rte_mempool* mbuf_pool,
   // 1 == enable
   // This will make dpdk follow the flow rules to deliver packets to the application
   // Allows the application to not have to filter unnecessary traffic
-  //rte_flow_error flow_error;
-  //int en_isolate = rte_flow_isolate(port, 1, &flow_error);
-  //if (en_isolate != 0) {
-  //  std::printf("Flow cannot be isolated %d message: %s\n", flow_error.type,
-  //              flow_error.message ? flow_error.message : "(no stated reason)");
-  //  RtAssert(en_isolate == 0, "Unable to set flow isolate mode");
-  //}
+  rte_flow_error flow_error;
+  int en_isolate = rte_flow_isolate(port, 1, &flow_error);
+  if (en_isolate != 0) {
+    std::printf("Flow cannot be isolated %d message: %s\n", flow_error.type,
+                flow_error.message ? flow_error.message : "(no stated reason)");
+    //RtAssert(en_isolate == 0, "Unable to set flow isolate mode");
+  }
 
   retval = rte_eth_dev_info_get(port, &dev_info);
   if (retval < 0) {
@@ -129,19 +129,18 @@ int DpdkTransport::NicInit(uint16_t port, rte_mempool* mbuf_pool,
   retval = rte_eth_dev_configure(port, rx_rings, tx_rings, &port_conf);
   if (retval != 0) {
     std::printf("Error in rte_eth_dev_configure\n");
-    std::fflush(stdout);
     return retval;
   }
   retval = rte_eth_dev_adjust_nb_rx_tx_desc(port, &nb_rxd, &nb_txd);
   if (retval != 0) {
     std::printf("Error in rte_eth_dev_adjust_nb_rx_tx_desc\n");
-    std::fflush(stdout);
     return retval;
   }
-  retval = rte_eth_dev_set_mtu(port, kJumboFrameSize);
+
+  uint16_t mtu_size = kJumboFrameSize;
+  retval = rte_eth_dev_set_mtu(port, mtu_size);
   RtAssert(retval == 0, "Cannot set the MTU size for the given dev");
 
-  uint16_t mtu_size = 0;
   retval = rte_eth_dev_get_mtu(port, &mtu_size);
   RtAssert(retval == 0, "Cannot get the MTU size for the given dev");
   RtAssert(mtu_size == kJumboFrameSize, "Invalid MTU (must be 9000 bytes)");
@@ -406,7 +405,7 @@ rte_mbuf* DpdkTransport::AllocUdp(rte_mempool* mbuf_pool,
                                   rte_ether_addr dst_mac_addr,
                                   uint32_t src_ip_addr, uint32_t dst_ip_addr,
                                   uint16_t src_udp_port, uint16_t dst_udp_port,
-                                  size_t buffer_length) {
+                                  size_t buffer_length, uint16_t pkt_id) {
   rte_mbuf* tx_buf __attribute__((aligned(64)));
   tx_buf = rte_pktmbuf_alloc(mbuf_pool);
 
@@ -425,8 +424,9 @@ rte_mbuf* DpdkTransport::AllocUdp(rte_mempool* mbuf_pool,
   ip_h->type_of_service = 0;
   ip_h->total_length =
       rte_cpu_to_be_16(buffer_length + kPayloadOffset - sizeof(rte_ether_hdr));
-  ip_h->packet_id = 0;
-  ip_h->fragment_offset = 0;
+  ip_h->packet_id = rte_cpu_to_be_16(pkt_id);
+  //Do not fragment flag?
+  ip_h->fragment_offset = rte_cpu_to_be_16(1 << 14);
   ip_h->time_to_live = 64;
   ip_h->hdr_checksum = 0;
 
@@ -440,11 +440,12 @@ rte_mbuf* DpdkTransport::AllocUdp(rte_mempool* mbuf_pool,
 
   tx_buf->pkt_len = buffer_length + kPayloadOffset;
   tx_buf->data_len = buffer_length + kPayloadOffset;
-  //tx_buf->ol_flags = (PKT_TX_IP_CKSUM | PKT_TX_UDP_CKSUM);
+  //Should very that these offloads were enabled
   tx_buf->ol_flags =
       RTE_MBUF_F_TX_IPV4 | RTE_MBUF_F_TX_IP_CKSUM | RTE_MBUF_F_TX_UDP_CKSUM;
-  //tx_buf->l2_len = sizeof(rte_ether_hdr);
-  //tx_buf->l3_len = sizeof(rte_ipv4_hdr);
+  //Not sure if this is needed?
+  tx_buf->l2_len = sizeof(*eth_hdr);
+  tx_buf->l3_len = sizeof(rte_ipv4_hdr);
   return tx_buf;
 }
 
