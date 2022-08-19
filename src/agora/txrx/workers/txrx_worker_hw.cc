@@ -8,7 +8,10 @@
 
 #include <cassert>
 
+#include "comms-lib.h"
+#include "gettime.h"
 #include "logger.h"
+#include "message.h"
 
 static constexpr bool kSymbolTimingEnabled = false;
 static constexpr bool kBeamsweepData = false;

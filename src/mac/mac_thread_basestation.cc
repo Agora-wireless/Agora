@@ -4,15 +4,16 @@
  */
 #include "mac_thread_basestation.h"
 
+#include "comms-lib.h"
+#include "gettime.h"
 #include "logger.h"
+#include "message.h"
 #include "utils_ldpc.h"
 
 static constexpr size_t kUdpRxBufferPadding = 2048u;
 
 MacThreadBaseStation::MacThreadBaseStation(
-    Config* cfg, size_t core_offset,
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
-    Table<int8_t>* dl_bits_buffer, Table<int8_t>* dl_bits_buffer_status,
+    Config* cfg, size_t core_offset, AgoraBuffer* buffer,
     moodycamel::ConcurrentQueue<EventData>* rx_queue,
     moodycamel::ConcurrentQueue<EventData>* tx_queue,
     const std::string& log_filename)
@@ -20,7 +21,7 @@ MacThreadBaseStation::MacThreadBaseStation(
       freq_ghz_(GetTime::MeasureRdtscFreq()),
       tsc_delta_((cfg_->GetFrameDurationSec() * 1e9) / freq_ghz_),
       core_offset_(core_offset),
-      decoded_buffer_(decoded_buffer),
+      buffer_(buffer),
       rx_queue_(rx_queue),
       tx_queue_(tx_queue) {
   // Set up MAC log file
@@ -36,10 +37,8 @@ MacThreadBaseStation::MacThreadBaseStation(
       "MacThreadBaseStation: Frame duration %.2f ms, tsc_delta %zu\n",
       cfg_->GetFrameDurationSec() * 1000, tsc_delta_);
 
-  // Set up buffers
-  client_.dl_bits_buffer_id_.fill(0);
-  client_.dl_bits_buffer_ = dl_bits_buffer;
-  client_.dl_bits_buffer_status_ = dl_bits_buffer_status;
+  // Set up buffer id
+  dl_bits_buffer_id_.fill(0);
 
   server_.n_filled_in_frame_.fill(0);
   for (size_t ue_ant = 0; ue_ant < cfg_->UeAntTotal(); ue_ant++) {
@@ -138,8 +137,8 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
       cfg_->MacPacketsPerframe(Direction::kUplink);
   const size_t mac_payload_max_length =
       cfg_->MacPayloadMaxLength(Direction::kUplink);
-  const int8_t* src_data =
-      decoded_buffer_[(frame_id % kFrameWnd)][symbol_array_index][ue_id];
+  const int8_t* src_data = buffer_->GetDecodedBuffer(frame_id % kFrameWnd,
+                                                     symbol_array_index, ue_id);
 
   std::stringstream ss;  // Debug formatting
 
@@ -422,9 +421,9 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
   next_radio_id_ = ue_id;
 
   // We've received bits for the uplink.
-  size_t& radio_buf_id = client_.dl_bits_buffer_id_[next_radio_id_];
+  size_t& radio_buf_id = dl_bits_buffer_id_[next_radio_id_];
 
-  if ((*client_.dl_bits_buffer_status_)[next_radio_id_][radio_buf_id] == 1) {
+  if (buffer_->GetDlBitsBufferStatus(next_radio_id_)[radio_buf_id] == 1) {
     std::fprintf(
         stderr,
         "MacThreadBasestation: UDP RX buffer full, buffer ID: %zu. Dropping "
@@ -468,7 +467,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
                                    mac_packet_length;
 
     auto* pkt = reinterpret_cast<MacPacketPacked*>(
-        &(*client_.dl_bits_buffer_)[next_radio_id_][dest_pkt_offset]);
+        &(buffer_->GetDlBitsBuffer(next_radio_id_)[dest_pkt_offset]));
 
     pkt->Set(next_tx_frame_id_, src_packet->Symbol(), src_packet->Ue(),
              src_packet->PayloadLength());
@@ -479,8 +478,9 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
 
     pkt->LoadData(src_packet->Data());
     // Insert CRC
-    pkt->Crc((uint16_t)(
-        crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) & 0xFFFF));
+    pkt->Crc(
+        (uint16_t)(crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) &
+                   0xFFFF));
 
     if (kLogMacPackets) {
       std::stringstream ss;
@@ -508,7 +508,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
     src_pkt_offset += pkt->PayloadLength() + MacPacketPacked::kHeaderSize;
   }  // end all packets
 
-  (*client_.dl_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
+  (buffer_->GetDlBitsBufferStatus(next_radio_id_)[radio_buf_id]) = 1;
   EventData msg(EventType::kPacketFromMac,
                 rx_mac_tag_t(next_radio_id_, radio_buf_id).tag_);
   AGORA_LOG_FRAME("MacThreadBasestation: Tx mac information to %zu %zu\n",

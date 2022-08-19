@@ -12,16 +12,14 @@
 #ifndef COMMSLIB_H_
 #define COMMSLIB_H_
 
-#include <immintrin.h>
-#include <unistd.h>
-
-#include <algorithm>
+#include <cmath>
 #include <complex>
-#include <fstream>
-#include <iostream>
+#include <map>
+#include <string>
 #include <vector>
 
-#include "buffer.h"
+#include "common_typedef_sdk.h"
+#include "immintrin.h"
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 
@@ -52,7 +50,7 @@ class CommsLib {
   explicit CommsLib(std::string);
   ~CommsLib();
 
-  static std::vector<std::vector<double>> GetSequence(int N, int type);
+  static std::vector<std::vector<double>> GetSequence(size_t seq_len, int type);
   static std::vector<std::complex<float>> Modulate(
       const std::vector<int8_t>& in, int type);
   static std::vector<int> GetDataSc(int fftSize);
@@ -115,12 +113,13 @@ class CommsLib {
     return std::abs(std::complex<float>(d.re, d.im));
   }
   static int FindBeaconAvx(const std::vector<std::complex<float>>& iq,
-                           const std::vector<std::complex<float>>& seq);
+                           const std::vector<std::complex<float>>& seq,
+                           float corr_scale = 1.f);
 
   ///Find Beacon with raw samples from the radio
   static ssize_t FindBeaconAvx(const std::complex<int16_t>* iq,
                                const std::vector<std::complex<float>>& seq,
-                               size_t sample_window);
+                               size_t sample_window, float corr_scale = 1.f);
 
   static std::vector<float> CorrelateAvxS(std::vector<float> const& f,
                                           std::vector<float> const& g);

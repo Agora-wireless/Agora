@@ -12,6 +12,7 @@
 #include "config.h"
 #include "crc.h"
 #include "gettime.h"
+#include "message.h"
 #include "ran_config.h"
 #include "symbols.h"
 #include "udp_client.h"
@@ -38,13 +39,11 @@ class MacThreadBaseStation {
   // TODO: map this to time?
   static constexpr size_t kSNRWindowSize = 100;
 
-  MacThreadBaseStation(
-      Config* const cfg, size_t core_offset,
-      PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
-      Table<int8_t>* dl_bits_buffer, Table<int8_t>* dl_bits_buffer_status,
-      moodycamel::ConcurrentQueue<EventData>* rx_queue,
-      moodycamel::ConcurrentQueue<EventData>* tx_queue,
-      const std::string& log_filename = "");
+  MacThreadBaseStation(Config* const cfg, size_t core_offset,
+                       AgoraBuffer* buffer,
+                       moodycamel::ConcurrentQueue<EventData>* rx_queue,
+                       moodycamel::ConcurrentQueue<EventData>* tx_queue,
+                       const std::string& log_filename = "");
 
   ~MacThreadBaseStation();
 
@@ -129,16 +128,9 @@ class MacThreadBaseStation {
 
   } server_;
 
-  // TODO: decoded_buffer_ is used by only the server, so it should be moved
-  // to server_ for clarity.
-  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer_;
+  AgoraBuffer* buffer_;
+  std::array<size_t, kMaxUEs> dl_bits_buffer_id_;
 
-  struct {
-    std::array<size_t, kMaxUEs> dl_bits_buffer_id_;
-
-    Table<int8_t>* dl_bits_buffer_;
-    Table<int8_t>* dl_bits_buffer_status_;
-  } client_;
   // FIFO queue for receiving messages from the master thread
   moodycamel::ConcurrentQueue<EventData>* rx_queue_;
 

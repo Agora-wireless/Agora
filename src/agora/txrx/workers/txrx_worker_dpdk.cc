@@ -12,7 +12,9 @@
 #include <utility>
 
 #include "dpdk_transport.h"
+#include "gettime.h"
 #include "logger.h"
+#include "message.h"
 
 static constexpr bool kDebugDPDK = false;
 

@@ -9,6 +9,7 @@
 #include "SoapySDR/Logger.hpp"
 #include "SoapySDR/Time.hpp"
 #include "SoapySDR/Version.hpp"
+#include "comms-lib.h"
 #include "logger.h"
 #include "radio_data_plane.h"
 #include "symbols.h"
@@ -800,8 +801,7 @@ void RadioSoapySdr::SetFreqRf(size_t channel, double freq) {
   dev_->setFrequency(SOAPY_SDR_RX, channel, "RF", freq);
 }
 
-void RadioSoapySdr::ConfigureTddModeBs(bool is_ref_radio,
-                                       size_t beacon_radio_id) {
+void RadioSoapySdr::ConfigureTddModeBs(bool is_ref_radio, size_t radio_id) {
   nlohmann::json conf;
   conf["tdd_enabled"] = true;
   conf["frame_mode"] = "free_running";
@@ -844,7 +844,8 @@ void RadioSoapySdr::ConfigureTddModeBs(bool is_ref_radio,
   size_t ndx = 0;
   for (const auto& channel : EnabledChannels()) {
     const bool is_beacon_antenna =
-        !cfg_->Beamsweep() && ndx == cfg_->BeaconAnt();
+        !cfg_->Beamsweep() &&
+        radio_id * cfg_->NumChannels() + ndx == cfg_->BeaconAnt();
     std::vector<unsigned> beacon_weights(
         cfg_->NumRadios() * cfg_->NumChannels(), is_beacon_antenna ? 1 : 0);
     if (cfg_->Beamsweep()) {
@@ -867,7 +868,7 @@ void RadioSoapySdr::ConfigureTddModeBs(bool is_ref_radio,
     dev_->writeRegisters(prog_reg, 0, beacon_weights);
     ++ndx;
   }
-  dev_->writeSetting("BEACON_START", std::to_string(beacon_radio_id));
+  dev_->writeSetting("BEACON_START", std::to_string(cfg_->NumRadios()));
 }
 
 void RadioSoapySdr::ConfigureTddModeUe() {
