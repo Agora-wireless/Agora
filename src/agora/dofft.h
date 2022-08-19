@@ -5,15 +5,14 @@
 #ifndef DOFFT_H_
 #define DOFFT_H_
 
-#include <armadillo>
-#include <iostream>
-#include <vector>
+#include <complex>
+#include <cstddef>
 
 #include "buffer.h"
-#include "concurrentqueue.h"
+#include "common_typedef_sdk.h"
 #include "config.h"
 #include "doer.h"
-#include "gettime.h"
+#include "message.h"
 #include "mkl_dfti.h"
 #include "phy_stats.h"
 #include "stats.h"
@@ -21,10 +20,7 @@
 
 class DoFFT : public Doer {
  public:
-  DoFFT(Config* config, size_t tid, Table<complex_float>& data_buffer,
-        PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
-        Table<complex_float>& calib_dl_buffer,
-        Table<complex_float>& calib_ul_buffer, PhyStats* in_phy_stats,
+  DoFFT(Config* config, size_t tid, AgoraBuffer* buffer, PhyStats* in_phy_stats,
         Stats* stats_manager);
   ~DoFFT() override;
 
@@ -96,10 +92,7 @@ class DoFFT : public Doer {
                         SymbolType symbol_type) const;
 
  private:
-  Table<complex_float>& data_buffer_;
-  PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
-  Table<complex_float>& calib_dl_buffer_;
-  Table<complex_float>& calib_ul_buffer_;
+  AgoraBuffer* buffer_;
   DFTI_DESCRIPTOR_HANDLE mkl_handle_;
   complex_float* fft_inout_;      // Buffer for both FFT input and output
   complex_float* fft_shift_tmp_;  // Buffer for both FFT input and output

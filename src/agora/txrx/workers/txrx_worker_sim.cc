@@ -8,7 +8,9 @@
 
 #include <cassert>
 
+#include "gettime.h"
 #include "logger.h"
+#include "message.h"
 
 static constexpr bool kEnableSlowStart = true;
 static constexpr bool kDebugPrintBeacon = false;

@@ -5,6 +5,7 @@
 #include "agora.h"
 #include "gflags/gflags.h"
 #include "logger.h"
+#include "signal_handler.h"
 #include "version_config.h"
 
 DEFINE_string(

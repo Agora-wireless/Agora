@@ -10,13 +10,14 @@
 #include <thread>
 #include <vector>
 
-#include "buffer.h"
+#include "common_typedef_sdk.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "csv_logger.h"
 #include "dodecode_client.h"
-#include "doencode.h"
+#include "doencode_client.h"
 #include "doifft_client.h"
+#include "message.h"
 #include "mkl_dfti.h"
 #include "simd_types.h"
 #include "stats.h"
@@ -49,7 +50,7 @@ class UeWorker {
    * modulate data from nUEs and does spatial multiplexing by applying
    * beamweights
    */
-  void DoEncodeUe(DoEncode* encoder, size_t tag);
+  void DoEncodeUe(DoEncodeClient* encoder, size_t tag);
   void DoModul(size_t tag);
   void DoIfftUe(DoIFFTClient* iffter, size_t tag);
   void DoIfft(size_t tag);

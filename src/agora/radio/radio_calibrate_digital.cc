@@ -3,6 +3,7 @@
  * @brief Implementation file for the digital (baseband) calibration 
  * functions such as sample offset and reciprocity calibration
  */
+#include "comms-lib.h"
 #include "datatype_conversion.h"
 #include "logger.h"
 #include "matplotlibcpp.h"

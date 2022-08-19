@@ -4,6 +4,7 @@
 #include "datatype_conversion.h"
 #include "gflags/gflags.h"
 #include "logger.h"
+#include "signal_handler.h"
 
 static const bool kDebugPrintUlCorr = false;
 static const bool kDebugPrintDlCorr = false;

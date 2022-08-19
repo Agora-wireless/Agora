@@ -8,7 +8,9 @@
 #include <thread>
 
 #include "datatype_conversion.h"
+#include "gettime.h"
 #include "logger.h"
+#include "message.h"
 #include "udp_client.h"
 
 #if defined(USE_DPDK)
