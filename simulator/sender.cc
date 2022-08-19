@@ -71,8 +71,9 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
   }
 
   InitIqFromFile(std::string(TOSTRING(PROJECT_DIRECTORY)) +
-                 "/data/LDPC_rx_data_" + std::to_string(cfg->OfdmCaNum()) +
-                 "_ant" + std::to_string(cfg->BsAntNum()) + ".bin");
+                 "/files/experiment/LDPC_rx_data_" +
+                 std::to_string(cfg->OfdmCaNum()) + "_ant" +
+                 std::to_string(cfg->BsAntNum()) + ".bin");
 
   task_ptok_ =
       static_cast<moodycamel::ProducerToken**>(Agora_memory::PaddedAlignedAlloc(
@@ -564,8 +565,9 @@ void Sender::CreateWorkerThreads(size_t num_workers) {
 }
 
 void Sender::WriteStatsToFile(size_t tx_frame_count) const {
-  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string filename = cur_directory + "/data/tx_result.txt";
+  const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+  const std::string filename =
+      cur_directory + "/files/experiment/tx_result.txt";
   std::printf("Printing sender results to file \"%s\"...\n", filename.c_str());
   FILE* fp_debug = std::fopen(filename.c_str(), "w");
   RtAssert(fp_debug != nullptr, "Failed to open stats file");

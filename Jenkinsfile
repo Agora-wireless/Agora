@@ -115,7 +115,7 @@ pipeline {
 					echo "Building data for unit tests ..."
 					sh '''
 						. /opt/intel/oneapi/setvars.sh --config="/opt/intel/oneapi/renew-config.txt"
-						./build/data_generator --conf_file data/tddconfig-sim-ul.json
+						./build/data_generator --conf_file files/config/ci/tddconfig-sim-ul.json
 					'''
 					
 					sh '''
