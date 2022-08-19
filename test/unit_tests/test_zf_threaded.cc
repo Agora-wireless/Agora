@@ -2,10 +2,12 @@
 // For some reason, gtest include order matters
 #include <thread>
 
+#include "buffer.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "dobeamweights.h"
 #include "gettime.h"
+#include "message.h"
 #include "utils.h"
 
 static constexpr size_t kNumWorkers = 14;
@@ -53,15 +55,8 @@ void MasterToWorkerDynamicWorker(
     Config* cfg, size_t worker_id,
     moodycamel::ConcurrentQueue<EventData>& event_queue,
     moodycamel::ConcurrentQueue<EventData>& complete_task_queue,
-    moodycamel::ProducerToken* ptok,
-    PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
-    Table<complex_float>& calib_dl_msum_buffer,
-    Table<complex_float>& calib_ul_msum_buffer,
-    Table<complex_float>& calib_dl_buffer,
-    Table<complex_float>& calib_ul_buffer,
-    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices,
-    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices,
-    PhyStats* phy_stats, Stats* stats) {
+    moodycamel::ProducerToken* ptok, AgoraBuffer* buffer, PhyStats* phy_stats,
+    Stats* stats) {
   PinToCoreWithOffset(ThreadType::kWorker, cfg->CoreOffset() + 1, worker_id);
 
   // Wait for all threads (including master) to start runnung
@@ -70,10 +65,8 @@ void MasterToWorkerDynamicWorker(
     // Wait
   }
 
-  auto compute_beam = std::make_unique<DoBeamWeights>(
-      cfg, worker_id, csi_buffers, calib_dl_msum_buffer, calib_ul_msum_buffer,
-      calib_dl_buffer, calib_ul_buffer, ul_beam_matrices, dl_beam_matrices,
-      phy_stats, stats);
+  auto compute_beam =
+      std::make_unique<DoBeamWeights>(cfg, worker_id, buffer, phy_stats, stats);
 
   size_t start_tsc = GetTime::Rdtsc();
   size_t num_tasks = 0;
@@ -118,25 +111,7 @@ TEST(TestZF, VaryingConfig) {
     ptok = new moodycamel::ProducerToken(complete_task_queue);
   }
 
-  Table<complex_float> calib_dl_msum_buffer;
-  Table<complex_float> calib_ul_msum_buffer;
-
-  Table<complex_float> calib_dl_buffer;
-  Table<complex_float> calib_ul_buffer;
-
-  PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers;
-  csi_buffers.RandAllocCxFloat(kMaxAntennas * kMaxDataSCs);
-
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrices(kMaxAntennas *
-                                                                  kMaxUEs);
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_beam_matrices(kMaxUEs *
-                                                                  kMaxAntennas);
-
-  calib_dl_buffer.RandAllocCxFloat(kFrameWnd, kMaxDataSCs * kMaxAntennas,
-                                   Agora_memory::Alignment_t::kAlign64);
-  calib_ul_buffer.RandAllocCxFloat(kFrameWnd, kMaxDataSCs * kMaxAntennas,
-                                   Agora_memory::Alignment_t::kAlign64);
-
+  auto buffer = std::make_unique<AgoraBuffer>(cfg.get());
   auto phy_stats = std::make_unique<PhyStats>(cfg.get(), Direction::kUplink);
   auto stats = std::make_unique<Stats>(cfg.get());
 
@@ -145,22 +120,14 @@ TEST(TestZF, VaryingConfig) {
                        std::ref(event_queue), std::ref(complete_task_queue));
 
   for (size_t i = 0; i < kNumWorkers; i++) {
-    threads.emplace_back(
-        MasterToWorkerDynamicWorker, cfg.get(), i, std::ref(event_queue),
-        std::ref(complete_task_queue), ptoks[i], std::ref(csi_buffers),
-        std::ref(calib_dl_msum_buffer), std::ref(calib_ul_msum_buffer),
-        std::ref(calib_dl_buffer), std::ref(calib_ul_buffer),
-        std::ref(ul_beam_matrices), std::ref(dl_beam_matrices), phy_stats.get(),
-        stats.get());
+    threads.emplace_back(MasterToWorkerDynamicWorker, cfg.get(), i,
+                         std::ref(event_queue), std::ref(complete_task_queue),
+                         ptoks[i], buffer.get(), phy_stats.get(), stats.get());
   }
   for (auto& thread : threads) {
     thread.join();
   }
 
-  calib_dl_msum_buffer.Free();
-  calib_ul_msum_buffer.Free();
-  calib_dl_buffer.Free();
-  calib_ul_buffer.Free();
   for (auto& ptok : ptoks) {
     delete ptok;
   }
