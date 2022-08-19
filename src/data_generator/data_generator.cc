@@ -192,18 +192,20 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
                   std::vector<std::vector<std::vector<uint8_t>>>(
                       this->cfg_->Frame().NumULSyms(),
                       std::vector<std::vector<uint8_t>>(
-                          this->cfg_->NumUeChannels()))));
+                          this->cfg_->NumUeChannels(),
+                          std::vector<uint8_t>(this->cfg_->OfdmDataNum())))));
       for (size_t n = 0; n < num_ul_codeblocks; n++) {
-        const size_t cl_sdr = n % this->cfg_->UeNum();
-        const size_t ul_slot = n / this->cfg_->UeAntNum();
+        const size_t cl_sdr = (n % this->cfg_->UeNum());
+        const size_t ul_slot = (n / this->cfg_->UeAntNum()) +
+                               this->cfg_->Frame().ClientUlPilotSymbols();
         const size_t cl_sdr_ch =
             (n % this->cfg_->UeAntNum()) % this->cfg_->NumUeChannels();
-        std::vector<uint8_t> modulated_cb(cfg_->OfdmDataNum());
+        std::vector<uint8_t> modulated_cb(this->cfg_->OfdmDataNum());
         AdaptBitsForMod(
             reinterpret_cast<const uint8_t*>(ul_encoded_codewords.at(n).data()),
             modulated_cb.data(),
-            cfg_->LdpcConfig(Direction::kUplink).NumEncodedBytes(),
-            cfg_->ModOrderBits(Direction::kUplink));
+            this->cfg_->LdpcConfig(Direction::kUplink).NumEncodedBytes(),
+            this->cfg_->ModOrderBits(Direction::kUplink));
         for (size_t f = 0; f < kSounderDataFrameNum; f++) {
           sounder_data.at(cl_sdr).at(f).at(ul_slot).at(cl_sdr_ch) =
               modulated_cb;
@@ -219,12 +221,13 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
             std::to_string(this->cfg_->Frame().NumULSyms()) + "_" +
             std::to_string(kSounderDataFrameNum) + "_" +
             this->cfg_->UeChannel() + "_" + std::to_string(i) + ".bin";
+        AGORA_LOG_INFO("Saving Sounder uplink data to %s\n", filename_input.c_str());
         FILE* fp_tx_b = std::fopen(filename_input.c_str(), "wb");
         for (size_t f = 0; f < kSounderDataFrameNum; f++) {
           for (size_t u = 0; u < this->cfg_->Frame().NumULSyms(); u++) {
             for (size_t h = 0; h < this->cfg_->NumUeChannels(); h++) {
               std::fwrite(sounder_data.at(i).at(f).at(u).at(h).data(),
-                          cfg_->OfdmDataNum(), sizeof(uint8_t), fp_tx_b);
+                          this->cfg_->OfdmDataNum(), sizeof(uint8_t), fp_tx_b);
             }
           }
         }
