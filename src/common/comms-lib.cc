@@ -24,7 +24,7 @@
 
 #include <utility>
 
-#include "constants.h"
+#include "comms-constants.inc"
 #include "datatype_conversion.h"
 #include "logger.h"
 #include "utils.h"
@@ -677,10 +677,10 @@ std::vector<std::vector<double>> CommsLib::GetSequence(size_t seq_len,
     matrix.resize(2);
     const size_t sts_seq_len = 16;
 
-    std::vector<std::complex<float>> sts_freq(
-        Consts::sts_seq, Consts::sts_seq + Consts::kFftSize_80211);
+    std::vector<std::complex<float>> sts_freq(sts_seq,
+                                              sts_seq + kFftSize_80211);
     // Perform ifft with ifft-shift on sts_freq
-    CommsLib::IFFT(sts_freq, Consts::kFftSize_80211, false);
+    CommsLib::IFFT(sts_freq, kFftSize_80211, false);
     auto sts_iq = CommsLib::FFTShift(sts_freq);
 
     size_t out_seq_len = sts_seq_len;
@@ -693,10 +693,9 @@ std::vector<std::vector<double>> CommsLib::GetSequence(size_t seq_len,
     }
   } else if (type == kLtsFSeq || type == kLtsSeq) {
     matrix.resize(2);
-    const size_t lts_seq_len = Consts::kFftSize_80211;
+    const size_t lts_seq_len = kFftSize_80211;
 
-    std::vector<std::complex<float>> lts_freq(Consts::lts_seq,
-                                              Consts::lts_seq + lts_seq_len);
+    std::vector<std::complex<float>> lts_freq(lts_seq, lts_seq + lts_seq_len);
     if (type == kLtsFSeq) {
       matrix[0].resize(lts_seq_len);
       matrix[1].resize(lts_seq_len);
@@ -724,10 +723,10 @@ std::vector<std::vector<double>> CommsLib::GetSequence(size_t seq_len,
     matrix.resize(2);
     double u = 1;  // Cell ID 1
     double v = 0;
-    int m = Consts::prime[308];
+    int m = prime[308];
     for (int j = 0; j < 308; j++) {
-      if (Consts::prime[j] < seq_len && Consts::prime[j + 1] > seq_len) {
-        m = Consts::prime[j];
+      if (prime[j] < seq_len && prime[j + 1] > seq_len) {
+        m = prime[j];
         break;
       }
     }
@@ -747,14 +746,15 @@ std::vector<std::vector<double>> CommsLib::GetSequence(size_t seq_len,
     const size_t gold_seq_len = 128;
 
     // Use row 52 in gold-127
-    std::vector<int> gold_code(Consts::gold_code, Consts::gold_code + 127);
+    std::vector<int> gold_freq_real(gold_seq, gold_seq + 127);
 
     // Insert 0 at center freq, construct inter-leaved quad code
-    gold_code.insert(gold_code.begin() + 63, 0);
+    gold_freq_real.insert(gold_freq_real.begin() + 63, 0);
 
     std::vector<std::complex<float>> gold_freq(2 * gold_seq_len);
     for (size_t i = 0; i < gold_seq_len; i++) {
-      gold_freq[2 * i] = std::complex<float>(gold_code[i], gold_code[i]);
+      gold_freq[2 * i] =
+          std::complex<float>(gold_freq_real[i], gold_freq_real[i]);
     }
 
     // Perform ifft with ifft-shift on gold_freq
