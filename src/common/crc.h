@@ -13,17 +13,15 @@
 #ifndef CRC_H_
 #define CRC_H_
 
-#include <unistd.h>
+#include <cstdint>
 
-#include <iostream>
-
-#include "buffer.h"
+#include "message.h"
 
 // Generating polynomial
 // G_CRC_24_A(D) = [D24 + D23 + D18 + D17 + D14 + D11 + D10 + D7 + D6 + D5 + D4
 // + D3 + D + 1]
-#define G_CRC_24A 0x1864CFBu;  // Normal representation
-#define CRCSEED 0              // could be non-zero to detect leading zeros
+#define G_CRC_24A (0x1864CFBu;)  // Normal representation
+#define CRCSEED (0)              // could be non-zero to detect leading zeros
 
 // CRC segments
 #define LO(x) (unsigned char)((x)&0xff)

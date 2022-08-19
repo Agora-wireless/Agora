@@ -1,27 +1,31 @@
 /**
- * @file doencode.cc
- * @brief Implmentation file for the DoEncode class.  Currently, just supports
+ * @file doencode_client.cc
+ * @brief Implmentation file for the DoEncodeClient class.  Currently, just supports
  * basestation
  */
 
-#include "doencode.h"
+#include "doencode_client.h"
 
 #include "concurrent_queue_wrapper.h"
 #include "encoder.h"
 #include "gettime.h"
+#include "logger.h"
 #include "message.h"
 #include "phy_ldpc_decoder_5gnr.h"
 
 static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintRawMacData = false;
 
-DoEncode::DoEncode(Config* in_config, int in_tid, Direction dir,
-                   AgoraBuffer* buffer, size_t in_buffer_rollover,
-                   Stats* in_stats_manager)
+DoEncodeClient::DoEncodeClient(Config* in_config, int in_tid, Direction dir,
+                               Table<int8_t>& in_raw_data_buffer,
+                               size_t in_buffer_rollover,
+                               Table<int8_t>& in_mod_bits_buffer,
+                               Stats* in_stats_manager)
     : Doer(in_config, in_tid),
       dir_(dir),
-      buffer_(buffer),
+      raw_data_buffer_(in_raw_data_buffer),
       raw_buffer_rollover_(in_buffer_rollover),
+      mod_bits_buffer_(in_mod_bits_buffer),
       scrambler_(std::make_unique<AgoraScrambler::Scrambler>()) {
   duration_stat_ = in_stats_manager->GetDurationStat(DoerType::kEncode, in_tid);
   parity_buffer_ = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
@@ -43,13 +47,13 @@ DoEncode::DoEncode(Config* in_config, int in_tid, Direction dir,
   assert(scrambler_buffer_ != nullptr);
 }
 
-DoEncode::~DoEncode() {
+DoEncodeClient::~DoEncodeClient() {
   std::free(parity_buffer_);
   std::free(encoded_buffer_temp_);
   std::free(scrambler_buffer_);
 }
 
-EventData DoEncode::Launch(size_t tag) {
+EventData DoEncodeClient::Launch(size_t tag) {
   const LDPCconfig& ldpc_config = cfg_->LdpcConfig(dir_);
   size_t frame_id = gen_tag_t(tag).frame_id_;
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
@@ -84,8 +88,9 @@ EventData DoEncode::Launch(size_t tag) {
   /// universal with raw_buffer_rollover_ the parameter.
   if (kEnableMac) {
     // All cb's per symbol are included in 1 mac packet
-    tx_data_ptr = &this->GetRawDataBuffer(ue_id)[cfg_->GetMacBitsIdx(
-        dir_, (frame_id % raw_buffer_rollover_), symbol_idx_data, cur_cb_id)];
+    tx_data_ptr = cfg_->GetMacBits(raw_data_buffer_, dir_,
+                                   (frame_id % raw_buffer_rollover_),
+                                   symbol_idx_data, ue_id, cur_cb_id);
 
     if (kPrintRawMacData) {
       auto* pkt = reinterpret_cast<MacPacketPacked*>(tx_data_ptr);
@@ -102,8 +107,8 @@ EventData DoEncode::Launch(size_t tag) {
       std::printf("\n");
     }
   } else {
-    tx_data_ptr = &this->GetRawDataBuffer(
-        symbol_idx)[cfg_->GetInfoBitsIdx(dir_, ue_id, cur_cb_id)];
+    tx_data_ptr =
+        cfg_->GetInfoBits(raw_data_buffer_, dir_, symbol_idx, ue_id, cur_cb_id);
   }
 
   int8_t* ldpc_input = nullptr;
@@ -119,10 +124,8 @@ EventData DoEncode::Launch(size_t tag) {
   LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
                    ldpc_config.NumRows(), encoded_buffer_temp_, parity_buffer_,
                    ldpc_input);
-  int8_t* mod_buffer_ptr =
-      &buffer_->GetDlModBitsBuffer(cfg_->GetTotalDataSymbolIdxUl(
-          frame_id,
-          symbol_idx))[cfg_->GetModBitsBufIdx(dir_, ue_id, cur_cb_id)];
+  int8_t* mod_buffer_ptr = cfg_->GetModBitsBuf(mod_bits_buffer_, dir_, frame_id,
+                                               symbol_idx, ue_id, cur_cb_id);
 
   if (kPrintRawMacData && dir_ == Direction::kUplink) {
     std::printf("Encoded data - placed at location (%zu %zu %zu) %zu\n",

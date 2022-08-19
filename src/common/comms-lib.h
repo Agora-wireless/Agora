@@ -12,16 +12,14 @@
 #ifndef COMMSLIB_H_
 #define COMMSLIB_H_
 
-#include <immintrin.h>
-#include <unistd.h>
-
-#include <algorithm>
+#include <cmath>
 #include <complex>
-#include <fstream>
-#include <iostream>
+#include <map>
+#include <string>
 #include <vector>
 
-#include "buffer.h"
+#include "common_typedef_sdk.h"
+#include "immintrin.h"
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 

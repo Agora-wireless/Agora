@@ -83,7 +83,10 @@
 			"cassert": "cpp",
 			"armadillo": "cpp",
 			"*.inc": "cpp",
-			"netfwd": "cpp"
+			"netfwd": "cpp",
+			"any": "cpp",
+			"charconv": "cpp",
+			"regex": "cpp"
 		},
 		"testMate.cpp.test.workingDirectory": "${workspaceFolder}",
 		"testExplorer.showOnRun": true
