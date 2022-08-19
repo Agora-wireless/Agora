@@ -9,8 +9,8 @@
 
 #include "recorder_thread.h"
 
-#include "buffer.h"
 #include "logger.h"
+#include "message.h"
 #include "utils.h"
 
 namespace Agora_recorder {

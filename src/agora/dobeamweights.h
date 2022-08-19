@@ -5,34 +5,23 @@
 #ifndef DOBEAMWEIGHTS_H_
 #define DOBEAMWEIGHTS_H_
 
-#include <armadillo>
-#include <iostream>
+#include <memory>
 
+#include "armadillo"
 #include "buffer.h"
-#include "concurrentqueue.h"
-#include "config.h"
+#include "common_typedef_sdk.h"
 #include "doer.h"
-#include "gettime.h"
 #include "mat_logger.h"
+#include "message.h"
 #include "phy_stats.h"
 #include "stats.h"
-#include "symbols.h"
-#include "utils.h"
 
 class DoBeamWeights : public Doer {
  public:
-  DoBeamWeights(
-      Config* in_config, int tid,
-      PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
-      Table<complex_float>& calib_dl_buffer,
-      Table<complex_float>& calib_ul_buffer,
-      Table<complex_float>& calib_dl_msum_buffer,
-      Table<complex_float>& calib_ul_msum_buffer,
-      PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_,
-      PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_,
-      PhyStats* in_phy_stats, Stats* stats_manager,
-      std::shared_ptr<CsvLog::MatLogger> dl_csi_logger = {},
-      std::shared_ptr<CsvLog::MatLogger> dl_beam_logger = {});
+  DoBeamWeights(Config* in_config, int tid, AgoraBuffer* buffer,
+                PhyStats* in_phy_stats, Stats* stats_manager,
+                std::shared_ptr<CsvLog::MatLogger> dl_csi_logger = {},
+                std::shared_ptr<CsvLog::MatLogger> dl_beam_logger = {});
   ~DoBeamWeights() override;
 
   /**
@@ -89,18 +78,10 @@ class DoBeamWeights : public Doer {
    */
   void Predict(size_t offset);
 
-  PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
+  AgoraBuffer* buffer_;
+
   complex_float* pred_csi_buffer_;
 
-  //Should be read only (Set by FFT and read by Zf)
-  Table<complex_float>& calib_dl_buffer_;
-  Table<complex_float>& calib_ul_buffer_;
-
-  //Shared by all doZf objects
-  Table<complex_float>& calib_dl_msum_buffer_;
-  Table<complex_float>& calib_ul_msum_buffer_;
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_;
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_;
   DurationStat* duration_stat_;
 
   complex_float* csi_gather_buffer_;  // Intermediate buffer to gather CSI

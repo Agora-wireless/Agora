@@ -4,24 +4,17 @@
  */
 #include "dodemul.h"
 
+#include "comms-lib.h"
 #include "concurrent_queue_wrapper.h"
+#include "gettime.h"
+#include "message.h"
+#include "modulation.h"
 
 static constexpr bool kUseSIMDGather = true;
 
-DoDemul::DoDemul(
-    Config* config, int tid, Table<complex_float>& data_buffer,
-    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices,
-    Table<complex_float>& ue_spec_pilot_buffer,
-    Table<complex_float>& equal_buffer,
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
-    PhyStats* in_phy_stats, Stats* stats_manager)
-    : Doer(config, tid),
-      data_buffer_(data_buffer),
-      ul_beam_matrices_(ul_beam_matrices),
-      ue_spec_pilot_buffer_(ue_spec_pilot_buffer),
-      equal_buffer_(equal_buffer),
-      demod_buffers_(demod_buffers),
-      phy_stats_(in_phy_stats) {
+DoDemul::DoDemul(Config* config, int tid, AgoraBuffer* buffer,
+                 PhyStats* in_phy_stats, Stats* stats_manager)
+    : Doer(config, tid), buffer_(buffer), phy_stats_(in_phy_stats) {
   duration_stat_ = stats_manager->GetDurationStat(DoerType::kDemul, tid);
 
   data_gather_buffer_ =
@@ -44,7 +37,7 @@ DoDemul::DoDemul(
                                cfg_->UeAntNum(), false);
   ue_pilot_data_ = mat_pilot_data.st();
 
-#if USE_MKL_JIT
+#if defined(USE_MKL_JIT)
   MKL_Complex8 alpha = {1, 0};
   MKL_Complex8 beta = {0, 0};
 
@@ -68,7 +61,7 @@ DoDemul::~DoDemul() {
   std::free(equaled_buffer_temp_);
   std::free(equaled_buffer_temp_transposed_);
 
-#if USE_MKL_JIT
+#if defined(USE_MKL_JIT)
   mkl_jit_status_t status = mkl_jit_destroy(jitter_);
   if (MKL_JIT_ERROR == status) {
     std::fprintf(stderr, "!!!!Error: Error while destorying MKL JIT\n");
@@ -86,7 +79,8 @@ EventData DoDemul::Launch(size_t tag) {
       symbol_idx_ul - this->cfg_->Frame().ClientUlPilotSymbols();
   const size_t total_data_symbol_idx_ul =
       cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
-  const complex_float* data_buf = data_buffer_[total_data_symbol_idx_ul];
+  const complex_float* data_buf =
+      buffer_->GetDataBuffer(total_data_symbol_idx_ul);
 
   const size_t frame_slot = frame_id % kFrameWnd;
   size_t start_tsc = GetTime::WorkerRdtsc();
@@ -201,9 +195,8 @@ EventData DoDemul::Launch(size_t tag) {
 
       arma::cx_float* equal_ptr = nullptr;
       if (kExportConstellation) {
-        equal_ptr =
-            (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                            [cur_sc_id * cfg_->UeAntNum()]);
+        equal_ptr = (arma::cx_float*)(&buffer_->GetEqualBuffer(
+            total_data_symbol_idx_ul)[cur_sc_id * cfg_->UeAntNum()]);
       } else {
         equal_ptr =
             (arma::cx_float*)(&equaled_buffer_temp_[(cur_sc_id - base_sc_id) *
@@ -215,10 +208,10 @@ EventData DoDemul::Launch(size_t tag) {
           &data_gather_buffer_[j * cfg_->BsAntNum()]);
       // size_t start_tsc2 = worker_rdtsc();
       auto* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
-          ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
+          buffer_->GetUlBeamMatrix(frame_slot, cfg_->GetBeamScId(cur_sc_id)));
 
       size_t start_tsc2 = GetTime::WorkerRdtsc();
-#if USE_MKL_JIT
+#if defined(USE_MKL_JIT)
       mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_beam_ptr,
                      (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
 #else
@@ -234,15 +227,15 @@ EventData DoDemul::Launch(size_t tag) {
         if (symbol_idx_ul == 0 && cur_sc_id == 0) {
           // Reset previous frame
           auto* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
-              ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
+              buffer_->GetUeSpecPilotBuffer((frame_id - 1) % kFrameWnd));
           arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(),
                                         cfg_->Frame().ClientUlPilotSymbols(),
                                         false);
           mat_phase_shift.fill(0);
         }
-        auto* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
-            &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
-                                  [symbol_idx_ul * cfg_->UeAntNum()]);
+        auto* phase_shift_ptr =
+            reinterpret_cast<arma::cx_float*>(&buffer_->GetUeSpecPilotBuffer(
+                frame_id % kFrameWnd)[symbol_idx_ul * cfg_->UeAntNum()]);
         arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(), 1,
                                       false);
         arma::cx_fmat shift_sc =
@@ -252,7 +245,7 @@ EventData DoDemul::Launch(size_t tag) {
       // apply previously calc'ed phase shift to data
       else if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
         auto* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
-            ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
+            buffer_->GetUeSpecPilotBuffer(frame_id % kFrameWnd));
         arma::cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeAntNum(),
                                      cfg_->Frame().ClientUlPilotSymbols(),
                                      false);
@@ -292,9 +285,8 @@ EventData DoDemul::Launch(size_t tag) {
   for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
     float* equal_ptr = nullptr;
     if (kExportConstellation) {
-      equal_ptr = reinterpret_cast<float*>(
-          &equal_buffer_[total_data_symbol_idx_ul]
-                        [base_sc_id * cfg_->UeAntNum() + ue_id]);
+      equal_ptr = reinterpret_cast<float*>(&buffer_->GetEqualBuffer(
+          total_data_symbol_idx_ul)[base_sc_id * cfg_->UeAntNum() + ue_id]);
     } else {
       equal_ptr = reinterpret_cast<float*>(equaled_buffer_temp_ + ue_id);
     }
@@ -306,8 +298,9 @@ EventData DoDemul::Launch(size_t tag) {
       equal_ptr += cfg_->UeAntNum() * k_num_double_in_sim_d256 * 2;
     }
     equal_t_ptr = (float*)(equaled_buffer_temp_transposed_);
-    int8_t* demod_ptr = demod_buffers_[frame_slot][symbol_idx_ul][ue_id] +
-                        (cfg_->ModOrderBits(Direction::kUplink) * base_sc_id);
+    int8_t* demod_ptr =
+        buffer_->GetDemodBuffer(frame_slot, symbol_idx_ul, ue_id) +
+        (cfg_->ModOrderBits(Direction::kUplink) * base_sc_id);
 
     switch (cfg_->ModOrderBits(Direction::kUplink)) {
       case (CommsLib::kQpsk):
