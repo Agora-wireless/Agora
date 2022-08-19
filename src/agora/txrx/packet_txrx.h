@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "buffer.h"
+#include "common_typedef_sdk.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "txrx_worker.h"

@@ -4,8 +4,12 @@
  */
 #include "doifft.h"
 
+#include "comms-lib.h"
 #include "concurrent_queue_wrapper.h"
 #include "datatype_conversion.h"
+#include "gettime.h"
+#include "logger.h"
+#include "message.h"
 
 static constexpr bool kPrintIFFTOutput = false;
 static constexpr bool kPrintSocketOutput = false;
@@ -13,12 +17,9 @@ static constexpr bool kUseOutOfPlaceIFFT = false;
 static constexpr bool kMemcpyBeforeIFFT = true;
 static constexpr bool kPrintIfftStats = false;
 
-DoIFFT::DoIFFT(Config* in_config, int in_tid,
-               Table<complex_float>& in_dl_ifft_buffer,
-               char* in_dl_socket_buffer, Stats* in_stats_manager)
-    : Doer(in_config, in_tid),
-      dl_ifft_buffer_(in_dl_ifft_buffer),
-      dl_socket_buffer_(in_dl_socket_buffer) {
+DoIFFT::DoIFFT(Config* in_config, int in_tid, AgoraBuffer* buffer,
+               Stats* in_stats_manager)
+    : Doer(in_config, in_tid), buffer_(buffer) {
   duration_stat_ = in_stats_manager->GetDurationStat(DoerType::kIFFT, in_tid);
   DftiCreateDescriptor(&mkl_handle_, DFTI_SINGLE, DFTI_COMPLEX, 1,
                        cfg_->OfdmCaNum());
@@ -65,7 +66,8 @@ EventData DoIFFT::Launch(size_t tag) {
   const size_t start_tsc1 = GetTime::WorkerRdtsc();
   duration_stat_->task_duration_[1u] += start_tsc1 - start_tsc;
 
-  auto* ifft_in_ptr = reinterpret_cast<float*>(dl_ifft_buffer_[offset]);
+  auto* ifft_in_ptr =
+      reinterpret_cast<float*>(buffer_->GetDlIfftBuffer(offset));
   auto* ifft_out_ptr =
       (kUseOutOfPlaceIFFT || kMemcpyBeforeIFFT) ? ifft_out_ : ifft_in_ptr;
 
@@ -118,8 +120,8 @@ EventData DoIFFT::Launch(size_t tag) {
     ss << "IFFT_output" << ant_id << "=[";
     for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
       ss << std::fixed << std::setw(5) << std::setprecision(3)
-         << dl_ifft_buffer_[offset][i].re << "+1j*"
-         << dl_ifft_buffer_[offset][i].im << " ";
+         << buffer_->GetDlIfftBuffer(offset)[i].re << "+1j*"
+         << buffer_->GetDlIfftBuffer(offset)[i].im << " ";
     }
     ss << "];" << std::endl;
     std::cout << ss.str();
@@ -129,7 +131,7 @@ EventData DoIFFT::Launch(size_t tag) {
   duration_stat_->task_duration_[2u] += start_tsc2 - start_tsc1;
 
   auto* pkt = reinterpret_cast<struct Packet*>(
-      &dl_socket_buffer_[offset * cfg_->DlPacketLength()]);
+      &buffer_->GetDlSocketBuffer()[offset * cfg_->DlPacketLength()]);
   short* socket_ptr = &pkt->data_[2u * cfg_->OfdmTxZeroPrefix()];
 
   // IFFT scaled results by OfdmCaNum(), we scale down IFFT results

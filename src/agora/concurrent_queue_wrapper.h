@@ -6,9 +6,12 @@
 #ifndef CONCURRENT_QUEUE_WRAPPER_H_
 #define CONCURRENT_QUEUE_WRAPPER_H_
 
+#include <cstddef>
+
 #include "buffer.h"
 #include "concurrentqueue.h"
-#include "utils.h"
+#include "message.h"
+#include "symbols.h"
 
 /// Enqueue one event to a concurrent queue and print a warning message
 /// if we're short on queue space
@@ -43,6 +46,20 @@ static inline void TryEnqueueBulkFallback(
     RtAssert(mc_queue->enqueue_bulk(*producer_token, event_list, num_events),
              "Message bulk enqueue failed\n");
   }
+}
+
+// Fetch the concurrent queue for this event type
+inline moodycamel::ConcurrentQueue<EventData>* GetConq(
+    SchedInfo sched_info_arr[kScheduleQueues][kNumEventTypes],
+    EventType event_type, size_t qid) {
+  return &sched_info_arr[qid][static_cast<size_t>(event_type)].concurrent_q_;
+}
+
+// Fetch the producer token for this event type
+inline moodycamel::ProducerToken* GetPtok(
+    SchedInfo sched_info_arr[kScheduleQueues][kNumEventTypes],
+    EventType event_type, size_t qid) {
+  return sched_info_arr[qid][static_cast<size_t>(event_type)].ptok_;
 }
 
 #endif  // CONCURRENT_QUEUE_WRAPPER_H_

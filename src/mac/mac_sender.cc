@@ -9,7 +9,9 @@
 
 #include "datatype_conversion.h"
 #include "file_receiver.h"
+#include "gettime.h"
 #include "logger.h"
+#include "message.h"
 #include "udp_client.h"
 #include "video_receiver.h"
 

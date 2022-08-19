@@ -5,19 +5,15 @@
 #include "doprecode.h"
 
 #include "concurrent_queue_wrapper.h"
+#include "gettime.h"
+#include "message.h"
+#include "modulation.h"
 
 static constexpr bool kUseSpatialLocality = true;
 
-DoPrecode::DoPrecode(
-    Config* in_config, int in_tid,
-    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices,
-    Table<complex_float>& in_dl_ifft_buffer,
-    Table<int8_t>& dl_encoded_or_raw_data /* Encoded if LDPC is enabled */,
-    Stats* in_stats_manager)
-    : Doer(in_config, in_tid),
-      dl_beam_matrices_(dl_beam_matrices),
-      dl_ifft_buffer_(in_dl_ifft_buffer),
-      dl_raw_data_(dl_encoded_or_raw_data) {
+DoPrecode::DoPrecode(Config* in_config, int in_tid, AgoraBuffer* buffer,
+                     Stats* in_stats_manager)
+    : Doer(in_config, in_tid), buffer_(buffer) {
   duration_stat_ =
       in_stats_manager->GetDurationStat(DoerType::kPrecode, in_tid);
 
@@ -27,7 +23,7 @@ DoPrecode::DoPrecode(
                 cfg_->DemulBlockSize() * cfg_->BsAntNum(),
                 Agora_memory::Alignment_t::kAlign64, 0);
 
-#if USE_MKL_JIT
+#if defined(USE_MKL_JIT)
   MKL_Complex8 alpha = {1, 0};
   MKL_Complex8 beta = {0, 0};
   // Input: A: BsAntNum() x UeAntNum() , B: UeAntNum() x 1
@@ -53,7 +49,7 @@ DoPrecode::~DoPrecode() {
   FreeBuffer1d(&modulated_buffer_temp_);
   FreeBuffer1d(&precoded_buffer_temp_);
 
-#if USE_MKL_JIT
+#if defined(USE_MKL_JIT)
   mkl_jit_status_t status = mkl_jit_destroy(jitter_);
   if (MKL_JIT_ERROR == status) {
     std::fprintf(stderr, "!!!!Error: Error while destorying MKL JIT\n");
@@ -141,9 +137,8 @@ EventData DoPrecode::Launch(size_t tag) {
   auto* precoded_ptr = reinterpret_cast<float*>(precoded_buffer_temp_);
   for (size_t ant_id = 0; ant_id < cfg_->BsAntNum(); ant_id++) {
     int ifft_buffer_offset = ant_id + cfg_->BsAntNum() * total_data_symbol_idx;
-    auto* ifft_ptr = reinterpret_cast<float*>(
-        &dl_ifft_buffer_[ifft_buffer_offset]
-                        [base_sc_id + cfg_->OfdmDataStart()]);
+    auto* ifft_ptr = reinterpret_cast<float*>(&buffer_->GetDlIfftBuffer(
+        ifft_buffer_offset)[base_sc_id + cfg_->OfdmDataStart()]);
     for (size_t i = 0; i < cfg_->DemulBlockSize() / 4; i++) {
       float* input_shifted_ptr =
           precoded_ptr + 4 * i * 2 * cfg_->BsAntNum() + ant_id * 2;
@@ -172,10 +167,9 @@ void DoPrecode::LoadInputData(size_t symbol_idx_dl,
       (cfg_->IsDataSubcarrier(sc_id) == false)) {
     data_ptr[user_id] = cfg_->UeSpecificPilot()[user_id][sc_id];
   } else {
-    int8_t* raw_data_ptr =
-        &dl_raw_data_[total_data_symbol_idx]
-                     [cfg_->GetOFDMDataIndex(sc_id) +
-                      Roundup<64>(cfg_->GetOFDMDataNum()) * user_id];
+    int8_t* raw_data_ptr = &buffer_->GetDlModBitsBuffer(
+        total_data_symbol_idx)[cfg_->GetOFDMDataIndex(sc_id) +
+                               Roundup<64>(cfg_->GetOFDMDataNum()) * user_id];
     data_ptr[user_id] = ModSingleUint8((uint8_t)(*raw_data_ptr),
                                        cfg_->ModTable(Direction::kDownlink));
   }
@@ -184,7 +178,7 @@ void DoPrecode::LoadInputData(size_t symbol_idx_dl,
 void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
                                size_t sc_id_in_block) {
   auto* precoder_ptr = reinterpret_cast<arma::cx_float*>(
-      dl_beam_matrices_[frame_slot][cfg_->GetBeamScId(sc_id)]);
+      buffer_->GetDlBeamMatrix(frame_slot, cfg_->GetBeamScId(sc_id)));
   auto* data_ptr = reinterpret_cast<arma::cx_float*>(
       modulated_buffer_temp_ +
       (kUseSpatialLocality
@@ -192,7 +186,7 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
            : 0));
   auto* precoded_ptr = reinterpret_cast<arma::cx_float*>(
       precoded_buffer_temp_ + sc_id_in_block * cfg_->BsAntNum());
-#if USE_MKL_JIT
+#if defined(USE_MKL_JIT)
   my_cgemm_(jitter_, (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
             (MKL_Complex8*)precoded_ptr);
 #else
