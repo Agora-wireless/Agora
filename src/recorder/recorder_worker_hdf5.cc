@@ -206,10 +206,12 @@ void RecorderWorkerHDF5::Init() {
               "Attempting to write TxData for Symbol %zu, Antenna %zu total "
               "syms %zu\n",
               sym, ant, num_dl_syms);
+          //DlIqF is indexed by complex float
           hdf5_->WriteDataset(
               dataset_name, start, tx_data_dims,
-              reinterpret_cast<float*>(const_cast<Config*>(cfg_)->DlIqF()[sym] +
-                                       (ant * cfg_->OfdmDataNum())));
+              reinterpret_cast<const float*>(
+                  &const_cast<Config*>(cfg_)
+                       ->DlIqF()[sym][ant * (tx_data_size / 2)]));
         }
       }
       hdf5_->FinalizeDataset(dataset_name);
@@ -234,11 +236,11 @@ void RecorderWorkerHDF5::Init() {
           AGORA_LOG_TRACE(
               "Attempting to write TxPilot for Antenna %zu Symbol %zu\n", ant,
               sym);
+          //Since UeSpecificPilot == OfdmDataNum size then repeat for each symbol
           hdf5_->WriteDataset(
               dataset_name, start, tx_pilot_dims,
-              &reinterpret_cast<float*>(
-                  const_cast<Config*>(cfg_)
-                      ->UeSpecificPilot()[ant])[sym * tx_pilot_sym_size]);
+              reinterpret_cast<const float*>(
+                  &const_cast<Config*>(cfg_)->UeSpecificPilot()[ant][0u]));
         }
       }
       hdf5_->FinalizeDataset(dataset_name);
