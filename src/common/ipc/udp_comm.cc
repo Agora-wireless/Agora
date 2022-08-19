@@ -372,12 +372,13 @@ ssize_t UDPComm::Recv(std::byte* buf, size_t len) const {
   ssize_t ret = ::recv(sock_fd_, static_cast<void*>(buf), len, 0);
 
   if (ret == -1) {
-    if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+    if ((errno == EAGAIN) || (errno == EWOULDBLOCK) ||
+        (errno == ECONNREFUSED)) {
       // These errors mean that there's no data to receive
       ret = 0;
     } else {
-      AGORA_LOG_ERROR("UDPComm: recv() failed with unexpected error %s\n",
-                      std::strerror(errno));
+      AGORA_LOG_ERROR("UDPComm: recv() failed with unexpected error %s(%d)\n",
+                      std::strerror(errno), errno);
     }
   } else if (ret == 0) {
     AGORA_LOG_ERROR("UDPComm: recv() failed with return of 0\n");
