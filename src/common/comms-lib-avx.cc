@@ -25,7 +25,7 @@
 
 ssize_t CommsLib::FindBeaconAvx(const std::complex<int16_t>* iq,
                                 const std::vector<std::complex<float>>& seq,
-                                size_t sample_window) {
+                                size_t sample_window, float corr_scale) {
   //Sample window must be multiple of 64Bytes (for avx 512)
   static constexpr size_t kWindowAlignment = 64;
   const size_t padded_window =
@@ -39,12 +39,13 @@ ssize_t CommsLib::FindBeaconAvx(const std::complex<int16_t>* iq,
   ConvertShortToFloat(reinterpret_cast<const short*>(&iq[0u]),
                       reinterpret_cast<float*>(sync_compare.data()),
                       sample_window * 2);
-  return CommsLib::FindBeaconAvx(sync_compare, seq);
+  return CommsLib::FindBeaconAvx(sync_compare, seq, corr_scale);
 }
 
 /// Correlation and Peak detection of a beacon with Gold code  (2 repetitions)
 int CommsLib::FindBeaconAvx(const std::vector<std::complex<float>>& iq,
-                            const std::vector<std::complex<float>>& seq) {
+                            const std::vector<std::complex<float>>& seq,
+                            float corr_scale) {
   std::vector<int> valid_peaks;
 
   // Original LTS sequence
@@ -87,7 +88,7 @@ int CommsLib::FindBeaconAvx(const std::vector<std::complex<float>>& iq,
   // perform thresholding and find peak
   clock_gettime(CLOCK_MONOTONIC, &tv);
   for (size_t i = 0; i < gold_corr_avx_2.size(); i++) {
-    if (gold_corr_avx_2[i] > thresh_avx[i]) {
+    if (corr_scale * gold_corr_avx_2[i] > thresh_avx[i]) {
       valid_peaks.push_back(i);
     }
   }
