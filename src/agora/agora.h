@@ -94,11 +94,6 @@ class Agora {
 
   void HandleEventFft(size_t tag);
   void UpdateRxCounters(size_t frame_id, size_t symbol_id);
-  void PrintPerFrameDone(PrintType print_type, size_t frame_id);
-  void PrintPerSymbolDone(PrintType print_type, size_t frame_id,
-                          size_t symbol_id);
-  void PrintPerTaskDone(PrintType print_type, size_t frame_id, size_t symbol_id,
-                        size_t ant_or_sc_id);
 
   /// Update Agora's RAN config parameters
   void UpdateRanConfig(RanConfig rc);
