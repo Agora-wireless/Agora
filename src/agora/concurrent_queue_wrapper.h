@@ -50,17 +50,17 @@ static inline void TryEnqueueBulkFallback(
 }
 
 // Fetch the concurrent queue for this event type
-inline moodycamel::ConcurrentQueue<EventData>* GetConq(
-    SchedInfo sched_info_arr[kScheduleQueues][kNumEventTypes],
-    EventType event_type, size_t qid) {
-  return &sched_info_arr[qid][static_cast<size_t>(event_type)].concurrent_q_;
-}
+//inline moodycamel::ConcurrentQueue<EventData>* GetConq(
+//    SchedInfo sched_info_arr[kScheduleQueues][kNumEventTypes],
+//    EventType event_type, size_t qid) {
+//  return &sched_info_arr[qid][static_cast<size_t>(event_type)].concurrent_q_;
+//}
 
 // Fetch the producer token for this event type
-inline moodycamel::ProducerToken* GetPtok(
-    SchedInfo sched_info_arr[kScheduleQueues][kNumEventTypes],
-    EventType event_type, size_t qid) {
-  return sched_info_arr[qid][static_cast<size_t>(event_type)].ptok_;
-}
+//inline moodycamel::ProducerToken* GetPtok(
+//    SchedInfo sched_info_arr[kScheduleQueues][kNumEventTypes],
+//    EventType event_type, size_t qid) {
+//  return sched_info_arr[qid][static_cast<size_t>(event_type)].ptok_;
+//}
 
 #endif  // CONCURRENT_QUEUE_WRAPPER_H_

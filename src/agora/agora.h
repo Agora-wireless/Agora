@@ -88,8 +88,6 @@ class Agora {
   void InitializeUplinkBuffers();
   void InitializeDownlinkBuffers();
   void FreeQueues();
-  void FreeUplinkBuffers();
-  void FreeDownlinkBuffers();
 
   void SaveDecodeDataToFile(int frame_id);
   void SaveTxDataToFile(int frame_id);
@@ -166,49 +164,8 @@ class Agora {
   std::unique_ptr<Stats> stats_;
   std::unique_ptr<PhyStats> phy_stats_;
 
-  /*****************************************************
-   * Buffers
-   *****************************************************/
-
-  /* Uplink */
-  // RX buffer size per socket RX thread
-  size_t socket_buffer_size_;
-
-  // Received data buffers
-  // 1st dimension: number of socket RX threads
-  // 2nd dimension: socket buffer size
-  Table<char> socket_buffer_;
-
-  // Preliminary CSI buffers. Each buffer has [number of antennas] rows and
-  // [number of OFDM data subcarriers] columns.
-  PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers_;
-
-  // Data symbols after FFT
-  // 1st dimension: kFrameWnd * uplink data symbols per frame
-  // 2nd dimension: number of antennas * number of OFDM data subcarriers
-  //
-  // 2nd dimension data order: 32 blocks each with 32 subcarriers each:
-  // subcarrier 1 -- 32 of antennas, subcarrier 33 -- 64 of antennas, ...,
-  // subcarrier 993 -- 1024 of antennas.
-  Table<complex_float> data_buffer_;
-
-  // Calculated uplink zeroforcing detection matrices. Each matrix has
-  // [number of antennas] rows and [number of UEs] columns.
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrices_;
-
-  // Data after equalization
-  // 1st dimension: kFrameWnd * uplink data symbols per frame
-  // 2nd dimension: number of OFDM data subcarriers * number of UEs
-  Table<complex_float> equal_buffer_;
-
-  // Data after demodulation. Each buffer has kMaxModType * number of OFDM
-  // data subcarriers
-  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers_;
-
-  // Data after LDPC decoding. Each buffer [decoded bytes per UE] bytes.
-  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> decoded_buffer_;
-
-  Table<complex_float> ue_spec_pilot_buffer_;
+  //Agora Buffer containment
+  std::unique_ptr<AgoraBuffer> agora_memory_;
 
   // Counters related to various modules
   FrameCounters pilot_fft_counters_;
@@ -249,48 +206,6 @@ class Agora {
   // Per-frame queues of delayed FFT tasks. The queue contains offsets into
   // TX/RX buffers.
   std::array<std::queue<fft_req_tag_t>, kFrameWnd> fft_queue_arr_;
-
-  // Data for IFFT
-  // 1st dimension: kFrameWnd * number of antennas * number of
-  // data symbols per frame
-  // 2nd dimension: number of OFDM carriers (including non-data carriers)
-  Table<complex_float> dl_ifft_buffer_;
-
-  // Calculated uplink zeroforcing detection matrices. Each matrix has
-  // [number of UEs] rows and [number of antennas] columns.
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_beam_matrices_;
-
-  // 1st dimension: kFrameWnd
-  // 2nd dimension: number of OFDM data subcarriers * number of antennas
-  Table<complex_float> calib_ul_buffer_;
-  Table<complex_float> calib_dl_buffer_;
-  Table<complex_float> calib_ul_msum_buffer_;
-  Table<complex_float> calib_dl_msum_buffer_;
-
-  // 1st dimension: kFrameWnd * number of data symbols per frame
-  // 2nd dimension: number of OFDM data subcarriers * number of UEs
-  Table<int8_t> dl_mod_bits_buffer_;
-
-  // 1st dimension: kFrameWnd * number of DL data symbols per frame
-  // 2nd dimension: number of OFDM data subcarriers * number of UEs
-  Table<int8_t> dl_bits_buffer_;
-
-  // 1st dimension: number of UEs
-  // 2nd dimension: number of OFDM data subcarriers * kFrameWnd
-  //                * number of DL data symbols per frame
-  // Use different dimensions from dl_bits_buffer_ to avoid cache false sharing
-  Table<int8_t> dl_bits_buffer_status_;
-
-  /**
-   * Data for transmission
-   *
-   * Number of downlink socket buffers and status entries:
-   * kFrameWnd * symbol_num_perframe * BS_ANT_NUM
-   *
-   * Size of each downlink socket buffer entry: packet_length bytes
-   * Size of each downlink socket buffer status entry: one integer
-   */
-  char* dl_socket_buffer_;
 
   struct SchedInfoT {
     moodycamel::ConcurrentQueue<EventData> concurrent_q_;

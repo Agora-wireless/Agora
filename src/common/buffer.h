@@ -20,8 +20,8 @@ class AgoraBuffer {
  public:
   explicit AgoraBuffer(Config* const cfg)
       : config_(cfg),
-        socket_buffer_size_(cfg->PacketLength() * cfg->BsAntNum() * kFrameWnd *
-                            cfg->Frame().NumTotalSyms()),
+        ul_socket_buf_size(cfg->PacketLength() * cfg->BsAntNum() * kFrameWnd *
+                           cfg->Frame().NumTotalSyms()),
         csi_buffer_(kFrameWnd, cfg->UeAntNum(),
                     cfg->BsAntNum() * cfg->OfdmDataNum()),
         ul_beam_matrix_(kFrameWnd, cfg->OfdmDataNum(),
@@ -34,22 +34,26 @@ class AgoraBuffer {
             kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),
             cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
                 Roundup<64>(cfg->NumBytesPerCb(Direction::kUplink))) {
-    this->AllocateTables(cfg);
+    AllocateTables(cfg);
   }
+  // Delete copy constructor and copy assignment
+  AgoraBuffer(AgoraBuffer const&) = delete;
+  AgoraBuffer& operator=(AgoraBuffer const&) = delete;
 
-  ~AgoraBuffer() { this->FreeTables(); }
+  ~AgoraBuffer() { FreeTables(); }
 
   void AllocateTables(Config* const cfg) {
     // Uplink
     const size_t task_buffer_symbol_num_ul =
         cfg->Frame().NumULSyms() * kFrameWnd;
 
-    socket_buffer_.Malloc(cfg->SocketThreadNum() /* RX */, socket_buffer_size_,
-                          Agora_memory::Alignment_t::kAlign64);
+    ul_socket_buffer_.Malloc(cfg->SocketThreadNum() /* RX */,
+                             ul_socket_buf_size,
+                             Agora_memory::Alignment_t::kAlign64);
 
-    data_buffer_.Malloc(task_buffer_symbol_num_ul,
-                        cfg->OfdmDataNum() * cfg->BsAntNum(),
-                        Agora_memory::Alignment_t::kAlign64);
+    fft_buffer_.Malloc(task_buffer_symbol_num_ul,
+                       cfg->OfdmDataNum() * cfg->BsAntNum(),
+                       Agora_memory::Alignment_t::kAlign64);
 
     equal_buffer_.Malloc(task_buffer_symbol_num_ul,
                          cfg->OfdmDataNum() * cfg->UeAntNum(),
@@ -110,8 +114,8 @@ class AgoraBuffer {
 
   void FreeTables() {
     // Uplink
-    socket_buffer_.Free();
-    data_buffer_.Free();
+    ul_socket_buffer_.Free();
+    fft_buffer_.Free();
     equal_buffer_.Free();
     ue_spec_pilot_buffer_.Free();
 
@@ -129,75 +133,53 @@ class AgoraBuffer {
     }
   }
 
-  // Get functions
-  size_t GetSocketBufferSize() { return this->socket_buffer_size_; }
-  complex_float* GetCsiBuffer(size_t x, size_t y) {
-    return this->csi_buffer_[x][y];
+  inline PtrGrid<kFrameWnd, kMaxUEs, complex_float>& GetCsi() {
+    return csi_buffer_;
   }
-  complex_float* GetUlBeamMatrix(size_t x, size_t y) {
-    return this->ul_beam_matrix_[x][y];
+  inline PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& GetUlBeamMatrix() {
+    return ul_beam_matrix_;
   }
-  complex_float* GetDlBeamMatrix(size_t x, size_t y) {
-    return this->dl_beam_matrix_[x][y];
+  inline PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& GetDlBeamMatrix() {
+    return dl_beam_matrix_;
   }
-  int8_t* GetDemodBuffer(size_t x, size_t y, size_t z) {
-    return this->demod_buffer_[x][y][z];
+  inline PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& GetDemod() {
+    return demod_buffer_;
   }
-  int8_t* GetDecodedBuffer(size_t x, size_t y, size_t z) {
-    return this->decoded_buffer_[x][y][z];
+  inline PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& GetDecod() {
+    return decoded_buffer_;
   }
-  complex_float* GetDataBuffer(size_t x) { return this->data_buffer_[x]; }
-  complex_float* GetEqualBuffer(size_t x) { return this->equal_buffer_[x]; }
-  complex_float* GetUeSpecPilotBuffer(size_t x) {
-    return this->ue_spec_pilot_buffer_[x];
+  inline Table<complex_float>& GetFft() { return fft_buffer_; }
+  inline Table<complex_float>& GetEqual() { return equal_buffer_; }
+  inline Table<complex_float>& GetUeSpecPilot() {
+    return ue_spec_pilot_buffer_;
   }
-  complex_float* GetDlIfftBuffer(size_t x) { return this->dl_ifft_buffer_[x]; }
-  complex_float* GetCalibUlBuffer(size_t x) {
-    return this->calib_ul_buffer_[x];
+  inline Table<complex_float>& GetIfft() { return dl_ifft_buffer_; }
+  inline Table<complex_float>& GetCalibUlMsum() {
+    return calib_ul_msum_buffer_;
   }
-  complex_float* GetCalibDlBuffer(size_t x) {
-    return this->calib_dl_buffer_[x];
+  inline Table<complex_float>& GetCalibDlMsum() {
+    return calib_dl_msum_buffer_;
   }
-  complex_float* GetCalibUlMsumBuffer(size_t x) {
-    return this->calib_ul_msum_buffer_[x];
-  }
-  complex_float* GetCalibDlMsumBuffer(size_t x) {
-    return this->calib_dl_msum_buffer_[x];
-  }
-  int8_t* GetDlModBitsBuffer(size_t x) { return this->dl_mod_bits_buffer_[x]; }
+  inline Table<int8_t>& GetDlModBits() { return dl_mod_bits_buffer_; }
+  inline Table<int8_t>& GetDlBits() { return dl_bits_buffer_; }
+  inline Table<int8_t>& GetDlBitsStatus() { return dl_bits_buffer_status_; }
 
-  int8_t* GetDlBitsBuffer(size_t x) { return this->dl_bits_buffer_[x]; }
-  int8_t* GetDlBitsBufferStatus(size_t x) {
-    return this->dl_bits_buffer_status_[x];
-  }
-  char* GetDlSocketBuffer() { return this->dl_socket_buffer_; }
-
-  // Set functions
-  void SetDlBitsBufferStatus(int8_t value, size_t x, size_t y) {
-    this->dl_bits_buffer_status_[x][y] = value;
-  }
-
-  // Delete copy constructor and copy assignment
-  AgoraBuffer(AgoraBuffer const&) = delete;
-  AgoraBuffer& operator=(AgoraBuffer const&) = delete;
-
-  // TX RX Buffers
-  // Direct access is allowed for packetTXRX classes
-  Table<char> socket_buffer_;
-  char* dl_socket_buffer_;
-  Table<complex_float> calib_ul_buffer_;
-  Table<complex_float> calib_dl_buffer_;
+  inline size_t GetUlSocketSize() const { return ul_socket_buf_size; }
+  inline Table<char>& GetUlSocket() { return ul_socket_buffer_; }
+  inline char* GetDlSocket() { return dl_socket_buffer_; }
+  inline Table<complex_float>& GetCalibUl() { return calib_ul_buffer_; }
+  inline Table<complex_float>& GetCalibDl() { return calib_dl_buffer_; }
 
  private:
   Config* const config_;
-  const size_t socket_buffer_size_;
+  const size_t ul_socket_buf_size;
 
   PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffer_;
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrix_;
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_beam_matrix_;
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffer_;
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> decoded_buffer_;
-  Table<complex_float> data_buffer_;
+  Table<complex_float> fft_buffer_;
   Table<complex_float> equal_buffer_;
   Table<complex_float> ue_spec_pilot_buffer_;
   Table<complex_float> dl_ifft_buffer_;
@@ -206,6 +188,11 @@ class AgoraBuffer {
   Table<int8_t> dl_mod_bits_buffer_;
   Table<int8_t> dl_bits_buffer_;
   Table<int8_t> dl_bits_buffer_status_;
+
+  Table<char> ul_socket_buffer_;
+  char* dl_socket_buffer_;
+  Table<complex_float> calib_ul_buffer_;
+  Table<complex_float> calib_dl_buffer_;
 };
 
 struct SchedInfo {
