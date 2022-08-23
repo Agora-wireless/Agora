@@ -5,16 +5,13 @@
 #ifndef DODEMUL_H_
 #define DODEMUL_H_
 
-#include <armadillo>
-#include <iostream>
-#include <vector>
-
+#include "armadillo"
+#include "common_typedef_sdk.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "doer.h"
-#include "gettime.h"
-#include "message.h"
-#include "modulation.h"
+#include "memory_manage.h"
+#include "mkl_dfti.h"
 #include "phy_stats.h"
 #include "stats.h"
 #include "symbols.h"

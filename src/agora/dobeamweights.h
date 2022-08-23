@@ -5,19 +5,17 @@
 #ifndef DOBEAMWEIGHTS_H_
 #define DOBEAMWEIGHTS_H_
 
-#include <armadillo>
-#include <iostream>
+#include <memory>
 
-#include "concurrentqueue.h"
+#include "armadillo"
+#include "common_typedef_sdk.h"
 #include "config.h"
 #include "doer.h"
-#include "gettime.h"
 #include "mat_logger.h"
+#include "memory_manage.h"
 #include "message.h"
 #include "phy_stats.h"
 #include "stats.h"
-#include "symbols.h"
-#include "utils.h"
 
 class DoBeamWeights : public Doer {
  public:

@@ -4,9 +4,9 @@
  */
 #include "doifft_client.h"
 
-#include <armadillo>
 #include <vector>
 
+#include "armadillo"
 #include "comms-lib.h"
 #include "concurrent_queue_wrapper.h"
 #include "datatype_conversion.h"

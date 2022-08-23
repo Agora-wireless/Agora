@@ -6,13 +6,13 @@
 #define CHANNEL_H_
 
 #include <algorithm>
-#include <armadillo>
 #include <cassert>
 #include <cmath>
 #include <ctime>
 #include <iomanip>
 #include <numeric>
 
+#include "armadillo"
 #include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"

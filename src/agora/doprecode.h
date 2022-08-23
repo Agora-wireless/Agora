@@ -5,10 +5,10 @@
 #ifndef DOPRECODE_H_
 #define DOPRECODE_H_
 
-#include <armadillo>
 #include <iostream>
 #include <vector>
 
+#include "armadillo"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "doer.h"

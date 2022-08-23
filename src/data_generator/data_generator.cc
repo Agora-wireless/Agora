@@ -8,12 +8,12 @@
 
 #include <immintrin.h>
 
-#include <armadillo>
 #include <bitset>
 #include <fstream>
 #include <iostream>
 #include <memory>
 
+#include "armadillo"
 #include "comms-lib.h"
 #include "config.h"
 #include "crc.h"

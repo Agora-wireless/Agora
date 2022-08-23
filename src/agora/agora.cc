@@ -14,6 +14,7 @@
 #include "logger.h"
 #include "packet_txrx_radio.h"
 #include "packet_txrx_sim.h"
+#include "signal_handler.h"
 
 static const bool kDebugPrintPacketsFromMac = false;
 static const bool kDebugDeferral = true;

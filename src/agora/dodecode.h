@@ -6,6 +6,7 @@
 #ifndef DODECODE_H_
 #define DODECODE_H_
 
+#include <cstdint>
 #include <memory>
 
 #include "config.h"

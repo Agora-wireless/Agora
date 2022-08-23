@@ -6,35 +6,23 @@
 #ifndef AGORA_H_
 #define AGORA_H_
 
-#include <unistd.h>
-
-#include <algorithm>
-#include <iostream>
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <queue>
-#include <system_error>
 #include <vector>
 
 #include "agora_worker.h"
 #include "buffer.h"
-#include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"
-#include "config.h"
-#include "dobeamweights.h"
-#include "dodecode.h"
-#include "dodemul.h"
-#include "doencode.h"
-#include "dofft.h"
-#include "doifft.h"
-#include "doprecode.h"
 #include "mac_thread_basestation.h"
-#include "mat_logger.h"
-#include "memory_manage.h"
+#include "message.h"
 #include "packet_txrx.h"
 #include "phy_stats.h"
-#include "signal_handler.h"
+#include "ran_config.h"
 #include "stats.h"
-#include "utils.h"
+#include "symbols.h"
 
 class Agora {
  public:
@@ -79,12 +67,6 @@ class Agora {
 
   size_t FetchEvent(std::vector<EventData>& events_list,
                     bool is_turn_to_dequeue_from_io);
-
-  void WorkerFft(int tid);
-  void WorkerBeam(int tid);
-  void WorkerDemul(int tid);
-  void WorkerDecode(int tid);
-  void Worker(int tid);
 
   void InitializeQueues();
   void InitializeCounters();

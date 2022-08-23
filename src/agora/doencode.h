@@ -7,12 +7,13 @@
 #ifndef DOENCODE_H_
 #define DOENCODE_H_
 
+#include <cstdint>
 #include <memory>
 
-#include "message.h"
 #include "config.h"
 #include "doer.h"
 #include "memory_manage.h"
+#include "message.h"
 #include "scrambler.h"
 #include "stats.h"
 
