@@ -12,6 +12,7 @@
 #include "packet_txrx_dpdk.h"
 #endif
 #include "logger.h"
+#include "modulation.h"
 #include "packet_txrx_radio.h"
 #include "packet_txrx_sim.h"
 #include "signal_handler.h"

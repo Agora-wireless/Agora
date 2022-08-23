@@ -5,6 +5,7 @@
 #include "doprecode.h"
 
 #include "concurrent_queue_wrapper.h"
+#include "modulation.h"
 
 static constexpr bool kUseSpatialLocality = true;
 

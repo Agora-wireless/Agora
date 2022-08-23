@@ -5,6 +5,7 @@
  */
 #include "dobeamweights.h"
 
+#include "comms-lib.h"
 #include "concurrent_queue_wrapper.h"
 #include "doer.h"
 #include "logger.h"

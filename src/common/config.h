@@ -10,26 +10,18 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
-#include <emmintrin.h>
-#include <immintrin.h>
-#include <unistd.h>
-
-#include <boost/range/algorithm/count.hpp>
-#include <fstream>  // std::ifstream
-#include <iostream>
+#include <atomic>
+#include <cstddef>
+#include <string>
 #include <vector>
 
-#include "comms-lib.h"
+#include "common_typedef_sdk.h"
 #include "framestats.h"
-#include "gettime.h"
 #include "ldpc_config.h"
 #include "memory_manage.h"
-#include "message.h"
-#include "modulation.h"
 #include "nlohmann/json.hpp"
 #include "symbols.h"
 #include "utils.h"
-#include "utils_ldpc.h"
 
 class Config {
  public:

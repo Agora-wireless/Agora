@@ -9,13 +9,10 @@
 #include <vector>
 
 #include "armadillo"
-#include "concurrentqueue.h"
 #include "config.h"
 #include "doer.h"
-#include "gettime.h"
 #include "memory_manage.h"
 #include "message.h"
-#include "modulation.h"
 #include "stats.h"
 #include "symbols.h"
 

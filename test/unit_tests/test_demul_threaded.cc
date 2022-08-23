@@ -6,6 +6,7 @@
 #include "config.h"
 #include "dodemul.h"
 #include "gettime.h"
+#include "modulation.h"
 #include "phy_stats.h"
 #include "utils.h"
 
