@@ -44,7 +44,7 @@ DoDemul::DoDemul(
                                cfg_->UeAntNum(), false);
   ue_pilot_data_ = mat_pilot_data.st();
 
-#if USE_MKL_JIT
+#if defined(USE_MKL_JIT)
   MKL_Complex8 alpha = {1, 0};
   MKL_Complex8 beta = {0, 0};
 
@@ -68,7 +68,7 @@ DoDemul::~DoDemul() {
   std::free(equaled_buffer_temp_);
   std::free(equaled_buffer_temp_transposed_);
 
-#if USE_MKL_JIT
+#if defined(USE_MKL_JIT)
   mkl_jit_status_t status = mkl_jit_destroy(jitter_);
   if (MKL_JIT_ERROR == status) {
     std::fprintf(stderr, "!!!!Error: Error while destorying MKL JIT\n");
@@ -218,7 +218,7 @@ EventData DoDemul::Launch(size_t tag) {
           ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
 
       size_t start_tsc2 = GetTime::WorkerRdtsc();
-#if USE_MKL_JIT
+#if defined(USE_MKL_JIT)
       mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_beam_ptr,
                      (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
 #else

@@ -76,7 +76,7 @@ class DoDemul : public Doer {
   arma::cx_fmat ue_pilot_data_;
   int ue_num_simd256_;
 
-#if USE_MKL_JIT
+#if defined(USE_MKL_JIT)
   void* jitter_;
   cgemm_jit_kernel_t mkl_jit_cgemm_;
 #endif

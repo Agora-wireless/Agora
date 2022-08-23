@@ -68,7 +68,7 @@ class DoPrecode : public Doer {
   DurationStat* duration_stat_;
   complex_float* modulated_buffer_temp_;
   complex_float* precoded_buffer_temp_;
-#if USE_MKL_JIT
+#if defined(USE_MKL_JIT)
   void* jitter_;
   cgemm_jit_kernel_t my_cgemm_;
 #endif
