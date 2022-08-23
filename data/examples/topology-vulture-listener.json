@@ -74,14 +74,11 @@
     "Clients": {
         "sdr": [
             /*Below will be Eve's serial ID*/
-            /*"RF3E000241"*/
             /*"RF3E000392"*/
             /*"RF3E000125"*/
             "RF3E000241"
             /*"RF3D000016"*/
             /*"RF3E000059"*/
-
-            
 
         ]
     }

@@ -6,8 +6,10 @@
     "channel": "A",
     "frequency": 3.6e9,
     "single_gain": true,
-    "rx_gain_a": 60,
-    "tx_gain_a": 75,
+    /*"rx_gain_a": 60,*/
+    "rx_gain_a": 65,
+    /*"tx_gain_a": 74,*/     /*(SUBF-suitable)*/
+    "tx_gain_a": 80,
     "rx_gain_b": 60,
     "tx_gain_b": 75,
     "sample_rate": 7.68e6,
@@ -34,12 +36,13 @@
         "BGCLGGPGGDDDG"
     ],
     "client_dl_pilot_syms": 1,
-    "beamsweep": false,
+    "beamsweep": true,
     "beacon_antenna": 0,
     /* UE configuration */
-    "ue_resync_period": 200,
+    "ue_resync_period": 1,
     "ue_channel": "A",
     "ue_rx_gain_a": [
+        /*65*/
         65
     ],
     "ue_tx_gain_a": [
@@ -57,17 +60,21 @@
     "ue_hw_framer": false,
     "hw_framer": true,
     /* Compute configuration */
-    "exclude_cores": [],
+    "exclude_cores": [0],
+
     "ue_core_offset": 13,
-    /*"ue_core_offset": 16,*/ /*bad*/
+    /*"ue_core_offset": 14,*/
+
     "ue_worker_thread_num": 2,
     "ue_socket_thread_num": 1,
+
     /* Vulture radios */
     "core_offset": 0,
+    /*"core_offset": 1,*/
     "worker_thread_num": 8,
     /*"worker_thread_num": 10,*/
     /*"worker_thread_num": 12,*/  /*bad*/
     "wlan_scrambler" : false,
     "socket_thread_num": 4,
-    "max_frame": 5000
+    "max_frame": 1000
 }

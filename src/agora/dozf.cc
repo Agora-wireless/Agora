@@ -17,8 +17,8 @@ static constexpr bool kUseUlZfForDownlink = false; // more accurate matrix pinv 
 
 enum AsmVersion { ASMv1, ASMv2 };
 static constexpr enum AsmVersion kAsmVersion = ASMv2;
-static constexpr size_t N_OFF = 0;  // num of OFF antennas among all BS antennas
-static constexpr bool kPrintEffGain = true;
+static constexpr size_t N_OFF = 3;  // num of OFF antennas among all BS antennas
+static constexpr bool kPrintEffGain = true;  // wil be in bs.txt
 
 DoZF::DoZF(Config* config, int tid,
            PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
@@ -123,8 +123,8 @@ float DoZF::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
 
   if (cfg_->Frame().NumDLSyms() > 0) {
     arma::cx_fmat mat_dl_zf_tmp;
-    arma::cx_fmat mat_dl_csi = arma::inv(arma::diagmat(calib_sc_vec)) * mat_csi;
-    if (kUseUlZfForDownlink == true) {    
+    arma::cx_fmat mat_dl_csi = arma::inv(arma::diagmat(calib_sc_vec)) * mat_csi; // [fixed]
+    if (kUseUlZfForDownlink == true) {    // false
       // With orthonormal calib matrix:
       // pinv(calib * csi) = pinv(csi)*inv(calib)
       // This probably causes a performance hit since we are throwing
@@ -152,7 +152,7 @@ float DoZF::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
 
       // =========================END=========================================
       
-    } else {       // kUseUlZfForDownlink == false
+    } else {       // when kUseUlZfForDownlink == false
       // arma::cx_fmat mat_dl_csi = arma::diagmat(calib_sc_vec) * mat_csi; // original, DO NOT USE
       // mat_dl_csi = arma::inv(arma::diagmat(calib_sc_vec)) * mat_csi; // [fixed, moved above]
       if (kUseInverseForZF) {      // true
