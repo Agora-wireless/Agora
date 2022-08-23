@@ -201,10 +201,20 @@ struct SchedInfo {
 };
 
 // Used to communicate between the manager and the worker class
-struct MessageInfo {
+//Needs to manage its own memory
+class MessageInfo {
+ public:
   moodycamel::ConcurrentQueue<EventData> complete_task_queue_[kScheduleQueues];
   moodycamel::ProducerToken* worker_ptoks_ptr_[kMaxThreads][kScheduleQueues];
   SchedInfo sched_info_arr_[kScheduleQueues][kNumEventTypes];
+
+  inline moodycamel::ProducerToken* GetPtok(EventType event_type, size_t qid) {
+    return sched_info_arr_[qid][static_cast<size_t>(event_type)].ptok_;
+  }
+  inline moodycamel::ConcurrentQueue<EventData>* GetConq(EventType event_type,
+                                                         size_t qid) {
+    return &sched_info_arr_[qid][static_cast<size_t>(event_type)].concurrent_q_;
+  }
 };
 
 struct FrameInfo {

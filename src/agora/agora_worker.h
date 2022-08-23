@@ -21,9 +21,9 @@
 
 class AgoraWorker {
  public:
-  explicit AgoraWorker(Config* /*cfg*/, Stats* /*stats*/,
-                       PhyStats* /*phy_stats*/, MessageInfo* /*message*/,
-                       AgoraBuffer* /*agora_buffer*/, FrameInfo* /*frame*/);
+  explicit AgoraWorker(Config* cfg, Stats* stats, PhyStats* phy_stats,
+                       MessageInfo* message, AgoraBuffer* buffer,
+                       FrameInfo* frame);
   ~AgoraWorker();
 
  private:
@@ -40,9 +40,6 @@ class AgoraWorker {
   MessageInfo* message_;
   AgoraBuffer* buffer_;
   FrameInfo* frame_;
-
-  size_t cur_sche_frame_id_;
-  size_t cur_proc_frame_id_;
 
   std::array<std::shared_ptr<CsvLog::MatLogger>, CsvLog::kMatLogs> mat_loggers_;
 };

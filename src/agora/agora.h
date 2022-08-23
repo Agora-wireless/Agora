@@ -15,6 +15,7 @@
 #include <system_error>
 #include <vector>
 
+#include "agora_worker.h"
 #include "buffer.h"
 #include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"
@@ -76,13 +77,14 @@ class Agora {
   void CheckIncrementScheduleFrame(size_t frame_id,
                                    ScheduleProcessingFlags completed);
 
+  size_t FetchEvent(std::vector<EventData>& events_list,
+                    bool is_turn_to_dequeue_from_io);
+
   void WorkerFft(int tid);
   void WorkerBeam(int tid);
   void WorkerDemul(int tid);
   void WorkerDecode(int tid);
   void Worker(int tid);
-
-  void CreateThreads();  /// Launch worker threads
 
   void InitializeQueues();
   void InitializeCounters();
@@ -120,28 +122,6 @@ class Agora {
   // Send current frame's SNR measurements from PHY to MAC
   void SendSnrReport(EventType event_type, size_t frame_id, size_t symbol_id);
 
-  /// Fetch the concurrent queue for this event type
-  moodycamel::ConcurrentQueue<EventData>* GetConq(EventType event_type,
-                                                  size_t qid) {
-    return &sched_info_arr_[qid][static_cast<size_t>(event_type)].concurrent_q_;
-  }
-
-  /// Fetch the producer token for this event type
-  moodycamel::ProducerToken* GetPtok(EventType event_type, size_t qid) const {
-    return sched_info_arr_[qid][static_cast<size_t>(event_type)].ptok_;
-  }
-
-  /// Return a string containing the sizes of the FFT queues
-  std::string GetFftQueueSizesString() const {
-    std::ostringstream ret;
-    ret << "[";
-    for (size_t i = 0; i < kFrameWnd; i++) {
-      ret << std::to_string(fft_queue_arr_[i].size()) << " ";
-    }
-    ret << "]";
-    return ret.str();
-  }
-
   // Worker thread i runs on core base_worker_core_offset + i
   const size_t base_worker_core_offset_;
 
@@ -154,10 +134,10 @@ class Agora {
   std::unique_ptr<MacThreadBaseStation> mac_thread_;
   // Handle for the MAC thread
   std::thread mac_std_thread_;
-  std::vector<std::thread> workers_;
 
   std::unique_ptr<Stats> stats_;
   std::unique_ptr<PhyStats> phy_stats_;
+  std::unique_ptr<AgoraWorker> worker_set_;
 
   //Agora Buffer containment
   std::unique_ptr<AgoraBuffer> agora_memory_;
@@ -185,8 +165,8 @@ class Agora {
   // cur_sche_frame_id is the frame that is currently being scheduled.
   // A frame's schduling finishes before processing ends, so the two
   // variables are possible to have different values.
-  size_t cur_proc_frame_id_ = 0;
-  size_t cur_sche_frame_id_ = 0;
+  FrameInfo frame_tracking_{0, 0};
+  MessageInfo message_;
 
   // The frame index for a symbol whose FFT is done
   std::vector<size_t> fft_cur_frame_for_symbol_;
@@ -202,12 +182,6 @@ class Agora {
   // TX/RX buffers.
   std::array<std::queue<fft_req_tag_t>, kFrameWnd> fft_queue_arr_;
 
-  struct SchedInfoT {
-    moodycamel::ConcurrentQueue<EventData> concurrent_q_;
-    moodycamel::ProducerToken* ptok_;
-  };
-  SchedInfoT sched_info_arr_[kScheduleQueues][kNumEventTypes];
-
   // Master thread's message queue for receiving packets
   moodycamel::ConcurrentQueue<EventData> message_queue_;
 
@@ -217,17 +191,11 @@ class Agora {
   // Worker-to-master queue for MAC
   moodycamel::ConcurrentQueue<EventData> mac_response_queue_;
 
-  // Master thread's message queue for event completion from Doers;
-  moodycamel::ConcurrentQueue<EventData> complete_task_queue_[kScheduleQueues];
-  moodycamel::ProducerToken* worker_ptoks_ptr_[kMaxThreads][kScheduleQueues];
-
   moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
 
   uint8_t schedule_process_flags_;
-
   std::queue<size_t> encode_deferral_;
-  std::array<std::shared_ptr<CsvLog::MatLogger>, CsvLog::kMatLogs> mat_loggers_;
 };
 
 #endif  // AGORA_H_
