@@ -9,8 +9,11 @@
 #include <cassert>
 #include <complex>
 
+#include "comms-lib.h"
 #include "datatype_conversion.h"
+#include "gettime.h"
 #include "logger.h"
+#include "message.h"
 
 static constexpr bool kDebugBeaconChannels = false;
 static constexpr size_t kSyncDetectChannel = 0;

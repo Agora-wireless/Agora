@@ -6,11 +6,13 @@
 #ifndef DOER_H_
 #define DOER_H_
 
-#include "buffer.h"
+#include <cstddef>
+
 #include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"
-#include "logger.h"
-#include "stats.h"
+#include "config.h"
+#include "message.h"
+#include "utils.h"
 
 class Doer {
  public:
@@ -57,7 +59,6 @@ class Doer {
 
  protected:
   Doer(Config* in_config, int in_tid) : cfg_(in_config), tid_(in_tid) {}
-
   virtual ~Doer() = default;
 
   Config* cfg_;
