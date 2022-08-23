@@ -6,7 +6,6 @@
 #ifndef AGORA_WORKER_H_
 #define AGORA_WORKER_H_
 
-#include "buffer.h"
 #include "concurrent_queue_wrapper.h"
 #include "csv_logger.h"
 #include "dobeamweights.h"
@@ -17,6 +16,7 @@
 #include "doifft.h"
 #include "doprecode.h"
 #include "mat_logger.h"
+#include "message.h"
 #include "phy_stats.h"
 
 class AgoraWorker {

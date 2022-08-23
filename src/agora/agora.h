@@ -37,13 +37,6 @@
 
 class Agora {
  public:
-  // Dequeue batch size, used to reduce the overhead of dequeue in main thread
-  static const size_t kDequeueBulkSizeTXRX = 8;
-  static const size_t kDequeueBulkSizeWorker = 4;
-  // Max number of worker threads allowed
-  static const size_t kMaxWorkerNum = 50;
-  static const size_t kScheduleQueues = 2;
-
   explicit Agora(
       Config* /*cfg*/);  /// Create an Agora object and start the worker threads
   ~Agora();

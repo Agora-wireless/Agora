@@ -10,13 +10,13 @@
 #include <thread>
 #include <vector>
 
-#include "buffer.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "csv_logger.h"
 #include "dodecode_client.h"
 #include "doencode.h"
 #include "doifft_client.h"
+#include "message.h"
 #include "mkl_dfti.h"
 #include "simd_types.h"
 #include "stats.h"

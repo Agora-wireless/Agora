@@ -9,7 +9,7 @@
 
 #include <vector>
 
-#include "buffer.h"
+#include "message.h"
 #include "common_typedef_sdk.h"
 #include "concurrentqueue.h"
 #include "config.h"

@@ -6,6 +6,7 @@
 
 #include "concurrent_queue_wrapper.h"
 #include "datatype_conversion.h"
+#include "logger.h"
 
 static constexpr bool kPrintIFFTOutput = false;
 static constexpr bool kPrintSocketOutput = false;

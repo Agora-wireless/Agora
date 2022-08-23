@@ -19,12 +19,12 @@
 #include <iostream>
 #include <vector>
 
-#include "buffer.h"
 #include "comms-lib.h"
 #include "framestats.h"
 #include "gettime.h"
 #include "ldpc_config.h"
 #include "memory_manage.h"
+#include "message.h"
 #include "modulation.h"
 #include "nlohmann/json.hpp"
 #include "symbols.h"

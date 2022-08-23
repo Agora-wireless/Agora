@@ -11,13 +11,12 @@
 #if defined(USE_DPDK)
 #include "packet_txrx_dpdk.h"
 #endif
+#include "logger.h"
 #include "packet_txrx_radio.h"
 #include "packet_txrx_sim.h"
 
 static const bool kDebugPrintPacketsFromMac = false;
 static const bool kDebugDeferral = true;
-static const size_t kDefaultMessageQueueSize = 512;
-static const size_t kDefaultWorkerQueueSize = 256;
 
 static const std::string kProjectDirectory = TOSTRING(PROJECT_DIRECTORY);
 static const std::string kOutputFilepath =

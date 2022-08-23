@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "datatype_conversion.h"
+#include "logger.h"
 #include "phy_ldpc_decoder_5gnr.h"
 #include "phy_stats.h"
 #include "scrambler.h"

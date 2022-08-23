@@ -13,7 +13,7 @@
 #include <iomanip>
 #include <numeric>
 
-#include "buffer.h"
+#include "message.h"
 #include "channel.h"
 #include "concurrent_queue_wrapper.h"
 #include "config.h"

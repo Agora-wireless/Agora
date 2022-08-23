@@ -12,6 +12,7 @@
 #include "concurrentqueue.h"
 #include "message.h"
 #include "symbols.h"
+#include "utils.h"
 
 /// Enqueue one event to a concurrent queue and print a warning message
 /// if we're short on queue space

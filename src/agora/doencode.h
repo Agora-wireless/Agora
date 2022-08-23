@@ -9,7 +9,7 @@
 
 #include <memory>
 
-#include "buffer.h"
+#include "message.h"
 #include "config.h"
 #include "doer.h"
 #include "memory_manage.h"

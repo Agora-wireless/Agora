@@ -8,12 +8,12 @@
 #include <armadillo>
 #include <iostream>
 
-#include "buffer.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "doer.h"
 #include "gettime.h"
 #include "mat_logger.h"
+#include "message.h"
 #include "phy_stats.h"
 #include "stats.h"
 #include "symbols.h"

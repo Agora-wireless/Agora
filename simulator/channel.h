@@ -13,10 +13,10 @@
 #include <iomanip>
 #include <numeric>
 
-#include "buffer.h"
 #include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"
+#include "message.h"
 #include "signal_handler.h"
 #include "symbols.h"
 #include "utils.h"
