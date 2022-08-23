@@ -7,8 +7,6 @@
 #include <memory>
 #include <vector>
 
-#include "logger.h"
-#include "message.h"
 #include "packet_txrx_client_radio.h"
 #include "packet_txrx_client_sim.h"
 #include "phy_ldpc_decoder_5gnr.h"

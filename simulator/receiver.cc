@@ -4,7 +4,6 @@
  */
 #include "receiver.h"
 
-#include "gettime.h"
 #include "udp_server.h"
 
 Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset)

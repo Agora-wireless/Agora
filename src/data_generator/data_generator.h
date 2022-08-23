@@ -8,10 +8,7 @@
 
 #include <string>
 
-#include "common_typedef_sdk.h"
-#include "comms-lib.h"
 #include "config.h"
-#include "modulation.h"
 #include "utils_ldpc.h"
 
 /**

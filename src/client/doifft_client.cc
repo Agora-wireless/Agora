@@ -7,12 +7,8 @@
 #include <armadillo>
 #include <vector>
 
-#include "comms-lib.h"
 #include "concurrent_queue_wrapper.h"
 #include "datatype_conversion.h"
-#include "gettime.h"
-#include "logger.h"
-#include "message.h"
 
 static constexpr bool kPrintIFFTOutput = false;
 static constexpr bool kPrintSocketOutput = false;

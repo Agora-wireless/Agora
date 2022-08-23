@@ -9,7 +9,6 @@
 #include "SoapySDR/Logger.hpp"
 #include "SoapySDR/Time.hpp"
 #include "SoapySDR/Version.hpp"
-#include "comms-lib.h"
 #include "logger.h"
 #include "radio_data_plane.h"
 #include "symbols.h"

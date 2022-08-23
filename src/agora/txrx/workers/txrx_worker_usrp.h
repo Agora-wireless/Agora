@@ -10,7 +10,7 @@
 #include <memory>
 #include <vector>
 
-#include "message.h"
+#include "buffer.h"
 #include "radio_lib.h"
 #include "txrx_worker.h"
 

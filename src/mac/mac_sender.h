@@ -14,7 +14,6 @@
 #include "config.h"
 #include "mac_data_receiver.h"
 #include "memory_manage.h"
-#include "message.h"
 
 class MacSender {
  public:

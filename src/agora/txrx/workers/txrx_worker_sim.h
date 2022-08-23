@@ -9,7 +9,7 @@
 #include <memory>
 #include <vector>
 
-#include "message.h"
+#include "buffer.h"
 #include "txrx_worker.h"
 #include "udp_client.h"
 #include "udp_server.h"

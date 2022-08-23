@@ -5,20 +5,24 @@
 #ifndef DOIFFT_H_
 #define DOIFFT_H_
 
-#include <cstddef>
+#include <armadillo>
+#include <iostream>
+#include <vector>
 
 #include "buffer.h"
-#include "common_typedef_sdk.h"
+#include "concurrentqueue.h"
 #include "config.h"
 #include "doer.h"
-#include "message.h"
+#include "gettime.h"
 #include "mkl_dfti.h"
+#include "phy_stats.h"
 #include "stats.h"
+#include "symbols.h"
 
 class DoIFFT : public Doer {
  public:
-  DoIFFT(Config* in_config, int in_tid, AgoraBuffer* buffer,
-         Stats* in_stats_manager);
+  DoIFFT(Config* in_config, int in_tid, Table<complex_float>& in_dl_ifft_buffer,
+         char* in_dl_socket_buffer, Stats* in_stats_manager);
   ~DoIFFT() override;
 
   /**
@@ -47,7 +51,8 @@ class DoIFFT : public Doer {
   EventData Launch(size_t tag) override;
 
  private:
-  AgoraBuffer* buffer_;
+  Table<complex_float>& dl_ifft_buffer_;
+  char* dl_socket_buffer_;
   DurationStat* duration_stat_;
   DFTI_DESCRIPTOR_HANDLE mkl_handle_;
   float* ifft_out_;  // Buffer for IFFT output

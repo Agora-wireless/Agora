@@ -12,19 +12,18 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <boost/align/aligned_allocator.hpp>
 #include <chrono>
 #include <iostream>
 #include <numeric>
 #include <thread>
 #include <vector>
 
-#include "common_typedef_sdk.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "datatype_conversion.h"
 #include "gettime.h"
 #include "memory_manage.h"
-#include "message.h"
 #include "mkl_dfti.h"
 #include "symbols.h"
 #include "utils.h"

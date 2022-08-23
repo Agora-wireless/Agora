@@ -6,8 +6,6 @@
 
 #include <memory>
 
-#include "gettime.h"
-
 static const bool kDebugPrintAllRxSymbols = false;
 static const bool kDebugPrintSimSetup = true;
 

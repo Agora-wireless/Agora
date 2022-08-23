@@ -5,11 +5,10 @@
  */
 #ifndef MEMORY_MANAGE_H_
 #define MEMORY_MANAGE_H_
-
 #include <array>
 #include <cassert>
 #include <complex>
-#include <cstddef>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <random>

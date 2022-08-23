@@ -25,7 +25,7 @@ static constexpr size_t kFrameWnd = 40;
 #if __INTEL_MKL__ >= 2020 || (__INTEL_MKL__ == 2019 && __INTEL_MKL_UPDATE__ > 3)
 #define USE_MKL_JIT (1)
 #else
-#undef USE_MKL_JIT
+#define USE_MKL_JIT (0)
 #endif
 
 #define ENABLE_RB_IND (0)
@@ -38,7 +38,7 @@ static constexpr inline bool IsPowerOfTwo(T x) {
 
 enum class Direction : int { kDownlink, kUplink };
 
-/// \todo Merge EventType and DoerType into WorkType
+// TODO: Merge EventType and DoerType into WorkType
 enum class EventType : int {
   kPacketRX,
   kFFT,
@@ -112,24 +112,6 @@ enum class PrintType : int {
   kPacketToMac,
   kModul
 };
-
-enum ScheduleProcessingFlags : uint8_t {
-  kNone = 0,
-  kUplinkComplete = 0x1,
-  kDownlinkComplete = 0x2,
-  kProcessingComplete = (kUplinkComplete + kDownlinkComplete)
-};
-
-// Moved from Agora class
-/// \todo need organization
-static const size_t kDefaultMessageQueueSize = 512;
-static const size_t kDefaultWorkerQueueSize = 256;
-// Max number of worker threads allowed
-static const size_t kMaxWorkerNum = 50;
-static const size_t kScheduleQueues = 2;
-// Dequeue batch size, used to reduce the overhead of dequeue in main thread
-static const size_t kDequeueBulkSizeTXRX = 8;
-static const size_t kDequeueBulkSizeWorker = 4;
 
 // Enable thread pinning and exit if thread pinning fails. Thread pinning is
 // crucial for good performance. For testing or developing Agora on machines
@@ -332,7 +314,7 @@ static constexpr size_t kMacBaseLocalPort = 8180;
 
 // Agora sends control information over an out-of-band control channel
 // to each UE #i, at port kBaseClientPort + i
-/// \todo need to generalize for hostname, port pairs for each client
+// TODO: need to generalize for hostname, port pairs for each client
 static constexpr size_t kMacBaseClientPort = 7070;
 
 // Number of subcarriers in a partial transpose block

@@ -10,18 +10,26 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
-#include <atomic>
-#include <cstddef>
-#include <string>
+#include <emmintrin.h>
+#include <immintrin.h>
+#include <unistd.h>
+
+#include <boost/range/algorithm/count.hpp>
+#include <fstream>  // std::ifstream
+#include <iostream>
 #include <vector>
 
-#include "common_typedef_sdk.h"
+#include "buffer.h"
+#include "comms-lib.h"
 #include "framestats.h"
+#include "gettime.h"
 #include "ldpc_config.h"
 #include "memory_manage.h"
+#include "modulation.h"
 #include "nlohmann/json.hpp"
 #include "symbols.h"
 #include "utils.h"
+#include "utils_ldpc.h"
 
 class Config {
  public:
@@ -421,12 +429,12 @@ class Config {
 
   /// Fetch the data buffer for this frame and symbol ID. The symbol must
   /// be an uplink symbol.
-  inline size_t GetIndexForFrameAndSymbol(size_t frame_id,
-                                          size_t symbol_id) const {
+  inline complex_float* GetDataBuf(Table<complex_float>& data_buffers,
+                                   size_t frame_id, size_t symbol_id) const {
     size_t frame_slot = frame_id % kFrameWnd;
     size_t symbol_offset = (frame_slot * this->frame_.NumULSyms()) +
                            this->frame_.GetULSymbolIdx(symbol_id);
-    return symbol_offset;
+    return data_buffers[symbol_offset];
   }
 
   /// Return the subcarrier ID to which we should refer to for the zeroforcing
@@ -463,24 +471,6 @@ class Config {
                              cb_id * num_bytes_per_cb];
   }
 
-  inline size_t GetMacBitsIdx(Direction dir, size_t frame_id, size_t symbol_id,
-                              size_t cb_id) const {
-    size_t mac_bytes_perframe;
-    size_t num_bytes_per_cb;
-    size_t mac_packet_length;
-    if (dir == Direction::kDownlink) {
-      mac_bytes_perframe = this->dl_mac_bytes_num_perframe_;
-      num_bytes_per_cb = this->dl_num_bytes_per_cb_;
-      mac_packet_length = this->dl_mac_packet_length_;
-    } else {
-      mac_bytes_perframe = ul_mac_bytes_num_perframe_;
-      num_bytes_per_cb = this->ul_num_bytes_per_cb_;
-      mac_packet_length = this->ul_mac_packet_length_;
-    }
-    return (frame_id % kFrameWnd) * mac_bytes_perframe +
-           symbol_id * mac_packet_length + cb_id * num_bytes_per_cb;
-  }
-
   /// Get info bits for this symbol, user and code block ID
   inline int8_t* GetInfoBits(Table<int8_t>& info_bits, Direction dir,
                              size_t symbol_id, size_t ue_id,
@@ -496,21 +486,6 @@ class Config {
     }
     return &info_bits[symbol_id][Roundup<64>(num_bytes_per_cb) *
                                  (num_blocks_in_symbol * ue_id + cb_id)];
-  }
-
-  inline size_t GetInfoBitsIdx(Direction dir, size_t ue_id,
-                               size_t cb_id) const {
-    size_t num_bytes_per_cb;
-    size_t num_blocks_in_symbol;
-    if (dir == Direction::kDownlink) {
-      num_bytes_per_cb = this->dl_num_bytes_per_cb_;
-      num_blocks_in_symbol = this->dl_ldpc_config_.NumBlocksInSymbol();
-    } else {
-      num_bytes_per_cb = this->ul_num_bytes_per_cb_;
-      num_blocks_in_symbol = this->ul_ldpc_config_.NumBlocksInSymbol();
-    }
-    return Roundup<64>(num_bytes_per_cb) *
-           (num_blocks_in_symbol * ue_id + cb_id);
   }
 
   /// Get encoded_buffer for this frame, symbol, user and code block ID
@@ -529,19 +504,6 @@ class Config {
 
     return &mod_bits_buffer[total_data_symbol_id]
                            [Roundup<64>(ofdm_data_num) * ue_id + sc_id];
-  }
-
-  /// Get encoded_buffer for this frame, symbol, user and code block ID
-  inline size_t GetModBitsBufIdx(Direction dir, size_t ue_id,
-                                 size_t sc_id) const {
-    size_t ofdm_data_num;
-    if (dir == Direction::kDownlink) {
-      ofdm_data_num = GetOFDMDataNum();
-    } else {
-      ofdm_data_num = this->ofdm_data_num_;
-    }
-
-    return Roundup<64>(ofdm_data_num) * ue_id + sc_id;
   }
 
   // Returns the number of pilot subcarriers in downlink symbols used for

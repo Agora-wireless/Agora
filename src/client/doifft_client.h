@@ -5,7 +5,6 @@
 #ifndef DOIFFT_CLIENT_H_
 #define DOIFFT_CLIENT_H_
 
-#include "common_typedef_sdk.h"
 #include "config.h"
 #include "doer.h"
 #include "memory_manage.h"

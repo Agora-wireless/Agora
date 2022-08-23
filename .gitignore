@@ -30,7 +30,6 @@ build/*
 *.sql
 *.sqlite
 tags
-out
 files/experiment/*
 
 # OS generated files #

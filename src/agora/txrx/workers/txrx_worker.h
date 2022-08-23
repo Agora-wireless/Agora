@@ -13,7 +13,6 @@
 
 #include "concurrentqueue.h"
 #include "config.h"
-#include "message.h"
 
 class TxRxWorker {
  public:

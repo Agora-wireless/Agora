@@ -4,13 +4,10 @@
  */
 #include "channel_sim.h"
 
-#include <atomic>
 #include <utility>
 
 #include "datatype_conversion.h"
-#include "gettime.h"
 #include "logger.h"
-#include "message.h"
 
 static std::atomic<bool> running = true;
 static constexpr bool kPrintChannelOutput = false;

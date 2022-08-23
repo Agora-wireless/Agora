@@ -4,8 +4,8 @@
  */
 #include "recorder.h"
 
+#include "buffer.h"
 #include "logger.h"
-#include "message.h"
 
 namespace Agora_recorder {
 // buffer length of each rx thread
