@@ -85,8 +85,8 @@ class Agora {
   void CreateThreads();  /// Launch worker threads
 
   void InitializeQueues();
-  void InitializeUplinkBuffers();
-  void InitializeDownlinkBuffers();
+  void InitializeCounters();
+  void InitializeThreads();
   void FreeQueues();
 
   void SaveDecodeDataToFile(int frame_id);

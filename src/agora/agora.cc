@@ -45,64 +45,16 @@ Agora::Agora(Config* const cfg)
   cur_proc_frame_id_ = 0;
 
   InitializeQueues();
-  InitializeUplinkBuffers();
-  InitializeDownlinkBuffers();
-
-  /* Initialize TXRX threads */
-  if (kUseArgos || kUseUHD) {
-    packet_tx_rx_ = std::make_unique<PacketTxRxRadio>(
-        cfg, cfg->CoreOffset() + 1, &message_queue_,
-        GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
-        agora_memory_->GetUlSocket(),
-        agora_memory_->GetUlSocketSize() / cfg->PacketLength(),
-        this->stats_->FrameStart(), agora_memory_->GetDlSocket());
-#if defined(USE_DPDK)
-  } else if (kUseDPDK) {
-    packet_tx_rx_ = std::make_unique<PacketTxRxDpdk>(
-        cfg, cfg->CoreOffset() + 1, &message_queue_,
-        GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
-        agora_memory_->GetUlSocket(),
-        agora_memory_->GetUlSocketSize() / cfg->PacketLength(),
-        this->stats_->FrameStart(), agora_memory_->GetDlSocket());
-#endif
-  } else {
-    /* Default to the simulator */
-    packet_tx_rx_ = std::make_unique<PacketTxRxSim>(
-        cfg, cfg->CoreOffset() + 1, &message_queue_,
-        GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
-        agora_memory_->GetUlSocket(),
-        agora_memory_->GetUlSocketSize() / cfg->PacketLength(),
-        this->stats_->FrameStart(), agora_memory_->GetDlSocket());
-  }
-
-  if (kEnableMac == true) {
-    const size_t mac_cpu_core =
-        cfg->CoreOffset() + cfg->SocketThreadNum() + cfg->WorkerThreadNum() + 1;
-    mac_thread_ = std::make_unique<MacThreadBaseStation>(
-        cfg, mac_cpu_core, agora_memory_->GetDecod(),
-        &agora_memory_->GetDlBits(), &agora_memory_->GetDlBitsStatus(),
-        &mac_request_queue_, &mac_response_queue_);
-
-    mac_std_thread_ =
-        std::thread(&MacThreadBaseStation::RunEventLoop, mac_thread_.get());
-  }
+  InitializeCounters();
+  InitializeThreads();
 
   if (kEnableMatLog) {
     for (size_t i = 0; i < mat_loggers_.size(); i++) {
       mat_loggers_.at(i) = std::make_shared<CsvLog::MatLogger>(i, "BS");
     }
   }
-
   // Create worker threads
   CreateThreads();
-
-  AGORA_LOG_INFO(
-      "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
-      "cores %zu--%zu\n",
-      cfg->CoreOffset(), cfg->CoreOffset() + 1,
-      cfg->CoreOffset() + 1 + cfg->SocketThreadNum() - 1,
-      base_worker_core_offset_,
-      base_worker_core_offset_ + cfg->WorkerThreadNum() - 1);
 }
 
 Agora::~Agora() {
@@ -1259,7 +1211,7 @@ void Agora::FreeQueues() {
   }
 }
 
-void Agora::InitializeUplinkBuffers() {
+void Agora::InitializeCounters() {
   const auto& cfg = config_;
 
   rx_counters_.num_pilot_pkts_per_frame_ =
@@ -1301,9 +1253,7 @@ void Agora::InitializeUplinkBuffers() {
           cfg->UeAntNum());
 
   tomac_counters_.Init(cfg->Frame().NumULSyms(), cfg->UeAntNum());
-}
 
-void Agora::InitializeDownlinkBuffers() {
   if (config_->Frame().NumDLSyms() > 0) {
     AGORA_LOG_TRACE("Agora: Initializing downlink buffers\n");
 
@@ -1324,6 +1274,60 @@ void Agora::InitializeDownlinkBuffers() {
     // mac data is sent per frame, so we set max symbol to 1
     mac_to_phy_counters_.Init(1, config_->UeAntNum());
   }
+}
+
+void Agora::InitializeThreads() {
+  /* Initialize TXRX threads */
+  if (kUseArgos || kUseUHD) {
+    packet_tx_rx_ = std::make_unique<PacketTxRxRadio>(
+        config_, config_->CoreOffset() + 1, &message_queue_,
+        GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
+        agora_memory_->GetUlSocket(),
+        agora_memory_->GetUlSocketSize() / config_->PacketLength(),
+        this->stats_->FrameStart(), agora_memory_->GetDlSocket());
+#if defined(USE_DPDK)
+  } else if (kUseDPDK) {
+    packet_tx_rx_ = std::make_unique<PacketTxRxDpdk>(
+        config_, config_->CoreOffset() + 1, &message_queue_,
+        GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
+        agora_memory_->GetUlSocket(),
+        agora_memory_->GetUlSocketSize() / config_->PacketLength(),
+        this->stats_->FrameStart(), agora_memory_->GetDlSocket());
+#endif
+  } else {
+    /* Default to the simulator */
+    packet_tx_rx_ = std::make_unique<PacketTxRxSim>(
+        config_, config_->CoreOffset() + 1, &message_queue_,
+        GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
+        agora_memory_->GetUlSocket(),
+        agora_memory_->GetUlSocketSize() / config_->PacketLength(),
+        this->stats_->FrameStart(), agora_memory_->GetDlSocket());
+  }
+
+  if (kEnableMac == true) {
+    const size_t mac_cpu_core = config_->CoreOffset() +
+                                config_->SocketThreadNum() +
+                                config_->WorkerThreadNum() + 1;
+    mac_thread_ = std::make_unique<MacThreadBaseStation>(
+        config_, mac_cpu_core, agora_memory_->GetDecod(),
+        &agora_memory_->GetDlBits(), &agora_memory_->GetDlBitsStatus(),
+        &mac_request_queue_, &mac_response_queue_);
+
+    mac_std_thread_ =
+        std::thread(&MacThreadBaseStation::RunEventLoop, mac_thread_.get());
+  }
+
+  // Create workers
+  //worker_ = std::make_unique<AgoraWorker>(config_, stats_.get(), phy_stats_.get(),
+  //                                        &message_, buffer_.get(), &frame_);
+
+  AGORA_LOG_INFO(
+      "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
+      "cores %zu--%zu\n",
+      config_->CoreOffset(), config_->CoreOffset() + 1,
+      config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1,
+      base_worker_core_offset_,
+      base_worker_core_offset_ + config_->WorkerThreadNum() - 1);
 }
 
 void Agora::SaveDecodeDataToFile(int frame_id) {
