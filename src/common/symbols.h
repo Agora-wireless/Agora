@@ -122,14 +122,14 @@ enum ScheduleProcessingFlags : uint8_t {
 
 // Moved from Agora class
 /// \todo need organization
-static const size_t kDefaultMessageQueueSize = 512;
-static const size_t kDefaultWorkerQueueSize = 256;
+static constexpr size_t kDefaultMessageQueueSize = 512;
+static constexpr size_t kDefaultWorkerQueueSize = 256;
 // Max number of worker threads allowed
-static const size_t kMaxWorkerNum = 50;
-static const size_t kScheduleQueues = 2;
+//static constexpr size_t kMaxWorkerNum = 50;
+static constexpr size_t kScheduleQueues = 2;
 // Dequeue batch size, used to reduce the overhead of dequeue in main thread
-static const size_t kDequeueBulkSizeTXRX = 8;
-static const size_t kDequeueBulkSizeWorker = 4;
+static constexpr size_t kDequeueBulkSizeTXRX = 8;
+static constexpr size_t kDequeueBulkSizeWorker = 4;
 
 // Enable thread pinning and exit if thread pinning fails. Thread pinning is
 // crucial for good performance. For testing or developing Agora on machines

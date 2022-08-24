@@ -5,9 +5,9 @@
 
 #include <iostream>
 
-#include "buffer.h"
 #include "gettime.h"
 #include "memory_manage.h"
+#include "message.h"
 #include "modulation.h"
 #include "utils.h"
 

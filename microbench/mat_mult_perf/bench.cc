@@ -1,9 +1,9 @@
 #include <gflags/gflags.h>
 #include <mkl.h>
 
-#include <armadillo>
 #include <iostream>
 
+#include "armadillo"
 #include "timer.h"
 
 double freq_ghz = -1.0;  // RDTSC frequency

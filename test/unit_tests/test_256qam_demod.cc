@@ -2,9 +2,9 @@
 
 #include <random>
 
-#include "buffer.h"
 #include "gettime.h"
 #include "memory_manage.h"
+#include "message.h"
 #include "modulation.h"
 
 #define NUM_SYMBOLS 1000   // number of symbols to modulate and demodulate

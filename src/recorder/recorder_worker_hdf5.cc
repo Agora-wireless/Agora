@@ -58,6 +58,7 @@ void RecorderWorkerHDF5::Init() {
   conf.close();
   hdf5_->WriteAttribute("CONFIG", data.dump());
 
+  hdf5_->WriteAttribute("MAX_FRAME", cfg_->FramesToTest());
   // Write Atrributes
   // ******* COMMON ******** //
   // TX/RX Frequencyfile

@@ -6,8 +6,8 @@
 
 #include <string>
 
-#include "buffer.h"
 #include "eth_common.h"
+#include "message.h"
 #include "rte_version.h"
 #include "utils.h"
 

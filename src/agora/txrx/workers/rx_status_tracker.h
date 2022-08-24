@@ -9,8 +9,8 @@
 #include <cstddef>
 #include <vector>
 
-#include "buffer.h"
 #include "logger.h"
+#include "message.h"
 
 namespace TxRxWorkerRx {
 

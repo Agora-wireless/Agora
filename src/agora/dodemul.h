@@ -6,19 +6,24 @@
 #define DODEMUL_H_
 
 #include "armadillo"
-#include "buffer.h"
 #include "common_typedef_sdk.h"
+#include "concurrentqueue.h"
 #include "config.h"
 #include "doer.h"
-#include "message.h"
-#include "mkl_types.h"
+#include "memory_manage.h"
+#include "mkl_dfti.h"
 #include "phy_stats.h"
 #include "stats.h"
+#include "symbols.h"
 
 class DoDemul : public Doer {
  public:
-  DoDemul(Config* config, int tid, AgoraBuffer* buffer, PhyStats* in_phy_stats,
-          Stats* in_stats_manager);
+  DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
+          PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices,
+          Table<complex_float>& ue_spec_pilot_buffer,
+          Table<complex_float>& equal_buffer,
+          PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_,
+          PhyStats* in_phy_stats, Stats* in_stats_manager);
   ~DoDemul() override;
 
   /**
@@ -50,7 +55,11 @@ class DoDemul : public Doer {
   EventData Launch(size_t tag) override;
 
  private:
-  AgoraBuffer* buffer_;
+  Table<complex_float>& data_buffer_;
+  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_;
+  Table<complex_float>& ue_spec_pilot_buffer_;
+  Table<complex_float>& equal_buffer_;
+  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_;
   DurationStat* duration_stat_;
   PhyStats* phy_stats_;
 
