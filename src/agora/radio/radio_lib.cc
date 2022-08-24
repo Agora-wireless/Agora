@@ -274,7 +274,7 @@ bool RadioConfig::RadioStart() {
     if (cfg_->HwFramer()) {
       const size_t cell_id = cfg_->CellId().at(i);
       const bool is_ref_radio = (i == cfg_->RefRadio(cell_id));
-      radios_.at(i)->ConfigureTddModeBs(is_ref_radio, i);
+      radios_.at(i)->ConfigureTddModeBs(is_ref_radio);
     }
     radios_.at(i)->SetTimeAtTrigger(0);
     activate_radio_threads.emplace_back(&Radio::Activate, radios_.at(i).get(),

@@ -8,15 +8,14 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <queue>
-#include <thread>
 #include <vector>
 
+#include "agora_buffer.h"
 #include "agora_worker.h"
-#include "buffer.h"
 #include "concurrentqueue.h"
-#include "config.h"
 #include "mac_thread_basestation.h"
 #include "message.h"
 #include "packet_txrx.h"
@@ -24,17 +23,9 @@
 #include "ran_config.h"
 #include "stats.h"
 #include "symbols.h"
-#include "utils.h"
 
 class Agora {
  public:
-  // Dequeue batch size, used to reduce the overhead of dequeue in main thread
-  static constexpr size_t kDequeueBulkSizeTXRX = 8;
-  static constexpr size_t kDequeueBulkSizeWorker = 4;
-  // Max number of worker threads allowed
-  static constexpr size_t kMaxWorkerNum = 50;
-  static constexpr size_t kScheduleQueues = 2;
-
   explicit Agora(
       Config* /*cfg*/);  /// Create an Agora object and start the worker threads
   ~Agora();
@@ -73,19 +64,23 @@ class Agora {
   /// been acheived.
   void CheckIncrementScheduleFrame(size_t frame_id,
                                    ScheduleProcessingFlags completed);
-  size_t FetchEvent(EventData events_list[], bool is_turn_to_dequeue_from_io);
+
+  size_t FetchEvent(std::vector<EventData>& events_list,
+                    bool is_turn_to_dequeue_from_io);
 
   void InitializeQueues();
   void InitializeCounters();
   void InitializeThreads();
   void FreeQueues();
 
-  void HandleEventFft(size_t tag);
-  void UpdateRxCounters(size_t frame_id, size_t symbol_id);
-  void UpdateRanConfig(RanConfig rc);
-
   void SaveDecodeDataToFile(int frame_id);
   void SaveTxDataToFile(int frame_id);
+
+  void HandleEventFft(size_t tag);
+  void UpdateRxCounters(size_t frame_id, size_t symbol_id);
+
+  /// Update Agora's RAN config parameters
+  void UpdateRanConfig(RanConfig rc);
 
   void ScheduleSubcarriers(EventType event_type, size_t frame_id,
                            size_t symbol_id);
@@ -116,21 +111,18 @@ class Agora {
   size_t fft_created_count_;
   size_t max_equaled_frame_ = SIZE_MAX;
   std::unique_ptr<PacketTxRx> packet_tx_rx_;
-  std::unique_ptr<AgoraWorker> worker_;
 
   // The thread running MAC layer functions
   std::unique_ptr<MacThreadBaseStation> mac_thread_;
   // Handle for the MAC thread
   std::thread mac_std_thread_;
-  std::vector<std::thread> workers_;
 
   std::unique_ptr<Stats> stats_;
   std::unique_ptr<PhyStats> phy_stats_;
-  std::unique_ptr<AgoraBuffer> buffer_;
+  std::unique_ptr<AgoraWorker> worker_set_;
 
-  MessageInfo message_;
-  // AgoraBuffer buffer_;
-  FrameInfo frame_;
+  //Agora Buffer containment
+  std::unique_ptr<AgoraBuffer> agora_memory_;
 
   // Counters related to various modules
   FrameCounters pilot_fft_counters_;
@@ -155,8 +147,8 @@ class Agora {
   // cur_sche_frame_id is the frame that is currently being scheduled.
   // A frame's schduling finishes before processing ends, so the two
   // variables are possible to have different values.
-  size_t cur_proc_frame_id_ = 0;
-  size_t cur_sche_frame_id_ = 0;
+  FrameInfo frame_tracking_{0, 0};
+  std::unique_ptr<MessageInfo> message_;
 
   // The frame index for a symbol whose FFT is done
   std::vector<size_t> fft_cur_frame_for_symbol_;
@@ -172,8 +164,6 @@ class Agora {
   // TX/RX buffers.
   std::array<std::queue<fft_req_tag_t>, kFrameWnd> fft_queue_arr_;
 
-  // SchedInfo sched_info_arr_[kScheduleQueues][kNumEventTypes];
-
   // Master thread's message queue for receiving packets
   moodycamel::ConcurrentQueue<EventData> message_queue_;
 
@@ -183,9 +173,6 @@ class Agora {
   // Worker-to-master queue for MAC
   moodycamel::ConcurrentQueue<EventData> mac_response_queue_;
 
-  // Master thread's message queue for event completion from Doers;
-  // moodycamel::ConcurrentQueue<EventData> complete_task_queue_[kScheduleQueues];
-  // moodycamel::ProducerToken* worker_ptoks_ptr_[kMaxThreads][kScheduleQueues];
   moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
 
