@@ -112,8 +112,8 @@ void AgoraWorker::WorkerThread(int tid) {
     for (size_t i = 0; i < computers_vec.size(); i++) {
       if (computers_vec.at(i)->TryLaunch(
               *message_->GetConq(events_vec.at(i), cur_qid),
-              message_->complete_task_queue_[cur_qid],
-              message_->worker_ptoks_ptr_[tid][cur_qid])) {
+              message_->GetCompQueue(cur_qid),
+              message_->GetWorkerPtok(cur_qid, tid))) {
         empty_queue = false;
         break;
       }

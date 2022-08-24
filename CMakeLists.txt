@@ -380,6 +380,7 @@ endif()
 
 set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/agora.cc
+  src/agora/agora_buffer.cc
   src/agora/agora_worker.cc
   src/agora/dofft.cc
   src/agora/doifft.cc

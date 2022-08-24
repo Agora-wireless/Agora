@@ -6,6 +6,7 @@
 #ifndef AGORA_WORKER_H_
 #define AGORA_WORKER_H_
 
+#include "agora_buffer.h"
 #include "concurrent_queue_wrapper.h"
 #include "csv_logger.h"
 #include "dobeamweights.h"

@@ -8,7 +8,6 @@
 
 #include <cstddef>
 
-#include "buffer.h"
 #include "concurrentqueue.h"
 #include "message.h"
 #include "symbols.h"

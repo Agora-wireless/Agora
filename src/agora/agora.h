@@ -13,8 +13,8 @@
 #include <queue>
 #include <vector>
 
+#include "agora_buffer.h"
 #include "agora_worker.h"
-#include "buffer.h"
 #include "concurrentqueue.h"
 #include "mac_thread_basestation.h"
 #include "message.h"
@@ -148,7 +148,7 @@ class Agora {
   // A frame's schduling finishes before processing ends, so the two
   // variables are possible to have different values.
   FrameInfo frame_tracking_{0, 0};
-  MessageInfo message_;
+  std::unique_ptr<MessageInfo> message_;
 
   // The frame index for a symbol whose FFT is done
   std::vector<size_t> fft_cur_frame_for_symbol_;
