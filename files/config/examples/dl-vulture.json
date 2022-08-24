@@ -59,6 +59,10 @@
         140,
         140
     ],
+    "corr_scale": [
+        1,
+        1
+    ],
     "ue_hw_framer": false,
     "hw_framer": true,
     /* Compute configuration */

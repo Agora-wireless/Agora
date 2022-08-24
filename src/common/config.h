@@ -323,6 +323,9 @@ class Config {
   inline const std::vector<int>& ClTxAdvance() const {
     return this->cl_tx_advance_;
   }
+  inline const std::vector<float>& ClCorrScale() const {
+    return this->cl_corr_scale_;
+  }
 
   inline const FrameStats& Frame() const { return this->frame_; }
   inline const std::vector<std::complex<float>>& PilotCf32() const {
@@ -749,6 +752,7 @@ class Config {
   size_t packet_length_;
 
   std::vector<int> cl_tx_advance_;
+  std::vector<float> cl_corr_scale_;
 
   float scale_;  // Scaling factor for all transmit symbols
 
