@@ -34,14 +34,17 @@ TxRxWorkerClientSim::TxRxWorkerClientSim(
   for (size_t interface = 0; interface < num_interfaces_; interface++) {
     const uint16_t local_port_id =
         config->UeServerPort() + interface + interface_offset_;
+    const uint16_t rem_port_id =
+        config->UeRruPort() + interface + interface_offset_;
 
-    udp_servers_.emplace_back(
-        std::make_unique<UDPServer>(local_port_id, kSocketRxBufferSize));
-    udp_clients_.emplace_back(std::make_unique<UDPClient>());
+    udp_comm_.emplace_back(std::make_unique<UDPComm>(
+        config->UeServerAddr(), local_port_id, kSocketRxBufferSize, 0));
+    udp_comm_.back()->Connect(config->UeRruAddr(), rem_port_id);
     AGORA_LOG_FRAME(
         "TxRxWorkerClientSim[%zu]: set up UDP socket server listening "
-        "to local port %d\n",
-        tid_, local_port_id);
+        "to %s:%d sending to %s:%d\n",
+        tid_, config->UeServerAddr().c_str(), local_port_id,
+        config->UeRruAddr(), rem_port_id);
   }
 
   auto* pilot_pkt = reinterpret_cast<Packet*>(tx_pkt_pilot_.data());
@@ -93,8 +96,9 @@ std::vector<Packet*> TxRxWorkerClientSim::RecvEnqueue(size_t interface_id) {
   RxPacket& rx_placement = GetRxPacket();
   Packet* pkt = rx_placement.RawPacket();
 
-  ssize_t rx_bytes = udp_servers_.at(interface_id)
-                         ->Recv(reinterpret_cast<uint8_t*>(pkt), packet_length);
+  ssize_t rx_bytes =
+      udp_comm_.at(interface_id)
+          ->Recv(reinterpret_cast<std::byte*>(pkt), packet_length);
   if (rx_bytes == static_cast<ssize_t>(packet_length)) {
     if (kDebugPrintInTask) {
       AGORA_LOG_INFO(
@@ -173,10 +177,8 @@ size_t TxRxWorkerClientSim::DequeueSend() {
       //Fill out the frame / symbol / cell / ant
       new (tx_packet) Packet(frame_id, symbol_id, 0 /* cell_id */, ue_ant);
 
-      udp_clients_.at(local_interface)
-          ->Send(Configuration()->BsRruAddr(),
-                 Configuration()->UeRruPort() + ue_id,
-                 reinterpret_cast<uint8_t*>(tx_packet),
+      udp_comm_.at(local_interface)
+          ->Send(reinterpret_cast<std::byte*>(tx_packet),
                  Configuration()->PacketLength());
     }
 
@@ -197,10 +199,8 @@ size_t TxRxWorkerClientSim::DequeueSend() {
         new (tx_packet) Packet(frame_id, symbol_id, 0 /* cell_id */, ue_ant);
 
         // Send data (one OFDM symbol)
-        udp_clients_.at(local_interface)
-            ->Send(Configuration()->BsRruAddr(),
-                   Configuration()->UeRruPort() + ue_id,
-                   reinterpret_cast<uint8_t*>(tx_packet),
+        udp_comm_.at(local_interface)
+            ->Send(reinterpret_cast<std::byte*>(tx_packet),
                    Configuration()->PacketLength());
       }
     }  // event.event_type_ == EventType::kPacketTX

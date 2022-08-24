@@ -142,6 +142,23 @@ float CommsLib::FindMaxAbs(const complex_float* in, size_t len) {
   return max_val;
 }
 
+float CommsLib::FindMeanAbs(const Table<complex_float>& in, size_t dim1,
+                            size_t dim2) {
+  float mean_val = 0;
+  for (size_t i = 0; i < dim1; i++) {
+    mean_val += CommsLib::FindMaxAbs(in.At(i), dim2);
+  }
+  return mean_val / (dim1 * dim2);
+}
+
+float CommsLib::FindMeanAbs(const complex_float* in, size_t len) {
+  float mean_val = 0;
+  for (size_t j = 0; j < len; j++) {
+    mean_val += CommsLib::AbsCf(in[j]);
+  }
+  return mean_val / len;
+}
+
 void CommsLib::Meshgrid(const std::vector<int>& x_in,
                         const std::vector<int>& y_in,
                         std::vector<std::vector<int>>& x,

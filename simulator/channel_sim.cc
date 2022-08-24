@@ -19,12 +19,13 @@ static const bool kPrintDebugTxUser = false;
 static const bool kPrintDebugTxBs = false;
 
 static constexpr size_t kUdpMTU = 2048;
+static constexpr size_t kDequeueBulkSize = 5;
 
 //#define CHSIM_DEBUG_MEMORY
 /* Helper classes */
 struct SocketRxBuffer {
   size_t data_size_ = 0;
-  uint8_t* data_ = nullptr;
+  std::byte* data_ = nullptr;
 };
 
 ChannelSim::ChannelSim(const Config* const config, size_t bs_thread_num,
@@ -41,16 +42,14 @@ ChannelSim::ChannelSim(const Config* const config, size_t bs_thread_num,
       channel_type_(std::move(in_chan_type)),
       channel_snr_(in_chan_snr) {
   // initialize parameters from config
-  srand(time(nullptr));
+  ::srand(time(nullptr));
   dl_data_plus_beacon_symbols_ =
       cfg_->Frame().NumDLSyms() + cfg_->Frame().NumBeaconSyms();
   ul_data_plus_pilot_symbols_ =
       cfg_->Frame().NumULSyms() + cfg_->Frame().NumPilotSyms();
 
-  server_bs_.resize(bs_socket_num_);
-  client_bs_.resize(bs_socket_num_);
-  server_ue_.resize(user_socket_num_);
-  client_ue_.resize(user_socket_num_);
+  bs_comm_.resize(bs_socket_num_);
+  ue_comm_.resize(user_socket_num_);
 
   task_queue_bs_ = moodycamel::ConcurrentQueue<EventData>(
       kFrameWnd * dl_data_plus_beacon_symbols_ * cfg_->BsAntNum() *
@@ -66,12 +65,12 @@ ChannelSim::ChannelSim(const Config* const config, size_t bs_thread_num,
   payload_length_ = cfg_->PacketLength() - Packet::kOffsetOfData;
 
   // initialize bs-facing and client-facing data buffers
-  size_t rx_buffer_ue_size = kFrameWnd * ul_data_plus_pilot_symbols_ *
-                             cfg_->UeAntNum() * payload_length_;
+  const size_t rx_buffer_ue_size = kFrameWnd * ul_data_plus_pilot_symbols_ *
+                                   cfg_->UeAntNum() * payload_length_;
   rx_buffer_ue_.resize(rx_buffer_ue_size);
 
-  size_t rx_buffer_bs_size = kFrameWnd * dl_data_plus_beacon_symbols_ *
-                             cfg_->BsAntNum() * payload_length_;
+  const size_t rx_buffer_bs_size = kFrameWnd * dl_data_plus_beacon_symbols_ *
+                                   cfg_->BsAntNum() * payload_length_;
   rx_buffer_bs_.resize(rx_buffer_bs_size);
 
   // initilize rx and tx counters
@@ -151,23 +150,23 @@ void ChannelSim::Start() {
     user_rx_threads.at(i) = std::thread(&ChannelSim::UeRxLoop, this, i);
   }
 
-  sleep(1);
+  std::this_thread::sleep_for(std::chrono::seconds(1));
   int ret = 0;
 
-  static constexpr size_t kDequeueBulkSize = 5;
   EventData events_list[kDequeueBulkSize];
   while ((running.load() == true) &&
          (SignalHandler::GotExitSignal() == false)) {
     ret = message_queue_.try_dequeue_bulk(ctok, events_list, kDequeueBulkSize);
 
-    for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
+    for (size_t bulk_count = 0; static_cast<int>(bulk_count) < ret;
+         bulk_count++) {
       EventData& event = events_list[bulk_count];
 
       switch (event.event_type_) {
         case EventType::kPacketRX: {
-          const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          const gen_tag_t::TagType type = gen_tag_t(event.tags_[0]).tag_type_;
+          const size_t frame_id = gen_tag_t(event.tags_[0u]).frame_id_;
+          const size_t symbol_id = gen_tag_t(event.tags_[0u]).symbol_id_;
+          const gen_tag_t::TagType type = gen_tag_t(event.tags_[0u]).tag_type_;
           // received a packet from a client antenna
           if (type == gen_tag_t::TagType::kUsers) {
             const size_t pilot_symbol_id =
@@ -228,8 +227,7 @@ void ChannelSim::Start() {
             if (user_tx_counter_[offset] == dl_data_plus_beacon_symbols_) {
               if (kDebugPrintPerFrameDone) {
                 AGORA_LOG_FRAME(
-                    "Finished downlink transmission %zu symbols "
-                    "in frame %zu\n",
+                    "Finished downlink transmission %zu symbols in frame %zu\n",
                     dl_data_plus_beacon_symbols_, frame_id);
               }
               user_tx_counter_[offset] = 0;
@@ -240,8 +238,8 @@ void ChannelSim::Start() {
             if (bs_tx_counter_[offset] == ul_data_plus_pilot_symbols_) {
               if (kDebugPrintPerFrameDone) {
                 AGORA_LOG_FRAME(
-                    "Finished uplink transmission of %zu "
-                    "symbols in frame %zu\n",
+                    "Finished uplink transmission of %zu symbols in frame "
+                    "%zu\n",
                     ul_data_plus_pilot_symbols_, frame_id);
               }
               bs_tx_counter_[offset] = 0;
@@ -254,7 +252,6 @@ void ChannelSim::Start() {
       }
     }
   }
-
   running.store(false);
 
   // Join the joinable threads
@@ -358,21 +355,22 @@ void* ChannelSim::BsRxLoop(size_t tid) {
   static constexpr size_t kSockBufSize = (1024 * 1024 * 64 * 8) - 1;
   for (size_t socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
     const size_t local_port_id = cfg_->BsRruPort() + socket_id;
-    server_bs_.at(socket_id) =
-        std::make_unique<UDPServer>(local_port_id, kSockBufSize);
-    client_bs_.at(socket_id) = std::make_unique<UDPClient>();
+    const size_t remote_port_id = cfg_->BsServerPort() + socket_id;
+    bs_comm_.at(socket_id) = std::make_unique<UDPComm>(
+        cfg_->BsRruAddr(), local_port_id, kSockBufSize, 0);
+    //Create a 1:1 connection
+    bs_comm_.at(socket_id)->Connect(cfg_->BsServerAddr(), remote_port_id);
     AGORA_LOG_INFO(
         "ChannelSim::BsRxLoop[%zu]: set up UDP socket server listening to port "
         "%zu with remote address %s:%zu\n",
-        tid, local_port_id, cfg_->BsServerAddr().c_str(),
-        cfg_->BsServerPort() + socket_id);
+        tid, local_port_id, cfg_->BsServerAddr().c_str(), remote_port_id);
   }
 
   const size_t rx_packet_size = cfg_->PacketLength();
   const size_t buffer_size = (rx_packet_size) + kUdpMTU;
   std::vector<SocketRxBuffer> thread_rx_buffers(total_sockets);
   for (auto& buffer : thread_rx_buffers) {
-    buffer.data_ = reinterpret_cast<uint8_t*>(
+    buffer.data_ = reinterpret_cast<std::byte*>(
         PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64, buffer_size));
     buffer.data_size_ = 0;
   }
@@ -386,7 +384,7 @@ void* ChannelSim::BsRxLoop(size_t tid) {
   while (running) {
     SocketRxBuffer& rx_buffer = thread_rx_buffers.at(socket_id - socket_lo);
     const size_t rx_buffer_rem_size = buffer_size - rx_buffer.data_size_;
-    const int rx_bytes = server_bs_.at(socket_id)->Recv(
+    const int rx_bytes = bs_comm_.at(socket_id)->Recv(
         &rx_buffer.data_[rx_buffer.data_size_], rx_buffer_rem_size);
     if (0 > rx_bytes) {
       AGORA_LOG_WARN("BsRxLoop[%zu] socket %zu receive failed\n", tid,
@@ -475,23 +473,24 @@ void* ChannelSim::UeRxLoop(size_t tid) {
   // initialize client-facing sockets
   static constexpr size_t kSockBufSize = (1024 * 1024 * 64 * 8) - 1;
   for (size_t socket_id = socket_lo; socket_id < socket_hi; socket_id++) {
-    size_t local_port_id = cfg_->UeRruPort() + socket_id;
-    server_ue_.at(socket_id) =
-        std::make_unique<UDPServer>(local_port_id, kSockBufSize);
-    client_ue_.at(socket_id) = std::make_unique<UDPClient>();
+    const size_t local_port_id = cfg_->UeRruPort() + socket_id;
+    const size_t remote_port_id = cfg_->UeServerPort() + socket_id;
+    ue_comm_.at(socket_id) = std::make_unique<UDPComm>(
+        cfg_->UeRruAddr(), local_port_id, kSockBufSize, 0);
+    ue_comm_.at(socket_id)->Connect(cfg_->UeServerAddr(), remote_port_id);
 
     AGORA_LOG_INFO(
-        "ChannelSim::UeRxLoop[%zu]: set up UDP socket server listening to port "
-        "%zu with remote address %s:%zu\n",
-        tid, local_port_id, cfg_->UeServerAddr().c_str(),
-        cfg_->UeServerPort() + socket_id);
+        "ChannelSim::UeRxLoop[%zu]: set up UDP socket server listening to "
+        "%s:%zu with remote address %s:%zu\n",
+        tid, cfg_->UeRruAddr().c_str(), local_port_id,
+        cfg_->UeServerAddr().c_str(), remote_port_id);
   }
 
   const size_t rx_packet_size = cfg_->PacketLength();
   const size_t buffer_size = rx_packet_size + kUdpMTU;
   std::vector<SocketRxBuffer> thread_rx_buffers(total_sockets);
   for (auto& buffer : thread_rx_buffers) {
-    buffer.data_ = reinterpret_cast<uint8_t*>(
+    buffer.data_ = reinterpret_cast<std::byte*>(
         PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64, buffer_size));
     buffer.data_size_ = 0;
   }
@@ -506,7 +505,7 @@ void* ChannelSim::UeRxLoop(size_t tid) {
     const size_t rx_index = socket_id - socket_lo;
     SocketRxBuffer& rx_buffer = thread_rx_buffers.at(rx_index);
     const size_t rx_buffer_rem_size = buffer_size - rx_buffer.data_size_;
-    const int rx_bytes = server_ue_.at(socket_id)->Recv(
+    const int rx_bytes = ue_comm_.at(socket_id)->Recv(
         &rx_buffer.data_[rx_buffer.data_size_], rx_buffer_rem_size);
     if (0 > rx_bytes) {
       AGORA_LOG_WARN("UeRxLoop[%zu]: socket %zu receive failed\n", tid,
@@ -597,8 +596,7 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
                       size_t ant_per_socket, std::byte* tx_buffer,
                       const arma::cx_float* source_data,
                       SimdAlignByteVector* udp_pkt_buf,
-                      std::vector<std::unique_ptr<UDPClient>>& udp_clients,
-                      const std::string& dest_address, size_t dest_port) {
+                      std::vector<std::unique_ptr<UDPComm>>& udp_senders) {
   // The 2 is from complex float -> float
   const size_t convert_length = (2 * cfg_->SampsPerSymbol() * max_ant);
   auto* dst_ptr = reinterpret_cast<short*>(tx_buffer);
@@ -622,10 +620,8 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
     // Can remove this with some changes
     std::memcpy(pkt->data_, &tx_buffer[ant_id * payload_length_],
                 payload_length_);
-    udp_clients.at(socket)->Send(
-        dest_address, dest_port + socket,
-        reinterpret_cast<const uint8_t*>(udp_pkt_buf->data()),
-        udp_pkt_buf->size());
+    //Destination already set by "connect"
+    udp_senders.at(socket)->Send(udp_pkt_buf->data(), udp_pkt_buf->size());
     // Assumes blocking
   }
 }
@@ -711,8 +707,7 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
 
   DoTx(frame_id, symbol_id, cfg_->BsAntNum(), cfg_->NumChannels(),
        &local.bs_tx_buffer_->at(total_offset_bs), fmat_noisy.memptr(),
-       local.udp_tx_buffer_, client_bs_, cfg_->BsServerAddr(),
-       cfg_->BsServerPort());
+       local.udp_tx_buffer_, bs_comm_);
 
   RtAssert(message_queue_.enqueue(
                *task_ptok_[local.tid_],
@@ -794,8 +789,7 @@ void ChannelSim::DoTxUser(WorkerThreadStorage& local, size_t tag) {
 
   DoTx(frame_id, symbol_id, cfg_->UeAntNum(), cfg_->NumUeChannels(),
        &local.ue_tx_buffer_->at(total_offset_ue), fmat_noisy.memptr(),
-       local.udp_tx_buffer_, client_ue_, cfg_->UeServerAddr(),
-       cfg_->UeServerPort());
+       local.udp_tx_buffer_, ue_comm_);
 
   RtAssert(message_queue_.enqueue(
                *task_ptok_[local.tid_],

@@ -294,7 +294,9 @@ class Config {
   inline std::string UeServerAddr() const { return this->ue_server_addr_; }
   inline std::string BsServerAddr() const { return this->bs_server_addr_; }
 
+  inline std::string UeRruAddr() const { return this->ue_rru_addr_; }
   inline std::string BsRruAddr() const { return this->bs_rru_addr_; }
+
   inline int BsServerPort() const { return this->bs_server_port_; }
   inline int BsRruPort() const { return this->bs_rru_port_; }
   inline int UeServerPort() const { return this->ue_server_port_; }
@@ -320,6 +322,9 @@ class Config {
   /* Inline accessors (complex types) */
   inline const std::vector<int>& ClTxAdvance() const {
     return this->cl_tx_advance_;
+  }
+  inline const std::vector<float>& ClCorrScale() const {
+    return this->cl_corr_scale_;
   }
 
   inline const FrameStats& Frame() const { return this->frame_; }
@@ -747,6 +752,7 @@ class Config {
   size_t packet_length_;
 
   std::vector<int> cl_tx_advance_;
+  std::vector<float> cl_corr_scale_;
 
   float scale_;  // Scaling factor for all transmit symbols
 
@@ -798,6 +804,10 @@ class Config {
   // IP address of the base station RRU, RRU emulator (sender),
   // or channel simulator
   std::string bs_rru_addr_;
+
+  // IP address of the Ue RRU, RRU emulator (sender), or channel simulator
+  // could be multiple addresses
+  std::string ue_rru_addr_;
 
   // IP address of the data source/sink server communicating with MAC (BS/UE)
   std::string mac_remote_addr_;

@@ -1,8 +1,8 @@
-function [data_phase_corr, data_sc_idx, evm, snr, rf_snr_db] = process_rx_frame(configs, tx_pilot_cxdouble, tx_data_cxdouble, rx_pilot_cxdouble, rx_data_cxdouble)
+function [data_phase_corr, data_sc_idx, evm, snr, rf_snr_db, tx_waveform] = process_rx_frame(configs, tx_pilot_cxdouble, tx_data_cxdouble, rx_pilot_cxdouble, rx_data_cxdouble)
 %     configs = [samples_per_slot tx_zero_prefix_len data_size data_start data_stop fft_size cp_len ...
 %         total_dl_symbols dl_pilot_symbols total_users];
     
-    %samples_per_slot = configs(1);
+    samples_per_slot = configs(1);
     tx_zero_prefix_len = configs(2);
     data_size = configs(3);
     %data_start = configs(4);
@@ -24,6 +24,7 @@ function [data_phase_corr, data_sc_idx, evm, snr, rf_snr_db] = process_rx_frame(
     nz_start_idx = (fft_size - data_size)/2;
     nz_sc_idx = nz_start_idx+1:nz_start_idx+data_size;
     nz_stop_idx = nz_start_idx+data_size;
+
     plt_trk_sp = 16;
     data_sc_idx = setdiff(1:data_size, 1:plt_trk_sp:data_size);
     data_phase_corr = zeros(data_size, dl_data_symbols, total_users);
@@ -67,5 +68,15 @@ function [data_phase_corr, data_sc_idx, evm, snr, rf_snr_db] = process_rx_frame(
         evm(u) = mean(aevms) * 100;
         rf_snr_db(u) = 10*log10(rf_snr);
     end
+
+    %
+    data_slot_range = dl_pilot_symbols + 1: total_dl_symbols;
+    tx_waveform_f = zeros(fft_size, total_users, total_dl_symbols);
+    tx_waveform_f(nz_sc_idx, :, 1:dl_pilot_symbols) = tx_pilot_cxdouble;
+    tx_waveform_f(nz_sc_idx, :, data_slot_range) = tx_data_cxdouble;
+    tx_waveform_f = ifft(tx_waveform_f, fft_size, 1) / fft_size;
+    tx_waveform = zeros(samples_per_slot, total_users, total_dl_symbols);
+    tx_waveform(start_id+1:start_id+fft_size,:,:) = tx_waveform_f;
+    tx_waveform(tx_zero_prefix_len+1:tx_zero_prefix_len+cp_len, : , :) = tx_waveform_f(fft_size - cp_len + 1:end, : , :);
 
 end

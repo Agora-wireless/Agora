@@ -6,13 +6,17 @@
 #include "video_receiver.h"
 
 #include <cstring>
+#include <string>
 
 #include "logger.h"
 
 static constexpr size_t kMaxRxAttempts = 25u;
+//Receive on all addresses
+static const std::string kRxAddress = "";
 
-VideoReceiver::VideoReceiver(size_t port)
-    : udp_video_receiver_(port, VideoReceiver::kVideoStreamSocketRxBufSize),
+VideoReceiver::VideoReceiver(uint16_t port)
+    : udp_video_receiver_(kRxAddress, port,
+                          VideoReceiver::kVideoStreamSocketRxBufSize),
       data_available_(0),
       data_start_offset_(0) {}
 
