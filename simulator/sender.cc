@@ -14,6 +14,7 @@
 #include "udp_client.h"
 
 #if defined(USE_DPDK)
+#defined DPDK_BURST_BULK
 #include <arpa/inet.h>
 #endif
 
@@ -87,25 +88,25 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
 
   // Create a master thread when started from simulator
   if (create_thread_for_master == true) {
-    this->threads_.emplace_back(&Sender::MasterThread, this,
-                                socket_thread_num_);
+    threads_.emplace_back(&Sender::MasterThread, this, socket_thread_num_);
   }
 
 #if defined(USE_DPDK)
   DpdkTransport::DpdkInit(core_offset, socket_thread_num_);
-  printf("Number of ports: %d used (offset: %d), %d available, socket: %d\n",
-         cfg->DpdkNumPorts(), cfg->DpdkPortOffset(), rte_eth_dev_count_avail(),
-         rte_socket_id());
+  std::printf(
+      "Number of ports: %d used (offset: %d), %d available, socket: %d\n",
+      cfg->DpdkNumPorts(), cfg->DpdkPortOffset(), rte_eth_dev_count_avail(),
+      rte_socket_id());
   RtAssert(cfg->DpdkNumPorts() <= rte_eth_dev_count_avail(),
            "Invalid number of DPDK ports");
-  this->mbuf_pool_ =
+  mbuf_pool_ =
       DpdkTransport::CreateMempool(cfg->DpdkNumPorts(), cfg->PacketLength());
 
   // Parse IP addresses
-  int ret = inet_pton(AF_INET, cfg->BsRruAddr().c_str(), &bs_rru_addr_);
-  RtAssert(ret == 1, "Invalid sender IP address");
-  ret = inet_pton(AF_INET, cfg->BsServerAddr().c_str(), &bs_server_addr_);
-  RtAssert(ret == 1, "Invalid server IP address");
+  int status = inet_pton(AF_INET, cfg->BsRruAddr().c_str(), &bs_rru_addr_);
+  RtAssert(status == 1, "Invalid sender IP address");
+  status = inet_pton(AF_INET, cfg->BsServerAddr().c_str(), &bs_server_addr_);
+  RtAssert(status == 1, "Invalid server IP address");
 
   RtAssert(server_mac_addr_str.length() ==
                (cfg->DpdkNumPorts() * (kMacAddrBtyes + 1) - 1),
@@ -127,17 +128,20 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
         server_mac_addr_str.substr(i * (kMacAddrBtyes + 1), kMacAddrBtyes)
             .c_str());
     RtAssert(parsed_mac != nullptr, "Invalid server mac address");
-    if (DpdkTransport::NicInit(port_ids_.at(i), mbuf_pool_, socket_thread_num_,
-                               cfg->PacketLength()) != 0) {
+
+    const int num_queues = cfg_->NumRadios() / cfg->DpdkNumPorts();
+    const auto nic_status = DpdkTransport::NicInit(port_ids_.at(i), mbuf_pool_, num_queues,
+                               cfg->PacketLength()
+    if (nic_status != 0) {
       rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_ids_.at(i));
     }
     std::memcpy(&server_mac_addr_[i], parsed_mac, sizeof(ether_addr));
 
-    ret = rte_eth_macaddr_get(port_ids_.at(i), &sender_mac_addr_[i]);
-    RtAssert(ret == 0, "Cannot get MAC address of the port");
+    status = rte_eth_macaddr_get(port_ids_.at(i), &sender_mac_addr_[i]);
+    RtAssert(status == 0, "Cannot get MAC address of the port");
     AGORA_LOG_INFO("Number of DPDK cores: %d\n", rte_lcore_count());
 
-    printf("Sending IP(MAC): From %s To %s(%s)\n", cfg->BsRruAddr().c_str(),
+    std::printf("Sending IP(MAC): From %s To %s(%s)\n", cfg->BsRruAddr().c_str(),
            cfg->BsServerAddr().c_str(), ether_ntoa(parsed_mac));
   }
 
@@ -148,7 +152,7 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
 Sender::~Sender() {
   keep_running.store(false);
 
-  for (auto& thread : this->threads_) {
+  for (auto& thread : threads_) {
     AGORA_LOG_INFO("Sender: Joining threads\n");
     thread.join();
   }
@@ -156,25 +160,27 @@ Sender::~Sender() {
   iq_data_short_.Free();
   for (auto& i : packet_count_per_symbol_) {
     delete[] i;
+    i = nullptr;
   }
 
   for (size_t i = 0; i < socket_thread_num_; i++) {
     delete (task_ptok_[i]);
+    task_ptok_[i] = nullptr;
   }
   std::free(task_ptok_);
   AGORA_LOG_INFO("Sender: Complete\n");
 }
 
 void Sender::StartTx() {
-  this->frame_start_ = new double[kNumStatsFrames]();
-  this->frame_end_ = new double[kNumStatsFrames]();
+  frame_start_ = new double[kNumStatsFrames]();
+  frame_end_ = new double[kNumStatsFrames]();
 
   CreateWorkerThreads(socket_thread_num_);
   signal(SIGINT, InterruptHandler);
   MasterThread(0);  // Start the master thread
 
-  delete[](this->frame_start_);
-  delete[](this->frame_end_);
+  delete[](frame_start_);
+  delete[](frame_end_);
 }
 
 void Sender::StartTxfromMain(double* in_frame_start, double* in_frame_end) {
@@ -226,7 +232,7 @@ void* Sender::MasterThread(int /*unused*/) {
   uint64_t tick_start = GetTime::Rdtsc();
   double frame_start_us = GetTime::GetTimeUs();
   double frame_end_us = 0;
-  this->frame_start_[0] = frame_start_us;
+  frame_start_[0] = frame_start_us;
 
   size_t start_symbol = FindNextSymbol(0);
   // Delay until the start of the first symbol
@@ -291,7 +297,7 @@ void* Sender::MasterThread(int /*unused*/) {
                 next_frame_id, next_symbol_id);
           }
           // Set end of frame time to the time after the last symbol
-          this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] = frame_end_us;
+          frame_end_[(ctag.frame_id_ % kNumStatsFrames)] = frame_end_us;
 
           if (next_frame_id == cfg_->FramesToTest()) {
             keep_running.store(false);
@@ -304,8 +310,7 @@ void* Sender::MasterThread(int /*unused*/) {
 
             // Set the frame start time to the start time of the frame
             // (independant of symbol type)
-            this->frame_start_[(next_frame_id % kNumStatsFrames)] =
-                frame_start_us;
+            frame_start_[(next_frame_id % kNumStatsFrames)] = frame_start_us;
 
             // Wait until the first tx symbol
             DelayTicks(tick_start,
@@ -363,10 +368,8 @@ void* Sender::WorkerThread(int tid) {
 
 #if defined(USE_DPDK)
   uint16_t port_id = port_ids_.at(tid % cfg_->DpdkNumPorts());
-  const size_t queue_id = tid / cfg_->DpdkNumPorts();
-  AGORA_LOG_INFO("Sender worker[%d]: using port %u, queue %zu\n", tid, port_id,
-                 queue_id);
-  rte_mbuf* tx_mbufs[kDequeueBulkSize];
+  AGORA_LOG_INFO("Sender worker[%d]: using port %u\n", tid, port_id);
+  std::array<rte_mbuf*, kDequeueBulkSize> tx_mbufs;
 #else
   // Make a client / socket for each interface (simular to radio behavior)
   std::vector<std::unique_ptr<UDPClient> > udp_clients;
@@ -401,32 +404,31 @@ void* Sender::WorkerThread(int tid) {
 
   size_t tags[kDequeueBulkSize];
   while (keep_running.load() == true) {
-    size_t num_tags = this->send_queue_.try_dequeue_bulk_from_producer(
-        *(this->task_ptok_[tid]), tags, kDequeueBulkSize);
+    size_t num_tags = send_queue_.try_dequeue_bulk_from_producer(
+        *(task_ptok_[tid]), tags, kDequeueBulkSize);
     if (num_tags > 0) {
       for (size_t tag_id = 0; (tag_id < num_tags); tag_id++) {
-        size_t start_tsc_send = GetTime::Rdtsc();
-
-        auto tag = gen_tag_t(tags[tag_id]);
+        const size_t start_tsc_send = GetTime::Rdtsc();
+        const auto tag = gen_tag_t(tags[tag_id]);
         assert((cfg_->GetSymbolType(tag.symbol_id_) == SymbolType::kPilot) ||
                (cfg_->GetSymbolType(tag.symbol_id_) == SymbolType::kUL));
 
         // Send a message to the server. We assume that the server is running.
         Packet* pkt = nullptr;
 #if defined(USE_DPDK)
-        tx_mbufs[tag_id] = DpdkTransport::AllocUdp(
+        tx_mbufs.at(tag_id) = DpdkTransport::AllocUdp(
             mbuf_pool_, sender_mac_addr_[port_id], server_mac_addr_[port_id],
-            bs_rru_addr_, bs_server_addr_, this->cfg_->BsRruPort() + tid,
-            this->cfg_->BsServerPort() + tid, this->cfg_->PacketLength(),
+            bs_rru_addr_, bs_server_addr_, cfg_->BsRruPort() + cur_radio,
+            cfg_->BsServerPort() + cur_radio, cfg_->PacketLength(),
             (uint16_t(tag.frame_id_ & 0xffff) << 8) |
                 uint16_t(tag.symbol_id_ & 0xffff));
         pkt = reinterpret_cast<Packet*>(
-            rte_pktmbuf_mtod(tx_mbufs[tag_id], uint8_t*) + kPayloadOffset);
+            rte_pktmbuf_mtod(tx_mbufs.at(tag_id), uint8_t*) + kPayloadOffset);
 #else
         pkt = socks_pkt_buf;
 #endif
 
-        if ((kDebugPrintSender == true)) {
+        if (kDebugPrintSender) {
           AGORA_LOG_INFO(
               "Sender worker [%d]: processing frame %d symbol %d, type %d\n",
               tid, tag.frame_id_, tag.symbol_id_,
@@ -448,7 +450,20 @@ void* Sender::WorkerThread(int tid) {
 
         const size_t dest_port = cfg_->BsServerPort() + cur_radio;
 
-#ifndef USE_DPDK
+#if (defined(USE_DPDK) && !defined(DPDK_BURST_BULK))
+        //DpdkNumPorts;
+        const size_t queue_id =
+            cur_radio % (cfg_->NumRadios() / cfg_->DpdkNumPorts());
+        const size_t nb_tx_new =
+            rte_eth_tx_burst(port_id, queue_id, tx_mbufs.at(tag_id), 1);
+        if (unlikely(nb_tx_new != 1)) {
+          AGORA_LOG_INFO(
+              "Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, \n", tid,
+              nb_tx_new, 1);
+          keep_running.store(false);
+          break;
+        }
+#else
         const size_t interface_idx = cur_radio - radio_lo;
         udp_clients.at(interface_idx)
             ->Send(cfg_->BsServerAddr(), dest_port,
@@ -490,7 +505,7 @@ void* Sender::WorkerThread(int tid) {
         }
       }
 
-#if defined(USE_DPDK)
+#if (defined(USE_DPDK) && defined(DPDK_BURST_BULK))
       //1 queue id oer worker?  What if a worker will need to handle multiple tx queues?
       AGORA_LOG_INFO("Thread %d rte_eth_tx_burst(), queue %zu num_tags: %zu\n",
                      tid, queue_id, num_tags);
@@ -571,7 +586,7 @@ void Sender::InitIqFromFile(const std::string& filename) {
 
 void Sender::CreateWorkerThreads(size_t num_workers) {
   for (size_t i = 0u; i < num_workers; i++) {
-    this->threads_.emplace_back(&Sender::WorkerThread, this, i);
+    threads_.emplace_back(&Sender::WorkerThread, this, i);
   }
 }
 
