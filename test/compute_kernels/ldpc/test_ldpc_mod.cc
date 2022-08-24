@@ -8,13 +8,13 @@
 #include <gflags/gflags.h>
 #include <immintrin.h>
 
-#include <armadillo>
 #include <bitset>
 #include <chrono>
 #include <fstream>
 #include <iostream>
 #include <random>
 
+#include "armadillo"
 #include "comms-lib.h"
 #include "config.h"
 #include "data_generator.h"

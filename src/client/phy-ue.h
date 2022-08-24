@@ -38,10 +38,6 @@ class PhyUe {
     kFrameComplete = (kDownlinkComplete | kMacTxComplete | kUplinkTxComplete)
   };
 
-  // dequeue bulk size, used to reduce the overhead of dequeue in main
-  // thread
-  static const int kDequeueBulkSizeTXRX = 8;
-
   explicit PhyUe(Config* config);
   ~PhyUe();
 

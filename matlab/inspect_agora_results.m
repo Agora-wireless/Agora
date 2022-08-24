@@ -10,6 +10,7 @@ function inspect_agora_results(dataset_filename, verbose)
         h5disp(dataset_filename, group_id);
     end
 
+    total_frames = double(h5readatt(dataset_filename, group_id, 'MAX_FRAME'));
     samples_per_slot = double(h5readatt(dataset_filename, group_id, 'SLOT_SAMP_LEN'));
     tx_zero_prefix_len = double(h5readatt(dataset_filename, group_id, 'TX_ZERO_PREFIX_LEN'));
     data_size = double(h5readatt(dataset_filename, group_id, 'OFDM_DATA_NUM'));
@@ -31,14 +32,13 @@ function inspect_agora_results(dataset_filename, verbose)
     %Generate a int16 array
     rx_beacon_hdf5 = h5read(dataset_filename, strcat(group_id,dataset_id));
     % Dimensions  [Samples, Ant, Symbol, Cells, Frame]
-    total_frames = size(rx_beacon_hdf5, 5);
     total_users = size(rx_beacon_hdf5, 2);
     %Convert to double and scale
     rx_beacon_scaled_double = double(rx_beacon_hdf5) ./ double(intmax('int16'));
     clear rx_beacon_hdf5;
     %Convert to complex double
     % Samples x User x Symbol
-    rx_beacon_cxdouble = complex(rx_beacon_scaled_double(1:2:end, :, :, :), rx_beacon_scaled_double(2:2:end,:, :, :));
+    rx_beacon_cxdouble = complex(rx_beacon_scaled_double(1:2:end, :, :, 1:total_frames), rx_beacon_scaled_double(2:2:end,:, :, 1:total_frames));
     rx_beacon_rssi = process_beacon(rx_beacon_cxdouble, tx_zero_prefix_len);
     clear rx_beacon_scaled_double;
 
@@ -70,16 +70,14 @@ function inspect_agora_results(dataset_filename, verbose)
     end
     %Generate a int16 array
     rx_syms_hdf5 = h5read(dataset_filename, strcat(group_id,dataset_id));
-    total_frames = size(rx_syms_hdf5, 5);
-    %n_symbols = size(rx_syms_hdf5, 3);
+    % Dimensions  [Samples, Ant, Symbol, Cells, Frame]
     total_users = size(rx_syms_hdf5, 2);
-    %n_samps = size(rx_syms_hdf5, 1);
     %Convert to double and scale
     rx_syms_scaled_double = double(rx_syms_hdf5) ./ double(intmax('int16'));
     clear rx_syms_hdf5;
     %Convert to complex double
     % Samples x User x Symbol x Frame
-    rx_syms_cxdouble = complex(rx_syms_scaled_double(1:2:end, :, :, :), rx_syms_scaled_double(2:2:end,:, :, :));
+    rx_syms_cxdouble = complex(rx_syms_scaled_double(1:2:end, :, :, 1:total_frames), rx_syms_scaled_double(2:2:end,:, :, 1:total_frames));
     clear rx_syms_scaled_double;
     % Split off pilots and data
     rx_pilot_cxdouble = rx_syms_cxdouble(:,:,1:dl_pilot_symbols, :);
@@ -137,11 +135,10 @@ function inspect_agora_results(dataset_filename, verbose)
     nexttile;
     plot(snr.', 'LineWidth',2);
     ylabel('EVM SNR (dB)')
-    %axis([0 inf -1 1]);
     %Bottom (EVM)
     nexttile;
     plot(evm.', 'LineWidth',2);
-    axis([0 total_frames 0 4 * max(mean(evm, 2))]);
+    axis([0 total_frames 0 (4 * max(mean(evm, 2)))]);
     ylabel('EVM (%)')
 
     clear rx_beacon_cxdouble rx_syms_cxdouble tx_syms_cxdouble total_users ;

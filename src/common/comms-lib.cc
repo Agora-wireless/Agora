@@ -62,11 +62,10 @@ int CommsLib::FindLts(const std::vector<std::complex<double>>& iq, int seqLen) {
    */
 
   float lts_thresh = 0.8;
-  std::vector<std::vector<double>> lts_seq;
   int best_peak;
 
   // Original LTS sequence
-  lts_seq = CommsLib::GetSequence(seqLen, kLtsSeq);
+  auto lts_seq = CommsLib::GetSequence(seqLen, kLtsSeq);
 
   // Re-arrange into complex vector, flip, and compute conjugate
   std::vector<std::complex<double>> lts_sym;
@@ -74,10 +73,10 @@ int CommsLib::FindLts(const std::vector<std::complex<double>>& iq, int seqLen) {
   for (int i = 0; i < 64; i++) {
     // lts_seq is a 2x160 matrix (real/imag by seqLen=160 elements)
     // grab one symbol and flip around
-    lts_sym.emplace_back(lts_seq[0][seqLen - 1 - i],
-                         lts_seq[1][seqLen - 1 - i]);
+    lts_sym.emplace_back(lts_seq.at(0).at(seqLen - 1 - i),
+                         lts_seq.at(1).at(seqLen - 1 - i));
     // conjugate
-    lts_sym_conj.push_back(std::conj(lts_sym[i]));
+    lts_sym_conj.push_back(std::conj(lts_sym.at(i)));
   }
 
   // Equivalent to numpy's sign function
@@ -141,6 +140,23 @@ float CommsLib::FindMaxAbs(const complex_float* in, size_t len) {
     }
   }
   return max_val;
+}
+
+float CommsLib::FindMeanAbs(const Table<complex_float>& in, size_t dim1,
+                            size_t dim2) {
+  float mean_val = 0;
+  for (size_t i = 0; i < dim1; i++) {
+    mean_val += CommsLib::FindMaxAbs(in.At(i), dim2);
+  }
+  return mean_val / (dim1 * dim2);
+}
+
+float CommsLib::FindMeanAbs(const complex_float* in, size_t len) {
+  float mean_val = 0;
+  for (size_t j = 0; j < len; j++) {
+    mean_val += CommsLib::AbsCf(in[j]);
+  }
+  return mean_val / len;
 }
 
 void CommsLib::Meshgrid(const std::vector<int>& x_in,
@@ -677,8 +693,8 @@ std::vector<std::vector<double>> CommsLib::GetSequence(size_t seq_len,
     matrix.resize(2);
     const size_t sts_seq_len = 16;
 
-    std::vector<std::complex<float>> sts_freq(sts_seq,
-                                              sts_seq + kFftSize_80211);
+    std::vector<std::complex<float>> sts_freq(kStsSeqArray,
+                                              kStsSeqArray + kFftSize_80211);
     // Perform ifft with ifft-shift on sts_freq
     CommsLib::IFFT(sts_freq, kFftSize_80211, false);
     auto sts_iq = CommsLib::FFTShift(sts_freq);
@@ -695,7 +711,8 @@ std::vector<std::vector<double>> CommsLib::GetSequence(size_t seq_len,
     matrix.resize(2);
     const size_t lts_seq_len = kFftSize_80211;
 
-    std::vector<std::complex<float>> lts_freq(lts_seq, lts_seq + lts_seq_len);
+    std::vector<std::complex<float>> lts_freq(kLtsSeqArray,
+                                              kLtsSeqArray + lts_seq_len);
     if (type == kLtsFSeq) {
       matrix[0].resize(lts_seq_len);
       matrix[1].resize(lts_seq_len);
@@ -723,10 +740,10 @@ std::vector<std::vector<double>> CommsLib::GetSequence(size_t seq_len,
     matrix.resize(2);
     double u = 1;  // Cell ID 1
     double v = 0;
-    int m = prime[308];
+    int m = kPrimeArray[308];
     for (int j = 0; j < 308; j++) {
-      if (prime[j] < seq_len && prime[j + 1] > seq_len) {
-        m = prime[j];
+      if (kPrimeArray[j] < seq_len && kPrimeArray[j + 1] > seq_len) {
+        m = kPrimeArray[j];
         break;
       }
     }
@@ -746,7 +763,7 @@ std::vector<std::vector<double>> CommsLib::GetSequence(size_t seq_len,
     const size_t gold_seq_len = 128;
 
     // Use row 52 in gold-127
-    std::vector<int> gold_freq_real(gold_seq, gold_seq + 127);
+    std::vector<int> gold_freq_real(kGoldSeqArray, kGoldSeqArray + 127);
 
     // Insert 0 at center freq, construct inter-leaved quad code
     gold_freq_real.insert(gold_freq_real.begin() + 63, 0);
