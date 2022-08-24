@@ -4,15 +4,17 @@
 
 #include <immintrin.h>
 
+#include <chrono>
 #include <string>
 
 #include "eth_common.h"
+#include "logger.h"
 #include "message.h"
 #include "rte_version.h"
 #include "utils.h"
 
 static constexpr size_t kJumboFrameSize = 9000;
-// /#define ETH_IN_PROMISCUOUS_MODE
+///#define ETH_IN_PROMISCUOUS_MODE
 
 std::vector<uint16_t> DpdkTransport::GetPortIDFromMacAddr(
     size_t port_num, const std::string& mac_addrs) {
@@ -77,8 +79,9 @@ int DpdkTransport::NicInit(uint16_t port, rte_mempool* mbuf_pool,
   rte_flow_error flow_error;
   int en_isolate = rte_flow_isolate(port, 1, &flow_error);
   if (en_isolate != 0) {
-    std::printf("Flow cannot be isolated %d message: %s\n", flow_error.type,
-                flow_error.message ? flow_error.message : "(no stated reason)");
+    AGORA_LOG_WARN(
+        "Flow cannot be isolated %d message: %s\n", flow_error.type,
+        flow_error.message ? flow_error.message : "(no stated reason)");
     //RtAssert(en_isolate == 0, "Unable to set flow isolate mode");
   }
 
@@ -89,13 +92,23 @@ int DpdkTransport::NicInit(uint16_t port, rte_mempool* mbuf_pool,
   }
 
   int overhead;
-  std::printf("Device max mtu %d\n", dev_info.max_mtu);
-  if (dev_info.max_rx_pktlen > dev_info.max_mtu) {
-    overhead = dev_info.max_rx_pktlen > dev_info.max_mtu;
+  AGORA_LOG_INFO("Device max mtu %d rx max pktlen %d pkt size %zu\n",
+                 dev_info.max_mtu, dev_info.max_rx_pktlen, pkt_len);
+  if ((dev_info.max_mtu != UINT16_MAX) &&
+      (dev_info.max_rx_pktlen > dev_info.max_mtu)) {
+    overhead = dev_info.max_rx_pktlen - dev_info.max_mtu;
   } else {
     overhead = RTE_ETHER_HDR_LEN + RTE_ETHER_CRC_LEN;
   }
-  port_conf.rxmode.mtu = pkt_len + overhead;
+  AGORA_LOG_TRACE("Device overhead %d offset %zu\n", overhead, kPayloadOffset);
+
+  //set the max rx packet size
+  const uint16_t desired_max_size = pkt_len + kPayloadOffset - overhead;
+  if (desired_max_size < dev_info.max_rx_pktlen) {
+    AGORA_LOG_INFO("Setting max rx pkt size to %d\n", desired_max_size);
+    dev_info.max_rx_pktlen = desired_max_size;
+  }
+
   if ((dev_info.rx_offload_capa & DEV_RX_OFFLOAD_IPV4_CKSUM) ==
       DEV_TX_OFFLOAD_IPV4_CKSUM) {
     std::printf("DEV_RX_OFFLOAD_IPV4_CKSUM  enabled\n");
@@ -124,8 +137,6 @@ int DpdkTransport::NicInit(uint16_t port, rte_mempool* mbuf_pool,
     port_conf.txmode.offloads |= DEV_TX_OFFLOAD_UDP_CKSUM;
   }
 
-  std::printf("rte_eth_dev_configure\n");
-  std::fflush(stdout);
   retval = rte_eth_dev_configure(port, rx_rings, tx_rings, &port_conf);
   if (retval != 0) {
     std::printf("Error in rte_eth_dev_configure\n");
@@ -137,13 +148,15 @@ int DpdkTransport::NicInit(uint16_t port, rte_mempool* mbuf_pool,
     return retval;
   }
 
-  uint16_t mtu_size = kJumboFrameSize;
+  //kPayloadOffset  overhead
+  const uint16_t desired_mtu = desired_max_size;
+  uint16_t mtu_size = desired_mtu;
   retval = rte_eth_dev_set_mtu(port, mtu_size);
   RtAssert(retval == 0, "Cannot set the MTU size for the given dev");
 
   retval = rte_eth_dev_get_mtu(port, &mtu_size);
   RtAssert(retval == 0, "Cannot get the MTU size for the given dev");
-  RtAssert(mtu_size == kJumboFrameSize, "Invalid MTU (must be 9000 bytes)");
+  RtAssert(mtu_size == desired_mtu, "Invalid MTU");
 
   //Setup RX
   rxconf = dev_info.default_rxconf;
@@ -184,7 +197,7 @@ int DpdkTransport::NicInit(uint16_t port, rte_mempool* mbuf_pool,
   rte_eth_link_get_nowait(port, &link);
   while (link.link_status == 0) {
     std::printf("Waiting for link up on NIC %" PRIu16 "\n", port);
-    sleep(1);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     rte_eth_link_get_nowait(port, &link);
   }
   if (link.link_status == 0) {
@@ -473,8 +486,7 @@ void DpdkTransport::DpdkInit(uint16_t core_offset, size_t thread_num) {
 
 rte_mempool* DpdkTransport::CreateMempool(size_t num_ports,
                                           size_t packet_length) {
-  //const size_t mbuf_size = packet_length + kMBufCacheSize;
-  const size_t mbuf_size = 9000 + (2 * kMBufCacheSize);
+  const size_t mbuf_size = packet_length + kPayloadOffset + kMBufCacheSize;
   rte_mempool* mbuf_pool =
       rte_pktmbuf_pool_create("MBUF_POOL", kNumMBufs * num_ports,
                               kMBufCacheSize, 0, mbuf_size, rte_socket_id());
