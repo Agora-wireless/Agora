@@ -172,7 +172,7 @@ void TxRxWorkerClientHw::DoTxRx() {
         for (size_t ch = 0; ch < channels_per_interface_; ch++) {
           const ssize_t sync_index = FindSyncBeacon(
               reinterpret_cast<std::complex<int16_t>*>(rx_pkts.at(ch)->data_),
-              samples_per_symbol);
+              samples_per_symbol, Configuration()->ClCorrScale().at(tid_));
           if (sync_index >= 0) {
             rx_adjust_samples = sync_index - Configuration()->BeaconLen() -
                                 Configuration()->OfdmTxZeroPrefix();
@@ -226,10 +226,10 @@ void TxRxWorkerClientHw::DoTxRx() {
         if (resync &&
             (rx_symbol_id == Configuration()->Frame().GetBeaconSymbolLast())) {
           //This is adding a race condition on this data, it is ok for now but we should fix this
-          const ssize_t sync_index =
-              FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
-                                 rx_pkts.at(kSyncDetectChannel)->data_),
-                             samples_per_symbol);
+          const ssize_t sync_index = FindSyncBeacon(
+              reinterpret_cast<std::complex<int16_t>*>(
+                  rx_pkts.at(kSyncDetectChannel)->data_),
+              samples_per_symbol, Configuration()->ClCorrScale().at(tid_));
           if (sync_index >= 0) {
             rx_adjust_samples = sync_index - Configuration()->BeaconLen() -
                                 Configuration()->OfdmTxZeroPrefix();
@@ -247,7 +247,8 @@ void TxRxWorkerClientHw::DoTxRx() {
                   const ssize_t aux_channel_sync =
                       FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
                                          rx_pkts.at(ch)->data_),
-                                     samples_per_symbol);
+                                     samples_per_symbol,
+                                     Configuration()->ClCorrScale().at(tid_));
                   AGORA_LOG_INFO(
                       "TxRxWorkerClientHw [%zu]: beacon status channel %zu, "
                       "sync_index: %ld, rx sample offset: %ld\n",
@@ -592,13 +593,14 @@ ssize_t TxRxWorkerClientHw::SyncBeacon(size_t local_interface,
 }
 
 ssize_t TxRxWorkerClientHw::FindSyncBeacon(
-    const std::complex<int16_t>* check_data, size_t sample_window) {
+    const std::complex<int16_t>* check_data, size_t sample_window,
+    float corr_scale) {
   ssize_t sync_index = -1;
   assert(sample_window <= (Configuration()->SampsPerSymbol() *
                            Configuration()->Frame().NumTotalSyms()));
 
   sync_index = CommsLib::FindBeaconAvx(check_data, Configuration()->GoldCf32(),
-                                       sample_window);
+                                       sample_window, corr_scale);
 
   if (kPrintClientBeaconSNR && (sync_index >= 0) &&
       ((sync_index + Configuration()->BeaconLen()) < sample_window)) {

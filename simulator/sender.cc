@@ -370,8 +370,8 @@ void* Sender::WorkerThread(int tid) {
   //Setting up the source port.  Each radio has a unique source port id
   for (size_t radio_number = radio_lo; radio_number <= radio_hi;
        radio_number++) {
-    udp_clients.emplace_back(
-        std::make_unique<UDPClient>(cfg_->BsRruPort() + radio_number));
+    udp_clients.emplace_back(std::make_unique<UDPClient>(
+        cfg_->BsRruAddr(), cfg_->BsRruPort() + radio_number));
   }
 #endif
 
@@ -447,7 +447,7 @@ void* Sender::WorkerThread(int tid) {
         const size_t interface_idx = cur_radio - radio_lo;
         udp_clients.at(interface_idx)
             ->Send(cfg_->BsServerAddr(), dest_port,
-                   reinterpret_cast<uint8_t*>(socks_pkt_buf),
+                   reinterpret_cast<std::byte*>(socks_pkt_buf),
                    cfg_->PacketLength());
 #endif
 

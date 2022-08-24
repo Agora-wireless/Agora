@@ -57,6 +57,9 @@
   "tx_advance": [
     0
   ],
+  "corr_scale": [
+    1
+  ],
   "calib_tx_gain_a": 20,
   "calib_tx_gain_b": 20,
   "client_gain_adjust_a": [

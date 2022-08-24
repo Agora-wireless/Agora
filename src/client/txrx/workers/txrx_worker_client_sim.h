@@ -11,8 +11,7 @@
 
 #include "message.h"
 #include "txrx_worker.h"
-#include "udp_client.h"
-#include "udp_server.h"
+#include "udp_comm.h"
 
 class TxRxWorkerClientSim : public TxRxWorker {
  public:
@@ -37,11 +36,7 @@ class TxRxWorkerClientSim : public TxRxWorker {
   std::vector<Packet*> RecvEnqueue(size_t interface_id);
 
   //1 for each responsible interface (ie radio)
-  //socket for incomming messages (received data)
-  std::vector<std::unique_ptr<UDPServer>> udp_servers_;
-
-  //socket for outgoing messages (data to transmit)
-  std::vector<std::unique_ptr<UDPClient>> udp_clients_;
+  std::vector<std::unique_ptr<UDPComm>> udp_comm_;
 
   //Helper tx vectors
   std::vector<uint8_t> tx_pkt_zeros_;

@@ -107,6 +107,9 @@ class CommsLib {
   static float FindMaxAbs(const complex_float* in, size_t len);
   static float FindMaxAbs(const Table<complex_float>& in, size_t dim1,
                           size_t dim2);
+  static float FindMeanAbs(const complex_float* in, size_t len);
+  static float FindMeanAbs(const Table<complex_float>& in, size_t dim1,
+                           size_t dim2);
   static void Ifft2tx(const complex_float* in, std::complex<short>* out,
                       size_t N, size_t prefix, size_t cp, float scale);
   static float AbsCf(complex_float d) {
