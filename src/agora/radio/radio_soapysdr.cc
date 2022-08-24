@@ -801,7 +801,7 @@ void RadioSoapySdr::SetFreqRf(size_t channel, double freq) {
   dev_->setFrequency(SOAPY_SDR_RX, channel, "RF", freq);
 }
 
-void RadioSoapySdr::ConfigureTddModeBs(bool is_ref_radio, size_t radio_id) {
+void RadioSoapySdr::ConfigureTddModeBs(bool is_ref_radio) {
   nlohmann::json conf;
   conf["tdd_enabled"] = true;
   conf["frame_mode"] = "free_running";
@@ -841,16 +841,19 @@ void RadioSoapySdr::ConfigureTddModeBs(bool is_ref_radio, size_t radio_id) {
   dev_->writeSetting("TDD_CONFIG", conf_string);
   dev_->writeRegisters("BEACON_RAM", 0, cfg_->Beacon());
 
-  size_t ndx = 0;
+  std::vector<unsigned> beacon_weights(cfg_->NumRadios() * cfg_->NumChannels());
+  size_t ant_idx = 0;
   for (const auto& channel : EnabledChannels()) {
-    const bool is_beacon_antenna =
-        !cfg_->Beamsweep() &&
-        radio_id * cfg_->NumChannels() + ndx == cfg_->BeaconAnt();
-    std::vector<unsigned> beacon_weights(
-        cfg_->NumRadios() * cfg_->NumChannels(), is_beacon_antenna ? 1 : 0);
     if (cfg_->Beamsweep()) {
       for (size_t j = 0; j < beacon_weights.size(); j++) {
-        beacon_weights.at(j) = CommsLib::Hadamard2(ndx, j);
+        beacon_weights.at(j) = CommsLib::Hadamard2(ant_idx, j);
+      }
+    } else {
+      const size_t ant_id = (Id() * cfg_->NumChannels()) + ant_idx;
+      if (ant_id == cfg_->BeaconAnt()) {
+        std::fill(beacon_weights.begin(), beacon_weights.end(), 1);
+      } else {
+        std::fill(beacon_weights.begin(), beacon_weights.end(), 0);
       }
     }
 
@@ -866,7 +869,7 @@ void RadioSoapySdr::ConfigureTddModeBs(bool is_ref_radio, size_t radio_id) {
     std::string prog_reg = "BEACON_RAM_WGT_";
     prog_reg.push_back(channel_letter);
     dev_->writeRegisters(prog_reg, 0, beacon_weights);
-    ++ndx;
+    ant_idx++;
   }
   dev_->writeSetting("BEACON_START", std::to_string(cfg_->NumRadios()));
 }

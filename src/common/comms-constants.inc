@@ -3,7 +3,7 @@ static constexpr size_t kFftSize_80211 = 64;
 static constexpr size_t kNumMappedSubcarriers_80211 = 52;
 // Define freq-domain STS according to
 // https://standards.ieee.org/standard/802_11a-1999.html
-static constexpr std::complex<float> sts_seq[64] = {
+static constexpr std::complex<float> kStsSeqArray[64] = {
     {0, 0},   {0, 0}, {0, 0}, {0, 0}, {0, 0},   {0, 0}, {0, 0}, {0, 0},
     {1, 1},   {0, 0}, {0, 0}, {0, 0}, {-1, -1}, {0, 0}, {0, 0}, {0, 0},
     {1, 1},   {0, 0}, {0, 0}, {0, 0}, {-1, -1}, {0, 0}, {0, 0}, {0, 0},
@@ -15,7 +15,7 @@ static constexpr std::complex<float> sts_seq[64] = {
 
 // Define freq-domain LTS according to
 // https://standards.ieee.org/standard/802_11a-1999.html
-static constexpr std::complex<float> lts_seq[64] = {
+static constexpr std::complex<float> kLtsSeqArray[64] = {
     {0, 0},  {0, 0},  {0, 0},  {0, 0},  {0, 0},  {0, 0},  {1, 0},  {1, 0},
     {-1, 0}, {-1, 0}, {1, 0},  {1, 0},  {-1, 0}, {1, 0},  {-1, 0}, {1, 0},
     {1, 0},  {1, 0},  {1, 0},  {1, 0},  {1, 0},  {-1, 0}, {-1, 0}, {1, 0},
@@ -26,7 +26,7 @@ static constexpr std::complex<float> lts_seq[64] = {
     {1, 0},  {1, 0},  {1, 0},  {0, 0},  {0, 0},  {0, 0},  {0, 0},  {0, 0}};
 
 // prime numbers [1,2048]
-static constexpr size_t prime[309] = {
+static constexpr size_t kPrimeArray[309] = {
     2,    3,    5,    7,    11,   13,   17,   19,   23,   29,   31,   37,
     41,   43,   47,   53,   59,   61,   67,   71,   73,   79,   83,   89,
     97,   101,  103,  107,  109,  113,  127,  131,  137,  139,  149,  151,
@@ -55,7 +55,7 @@ static constexpr size_t prime[309] = {
     1993, 1997, 1999, 2003, 2011, 2017, 2027, 2029, 2039};
 
 // Row 52 in gold-127
-static constexpr int gold_seq[127] = {
+static constexpr int kGoldSeqArray[127u] = {
     1,  -1, 1,  -1, 1,  -1, 1,  -1, -1, -1, -1, -1, -1, -1, -1, -1, 1,  1,  -1,
     1,  1,  1,  -1, 1,  -1, -1, -1, 1,  -1, -1, -1, -1, -1, 1,  -1, 1,  -1, -1,
     1,  -1, -1, 1,  1,  1,  -1, -1, 1,  1,  -1, 1,  1,  1,  1,  1,  -1, 1,  -1,

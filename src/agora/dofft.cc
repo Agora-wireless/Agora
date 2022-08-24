@@ -7,17 +7,23 @@
 #include "comms-lib.h"
 #include "concurrent_queue_wrapper.h"
 #include "datatype_conversion.h"
-#include "gettime.h"
 #include "logger.h"
-#include "message.h"
 
 static constexpr bool kPrintFFTInput = false;
 static constexpr bool kPrintInputPilot = false;
 static constexpr bool kPrintPilotCorrStats = false;
 
-DoFFT::DoFFT(Config* config, size_t tid, AgoraBuffer* buffer,
-             PhyStats* in_phy_stats, Stats* stats_manager)
-    : Doer(config, tid), buffer_(buffer), phy_stats_(in_phy_stats) {
+DoFFT::DoFFT(Config* config, size_t tid, Table<complex_float>& data_buffer,
+             PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
+             Table<complex_float>& calib_dl_buffer,
+             Table<complex_float>& calib_ul_buffer, PhyStats* in_phy_stats,
+             Stats* stats_manager)
+    : Doer(config, tid),
+      data_buffer_(data_buffer),
+      csi_buffers_(csi_buffers),
+      calib_dl_buffer_(calib_dl_buffer),
+      calib_ul_buffer_(calib_ul_buffer),
+      phy_stats_(in_phy_stats) {
   duration_stat_fft_ = stats_manager->GetDurationStat(DoerType::kFFT, tid);
   duration_stat_csi_ = stats_manager->GetDurationStat(DoerType::kCSI, tid);
   DftiCreateDescriptor(&mkl_handle_, DFTI_SINGLE, DFTI_COMPLEX, 1,
@@ -198,11 +204,10 @@ EventData DoFFT::Launch(size_t tag) {
                                    fft_inout_);
     }
     const size_t ue_id = pilot_symbol_id;
-    PartialTranspose(buffer_->GetCsiBuffer(frame_slot, ue_id), ant_id,
+    PartialTranspose(csi_buffers_[frame_slot][ue_id], ant_id,
                      SymbolType::kPilot);
   } else if (sym_type == SymbolType::kUL) {
-    PartialTranspose(buffer_->GetDataBuffer(
-                         cfg_->GetIndexForFrameAndSymbol(frame_id, symbol_id)),
+    PartialTranspose(cfg_->GetDataBuf(data_buffer_, frame_id, symbol_id),
                      ant_id, SymbolType::kUL);
   } else if (sym_type == SymbolType::kCalUL) {
     // Only process uplink for antennas that also do downlink in this frame
@@ -215,7 +220,7 @@ EventData DoFFT::Launch(size_t tag) {
           tid_, frame_id, symbol_id, ant_id, cal_index);
 
       complex_float* calib_ul_ptr =
-          &buffer_->GetCalibUlBuffer(cal_index)[ant_id * cfg_->OfdmDataNum()];
+          &calib_ul_buffer_[cal_index][ant_id * cfg_->OfdmDataNum()];
 
       PartialTranspose(calib_ul_ptr, ant_id, sym_type);
       phy_stats_->UpdateCalibPilotSnr(cal_index, 1, ant_id, fft_inout_);
@@ -234,8 +239,8 @@ EventData DoFFT::Launch(size_t tag) {
           tid_, frame_id, symbol_id, pilot_tx_ant, cal_index);
       RtAssert(cal_index != SIZE_MAX, "Out of bounds index");
 
-      complex_float* calib_dl_ptr = &buffer_->GetCalibDlBuffer(
-          cal_index)[pilot_tx_ant * cfg_->OfdmDataNum()];
+      complex_float* calib_dl_ptr =
+          &calib_dl_buffer_[cal_index][pilot_tx_ant * cfg_->OfdmDataNum()];
       PartialTranspose(calib_dl_ptr, pilot_tx_ant, sym_type);
       phy_stats_->UpdateCalibPilotSnr(cal_index, 0, pilot_tx_ant, fft_inout_);
     }

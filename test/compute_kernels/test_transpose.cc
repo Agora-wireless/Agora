@@ -4,7 +4,6 @@
  */
 #include <immintrin.h>
 
-#include <armadillo>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
@@ -12,6 +11,7 @@
 #include <iostream>
 #include <vector>
 
+#include "armadillo"
 #include "simd_types.h"
 
 #define OFDM (1024)

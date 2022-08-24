@@ -44,7 +44,7 @@ class RadioSoapySdr : public Radio {
   long long GetTimeNs() final;
   //End of generic interface
 
-  void ConfigureTddModeBs(bool is_ref_radio, size_t beacon_radio_id) final;
+  void ConfigureTddModeBs(bool is_ref_radio) final;
   void ConfigureTddModeUe() final;
   void ClearSyncDelay() final;
   void PrintSettings() const final;

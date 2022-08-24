@@ -378,6 +378,7 @@ endif()
 
 set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/agora.cc
+  src/agora/agora_buffer.cc
   src/agora/agora_worker.cc
   src/agora/dofft.cc
   src/agora/doifft.cc
@@ -400,7 +401,6 @@ add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 set(CLIENT_SOURCES
   src/client/doifft_client.cc
   src/client/dodecode_client.cc
-  src/client/doencode_client.cc
   src/client/client_radio.cc
   src/client/ue_worker.cc
   src/client/phy-ue.cc

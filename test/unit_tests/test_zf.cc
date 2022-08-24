@@ -1,11 +1,9 @@
 #include <gtest/gtest.h>
 // For some reason, gtest include order matters
-#include "buffer.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "dobeamweights.h"
 #include "gettime.h"
-#include "message.h"
 #include "utils.h"
 
 /// Measure performance of zeroforcing
@@ -16,12 +14,41 @@ TEST(TestZF, Perf) {
 
   int tid = 0;
 
-  auto buffer = std::make_unique<AgoraBuffer>(cfg.get());
+  PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers;
+  csi_buffers.RandAllocCxFloat(cfg->BsAntNum() * cfg->OfdmDataNum());
+
+  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(
+      cfg->BsAntNum() * cfg->UeAntNum());
+  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices(
+      cfg->UeAntNum() * cfg->BsAntNum());
+
+  Table<complex_float> calib_dl_msum_buffer;
+  calib_dl_msum_buffer.RandAllocCxFloat(kFrameWnd,
+                                        cfg->OfdmDataNum() * cfg->BsAntNum(),
+                                        Agora_memory::Alignment_t::kAlign64);
+
+  Table<complex_float> calib_ul_msum_buffer;
+  calib_ul_msum_buffer.RandAllocCxFloat(kFrameWnd,
+                                        cfg->OfdmDataNum() * cfg->BsAntNum(),
+                                        Agora_memory::Alignment_t::kAlign64);
+
+  Table<complex_float> calib_dl_buffer;
+  calib_dl_buffer.RandAllocCxFloat(kFrameWnd,
+                                   cfg->OfdmDataNum() * cfg->BsAntNum(),
+                                   Agora_memory::Alignment_t::kAlign64);
+
+  Table<complex_float> calib_ul_buffer;
+  calib_ul_buffer.RandAllocCxFloat(kFrameWnd,
+                                   cfg->OfdmDataNum() * cfg->BsAntNum(),
+                                   Agora_memory::Alignment_t::kAlign64);
+
   auto phy_stats = std::make_unique<PhyStats>(cfg.get(), Direction::kUplink);
   auto stats = std::make_unique<Stats>(cfg.get());
 
   auto compute_zf = std::make_unique<DoBeamWeights>(
-      cfg.get(), tid, buffer.get(), phy_stats.get(), stats.get());
+      cfg.get(), tid, csi_buffers, calib_dl_msum_buffer, calib_ul_msum_buffer,
+      calib_dl_buffer, calib_ul_buffer, ul_zf_matrices, dl_zf_matrices,
+      phy_stats.get(), stats.get());
 
   FastRand fast_rand;
   size_t start_tsc = GetTime::Rdtsc();
@@ -35,6 +62,11 @@ TEST(TestZF, Perf) {
   double ms = GetTime::CyclesToMs(GetTime::Rdtsc() - start_tsc, cfg->FreqGhz());
 
   std::printf("Time per zeroforcing iteration = %.4f ms\n", ms / kNumIters);
+
+  calib_dl_msum_buffer.Free();
+  calib_ul_msum_buffer.Free();
+  calib_dl_buffer.Free();
+  calib_ul_buffer.Free();
 }
 
 int main(int argc, char** argv) {
