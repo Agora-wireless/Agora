@@ -8,17 +8,17 @@
 #include <sys/types.h>
 
 #include <algorithm>
-#include <armadillo>
 #include <ctime>
 #include <iomanip>
 #include <numeric>
 
-#include "buffer.h"
+#include "armadillo"
 #include "channel.h"
 #include "concurrent_queue_wrapper.h"
 #include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"
+#include "message.h"
 #include "signal_handler.h"
 #include "simd_types.h"
 #include "symbols.h"

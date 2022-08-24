@@ -6,11 +6,11 @@
 
 #include <gflags/gflags.h>
 
-#include <armadillo>
 #include <bitset>
 #include <fstream>
 #include <iostream>
 
+#include "armadillo"
 #include "data_generator.h"
 #include "logger.h"
 #include "version_config.h"

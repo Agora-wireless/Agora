@@ -8,7 +8,7 @@
 #include <sys/resource.h>
 #include <sys/time.h>
 
-#include <armadillo>
+#include "armadillo"
 // #include <hpctoolkit.h>
 
 static double test_get_time(void) {
