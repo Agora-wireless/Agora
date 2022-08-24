@@ -14,7 +14,7 @@
 #include "udp_client.h"
 
 #if defined(USE_DPDK)
-#defined DPDK_BURST_BULK
+#define DPDK_BURST_BULK
 #include <arpa/inet.h>
 #endif
 
@@ -130,8 +130,8 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     RtAssert(parsed_mac != nullptr, "Invalid server mac address");
 
     const int num_queues = cfg_->NumRadios() / cfg->DpdkNumPorts();
-    const auto nic_status = DpdkTransport::NicInit(port_ids_.at(i), mbuf_pool_, num_queues,
-                               cfg->PacketLength()
+    const auto nic_status = DpdkTransport::NicInit(
+        port_ids_.at(i), mbuf_pool_, num_queues, cfg->PacketLength());
     if (nic_status != 0) {
       rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_ids_.at(i));
     }
@@ -141,8 +141,9 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     RtAssert(status == 0, "Cannot get MAC address of the port");
     AGORA_LOG_INFO("Number of DPDK cores: %d\n", rte_lcore_count());
 
-    std::printf("Sending IP(MAC): From %s To %s(%s)\n", cfg->BsRruAddr().c_str(),
-           cfg->BsServerAddr().c_str(), ether_ntoa(parsed_mac));
+    std::printf("Sending IP(MAC): From %s To %s(%s)\n",
+                cfg->BsRruAddr().c_str(), cfg->BsServerAddr().c_str(),
+                ether_ntoa(parsed_mac));
   }
 
 #endif
@@ -455,7 +456,7 @@ void* Sender::WorkerThread(int tid) {
         const size_t queue_id =
             cur_radio % (cfg_->NumRadios() / cfg_->DpdkNumPorts());
         const size_t nb_tx_new =
-            rte_eth_tx_burst(port_id, queue_id, tx_mbufs.at(tag_id), 1);
+            rte_eth_tx_burst(port_id, queue_id, &tx_mbufs.at(tag_id), 1);
         if (unlikely(nb_tx_new != 1)) {
           AGORA_LOG_INFO(
               "Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, \n", tid,
@@ -463,7 +464,7 @@ void* Sender::WorkerThread(int tid) {
           keep_running.store(false);
           break;
         }
-#else
+#elif (!defined(USE_DPDK))
         const size_t interface_idx = cur_radio - radio_lo;
         udp_clients.at(interface_idx)
             ->Send(cfg_->BsServerAddr(), dest_port,
@@ -506,11 +507,13 @@ void* Sender::WorkerThread(int tid) {
       }
 
 #if (defined(USE_DPDK) && defined(DPDK_BURST_BULK))
+      const size_t queue_id =
+          cur_radio % (cfg_->NumRadios() / cfg_->DpdkNumPorts());
       //1 queue id oer worker?  What if a worker will need to handle multiple tx queues?
       AGORA_LOG_INFO("Thread %d rte_eth_tx_burst(), queue %zu num_tags: %zu\n",
                      tid, queue_id, num_tags);
       const size_t nb_tx_new =
-          rte_eth_tx_burst(port_id, queue_id, tx_mbufs, num_tags);
+          rte_eth_tx_burst(port_id, queue_id, tx_mbufs.data(), num_tags);
       if (unlikely(nb_tx_new != num_tags)) {
         AGORA_LOG_INFO(
             "Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, "
