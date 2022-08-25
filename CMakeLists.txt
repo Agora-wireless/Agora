@@ -74,7 +74,6 @@ add_definitions(-DPROJECT_DIRECTORY=${SOURCE_DIR})
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "info" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
-set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
 set(USE_AVX2_ENCODER False CACHE STRING "Use Agora's AVX2 encoder instead of FlexRAN's AVX512 encoder")
 
 message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
@@ -122,20 +121,10 @@ if(${USE_DPDK})
   if(NOT DPDK_LIB)
     #If cmake doesn't find DPDK than have pkg-config attempt the same
     find_package(PkgConfig REQUIRED)
-    pkg_search_module(DPDK REQUIRED libdpdk>=20.11.1)
+    pkg_search_module(DPDK REQUIRED libdpdk>=21.11.1)
     message(STATUS "  DPDK version ${DPDK_VERSION} is enabled for Agora")
 
     set(DPDK_LIBRARIES ${DPDK_LINK_LIBRARIES})
-  else()
-    message(STATUS "  DPDK is enabled for Agora")
-    if(${USE_MLX_NIC})
-      set(MLX_LIBRARIES -libverbs -lmlx5)
-    endif()
-    set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk ${MLX_LIBRARIES} -Wl,--no-whole-archive dl)
-    # DPDK include directory. Locating rte_config.h does not work on some systems.
-    # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
-    # from the real DPDK include directory (/usr/include/dpdk/).
-    find_path(DPDK_INCLUDE_DIRS NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
   endif()
 
   if(NOT DPDK_LIBRARIES)
