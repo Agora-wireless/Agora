@@ -1039,7 +1039,7 @@ void Agora::InitializeThreads() {
   } else if (kUseDPDK) {
     packet_tx_rx_ = std::make_unique<PacketTxRxDpdk>(
         config_, config_->CoreOffset() + 1, &message_queue_,
-        message_->GetConq, EventType::kPacketTX, 0), rx_ptoks_ptr_,
+        message_->GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_,
         tx_ptoks_ptr_, agora_memory_->GetUlSocket(),
         agora_memory_->GetUlSocketSize() / config_->PacketLength(),
         this->stats_->FrameStart(), agora_memory_->GetDlSocket());

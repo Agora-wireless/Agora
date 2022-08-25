@@ -45,5 +45,7 @@ class TxRxWorkerDpdk : public TxRxWorker {
   const std::vector<std::pair<uint16_t, uint16_t>> dpdk_phy_port_queues_;
   // Shared memory pool for rx and tx
   rte_mempool* mbuf_pool_;
+  std::vector<rte_ether_addr> src_mac_;
+  std::vector<rte_ether_addr> dest_mac_;
 };
 #endif  // TXRX_WORKER_DPDK_H_

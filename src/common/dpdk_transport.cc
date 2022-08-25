@@ -4,21 +4,17 @@
 
 #include <immintrin.h>
 
+#include <chrono>
 #include <string>
 
 #include "eth_common.h"
+#include "logger.h"
 #include "message.h"
 #include "rte_version.h"
 #include "utils.h"
 
 static constexpr size_t kJumboFrameSize = 9000;
-
-inline rte_eth_conf PortConfDefault() {
-  rte_eth_conf port_conf = rte_eth_conf();
-  port_conf.rxmode.max_rx_pkt_len = kJumboFrameMaxSize;
-  port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
-  return port_conf;
-}
+///#define ETH_IN_PROMISCUOUS_MODE
 
 std::vector<uint16_t> DpdkTransport::GetPortIDFromMacAddr(
     size_t port_num, const std::string& mac_addrs) {
@@ -49,7 +45,7 @@ std::vector<uint16_t> DpdkTransport::GetPortIDFromMacAddr(
 
 int DpdkTransport::NicInit(uint16_t port, rte_mempool* mbuf_pool,
                            int thread_num, size_t pkt_len) {
-  rte_eth_conf port_conf = PortConfDefault();
+  rte_eth_conf port_conf = rte_eth_conf();
   const uint16_t rx_rings = thread_num;
   const uint16_t tx_rings = thread_num;
   int retval;
@@ -68,16 +64,6 @@ int DpdkTransport::NicInit(uint16_t port, rte_mempool* mbuf_pool,
   if (rte_eth_dev_is_valid_port(port) == 0) {
     rte_exit(EXIT_FAILURE, "NIC ID is invalid\n");
   }
-
-  int status;
-  status = rte_eth_dev_set_mtu(port, kJumboFrameSize);
-  RtAssert(status == 0, "Cannot set the MTU size for the given dev");
-
-  uint16_t mtu_size = 0;
-  status = rte_eth_dev_get_mtu(port, &mtu_size);
-  RtAssert(status == 0, "Cannot get the MTU size for the given dev");
-  RtAssert(mtu_size == kJumboFrameSize, "Invalid MTU (must be 9000 bytes)");
-
 #if defined(ETH_IN_PROMISCUOUS_MODE)
   // All the rx examples have this enabled, but it doesn't seem like this is necessary
   // for our use case where we know the sender and dest addresses
@@ -93,34 +79,88 @@ int DpdkTransport::NicInit(uint16_t port, rte_mempool* mbuf_pool,
   rte_flow_error flow_error;
   int en_isolate = rte_flow_isolate(port, 1, &flow_error);
   if (en_isolate != 0) {
-    std::printf("Flow cannot be isolated %d message: %s\n", flow_error.type,
-                flow_error.message ? flow_error.message : "(no stated reason)");
-    RtAssert(en_isolate == 0, "Unable to set flow isolate mode");
+    AGORA_LOG_WARN(
+        "Flow cannot be isolated %d message: %s\n", flow_error.type,
+        flow_error.message ? flow_error.message : "(no stated reason)");
+    //RtAssert(en_isolate == 0, "Unable to set flow isolate mode");
   }
 
-  status = rte_eth_dev_info_get(port, &dev_info);
-  RtAssert(status == 0, "Unable to obtain dev info");
-  if ((dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE) != 0u) {
+  retval = rte_eth_dev_info_get(port, &dev_info);
+  if (retval < 0) {
+    RtAssert(retval == 0, "Unable to obtain dev info");
+    return retval;
+  }
+
+  int overhead;
+  AGORA_LOG_INFO("Device max mtu %d rx max pktlen %d pkt size %zu\n",
+                 dev_info.max_mtu, dev_info.max_rx_pktlen, pkt_len);
+  if ((dev_info.max_mtu != UINT16_MAX) &&
+      (dev_info.max_rx_pktlen > dev_info.max_mtu)) {
+    overhead = dev_info.max_rx_pktlen - dev_info.max_mtu;
+  } else {
+    overhead = RTE_ETHER_HDR_LEN + RTE_ETHER_CRC_LEN;
+  }
+  AGORA_LOG_TRACE("Device overhead %d offset %zu\n", overhead, kPayloadOffset);
+
+  //set the max rx packet size
+  const uint16_t desired_max_size = pkt_len + kPayloadOffset - overhead;
+  if (desired_max_size < dev_info.max_rx_pktlen) {
+    AGORA_LOG_INFO("Setting max rx pkt size to %d\n", desired_max_size);
+    dev_info.max_rx_pktlen = desired_max_size;
+  }
+
+  if ((dev_info.rx_offload_capa & DEV_RX_OFFLOAD_IPV4_CKSUM) ==
+      DEV_TX_OFFLOAD_IPV4_CKSUM) {
+    std::printf("DEV_RX_OFFLOAD_IPV4_CKSUM  enabled\n");
+    port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_IPV4_CKSUM;
+  }
+  if ((dev_info.rx_offload_capa & DEV_RX_OFFLOAD_UDP_CKSUM) ==
+      DEV_RX_OFFLOAD_UDP_CKSUM) {
+    std::printf("DEV_RX_OFFLOAD_UDP_CKSUM enabled\n");
+    port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_UDP_CKSUM;
+  }
+
+  //port_conf.rx_adv_conf.rss_conf.rss_hf &= dev_info.flow_type_rss_offloads;
+  if ((dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE) ==
+      DEV_TX_OFFLOAD_MBUF_FAST_FREE) {
+    std::printf("DEV_TX_OFFLOAD_MBUF_FAST_FREE enabled\n");
     port_conf.txmode.offloads |= DEV_TX_OFFLOAD_MBUF_FAST_FREE;
   }
-
-  port_conf.rxmode.max_rx_pkt_len =
-      RTE_MIN(RTE_MIN(dev_info.max_rx_pktlen, port_conf.rxmode.max_rx_pkt_len),
-              pkt_len);
-  // port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
+  if ((dev_info.tx_offload_capa & DEV_TX_OFFLOAD_IPV4_CKSUM) ==
+      DEV_TX_OFFLOAD_IPV4_CKSUM) {
+    std::printf("DEV_TX_OFFLOAD_IPV4_CKSUM  enabled\n");
+    port_conf.txmode.offloads |= DEV_TX_OFFLOAD_IPV4_CKSUM;
+  }
+  if ((dev_info.tx_offload_capa & DEV_TX_OFFLOAD_UDP_CKSUM) ==
+      DEV_TX_OFFLOAD_UDP_CKSUM) {
+    std::printf("DEV_TX_OFFLOAD_UDP_CKSUM enabled\n");
+    port_conf.txmode.offloads |= DEV_TX_OFFLOAD_UDP_CKSUM;
+  }
 
   retval = rte_eth_dev_configure(port, rx_rings, tx_rings, &port_conf);
   if (retval != 0) {
+    std::printf("Error in rte_eth_dev_configure\n");
     return retval;
   }
   retval = rte_eth_dev_adjust_nb_rx_tx_desc(port, &nb_rxd, &nb_txd);
   if (retval != 0) {
+    std::printf("Error in rte_eth_dev_adjust_nb_rx_tx_desc\n");
     return retval;
   }
 
+  //kPayloadOffset  overhead
+  const uint16_t desired_mtu = desired_max_size;
+  uint16_t mtu_size = desired_mtu;
+  retval = rte_eth_dev_set_mtu(port, mtu_size);
+  RtAssert(retval == 0, "Cannot set the MTU size for the given dev");
+
+  retval = rte_eth_dev_get_mtu(port, &mtu_size);
+  RtAssert(retval == 0, "Cannot get the MTU size for the given dev");
+  RtAssert(mtu_size == desired_mtu, "Invalid MTU");
+
+  //Setup RX
   rxconf = dev_info.default_rxconf;
   rxconf.offloads = port_conf.rxmode.offloads;
-
   for (q = 0; q < rx_rings; q++) {
     retval = rte_eth_rx_queue_setup(
         port, q, nb_rxd, rte_eth_dev_socket_id(port), &rxconf, mbuf_pool);
@@ -129,9 +169,9 @@ int DpdkTransport::NicInit(uint16_t port, rte_mempool* mbuf_pool,
     }
   }
 
+  //Setup TX
   txconf = dev_info.default_txconf;
   txconf.offloads = port_conf.txmode.offloads;
-
   for (q = 0; q < tx_rings; q++) {
     retval = rte_eth_tx_queue_setup(port, q, nb_txd,
                                     rte_eth_dev_socket_id(port), &txconf);
@@ -146,7 +186,7 @@ int DpdkTransport::NicInit(uint16_t port, rte_mempool* mbuf_pool,
   }
 
   rte_ether_addr addr;
-  rte_eth_macaddr_get(port, &addr);
+  retval = rte_eth_macaddr_get(port, &addr);
   std::printf("NIC %u Socket: %d, MAC: %02" PRIx8 " %02" PRIx8 " %02" PRIx8
               " %02" PRIx8 " %02" PRIx8 " %02" PRIx8 " \n",
               port, rte_eth_dev_socket_id(port), addr.addr_bytes[0],
@@ -155,12 +195,12 @@ int DpdkTransport::NicInit(uint16_t port, rte_mempool* mbuf_pool,
 
   rte_eth_link link;
   rte_eth_link_get_nowait(port, &link);
-  while (!link.link_status) {
+  while (link.link_status == 0) {
     std::printf("Waiting for link up on NIC %" PRIu16 "\n", port);
-    sleep(1);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     rte_eth_link_get_nowait(port, &link);
   }
-  if (!link.link_status) {
+  if (link.link_status == 0) {
     std::printf("Link down on NIC %" PRIx16 "\n", port);
     return 0;
   }
@@ -378,15 +418,15 @@ rte_mbuf* DpdkTransport::AllocUdp(rte_mempool* mbuf_pool,
                                   rte_ether_addr dst_mac_addr,
                                   uint32_t src_ip_addr, uint32_t dst_ip_addr,
                                   uint16_t src_udp_port, uint16_t dst_udp_port,
-                                  size_t buffer_length) {
+                                  size_t buffer_length, uint16_t pkt_id) {
   rte_mbuf* tx_buf __attribute__((aligned(64)));
   tx_buf = rte_pktmbuf_alloc(mbuf_pool);
 
   rte_ether_hdr* eth_hdr = rte_pktmbuf_mtod(tx_buf, rte_ether_hdr*);
   eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
-  std::memcpy(eth_hdr->s_addr.addr_bytes, src_mac_addr.addr_bytes,
+  std::memcpy(eth_hdr->src_addr.addr_bytes, src_mac_addr.addr_bytes,
               RTE_ETHER_ADDR_LEN);
-  std::memcpy(eth_hdr->d_addr.addr_bytes, dst_mac_addr.addr_bytes,
+  std::memcpy(eth_hdr->dst_addr.addr_bytes, dst_mac_addr.addr_bytes,
               RTE_ETHER_ADDR_LEN);
 
   auto* ip_h = (rte_ipv4_hdr*)((char*)eth_hdr + sizeof(rte_ether_hdr));
@@ -397,8 +437,9 @@ rte_mbuf* DpdkTransport::AllocUdp(rte_mempool* mbuf_pool,
   ip_h->type_of_service = 0;
   ip_h->total_length =
       rte_cpu_to_be_16(buffer_length + kPayloadOffset - sizeof(rte_ether_hdr));
-  ip_h->packet_id = 0;
-  ip_h->fragment_offset = 0;
+  ip_h->packet_id = rte_cpu_to_be_16(pkt_id);
+  //Do not fragment flag?
+  ip_h->fragment_offset = rte_cpu_to_be_16(1 << 14);
   ip_h->time_to_live = 64;
   ip_h->hdr_checksum = 0;
 
@@ -408,11 +449,16 @@ rte_mbuf* DpdkTransport::AllocUdp(rte_mempool* mbuf_pool,
   udp_h->dgram_len =
       rte_cpu_to_be_16(buffer_length + kPayloadOffset - sizeof(rte_ether_hdr) -
                        sizeof(rte_ipv4_hdr));
+  udp_h->dgram_cksum = 0;
 
   tx_buf->pkt_len = buffer_length + kPayloadOffset;
   tx_buf->data_len = buffer_length + kPayloadOffset;
-  tx_buf->ol_flags = (PKT_TX_IP_CKSUM | PKT_TX_UDP_CKSUM);
-
+  //Should very that these offloads were enabled
+  tx_buf->ol_flags =
+      RTE_MBUF_F_TX_IPV4 | RTE_MBUF_F_TX_IP_CKSUM | RTE_MBUF_F_TX_UDP_CKSUM;
+  //Not sure if this is needed?
+  tx_buf->l2_len = sizeof(*eth_hdr);
+  tx_buf->l3_len = sizeof(rte_ipv4_hdr);
   return tx_buf;
 }
 
@@ -424,8 +470,8 @@ void DpdkTransport::DpdkInit(uint16_t core_offset, size_t thread_num) {
         core_list + "," + std::to_string(GetPhysicalCoreId(core_offset + i));
   }
   // n: channels, m: maximum memory in megabytes
-  const char* rte_argv[] = {"txrx",        "-l", core_list.c_str(),
-                            "--log-level", "0",  nullptr};
+  const char* rte_argv[] = {"txrx",        "-l",           core_list.c_str(),
+                            "--log-level", "lib.eal:info", nullptr};
   int rte_argc = static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
 
   // Initialize DPDK environment
@@ -440,7 +486,7 @@ void DpdkTransport::DpdkInit(uint16_t core_offset, size_t thread_num) {
 
 rte_mempool* DpdkTransport::CreateMempool(size_t num_ports,
                                           size_t packet_length) {
-  const size_t mbuf_size = packet_length + kMBufCacheSize;
+  const size_t mbuf_size = packet_length + kPayloadOffset + kMBufCacheSize;
   rte_mempool* mbuf_pool =
       rte_pktmbuf_pool_create("MBUF_POOL", kNumMBufs * num_ports,
                               kMBufCacheSize, 0, mbuf_size, rte_socket_id());

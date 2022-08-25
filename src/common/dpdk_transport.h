@@ -80,7 +80,8 @@ class DpdkTransport {
   static rte_mbuf* AllocUdp(rte_mempool* mbuf_pool, rte_ether_addr src_mac_addr,
                             rte_ether_addr dst_mac_addr, uint32_t src_ip_addr,
                             uint32_t dst_ip_addr, uint16_t src_udp_port,
-                            uint16_t dst_udp_port, size_t buffer_length);
+                            uint16_t dst_udp_port, size_t buffer_length,
+                            uint16_t pkt_id);
 
   /// Init dpdk on core [core_offset:core_offset+thread_num]
   static void DpdkInit(uint16_t core_offset, size_t thread_num);
