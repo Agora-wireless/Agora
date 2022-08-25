@@ -55,8 +55,7 @@ class Radio {
   virtual int Rx(std::vector<void*>& rx_locs, size_t rx_size,
                  RxFlags& out_flags, long long& rx_time_ns) = 0;
 
-  inline virtual void ConfigureTddModeBs(
-      [[maybe_unused]] bool is_ref_radio) {}
+  inline virtual void ConfigureTddModeBs([[maybe_unused]] bool is_ref_radio) {}
   inline virtual void ConfigureTddModeUe() {}
   inline virtual void ClearSyncDelay() {}
   inline virtual void PrintSettings() const {}
