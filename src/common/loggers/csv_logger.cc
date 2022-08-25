@@ -17,8 +17,9 @@
 
 namespace CsvLog {
 
-CsvLogger::CsvLogger(size_t log_id, const std::string& timestamp,
-                     const std::string& radio_name) {
+CsvLogger::CsvLogger([[maybe_unused]] size_t log_id,
+                     [[maybe_unused]] const std::string& timestamp,
+                     [[maybe_unused]] const std::string& radio_name) {
 #if defined(ENABLE_CSV_LOG)
   if (log_id >= kAllLogs) {
     AGORA_LOG_ERROR("Invalid log id %zu in CsvLogger\n", log_id);
@@ -32,9 +33,6 @@ CsvLogger::CsvLogger(size_t log_id, const std::string& timestamp,
     logger_->set_level(spdlog::level::info);
     logger_->set_pattern("%v");
   }
-#else
-  unused(log_id);
-  unused(radio_name);
 #endif  //ENABLE_CSV_LOG
 }
 
