@@ -19,6 +19,7 @@ static constexpr size_t kReSyncRetryCount = 100u;
 static constexpr float kBeaconDetectWindow = 2.33f;
 static constexpr size_t kBeaconsToStart = 2;
 static constexpr bool kPrintClientBeaconSNR = true;
+static constexpr size_t kSampleOffsetThreshold = 5;
 
 static constexpr float kShortMaxFloat = SHRT_MAX;
 
@@ -237,28 +238,37 @@ void TxRxWorkerClientHw::DoTxRx() {
                 "%ld, rx sample offset: %ld tries %zu\n",
                 tid_, kSyncDetectChannel, sync_index, rx_adjust_samples,
                 resync_retry_cnt);
-            resync_success++;
-            resync = false;
-            //Display all the other channels
-            if (kDebugBeaconChannels) {
-              for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-                if (ch != kSyncDetectChannel) {
-                  const ssize_t aux_channel_sync =
-                      FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
-                                         rx_pkts.at(ch)->data_),
-                                     samples_per_symbol);
-                  AGORA_LOG_INFO(
-                      "TxRxWorkerClientHw [%zu]: beacon status channel %zu, "
-                      "sync_index: %ld, rx sample offset: %ld\n",
-                      tid_, ch, aux_channel_sync,
-                      aux_channel_sync - (Configuration()->BeaconLen() +
-                                          Configuration()->OfdmTxZeroPrefix()));
+            if (static_cast<size_t>(std::abs(rx_adjust_samples)) <
+                kSampleOffsetThreshold) {
+              resync_success++;
+              resync = false;
+              //Display all the other channels
+              if (kDebugBeaconChannels) {
+                for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+                  if (ch != kSyncDetectChannel) {
+                    const ssize_t aux_channel_sync =
+                        FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
+                                           rx_pkts.at(ch)->data_),
+                                       samples_per_symbol);
+                    AGORA_LOG_INFO(
+                        "TxRxWorkerClientHw [%zu]: beacon status channel %zu, "
+                        "sync_index: %ld, rx sample offset: %ld\n",
+                        tid_, ch, aux_channel_sync,
+                        aux_channel_sync -
+                            (Configuration()->BeaconLen() +
+                             Configuration()->OfdmTxZeroPrefix()));
+                  }
                 }
               }
+              //Adjust the transmit time offset
+              time0 += rx_adjust_samples;
+              resync_retry_cnt = 0;
+            } else {
+              AGORA_LOG_WARN(
+                  "TxRxWorkerClientHw [%zu]: Ignoring large rx sample offset\n",
+                  tid_);
+              rx_adjust_samples = 0;
             }
-            //Adjust the transmit time offset
-            time0 += rx_adjust_samples;
-            resync_retry_cnt = 0;
           } else {
             resync_retry_cnt++;
             if (resync_retry_cnt > kReSyncRetryCount) {
