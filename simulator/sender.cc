@@ -510,12 +510,13 @@ void* Sender::WorkerThread(int tid) {
           cur_radio % (cfg_->NumRadios() / cfg_->DpdkNumPorts());
       //queue id might be a little abused here
       AGORA_LOG_TRACE("Thread %d rte_eth_tx_burst(), queue %zu num_tags: %zu\n",
-                     tid, queue_id, num_tags);
+                      tid, queue_id, num_tags);
       const size_t nb_tx_new =
           rte_eth_tx_burst(port_id, queue_id, tx_mbufs.data(), num_tags);
       if (unlikely(nb_tx_new != num_tags)) {
         AGORA_LOG_ERROR(
-            "Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, num_tags: %zu\n",
+            "Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, num_tags: "
+            "%zu\n",
             tid, nb_tx_new, num_tags);
         keep_running.store(false);
         break;
