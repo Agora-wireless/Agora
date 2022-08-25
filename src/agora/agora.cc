@@ -262,24 +262,43 @@ void Agora::ScheduleUsers(EventType event_type, size_t frame_id,
 
 size_t Agora::FetchEvent(std::vector<EventData>& events_list,
                          bool is_turn_to_dequeue_from_io) {
-  size_t num_events = 0;
+  size_t total_events = 0;
+  size_t remaining_events = events_list.size();
   if (is_turn_to_dequeue_from_io) {
     for (size_t i = 0; i < config_->SocketThreadNum(); i++) {
-      num_events += message_queue_.try_dequeue_bulk_from_producer(
-          *(rx_ptoks_ptr_[i]), &events_list.at(num_events),
-          events_list.size() - num_events);
+      if (remaining_events > 0) {
+        //Restrict the amount from each socket
+        const size_t request_events =
+            std::min(kDequeueBulkSizeTXRX, remaining_events);
+        const size_t new_events = message_queue_.try_dequeue_bulk_from_producer(
+            *(rx_ptoks_ptr_[i]), &events_list.at(total_events), request_events);
+        remaining_events = remaining_events - new_events;
+        total_events = total_events + new_events;
+      } else {
+        AGORA_LOG_WARN(
+            "remaining_events = %zu:%zu, queue %zu num elements %zu\n",
+            remaining_events, total_events, i, message_queue_.size_approx());
+      }
     }
-    if (kEnableMac == true) {
-      num_events += mac_response_queue_.try_dequeue_bulk(
-          &events_list.at(num_events), events_list.size() - num_events);
+
+    if (kEnableMac) {
+      if (remaining_events > 0) {
+        const size_t new_events = mac_response_queue_.try_dequeue_bulk(
+            &events_list.at(total_events), remaining_events);
+        remaining_events = remaining_events - new_events;
+        total_events = total_events + new_events;
+      } else {
+        AGORA_LOG_WARN(
+            "remaining_events = %zu:%zu, mac queue num elements %zu\n",
+            remaining_events, total_events, mac_response_queue_.size_approx());
+      }
     }
   } else {
-    num_events +=
+    total_events =
         message_->GetCompQueue(frame_tracking_.cur_proc_frame_id_ & 0x1)
-            .try_dequeue_bulk(&events_list.at(num_events),
-                              events_list.size() - num_events);
+            .try_dequeue_bulk(&events_list.at(total_events), remaining_events);
   }
-  return num_events;
+  return total_events;
 }
 
 void Agora::Start() {
