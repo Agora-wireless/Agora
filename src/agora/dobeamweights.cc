@@ -152,7 +152,8 @@ float DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     } else {
       arma::cx_fmat mat_dl_csi = inv(arma::diagmat(calib_sc_vec)) * mat_csi;
       if (kEnableMatLog) {
-        mat_loggers_.at(CsvLog::kDLCSI)->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_csi);
+        mat_loggers_.at(CsvLog::kDLCSI)
+            ->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_csi);
       }
       switch (cfg_->BeamformingAlgo()) {
         case CommsLib::BeamformingAlgorithm::kZF:
@@ -202,7 +203,8 @@ float DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
                               cfg_->BsAntNum(), cfg_->UeAntNum(), false);
     mat_dl_beam = mat_dl_beam_tmp.st();
     if (kEnableMatLog) {
-      mat_loggers_.at(CsvLog::kDlBeam)->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_beam);
+      mat_loggers_.at(CsvLog::kDlBeam)
+          ->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_beam);
     }
   }
   for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {

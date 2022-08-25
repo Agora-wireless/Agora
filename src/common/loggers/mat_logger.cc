@@ -14,7 +14,7 @@ namespace CsvLog {
 const std::string kMatHeader = "Frame,SC,BS-Ant,UE-Ant,Real,Imag";
 
 BfMatLogger::BfMatLogger(size_t mat_log_id, const std::string& timestamp,
-                     const std::string& radio_name)
+                         const std::string& radio_name)
     : CsvLogger(kCsvLogs + mat_log_id, timestamp, radio_name) {
 #if defined(ENABLE_MAT_LOG)
   logger_->info(kMatHeader);
@@ -23,8 +23,9 @@ BfMatLogger::BfMatLogger(size_t mat_log_id, const std::string& timestamp,
 
 BfMatLogger::~BfMatLogger() { SaveMatBuf(); }
 
-bool BfMatLogger::UpdateMatBuf(const size_t frame_id, const size_t sc_id,
-                             const arma::cx_fmat& mat_in) {
+bool BfMatLogger::UpdateMatBuf([[maybe_unused]] const size_t frame_id,
+                               [[maybe_unused]] const size_t sc_id,
+                               [[maybe_unused]] const arma::cx_fmat& mat_in) {
   bool status = false;
 #if defined(ENABLE_MAT_LOG)
   if (frame_id >= kFrameStart && frame_id < kFrameStart + kFrames &&
@@ -36,10 +37,6 @@ bool BfMatLogger::UpdateMatBuf(const size_t frame_id, const size_t sc_id,
         mat_in(0, 0, mat_copy_size);
     status = true;
   }
-#else
-  unused(frame_id);
-  unused(sc_id);
-  unused(mat_in);
 #endif
   return status;
 }

@@ -110,7 +110,8 @@ class DoBeamWeights : public Doer {
   arma::uvec ext_ref_id_;
   size_t num_ext_ref_;
 
-  std::array<std::unique_ptr<CsvLog::BfMatLogger>, CsvLog::kBfMatLogs> mat_loggers_;
+  std::array<std::unique_ptr<CsvLog::BfMatLogger>, CsvLog::kBfMatLogs>
+      mat_loggers_;
 };
 
 #endif  // DOBEAMWEIGHTS_H_

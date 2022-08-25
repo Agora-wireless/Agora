@@ -24,9 +24,10 @@ constexpr size_t kUEAnts = 1;
 class BfMatLogger : public CsvLogger {
  public:
   BfMatLogger(size_t mat_log_id, const std::string& timestamp,
-            const std::string& radio_name);
-  bool UpdateMatBuf(const size_t frame_id, const size_t sc_id,
-                    const arma::cx_fmat& mat_in);
+              const std::string& radio_name);
+  bool UpdateMatBuf([[maybe_unused]] const size_t frame_id,
+                    [[maybe_unused]] const size_t sc_id,
+                    [[maybe_unused]] const arma::cx_fmat& mat_in);
   ~BfMatLogger();
 
  private:
