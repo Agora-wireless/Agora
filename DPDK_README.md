@@ -36,12 +36,8 @@ Agora is compatable with and accelerated by the DPDK library.
     $ cd Agora
     $ mkdir build
     $ cd build
-    $ cmake -DUSE_DPDK=1 ..
+    $ cmake -DUSE_DPDK=true ..
     $ make -j
-    </pre>
-  * For Intel NICs, Mellanox libraries need to be excluded in the build. To do this, run
-    <pre>
-    $ cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=0 ..; make -j
     </pre>
 
  * Run Agora with emulated RRU traffic with DPDK 
