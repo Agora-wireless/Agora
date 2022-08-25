@@ -271,7 +271,7 @@ size_t TxRxWorkerDpdk::DequeueSend() {
     size_t nb_tx_new =
         rte_eth_tx_burst(tx_info.first, tx_info.second, &tx_bufs, kTxBatchSize);
     if (unlikely(nb_tx_new != kTxBatchSize)) {
-      std::printf("TxRxWorkerDpdk[%zu]: rte_eth_tx_burst() failed\n", tid_);
+      AGORA_LOG_ERROR("TxRxWorkerDpdk[%zu]: rte_eth_tx_burst() failed\n", tid_);
       throw std::runtime_error("TxRxWorkerDpdk: rte_eth_tx_burst() failed");
     }
     auto complete_event =

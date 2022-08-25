@@ -452,13 +452,12 @@ void* Sender::WorkerThread(int tid) {
         const size_t dest_port = cfg_->BsServerPort() + cur_radio;
 
 #if (defined(USE_DPDK) && !defined(DPDK_BURST_BULK))
-        //DpdkNumPorts;
         const size_t queue_id =
             cur_radio % (cfg_->NumRadios() / cfg_->DpdkNumPorts());
         const size_t nb_tx_new =
             rte_eth_tx_burst(port_id, queue_id, &tx_mbufs.at(tag_id), 1);
         if (unlikely(nb_tx_new != 1)) {
-          AGORA_LOG_INFO(
+          AGORA_LOG_ERROR(
               "Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, \n", tid,
               nb_tx_new, 1);
           keep_running.store(false);
@@ -509,15 +508,14 @@ void* Sender::WorkerThread(int tid) {
 #if (defined(USE_DPDK) && defined(DPDK_BURST_BULK))
       const size_t queue_id =
           cur_radio % (cfg_->NumRadios() / cfg_->DpdkNumPorts());
-      //1 queue id oer worker?  What if a worker will need to handle multiple tx queues?
-      AGORA_LOG_INFO("Thread %d rte_eth_tx_burst(), queue %zu num_tags: %zu\n",
+      //queue id might be a little abused here
+      AGORA_LOG_TRACE("Thread %d rte_eth_tx_burst(), queue %zu num_tags: %zu\n",
                      tid, queue_id, num_tags);
       const size_t nb_tx_new =
           rte_eth_tx_burst(port_id, queue_id, tx_mbufs.data(), num_tags);
       if (unlikely(nb_tx_new != num_tags)) {
-        AGORA_LOG_INFO(
-            "Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, "
-            "num_tags: %zu\n",
+        AGORA_LOG_ERROR(
+            "Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, num_tags: %zu\n",
             tid, nb_tx_new, num_tags);
         keep_running.store(false);
         break;
