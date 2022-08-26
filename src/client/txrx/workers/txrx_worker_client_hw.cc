@@ -22,6 +22,7 @@ static constexpr size_t kReSyncRetryCount = 100u;
 static constexpr float kBeaconDetectWindow = 2.33f;
 static constexpr size_t kBeaconsToStart = 2;
 static constexpr bool kPrintClientBeaconSNR = true;
+static constexpr ssize_t kMaxBeaconAdjust = 5;
 
 TxRxWorkerClientHw::TxRxWorkerClientHw(
     size_t core_offset, size_t tid, size_t interface_count,
@@ -231,36 +232,46 @@ void TxRxWorkerClientHw::DoTxRx() {
                   rx_pkts.at(kSyncDetectChannel)->data_),
               samples_per_symbol, Configuration()->ClCorrScale().at(tid_));
           if (sync_index >= 0) {
-            rx_adjust_samples = sync_index - Configuration()->BeaconLen() -
-                                Configuration()->OfdmTxZeroPrefix();
-            AGORA_LOG_INFO(
-                "TxRxWorkerClientHw [%zu]: Re-syncing channel %zu, sync_index: "
-                "%ld, rx sample offset: %ld tries %zu\n",
-                tid_, kSyncDetectChannel, sync_index, rx_adjust_samples,
-                resync_retry_cnt);
-            resync_success++;
-            resync = false;
-            //Display all the other channels
-            if (kDebugBeaconChannels) {
-              for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-                if (ch != kSyncDetectChannel) {
-                  const ssize_t aux_channel_sync =
-                      FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
-                                         rx_pkts.at(ch)->data_),
-                                     samples_per_symbol,
-                                     Configuration()->ClCorrScale().at(tid_));
-                  AGORA_LOG_INFO(
-                      "TxRxWorkerClientHw [%zu]: beacon status channel %zu, "
-                      "sync_index: %ld, rx sample offset: %ld\n",
-                      tid_, ch, aux_channel_sync,
-                      aux_channel_sync - (Configuration()->BeaconLen() +
-                                          Configuration()->OfdmTxZeroPrefix()));
+            const ssize_t adjust = sync_index - Configuration()->BeaconLen() -
+                                   Configuration()->OfdmTxZeroPrefix();
+            if (std::abs(adjust) > kMaxBeaconAdjust) {
+              AGORA_LOG_WARN(
+                  "TxRxWorkerClientHw [%zu]: Re-syncing ignored due to excess "
+                  "offset %ld - channel %zu, sync_index: %ld, tries %zu\n ",
+                  tid_, adjust, kSyncDetectChannel, sync_index,
+                  resync_retry_cnt);
+            } else {
+              rx_adjust_samples = adjust;
+              AGORA_LOG_INFO(
+                  "TxRxWorkerClientHw [%zu]: Re-syncing channel %zu, "
+                  "sync_index: %ld, rx sample offset: %ld tries %zu\n ",
+                  tid_, kSyncDetectChannel, sync_index, rx_adjust_samples,
+                  resync_retry_cnt);
+              resync_success++;
+              resync = false;
+              //Display all the other channels
+              if (kDebugBeaconChannels) {
+                for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+                  if (ch != kSyncDetectChannel) {
+                    const ssize_t aux_channel_sync =
+                        FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
+                                           rx_pkts.at(ch)->data_),
+                                       samples_per_symbol,
+                                       Configuration()->ClCorrScale().at(tid_));
+                    AGORA_LOG_INFO(
+                        "TxRxWorkerClientHw [%zu]: beacon status channel %zu, "
+                        "sync_index: %ld, rx sample offset: %ld\n",
+                        tid_, ch, aux_channel_sync,
+                        aux_channel_sync -
+                            (Configuration()->BeaconLen() +
+                             Configuration()->OfdmTxZeroPrefix()));
+                  }
                 }
               }
+              //Adjust the transmit time offset
+              time0 += rx_adjust_samples;
+              resync_retry_cnt = 0;
             }
-            //Adjust the transmit time offset
-            time0 += rx_adjust_samples;
-            resync_retry_cnt = 0;
           } else {
             resync_retry_cnt++;
             if (resync_retry_cnt > kReSyncRetryCount) {
