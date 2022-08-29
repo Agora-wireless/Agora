@@ -42,8 +42,7 @@ void ControlChannel::BsControlServer() {
         HandleControlMessage(rx_message.get());
       }
     } else if (rx_status < 0) {
-      AGORA_LOG_ERROR("Control Channel returned error status %lld\n",
-                      rx_status);
+      AGORA_LOG_ERROR("Control Channel returned error status %ld\n", rx_status);
     }
   }
   running_ = false;
