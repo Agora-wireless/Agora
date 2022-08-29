@@ -22,7 +22,7 @@ ControlChannel::~ControlChannel() {
 }
 
 void ControlChannel::Start() {
-  thread_ = std::thread(ControlChannel::BsControlServer, this);
+  thread_ = std::thread(&ControlChannel::BsControlServer, this);
 }
 
 void ControlChannel::Stop() { term_ = true; }
@@ -37,8 +37,10 @@ void ControlChannel::BsControlServer() {
     if (rx_status > 0) {
       const size_t message_size = static_cast<size_t>(rx_status);
       auto rx_message =
-          ControlMessage::Deserialize(udp_rx_buffer.data(), message_size);
-      HandleControlMessage(&rx_message);
+          ControlMessage::Construct(udp_rx_buffer.data(), message_size);
+      if (rx_message != nullptr) {
+        HandleControlMessage(rx_message.get());
+      }
     } else if (rx_status < 0) {
       AGORA_LOG_ERROR("Control Channel returned error status %lld\n",
                       rx_status);
@@ -48,11 +50,8 @@ void ControlChannel::BsControlServer() {
 }
 
 void ControlChannel::HandleControlMessage(ControlMessage* control_message) {
+  control_message->Print();
   if (control_message->Type() == ControlMessage::kAssociation) {
-    AssociationMessage* message =
-        dynamic_cast<AssociationMessage*>(control_message);
-    m
-
-    //Add clients?
+    //Do something?
   }
 }

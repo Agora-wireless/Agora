@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <thread>
 
+#include "control_message.h"
 #include "udp_comm.h"
 
 class ControlChannel {
