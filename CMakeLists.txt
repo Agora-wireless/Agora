@@ -203,7 +203,7 @@ add_definitions(-DTHREADED_INIT)
 set(BLA_VENDOR Intel10_64lp)
 find_package(BLAS REQUIRED)
 
-set(USE_SPDLOG False CACHE STRING "USE_SPDLOG defaulting to 'False'")
+set(USE_SPDLOG True CACHE STRING "USE_SPDLOG defaulting to 'False'")
 message(STATUS "USE_SPDLOG: ${USE_SPDLOG}")
 if(USE_SPDLOG)
   if(LOG_LEVEL STREQUAL "none")
