@@ -348,7 +348,11 @@ class RxCounters {
  */
 class FrameCounters {
  public:
-  FrameCounters() : task_count_(), symbol_count_() {}
+  FrameCounters()
+      : task_count_(),
+        symbol_count_(),
+        max_symbol_count_(0),
+        max_task_count_(0) {}
 
   void Init(size_t max_symbol_count, size_t max_task_count = 0) {
     this->max_symbol_count_ = max_symbol_count;
