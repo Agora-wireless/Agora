@@ -3,9 +3,10 @@ include(CheckCSourceRuns)
 cmake_policy(SET CMP0054 NEW)
 #Allow project version
 cmake_policy(SET CMP0048 NEW)
-project(Agora VERSION 1.1.0)
+project(Agora VERSION 1.2.0)
 
 if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
+  #Flags is enabled by default for c++17
   set(GCC_COVERAGE_COMPILE_FLAGS "-faligned-new")
 endif()
 
@@ -21,27 +22,25 @@ endif()
 
 # New versions of GCC enable position-independent executables by default. We
 # don't want to compile FlexRAN libraries with -fPIC because it reduces
-# performance by around 40%.
+# performance by around 40%.  Don’t produce a dynamically linked position independent executable. 
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -no-pie")
 
+set(CMAKE_CXX_STANDARD 17)
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   message(STATUS "Using GNU compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   set(CMAKE_C_FLAGS "-std=gnu11 -Wall -g -march=native -m64")
   set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -g -march=native -m64")
-  set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl)
+  #set(MKL_LIBS -Wl,--no-as-needed -lmkl_sequential)   -lmkl_tbb_thread -lmkl_intel_thread liomp5 (lmkl_intel_ilp64 causes errors?)
+  #set(MKL_LIBS -lmkl_intel_lp64 -lmkl_tbb_thread -ltbb -lmkl_core -lpthread -lm -ldl)
   if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.2)
     message(STATUS "GCC version: ${CMAKE_CXX_COMPILER_VERSION} (versions newer than 9.2 are suggested for using AVX512 optimizations)")
   endif()
 elseif(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
   message(STATUS "Using Intel compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/intel-compile-options.cmake)
-  set(MKL_LIBS -lpthread -lm -ldl)
   set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -g -march=native -mkl=sequential")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
   message(STATUS "Using Clang compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
-  set(CMAKE_CXX_STANDARD 17)
-else()
-  set(CMAKE_CXX_STANDARD 17)
 endif()
 
 option(DEBUG "Enable debugging" OFF)
@@ -202,7 +201,7 @@ add_definitions(-DTHREADED_INIT)
 
 # Intel MKL
 set(BLA_VENDOR Intel10_64lp)
-find_package(BLAS)
+find_package(BLAS REQUIRED)
 
 set(USE_SPDLOG False CACHE STRING "USE_SPDLOG defaulting to 'False'")
 message(STATUS "USE_SPDLOG: ${USE_SPDLOG}")
@@ -303,8 +302,7 @@ include_directories(
   src/client
   src/client/txrx
   src/client/txrx/workers
-  src/data_generator
-  /usr/include/mkl)
+  src/data_generator)
 
 include_directories(SYSTEM src/third_party src/third_party/spdlog/include src/third_party/nlohmann/single_include)
 
@@ -401,17 +399,17 @@ set(CLIENT_SOURCES
 add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
   
 include_directories(
-  ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
-  ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr
-  ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_common
+  ${FLEXRAN_FEC_LIB_DIR}/install/lib_ldpc_decoder_5gnr
+  ${FLEXRAN_FEC_LIB_DIR}/install/lib_ldpc_encoder_5gnr
+  ${FLEXRAN_FEC_LIB_DIR}/install/lib_common
   ${SOURCE_DIR}/src/encoder)
 
 set(FLEXRAN_LDPC_LIBS
-  ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a
-  ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
-  ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
+  ${FLEXRAN_FEC_LIB_DIR}/install/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a
+  ${FLEXRAN_FEC_LIB_DIR}/install/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
+  ${FLEXRAN_FEC_LIB_DIR}/install/lib_common/libcommon.a)
 
-set(COMMON_LIBS ${COMMON_LIBS} armadillo numa ${HDF5_LIBRARIES} ${DPDK_LIBRARIES} ${MKL_LIBS} ${SOAPY_LIB}
+set(COMMON_LIBS ${COMMON_LIBS} armadillo numa ${HDF5_LIBRARIES} ${DPDK_LIBRARIES} ${BLAS_LIBRARIES} ${SOAPY_LIB}
     ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
 
 # TODO: The main agora executable is performance-critical, so we need to
@@ -521,20 +519,3 @@ foreach(test_name IN LISTS UNIT_TESTS)
   target_link_libraries(${test_name} ${COMMON_LIBS})
   add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
-
-# if(NOT ${USE_DPDK})
-#   # Create shared libraries for Python
-#   # DPDK is currently not supported
-#    add_library(comp MODULE
-#      $<TARGET_OBJECTS:agora_sources_lib>
-#      $<TARGET_OBJECTS:common_sources_lib>)
-#    target_link_libraries(comp ${COMMON_LIBS})
-
-#   add_library(ue_phy MODULE
-#     $<TARGET_OBJECTS:client_sources_lib>
-#     $<TARGET_OBJECTS:common_sources_lib>)
-#   target_link_libraries(ue_phy ${COMMON_LIBS})
-# else()
-#   message(STATUS "Warning: DPDK is not supported for creating shared libraries!")
-# endif()
-
