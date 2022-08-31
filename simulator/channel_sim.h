@@ -5,38 +5,130 @@
 #ifndef CHANNEL_SIM_H_
 #define CHANNEL_SIM_H_
 
-#include <sys/types.h>
-
-#include <algorithm>
-#include <ctime>
-#include <iomanip>
-#include <numeric>
+#include <array>
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <thread>
+#include <vector>
 
 #include "armadillo"
 #include "channel.h"
-#include "concurrent_queue_wrapper.h"
+#include "concurrentqueue.h"
 #include "config.h"
-#include "gettime.h"
-#include "memory_manage.h"
+#include "logger.h"
 #include "message.h"
-#include "signal_handler.h"
 #include "simd_types.h"
-#include "symbols.h"
 #include "udp_comm.h"
 
-struct WorkerThreadStorage {
+class WorkerThreadStorage {
+ public:
+  WorkerThreadStorage(size_t tid, size_t ue_tx_buf_bytes, size_t ue_ant_count,
+                      size_t bs_tx_buf_bytes, size_t bs_ant_count,
+                      size_t samples_per_symbol, size_t udp_packet_size)
+      : tid_(tid),
+        ue_tx_buffer_(ue_tx_buf_bytes),
+        bs_tx_buffer_(bs_tx_buf_bytes),
+        udp_tx_buffer_(udp_packet_size) {
+    //UE
+    const size_t ue_input_storage_size =
+        (ue_ant_count * samples_per_symbol * sizeof(arma::cx_float));
+    auto* ue_input_float_storage =
+        reinterpret_cast<std::byte*>(PaddedAlignedAlloc(
+            Agora_memory::Alignment_t::kAlign64, ue_input_storage_size));
+
+    ue_input_matrix_ =
+        arma::cx_fmat(reinterpret_cast<arma::cx_float*>(ue_input_float_storage),
+                      samples_per_symbol, ue_ant_count, false, true);
+    AGORA_LOG_INFO("Ue input location %zu:%zu  diff %zu size %zu\n",
+                   reinterpret_cast<intptr_t>(ue_input_matrix_.memptr()),
+                   reinterpret_cast<intptr_t>(ue_input_float_storage),
+                   reinterpret_cast<intptr_t>(ue_input_matrix_.memptr()) -
+                       reinterpret_cast<intptr_t>(ue_input_float_storage),
+                   ue_input_storage_size);
+
+    AGORA_LOG_INFO("storage %zu:%zu, matrix %zu:%zu\n",
+                   reinterpret_cast<intptr_t>(&ue_input_float_storage[0u]),
+                   reinterpret_cast<intptr_t>(
+                       &ue_input_float_storage[ue_input_storage_size - 1]),
+                   reinterpret_cast<intptr_t>(&ue_input_matrix_.at(0, 0)),
+                   reinterpret_cast<intptr_t>(&ue_input_matrix_.at(
+                       samples_per_symbol - 1, ue_ant_count - 1)));
+
+    //RtAssert(ue_input_matrix_.memptr() == ue_input_float_storage,
+    //         "Ue Input storage not at correct location");
+    //ue_input_matrix_.zeros(samples_per_symbol, ue_ant_count);
+
+    const size_t ue_output_storage_size =
+        (bs_ant_count * samples_per_symbol * sizeof(arma::cx_float));
+    auto* ue_output_float_storage = PaddedAlignedAlloc(
+        Agora_memory::Alignment_t::kAlign64, ue_output_storage_size);
+    arma::cx_fmat test(
+        reinterpret_cast<arma::cx_float*>(ue_output_float_storage),
+        samples_per_symbol, bs_ant_count, false, true);
+
+    ue_output_matrix_ = arma::cx_fmat(
+        reinterpret_cast<arma::cx_float*>(ue_output_float_storage),
+        samples_per_symbol, bs_ant_count, false, true);
+    AGORA_LOG_INFO("Ue output location %zu:%zu:%zu diff %zu size %zu:%zu\n",
+                   reinterpret_cast<intptr_t>(ue_output_matrix_.memptr()),
+                   reinterpret_cast<intptr_t>(ue_output_float_storage),
+                   reinterpret_cast<intptr_t>(test.memptr()),
+                   reinterpret_cast<intptr_t>(ue_output_float_storage) -
+                       reinterpret_cast<intptr_t>(ue_output_matrix_.memptr()),
+                   sizeof(arma::cx_float), ue_output_storage_size);
+    RtAssert(ue_output_matrix_.memptr() == ue_output_float_storage,
+             "Ue Input storage not at correct location");
+    ue_output_matrix_.zeros(samples_per_symbol, bs_ant_count);
+
+    //BS
+    void* bs_input_float_storage = PaddedAlignedAlloc(
+        Agora_memory::Alignment_t::kAlign64,
+        (bs_ant_count * samples_per_symbol * sizeof(arma::cx_float)));
+    void* bs_output_float_storage = PaddedAlignedAlloc(
+        Agora_memory::Alignment_t::kAlign64,
+        (ue_ant_count * samples_per_symbol * sizeof(arma::cx_float)));
+
+    bs_input_matrix_ =
+        arma::cx_fmat(reinterpret_cast<arma::cx_float*>(bs_input_float_storage),
+                      samples_per_symbol, bs_ant_count, false, true);
+    bs_input_matrix_.zeros(samples_per_symbol, bs_ant_count);
+
+    bs_output_matrix_ = arma::cx_fmat(
+        reinterpret_cast<arma::cx_float*>(bs_output_float_storage),
+        samples_per_symbol, ue_ant_count, false, true);
+    bs_output_matrix_.zeros(samples_per_symbol, ue_ant_count);
+  }
+  ~WorkerThreadStorage(){
+      //std::free(ue_input_matrix_.memptr());
+      //std::free(ue_output_matrix_.memptr());
+      //std::free(bs_input_matrix_.memptr());
+      //std::free(bs_output_matrix_.memptr());
+  };
+
+  inline size_t Id() const { return tid_; }
+  inline arma::cx_fmat& UeInput() { return ue_input_matrix_; }
+  inline arma::cx_fmat& UeOutput() { return ue_output_matrix_; }
+  inline SimdAlignByteVector& BsTxBuffer() { return bs_tx_buffer_; }
+  inline SimdAlignByteVector& TxBuffer() { return udp_tx_buffer_; }
+
+  inline arma::cx_fmat& BsInput() { return bs_input_matrix_; }
+  inline arma::cx_fmat& BsOutput() { return bs_output_matrix_; }
+  inline SimdAlignByteVector& UeTxBuffer() { return ue_tx_buffer_; }
+
+ private:
   size_t tid_;
   // Aligned
-  SimdAlignByteVector* ue_tx_buffer_;
-  arma::cx_fmat* ue_input_matrix_;
-  arma::cx_fmat* ue_output_matrix_;
+  SimdAlignByteVector ue_tx_buffer_;
+  arma::cx_fmat ue_input_matrix_;
+  arma::cx_fmat ue_output_matrix_;
 
   // Aligned
-  SimdAlignByteVector* bs_tx_buffer_;
-  arma::cx_fmat* bs_input_matrix_;
-  arma::cx_fmat* bs_output_matrix_;
+  SimdAlignByteVector bs_tx_buffer_;
+  arma::cx_fmat bs_input_matrix_;
+  arma::cx_fmat bs_output_matrix_;
 
-  SimdAlignByteVector* udp_tx_buffer_;
+  SimdAlignByteVector udp_tx_buffer_;
 };
 
 /**
@@ -55,7 +147,7 @@ class ChannelSim {
              double in_chan_snr = 20);
   ~ChannelSim();
 
-  void Start();
+  void Run();
 
   // Loop thread receiving symbols from client antennas
   void* UeRxLoop(size_t tid);
@@ -76,8 +168,8 @@ class ChannelSim {
 
  private:
   void DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
-            size_t ant_per_socket, std::byte* tx_buffer,
-            const arma::cx_float* source_data, SimdAlignByteVector* udp_pkt_buf,
+            size_t ant_per_socket, const arma::cx_float* source_data,
+            SimdAlignByteVector* udp_pkt_buf,
             std::vector<std::unique_ptr<UDPComm>>& udp_clients);
 
   // BS-facing sockets
@@ -102,7 +194,8 @@ class ChannelSim {
 
   // Master thread's message queue for event completions;
   moodycamel::ConcurrentQueue<EventData> message_queue_;
-  moodycamel::ProducerToken* task_ptok_[kMaxThreads];
+  std::array<std::unique_ptr<moodycamel::ProducerToken>, kMaxThreads>
+      task_ptok_;
 
   std::vector<std::thread> task_threads_;
 
@@ -120,17 +213,40 @@ class ChannelSim {
   std::string channel_type_;
   double channel_snr_;
 
-  size_t* bs_rx_counter_;
-  size_t* user_rx_counter_;
+  //size_t* bs_rx_counter_;
+  std::unique_ptr<size_t[]> bs_rx_counter_;
+  std::unique_ptr<size_t[]> user_rx_counter_;
   std::array<size_t, kFrameWnd> bs_tx_counter_;
   std::array<size_t, kFrameWnd> user_tx_counter_;
 
-  inline size_t GetDlSymbolIdx(size_t symbol_id) const {
-    if (symbol_id == 0) {
-      return 0;
+  //Returns Beacon+Dl symbol index
+  inline size_t GetBsDlIdx(size_t symbol_id) const {
+    size_t symbol_idx = SIZE_MAX;
+    const auto type = cfg_->GetSymbolType(symbol_id);
+    if (type == SymbolType::kBeacon) {
+      symbol_idx = cfg_->Frame().GetBeaconSymbolIdx(symbol_id);
+    } else if (type == SymbolType::kDL) {
+      symbol_idx = cfg_->Frame().GetDLSymbolIdx(symbol_id) +
+                   cfg_->Frame().NumBeaconSyms();
     } else {
-      return cfg_->Frame().GetDLSymbolIdx(symbol_id) + 1;
+      throw std::runtime_error("Invalid BS Beacon or DL symbol id");
     }
+    return symbol_idx;
+  }
+
+  //Returns Pilot+Ul symbol index
+  inline size_t GetUeUlIdx(size_t symbol_id) const {
+    size_t symbol_idx = SIZE_MAX;
+    const auto type = cfg_->GetSymbolType(symbol_id);
+    if (type == SymbolType::kPilot) {
+      symbol_idx = cfg_->Frame().GetPilotSymbolIdx(symbol_id);
+    } else if (type == SymbolType::kUL) {
+      symbol_idx = cfg_->Frame().GetULSymbolIdx(symbol_id) +
+                   cfg_->Frame().NumPilotSyms();
+    } else {
+      throw std::runtime_error("Invalid Ue Pilot or UL symbol id");
+    }
+    return symbol_idx;
   }
 };
 

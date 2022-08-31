@@ -387,6 +387,7 @@ class Config {
   /// TODO document and review
   size_t GetSymbolId(size_t input_id) const;
 
+  bool IsBeacon(size_t /*frame_id*/, size_t /*symbol_id*/) const;
   bool IsPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
   bool IsDlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
   bool IsCalDlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;

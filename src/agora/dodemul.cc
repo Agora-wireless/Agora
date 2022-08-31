@@ -150,9 +150,9 @@ EventData DoDemul::Launch(size_t tag) {
                                ? _mm512_load_ps(&src[j * cfg_->BsAntNum() * 2])
                                : _mm512_i32gather_ps(index, &src[j * 2], 4);
 
-          assert((reinterpret_cast<size_t>(&dst[j * cfg_->BsAntNum() * 2]) %
+          assert((reinterpret_cast<intptr_t>(&dst[j * cfg_->BsAntNum() * 2]) %
                   (kAntNumPerSimd * sizeof(float) * 2)) == 0);
-          assert((reinterpret_cast<size_t>(&src[j * cfg_->BsAntNum() * 2]) %
+          assert((reinterpret_cast<intptr_t>(&src[j * cfg_->BsAntNum() * 2]) %
                   (kAntNumPerSimd * sizeof(float) * 2)) == 0);
           _mm512_store_ps(&dst[j * cfg_->BsAntNum() * 2], data_rx);
         }
@@ -167,9 +167,9 @@ EventData DoDemul::Launch(size_t tag) {
       for (size_t ant_i = 0; ant_i < cfg_->BsAntNum();
            ant_i += kAntNumPerSimd) {
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
-          assert((reinterpret_cast<size_t>(&src[j * 2]) %
-                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
-          assert((reinterpret_cast<size_t>(&dst[j * cfg_->BsAntNum() * 2]) %
+          //assert((reinterpret_cast<intptr_t>(&src[j * 2]) %
+          //        (kAntNumPerSimd * sizeof(float) * 2)) == 0);
+          assert((reinterpret_cast<intptr_t>(&dst[j * cfg_->BsAntNum() * 2]) %
                   (kAntNumPerSimd * sizeof(float) * 2)) == 0);
           __m256 data_rx = _mm256_i32gather_ps(&src[j * 2], index, 4);
           _mm256_store_ps(&dst[j * cfg_->BsAntNum() * 2], data_rx);

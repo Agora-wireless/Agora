@@ -11,21 +11,52 @@
 #include "gettime.h"
 #include "logger.h"
 #include "message.h"
+#include "signal_handler.h"
 
 static std::atomic<bool> running = true;
 static constexpr bool kPrintChannelOutput = false;
 static const size_t kDefaultQueueSize = 36;
 static const bool kPrintDebugTxUser = false;
-static const bool kPrintDebugTxBs = false;
+static const bool kPrintDebugTxBs = true;
 
-static constexpr size_t kUdpMTU = 2048;
+static constexpr size_t kUdpMTU = 9000;
 static constexpr size_t kDequeueBulkSize = 5;
+static constexpr size_t kSockBufSize = (1024 * 1024 * 64 * 8) - 1;
 
 //#define CHSIM_DEBUG_MEMORY
 /* Helper classes */
-struct SocketRxBuffer {
-  size_t data_size_ = 0;
-  std::byte* data_ = nullptr;
+class SocketRxBuffer {
+ public:
+  SocketRxBuffer(size_t num_bytes) : data_size_(0), data_(num_bytes) {}
+  ~SocketRxBuffer() = default;
+
+  inline size_t DataSize() const { return data_size_; }
+  inline size_t StorageSize() const { return data_.size(); }
+  inline std::byte* Rx() { return &data_.at(data_size_); }
+  inline const std::byte* At(size_t location) const {
+    return &data_.at(location);
+  }
+  inline void AddData(size_t data) {
+    data_size_ = data_size_ + data;
+    if (data_size_ > data_.size()) {
+      throw std::runtime_error("SocketRxBuffer overflow");
+    }
+  }
+  inline void RemoveData(size_t remove) {
+    if (remove > 0) {
+      if (remove > data_size_) {
+        throw std::runtime_error("Requested removal of too many bytes");
+      }
+      data_size_ = data_size_ - remove;
+      if (data_size_ > 0) {
+        std::memmove(&data_.at(0), &data_.at(remove), data_size_);
+      }
+    }
+  }
+
+ private:
+  size_t data_size_;
+  SimdAlignByteVector data_;
 };
 
 ChannelSim::ChannelSim(const Config* const config, size_t bs_thread_num,
@@ -60,8 +91,6 @@ ChannelSim::ChannelSim(const Config* const config, size_t bs_thread_num,
   message_queue_ = moodycamel::ConcurrentQueue<EventData>(
       kFrameWnd * cfg_->Frame().NumTotalSyms() *
       (cfg_->BsAntNum() + cfg_->UeAntNum()) * kDefaultQueueSize);
-
-  assert(cfg_->PacketLength() == cfg_->PacketLength());
   payload_length_ = cfg_->PacketLength() - Packet::kOffsetOfData;
 
   // initialize bs-facing and client-facing data buffers
@@ -74,12 +103,14 @@ ChannelSim::ChannelSim(const Config* const config, size_t bs_thread_num,
   rx_buffer_bs_.resize(rx_buffer_bs_size);
 
   // initilize rx and tx counters
-  bs_rx_counter_ = new size_t[dl_data_plus_beacon_symbols_ * kFrameWnd];
-  std::memset(bs_rx_counter_, 0,
+  bs_rx_counter_ =
+      std::make_unique<size_t[]>(dl_data_plus_beacon_symbols_ * kFrameWnd);
+  std::memset(bs_rx_counter_.get(), 0u,
               sizeof(size_t) * dl_data_plus_beacon_symbols_ * kFrameWnd);
 
-  user_rx_counter_ = new size_t[ul_data_plus_pilot_symbols_ * kFrameWnd];
-  std::memset(user_rx_counter_, 0,
+  user_rx_counter_ =
+      std::make_unique<size_t[]>(ul_data_plus_pilot_symbols_ * kFrameWnd);
+  std::memset(user_rx_counter_.get(), 0u,
               sizeof(size_t) * ul_data_plus_pilot_symbols_ * kFrameWnd);
 
   bs_tx_counter_.fill(0);
@@ -89,9 +120,9 @@ ChannelSim::ChannelSim(const Config* const config, size_t bs_thread_num,
   channel_ = std::make_unique<Channel>(cfg_, channel_type_, channel_snr_);
 
   for (size_t i = 0; i < worker_thread_num; i++) {
-    task_ptok_[i] = new moodycamel::ProducerToken(message_queue_);
+    task_ptok_.at(i) =
+        std::make_unique<moodycamel::ProducerToken>(message_queue_);
   }
-
   task_threads_.resize(worker_thread_num);
 
   // create task threads (transmit to base station and client antennas)
@@ -104,30 +135,25 @@ ChannelSim::~ChannelSim() {
   AGORA_LOG_INFO("Destroying channel simulator\n");
   running.store(false);
   for (auto& join_thread : task_threads_) {
-    join_thread.join();
+    if (join_thread.joinable()) {
+      join_thread.join();
+    }
   }
-
-  for (size_t i = 0; i < worker_thread_num_; i++) {
-    delete task_ptok_[i];
-  }
-
-  delete[] bs_rx_counter_;
-  delete[] user_rx_counter_;
 }
 
 void ChannelSim::ScheduleTask(EventData do_task,
                               moodycamel::ConcurrentQueue<EventData>* in_queue,
                               moodycamel::ProducerToken const& ptok) {
-  if (!in_queue->try_enqueue(ptok, do_task)) {
+  if (in_queue->try_enqueue(ptok, do_task) == false) {
     AGORA_LOG_WARN("need more memory\n");
-    if (!in_queue->enqueue(ptok, do_task)) {
+    if (in_queue->enqueue(ptok, do_task) == false) {
       AGORA_LOG_ERROR("task enqueue failed\n");
       throw std::runtime_error("ChannelSim: task enqueue failed");
     }
   }
 }
 
-void ChannelSim::Start() {
+void ChannelSim::Run() {
   constexpr size_t kChanSimMasterTid = 0;
   AGORA_LOG_INFO("Starting Channel Simulator ...\n");
   PinToCoreWithOffset(ThreadType::kMaster, core_offset_, kChanSimMasterTid);
@@ -151,38 +177,32 @@ void ChannelSim::Start() {
   }
 
   std::this_thread::sleep_for(std::chrono::seconds(1));
-  int ret = 0;
 
-  EventData events_list[kDequeueBulkSize];
-  while ((running.load() == true) &&
-         (SignalHandler::GotExitSignal() == false)) {
-    ret = message_queue_.try_dequeue_bulk(ctok, events_list, kDequeueBulkSize);
+  std::array<EventData, kDequeueBulkSize> events_list;
+  while ((running.load()) && (SignalHandler::GotExitSignal() == false)) {
+    const auto dequeued_events = message_queue_.try_dequeue_bulk(
+        ctok, events_list.data(), events_list.size());
 
-    for (size_t bulk_count = 0; static_cast<int>(bulk_count) < ret;
-         bulk_count++) {
-      EventData& event = events_list[bulk_count];
+    for (size_t current_event = 0; current_event < dequeued_events;
+         current_event++) {
+      EventData& event = events_list.at(current_event);
 
       switch (event.event_type_) {
         case EventType::kPacketRX: {
           const size_t frame_id = gen_tag_t(event.tags_[0u]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0u]).symbol_id_;
           const gen_tag_t::TagType type = gen_tag_t(event.tags_[0u]).tag_type_;
+          const size_t frame_idx = (frame_id % kFrameWnd);
           // received a packet from a client antenna
           if (type == gen_tag_t::TagType::kUsers) {
-            const size_t pilot_symbol_id =
-                cfg_->Frame().GetPilotSymbolIdx(symbol_id);
-            const size_t ul_symbol_id = cfg_->Frame().GetULSymbolIdx(symbol_id);
-            size_t total_symbol_id = pilot_symbol_id;
-            if (pilot_symbol_id == SIZE_MAX) {
-              total_symbol_id = ul_symbol_id + cfg_->Frame().NumPilotSyms();
-            }
+            const size_t ue_symbol_idx = GetUeUlIdx(symbol_id);
             const size_t frame_offset =
-                (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols_ +
-                total_symbol_id;
-            user_rx_counter_[frame_offset]++;
+                (frame_idx * ul_data_plus_pilot_symbols_) + ue_symbol_idx;
+            size_t& ue_rx_symbol_cnt = user_rx_counter_[frame_offset];
+            ue_rx_symbol_cnt++;
             // when received all client antennas on this symbol, kick-off BS TX
-            if (user_rx_counter_[frame_offset] == cfg_->UeAntNum()) {
-              user_rx_counter_[frame_offset] = 0;
+            if (ue_rx_symbol_cnt == cfg_->UeAntNum()) {
+              ue_rx_symbol_cnt = 0;
               if (kDebugPrintPerSymbolDone) {
                 AGORA_LOG_SYMBOL(
                     "Scheduling uplink transmission of frame %zu, symbol %zu, "
@@ -191,21 +211,23 @@ void ChannelSim::Start() {
               }
               ScheduleTask(EventData(EventType::kPacketTX, event.tags_[0]),
                            &task_queue_bs_, ptok_bs);
+            } else if (ue_rx_symbol_cnt > cfg_->UeAntNum()) {
+              throw std::runtime_error("Invalid user rx count");
             }
             // received a packet from a BS antenna
           } else if (type == gen_tag_t::TagType::kAntennas) {
-            const size_t dl_symbol_id = GetDlSymbolIdx(symbol_id);
+            const size_t dl_symbol_id = GetBsDlIdx(symbol_id);
             const size_t frame_offset =
-                (frame_id % kFrameWnd) * dl_data_plus_beacon_symbols_ +
-                dl_symbol_id;
-            bs_rx_counter_[frame_offset]++;
+                (frame_idx * dl_data_plus_beacon_symbols_) + dl_symbol_id;
+            size_t& bs_rx_symbol_cnt = bs_rx_counter_[frame_offset];
+            bs_rx_symbol_cnt++;
 
             AGORA_LOG_TRACE("Rx downlink frame %zu, symbol %zu, %zu\n",
-                            frame_id, symbol_id, bs_rx_counter_[frame_offset]);
+                            frame_id, symbol_id, bs_rx_symbol_cnt);
 
             // when received all BS antennas on this symbol, kick-off client TX
-            if (bs_rx_counter_[frame_offset] == cfg_->BsAntNum()) {
-              bs_rx_counter_[frame_offset] = 0;
+            if (bs_rx_symbol_cnt == cfg_->BsAntNum()) {
+              bs_rx_symbol_cnt = 0;
               if (kDebugPrintPerSymbolDone) {
                 AGORA_LOG_SYMBOL(
                     "Scheduling downlink transmission in frame %zu, symbol "
@@ -214,35 +236,43 @@ void ChannelSim::Start() {
               }
               ScheduleTask(EventData(EventType::kPacketTX, event.tags_[0]),
                            &task_queue_user_, ptok_user);
+            } else if (bs_rx_symbol_cnt > cfg_->UeAntNum()) {
+              throw std::runtime_error("Invalid bs rx count");
             }
           }
         } break;
 
         case EventType::kPacketTX: {
-          size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          size_t offset = frame_id % kFrameWnd;
-          if (gen_tag_t(event.tags_[0]).tag_type_ ==
+          const size_t frame_id = gen_tag_t(event.tags_[0u]).frame_id_;
+          const size_t frame_idx = (frame_id % kFrameWnd);
+          if (gen_tag_t(event.tags_[0u]).tag_type_ ==
               gen_tag_t::TagType::kUsers) {
-            user_tx_counter_[offset]++;
-            if (user_tx_counter_[offset] == dl_data_plus_beacon_symbols_) {
+            size_t& tx_counter = user_tx_counter_.at(frame_idx);
+            tx_counter++;
+            if (tx_counter == dl_data_plus_beacon_symbols_) {
               if (kDebugPrintPerFrameDone) {
-                AGORA_LOG_FRAME(
+                AGORA_LOG_INFO(
                     "Finished downlink transmission %zu symbols in frame %zu\n",
                     dl_data_plus_beacon_symbols_, frame_id);
               }
-              user_tx_counter_[offset] = 0;
+              tx_counter = 0;
+            } else if (tx_counter > dl_data_plus_beacon_symbols_) {
+              throw std::runtime_error("Downlink transmission error");
             }
           } else if (gen_tag_t(event.tags_[0]).tag_type_ ==
                      gen_tag_t::TagType::kAntennas) {
-            bs_tx_counter_[offset]++;
-            if (bs_tx_counter_[offset] == ul_data_plus_pilot_symbols_) {
+            size_t& tx_counter = bs_tx_counter_.at(frame_idx);
+            tx_counter++;
+            if (tx_counter == ul_data_plus_pilot_symbols_) {
               if (kDebugPrintPerFrameDone) {
-                AGORA_LOG_FRAME(
+                AGORA_LOG_INFO(
                     "Finished uplink transmission of %zu symbols in frame "
                     "%zu\n",
                     ul_data_plus_pilot_symbols_, frame_id);
               }
-              bs_tx_counter_[offset] = 0;
+              tx_counter = 0;
+            } else if (tx_counter > ul_data_plus_pilot_symbols_) {
+              throw std::runtime_error("Uplink transmission error");
             }
           }
         } break;
@@ -256,10 +286,14 @@ void ChannelSim::Start() {
 
   // Join the joinable threads
   for (auto& join_thread : base_station_rec_threads) {
-    join_thread.join();
+    if (join_thread.joinable()) {
+      join_thread.join();
+    }
   }
   for (auto& join_thread : user_rx_threads) {
-    join_thread.join();
+    if (join_thread.joinable()) {
+      join_thread.join();
+    }
   }
 }
 
@@ -272,60 +306,15 @@ void* ChannelSim::TaskThread(size_t tid) {
   moodycamel::ConsumerToken bs_consumer_token(task_queue_bs_);
   moodycamel::ConsumerToken ue_consumer_token(task_queue_user_);
 
-  size_t tx_buffer_ue_size =
+  const size_t tx_buffer_ue_size =
       dl_data_plus_beacon_symbols_ * cfg_->UeAntNum() * payload_length_;
-  SimdAlignByteVector tx_buffer_ue(tx_buffer_ue_size);
 
-  size_t tx_buffer_bs_size =
+  const size_t tx_buffer_bs_size =
       ul_data_plus_pilot_symbols_ * cfg_->BsAntNum() * payload_length_;
-  SimdAlignByteVector tx_buffer_bs(tx_buffer_bs_size);
 
-  void* bs_input_float_storage = PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::kAlign64,
-      (cfg_->SampsPerSymbol() * cfg_->BsAntNum() * sizeof(arma::cx_float)));
-  void* bs_output_float_storage = PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::kAlign64,
-      (cfg_->SampsPerSymbol() * cfg_->UeAntNum() * sizeof(arma::cx_float)));
-  void* ue_input_float_storage = PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::kAlign64,
-      (cfg_->SampsPerSymbol() * cfg_->UeAntNum() * sizeof(arma::cx_float)));
-  void* ue_output_float_storage = PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::kAlign64,
-      (cfg_->SampsPerSymbol() * cfg_->BsAntNum() * sizeof(arma::cx_float)));
-
-  arma::cx_fmat bs_input_matrix(
-      reinterpret_cast<arma::cx_float*>(bs_input_float_storage),
-      cfg_->SampsPerSymbol(), cfg_->BsAntNum(), false, true);
-  bs_input_matrix.zeros(cfg_->SampsPerSymbol(), cfg_->BsAntNum());
-
-  arma::cx_fmat bs_output_matrix(
-      reinterpret_cast<arma::cx_float*>(bs_output_float_storage),
-      cfg_->SampsPerSymbol(), cfg_->UeAntNum(), false, true);
-  bs_output_matrix.zeros(cfg_->SampsPerSymbol(), cfg_->UeAntNum());
-
-  arma::cx_fmat ue_input_matrix(
-      reinterpret_cast<arma::cx_float*>(ue_input_float_storage),
-      cfg_->SampsPerSymbol(), cfg_->UeAntNum(), false, true);
-  ue_input_matrix.zeros(cfg_->SampsPerSymbol(), cfg_->UeAntNum());
-
-  arma::cx_fmat ue_output_matrix(
-      reinterpret_cast<arma::cx_float*>(ue_output_float_storage),
-      cfg_->SampsPerSymbol(), cfg_->BsAntNum(), false, true);
-  ue_output_matrix.zeros(cfg_->SampsPerSymbol(), cfg_->BsAntNum());
-
-  SimdAlignByteVector udp_tx_buffer(cfg_->PacketLength());
-
-  WorkerThreadStorage thread_store;
-  thread_store.tid_ = tid;
-  thread_store.ue_tx_buffer_ = &tx_buffer_ue;
-  thread_store.bs_tx_buffer_ = &tx_buffer_bs;
-
-  thread_store.bs_input_matrix_ = &bs_input_matrix;
-  thread_store.bs_output_matrix_ = &bs_output_matrix;
-  thread_store.ue_input_matrix_ = &ue_input_matrix;
-  thread_store.ue_output_matrix_ = &ue_output_matrix;
-
-  thread_store.udp_tx_buffer_ = &udp_tx_buffer;
+  WorkerThreadStorage thread_store(
+      tid, tx_buffer_ue_size, cfg_->UeAntNum(), tx_buffer_bs_size,
+      cfg_->BsAntNum(), cfg_->SampsPerSymbol(), cfg_->PacketLength());
 
   EventData event;
   while (running) {
@@ -335,11 +324,6 @@ void* ChannelSim::TaskThread(size_t tid) {
       DoTxUser(thread_store, event.tags_[0]);
     }
   }
-
-  std::free(bs_input_float_storage);
-  std::free(bs_output_float_storage);
-  std::free(ue_input_float_storage);
-  std::free(ue_output_float_storage);
   return nullptr;
 }
 
@@ -352,8 +336,7 @@ void* ChannelSim::BsRxLoop(size_t tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_ + 1, tid);
 
   // initialize bs-facing sockets
-  static constexpr size_t kSockBufSize = (1024 * 1024 * 64 * 8) - 1;
-  for (size_t socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
+  for (size_t socket_id = socket_lo; socket_id < socket_hi; socket_id++) {
     const size_t local_port_id = cfg_->BsRruPort() + socket_id;
     const size_t remote_port_id = cfg_->BsServerPort() + socket_id;
     bs_comm_.at(socket_id) = std::make_unique<UDPComm>(
@@ -368,12 +351,8 @@ void* ChannelSim::BsRxLoop(size_t tid) {
 
   const size_t rx_packet_size = cfg_->PacketLength();
   const size_t buffer_size = (rx_packet_size) + kUdpMTU;
-  std::vector<SocketRxBuffer> thread_rx_buffers(total_sockets);
-  for (auto& buffer : thread_rx_buffers) {
-    buffer.data_ = reinterpret_cast<std::byte*>(
-        PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64, buffer_size));
-    buffer.data_size_ = 0;
-  }
+  std::vector<SocketRxBuffer> thread_rx_buffers(total_sockets,
+                                                SocketRxBuffer(buffer_size));
 
   AGORA_LOG_INFO(
       "BsRxLoop[%zu]: handling sockets %zu from %zu to %zu rx packet bytes "
@@ -383,28 +362,30 @@ void* ChannelSim::BsRxLoop(size_t tid) {
   size_t socket_id = socket_lo;
   while (running) {
     SocketRxBuffer& rx_buffer = thread_rx_buffers.at(socket_id - socket_lo);
-    const size_t rx_buffer_rem_size = buffer_size - rx_buffer.data_size_;
-    const int rx_bytes = bs_comm_.at(socket_id)->Recv(
-        &rx_buffer.data_[rx_buffer.data_size_], rx_buffer_rem_size);
+    const size_t rx_req_size = rx_packet_size;
+    const int rx_bytes =
+        bs_comm_.at(socket_id)->Recv(rx_buffer.Rx(), rx_req_size);
     if (0 > rx_bytes) {
       AGORA_LOG_WARN("BsRxLoop[%zu] socket %zu receive failed\n", tid,
                      socket_id);
       throw std::runtime_error("ChannelSim: BS socket receive failed");
-    } else if (rx_bytes != 0) {
+    } else if (rx_bytes > 0) {
       const size_t data_rx = static_cast<size_t>(rx_bytes);
-      rx_buffer.data_size_ += data_rx;
+      rx_buffer.AddData(data_rx);
 
       // Process all the full packets
-      const size_t packets_to_process = rx_buffer.data_size_ / rx_packet_size;
+      const size_t packets_to_process = rx_buffer.DataSize() / rx_packet_size;
+      RtAssert(packets_to_process == 1, "Multipacket receive not supported");
       size_t processed_packets = 0;
       size_t data_offset = 0;
       while (processed_packets < packets_to_process) {
         const Packet* pkt =
-            reinterpret_cast<Packet*>(&rx_buffer.data_[data_offset]);
+            reinterpret_cast<const Packet*>(rx_buffer.At(data_offset));
 
         const size_t frame_id = pkt->frame_id_;
         const size_t symbol_id = pkt->symbol_id_;
         const size_t ant_id = pkt->ant_id_;
+        const size_t frame_idx = frame_id % kFrameWnd;
         if (kDebugPrintInTask) {
           AGORA_LOG_INFO(
               "BsRxLoop[%zu]: Received BS packet for frame %zu, symbol %zu, "
@@ -412,13 +393,13 @@ void* ChannelSim::BsRxLoop(size_t tid) {
               tid, frame_id, symbol_id, ant_id, socket_id);
         }
 
-        const size_t dl_symbol_id = GetDlSymbolIdx(symbol_id);
+        const size_t bs_dl_symbol_id = GetBsDlIdx(symbol_id);
         const size_t symbol_offset =
-            (frame_id % kFrameWnd) * dl_data_plus_beacon_symbols_ +
-            dl_symbol_id;
-        const size_t dest_offset = symbol_offset * cfg_->BsAntNum() + ant_id;
-        std::memcpy(&rx_buffer_bs_[dest_offset * payload_length_], pkt->data_,
-                    payload_length_);
+            (frame_idx * dl_data_plus_beacon_symbols_) + bs_dl_symbol_id;
+        const size_t dest_offset = (symbol_offset * cfg_->BsAntNum()) + ant_id;
+        //Do fast memcpy
+        std::memcpy(&rx_buffer_bs_.at(dest_offset * payload_length_),
+                    pkt->data_, payload_length_);
 
         RtAssert(
             message_queue_.enqueue(
@@ -428,18 +409,11 @@ void* ChannelSim::BsRxLoop(size_t tid) {
                     gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_)),
             "BS socket message enqueue failed!");
 
-        rx_buffer.data_size_ -= rx_packet_size;
         data_offset += rx_packet_size;
         processed_packets++;
       }
-
       // Shift over any processed data
-      if (data_offset > 0) {
-        /* Can be optimized */
-        std::memmove(&rx_buffer.data_[0], &rx_buffer.data_[data_offset],
-                     rx_buffer.data_size_);
-        // No need to update the offset  goes out of scope next
-      }
+      rx_buffer.RemoveData(data_offset);
 
       AGORA_LOG_TRACE(
           "BsRxLoop[%zu]: handling socket %zu data buffered %zu processed "
@@ -452,12 +426,6 @@ void* ChannelSim::BsRxLoop(size_t tid) {
       socket_id = socket_lo;
     }
   }  // running
-
-  for (auto& buffer : thread_rx_buffers) {
-    std::free(buffer.data_);
-    buffer.data_ = nullptr;
-    buffer.data_size_ = 0;
-  }
   return nullptr;
 }
 
@@ -471,7 +439,6 @@ void* ChannelSim::UeRxLoop(size_t tid) {
                       core_offset_ + 1 + bs_thread_num_, tid);
 
   // initialize client-facing sockets
-  static constexpr size_t kSockBufSize = (1024 * 1024 * 64 * 8) - 1;
   for (size_t socket_id = socket_lo; socket_id < socket_hi; socket_id++) {
     const size_t local_port_id = cfg_->UeRruPort() + socket_id;
     const size_t remote_port_id = cfg_->UeServerPort() + socket_id;
@@ -487,13 +454,9 @@ void* ChannelSim::UeRxLoop(size_t tid) {
   }
 
   const size_t rx_packet_size = cfg_->PacketLength();
-  const size_t buffer_size = rx_packet_size + kUdpMTU;
-  std::vector<SocketRxBuffer> thread_rx_buffers(total_sockets);
-  for (auto& buffer : thread_rx_buffers) {
-    buffer.data_ = reinterpret_cast<std::byte*>(
-        PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64, buffer_size));
-    buffer.data_size_ = 0;
-  }
+  const size_t buffer_size = (rx_packet_size) + kUdpMTU;
+  std::vector<SocketRxBuffer> thread_rx_buffers(total_sockets,
+                                                SocketRxBuffer(buffer_size));
 
   AGORA_LOG_INFO(
       "UeRxLoop[%zu]: handling sockets %zu from %zu to %zu rx packet bytes "
@@ -502,42 +465,36 @@ void* ChannelSim::UeRxLoop(size_t tid) {
 
   size_t socket_id = socket_lo;
   while (running) {
-    const size_t rx_index = socket_id - socket_lo;
-    SocketRxBuffer& rx_buffer = thread_rx_buffers.at(rx_index);
-    const size_t rx_buffer_rem_size = buffer_size - rx_buffer.data_size_;
-    const int rx_bytes = ue_comm_.at(socket_id)->Recv(
-        &rx_buffer.data_[rx_buffer.data_size_], rx_buffer_rem_size);
+    SocketRxBuffer& rx_buffer = thread_rx_buffers.at(socket_id - socket_lo);
+    const size_t rx_req_size = rx_packet_size;
+    const int rx_bytes =
+        ue_comm_.at(socket_id)->Recv(rx_buffer.Rx(), rx_req_size);
+
     if (0 > rx_bytes) {
       AGORA_LOG_WARN("UeRxLoop[%zu]: socket %zu receive failed\n", tid,
                      socket_id);
       throw std::runtime_error("ChannelSim: UE socket receive failed");
-    } else if (rx_bytes != 0) {
+    } else if (rx_bytes > 0) {
       const size_t data_rx = static_cast<size_t>(rx_bytes);
-      rx_buffer.data_size_ += data_rx;
+      rx_buffer.AddData(data_rx);
 
       // Process all the full packets
-      const size_t packets_to_process = rx_buffer.data_size_ / rx_packet_size;
+      const size_t packets_to_process = rx_buffer.DataSize() / rx_packet_size;
+      RtAssert(packets_to_process == 1, "Multipacket receive not supported");
       size_t processed_packets = 0;
       size_t data_offset = 0;
       while (processed_packets < packets_to_process) {
         const Packet* pkt =
-            reinterpret_cast<Packet*>(&rx_buffer.data_[data_offset]);
+            reinterpret_cast<const Packet*>(rx_buffer.At(data_offset));
 
         const size_t frame_id = pkt->frame_id_;
         const size_t symbol_id = pkt->symbol_id_;
         const size_t ant_id = pkt->ant_id_;
+        const size_t frame_idx = frame_id % kFrameWnd;
 
-        const size_t pilot_symbol_id =
-            cfg_->Frame().GetPilotSymbolIdx(symbol_id);
-        const size_t ul_symbol_id = cfg_->Frame().GetULSymbolIdx(symbol_id);
-        size_t total_symbol_id = pilot_symbol_id;
-        if (pilot_symbol_id == SIZE_MAX) {
-          total_symbol_id = ul_symbol_id + cfg_->Frame().NumPilotSyms();
-        }
-
+        const size_t ue_ul_symbol_id = GetUeUlIdx(symbol_id);
         const size_t symbol_offset =
-            (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols_ +
-            total_symbol_id;
+            (frame_idx * ul_data_plus_pilot_symbols_) + ue_ul_symbol_id;
         const size_t offset = symbol_offset * cfg_->UeAntNum() + ant_id;
         auto* rx_data_destination = &rx_buffer_ue_.at(offset * payload_length_);
         std::memcpy(rx_data_destination, pkt->data_, payload_length_);
@@ -558,18 +515,11 @@ void* ChannelSim::UeRxLoop(size_t tid) {
                     gen_tag_t::FrmSymUe(frame_id, symbol_id, ant_id).tag_)),
             "UE Socket message enqueue failed!");
 
-        rx_buffer.data_size_ -= rx_packet_size;
         data_offset += rx_packet_size;
         processed_packets++;
       }
-
       // Shift over any processed data
-      if (data_offset > 0) {
-        /* Can be optimized */
-        std::memmove(&rx_buffer.data_[0], &rx_buffer.data_[data_offset],
-                     rx_buffer.data_size_);
-        // No need to update the offset  goes out of scope next
-      }
+      rx_buffer.RemoveData(data_offset);
 
       AGORA_LOG_TRACE(
           "UeRxLoop[%zu]: handling socket %zu data buffered %zu processed "
@@ -582,34 +532,25 @@ void* ChannelSim::UeRxLoop(size_t tid) {
       socket_id = socket_lo;
     }
   }  // running
-
-  for (auto& buffer : thread_rx_buffers) {
-    std::free(buffer.data_);
-    buffer.data_ = nullptr;
-    buffer.data_size_ = 0;
-  }
   return nullptr;
 }
 
 /// Warning: Threads are sharing these sender sockets.
 void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
-                      size_t ant_per_socket, std::byte* tx_buffer,
-                      const arma::cx_float* source_data,
+                      size_t ant_per_socket, const arma::cx_float* source_data,
                       SimdAlignByteVector* udp_pkt_buf,
                       std::vector<std::unique_ptr<UDPComm>>& udp_senders) {
   // The 2 is from complex float -> float
-  const size_t convert_length = (2 * cfg_->SampsPerSymbol() * max_ant);
-  auto* dst_ptr = reinterpret_cast<short*>(tx_buffer);
+  //const size_t convert_length = (2 * cfg_->SampsPerSymbol() * max_ant);
+  const size_t convert_length = (2 * cfg_->SampsPerSymbol());
 
 #if defined(CHSIM_DEBUG_MEMORY)
   RtAssert(((convert_length % 16) == 0) &&
-               ((reinterpret_cast<size_t>(dst_ptr) % 64) == 0) &&
-               ((reinterpret_cast<size_t>(source_data) % 64) == 0),
+               ((reinterpret_cast<intptr_t>(dst_ptr) % 64) == 0) &&
+               ((reinterpret_cast<intptr_t>(source_data) % 64) == 0),
            "Data Alignment not correct before calling into AVX optimizations");
 #endif
-  ConvertFloatToShort(reinterpret_cast<const float*>(source_data), dst_ptr,
-                      convert_length);
-
+  size_t source_idx = 0;
   auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf->at(0));
   for (size_t ant_id = 0u; ant_id < max_ant; ant_id++) {
     const size_t socket = ant_id / ant_per_socket;
@@ -617,46 +558,47 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
     pkt->symbol_id_ = symbol_id;
     pkt->ant_id_ = ant_id;
     pkt->cell_id_ = 0;
+
+    RtAssert(udp_pkt_buf->size() < (convert_length + Packet::kOffsetOfData),
+             "TX UDP Buffer Overflow");
+
+    //Modify this to use SIMD.
+    ConvertFloatToShort(
+        reinterpret_cast<const float*>(&source_data[source_idx]), pkt->data_,
+        convert_length);
+
     // Can remove this with some changes
-    std::memcpy(pkt->data_, &tx_buffer[ant_id * payload_length_],
-                payload_length_);
+    //std::memcpy(pkt->data_, &tx_buffer[ant_id * payload_length_],
+    //            payload_length_);
     //Destination already set by "connect"
     udp_senders.at(socket)->Send(udp_pkt_buf->data(), udp_pkt_buf->size());
-    // Assumes blocking
+    source_idx += convert_length;
   }
 }
 
 void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  // Modify this to check the symbol type
-  const size_t pilot_symbol_id = cfg_->Frame().GetPilotSymbolIdx(symbol_id);
-  const size_t ul_symbol_id = cfg_->Frame().GetULSymbolIdx(symbol_id);
-  size_t total_symbol_id = pilot_symbol_id;
-  if (pilot_symbol_id == SIZE_MAX) {
-    total_symbol_id = ul_symbol_id + cfg_->Frame().NumPilotSyms();
-  }
+  const size_t frame_idx = frame_id % kFrameWnd;
+  const size_t ue_ul_symbol_idx = GetUeUlIdx(symbol_id);
 
   if (kPrintDebugTxBs) {
     AGORA_LOG_INFO(
         "Channel Sim[%zu]: DoTxBs processing frame %zu, symbol %zu, ul "
         "symbol %zu, at %f ms\n",
-        local.tid_, frame_id, symbol_id, total_symbol_id,
+        local.Id(), frame_id, symbol_id, ue_ul_symbol_idx,
         GetTime::GetTimeUs() / 1000);
   }
 
   const size_t symbol_offset =
-      (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols_ + total_symbol_id;
+      (frame_idx * ul_data_plus_pilot_symbols_) + ue_ul_symbol_idx;
   const size_t total_offset_ue =
       symbol_offset * payload_length_ * cfg_->UeAntNum();
-  const size_t total_offset_bs =
-      total_symbol_id * payload_length_ * cfg_->BsAntNum();
 
   const auto* src_ptr =
       reinterpret_cast<const short*>(&rx_buffer_ue_.at(total_offset_ue));
 
-  arma::cx_fmat& fmat_src = *local.ue_input_matrix_;
-  // fmat_src.zeros(fmat_src.n_rows, fmat_src.n_cols);
+  arma::cx_fmat& fmat_src = local.UeInput();
   // 2 for complex type
   const size_t convert_length = (2 * fmat_src.n_rows * fmat_src.n_cols);
 
@@ -664,20 +606,20 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
       "Channel Sim[%zu]: DoTxBs processing frame %zu, symbol %zu, ul symbol "
       "%zu, samples per symbol %zu ue ant num %zu offset %zu ue plus %zu "
       "location %zu\n",
-      local.tid_, frame_id, symbol_id, total_symbol_id, cfg_->SampsPerSymbol(),
+      local.Id(), frame_id, symbol_id, ue_ul_symbol_idx, cfg_->SampsPerSymbol(),
       cfg_->UeAntNum(), total_offset_ue, ul_data_plus_pilot_symbols_,
-      (size_t)src_ptr);
+      reinterpret_cast<intptr_t>(src_ptr));
 
   AGORA_LOG_TRACE(
       "Channel Sim[%zu]: SimdConvertShortToFloat: DoTxBs Length %lld samps "
       "%lld ue ants %lld data size %zu\n",
-      local.tid_, fmat_src.n_elem, fmat_src.n_cols, fmat_src.n_rows,
+      local.Id, fmat_src.n_elem, fmat_src.n_cols, fmat_src.n_rows,
       sizeof(arma::cx_float));
 
 #if defined(CHSIM_DEBUG_MEMORY)
   RtAssert(((convert_length % 16) == 0) &&
-               ((reinterpret_cast<size_t>(src_ptr) % 64) == 0) &&
-               ((reinterpret_cast<size_t>(fmat_src.memptr()) % 64) == 0),
+               ((reinterpret_cast<intptr_t>(src_ptr) % 64) == 0) &&
+               ((reinterpret_cast<intptr_t>(fmat_src.memptr()) % 64) == 0),
            "Data Alignment not correct before calling into AVX optimizations");
 #endif
   // convert received data to complex float,
@@ -685,12 +627,11 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
   SimdConvertShortToFloat(src_ptr, reinterpret_cast<float*>(fmat_src.memptr()),
                           convert_length);
 
-  arma::cx_fmat& fmat_noisy = *local.ue_output_matrix_;
-  // fmat_noisy.zeros(fmat_noisy.n_rows, fmat_noisy.n_cols);
+  arma::cx_fmat& fmat_noisy = local.UeOutput();
 
   const bool is_downlink = false;
   bool is_new_frame;
-  if (symbol_id == 0) {
+  if (ue_ul_symbol_idx == 0) {
     is_new_frame = true;
   } else {
     is_new_frame = false;
@@ -706,11 +647,10 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
   }
 
   DoTx(frame_id, symbol_id, cfg_->BsAntNum(), cfg_->NumChannels(),
-       &local.bs_tx_buffer_->at(total_offset_bs), fmat_noisy.memptr(),
-       local.udp_tx_buffer_, bs_comm_);
+       fmat_noisy.memptr(), &local.TxBuffer(), bs_comm_);
 
   RtAssert(message_queue_.enqueue(
-               *task_ptok_[local.tid_],
+               *task_ptok_.at(local.Id()),
                EventData(EventType::kPacketTX,
                          gen_tag_t::FrmSymAnt(frame_id, symbol_id, 0).tag_)),
            "BS TX message enqueue failed!\n");
@@ -719,48 +659,45 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
 void ChannelSim::DoTxUser(WorkerThreadStorage& local, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  // If id = 0, then return 0;
-  const size_t dl_symbol_id = GetDlSymbolIdx(symbol_id);
+  const size_t frame_idx = frame_id % kFrameWnd;
+  const size_t bs_dl_symbol_idx = GetBsDlIdx(symbol_id);
 
   if (kPrintDebugTxUser) {
     AGORA_LOG_INFO(
         "Channel Sim[%zu]: DoTxUser processing frame %zu, symbol %zu, dl "
         "symbol %zu, at %f ms\n",
-        local.tid_, frame_id, symbol_id, dl_symbol_id,
+        local.Id(), frame_id, symbol_id, bs_dl_symbol_idx,
         GetTime::GetTimeUs() / 1000);
   }
 
   const size_t symbol_offset =
-      (frame_id % kFrameWnd) * dl_data_plus_beacon_symbols_ + dl_symbol_id;
+      (frame_idx * dl_data_plus_beacon_symbols_) + bs_dl_symbol_idx;
   const size_t total_offset_bs =
       symbol_offset * payload_length_ * cfg_->BsAntNum();
-  const size_t total_offset_ue =
-      dl_symbol_id * payload_length_ * cfg_->UeAntNum();
 
   const auto* src_ptr =
       reinterpret_cast<const short*>(&rx_buffer_bs_.at(total_offset_bs));
 
-  arma::cx_fmat& fmat_src = *local.bs_input_matrix_;
-  // fmat_src.zeros(fmat_src.n_rows, fmat_src.n_cols);
+  arma::cx_fmat& fmat_src = local.BsInput();
   // 2 for complex type
   const size_t convert_length = (2 * fmat_src.n_rows * fmat_src.n_cols);
 
   AGORA_LOG_FRAME(
       "Channel Sim[%zu]: DoTxUser processing frame %zu, symbol %zu, dl symbol "
       "%zu, samples per symbol %zu bs ant num %zu offset %zu location %zu\n",
-      local.tid_, frame_id, symbol_id, dl_symbol_id, cfg_->SampsPerSymbol(),
-      cfg_->BsAntNum(), total_offset_bs, (size_t)src_ptr);
+      local.Id(), frame_id, symbol_id, bs_dl_symbol_idx, cfg_->SampsPerSymbol(),
+      cfg_->BsAntNum(), total_offset_bs, reinterpret_cast<intptr_t>(src_ptr));
 
   AGORA_LOG_TRACE(
       "Channel Sim[%zu]: SimdConvertShortToFloat: DoTxUser Length %lld samps "
       "%lld bs ants %lld data size %zu\n",
-      local.tid_, fmat_src.n_elem, fmat_src.n_cols, fmat_src.n_rows,
+      local.Id(), fmat_src.n_elem, fmat_src.n_cols, fmat_src.n_rows,
       sizeof(arma::cx_float));
 
 #if defined(CHSIM_DEBUG_MEMORY)
   RtAssert(((convert_length % 16) == 0) &&
-               ((reinterpret_cast<size_t>(src_ptr) % 64) == 0) &&
-               ((reinterpret_cast<size_t>(fmat_src.memptr()) % 64) == 0),
+               ((reinterpret_cast<intptr_t>(src_ptr) % 64) == 0) &&
+               ((reinterpret_cast<intptr_t>(fmat_src.memptr()) % 64) == 0),
            "Data Alignment not correct before calling into AVX optimizations");
 #endif
   // convert received data to complex float,
@@ -768,12 +705,11 @@ void ChannelSim::DoTxUser(WorkerThreadStorage& local, size_t tag) {
   SimdConvertShortToFloat(src_ptr, reinterpret_cast<float*>(fmat_src.memptr()),
                           convert_length);
 
-  arma::cx_fmat& fmat_noisy = *local.bs_output_matrix_;
-  // fmat_noisy.zeros(fmat_noisy.n_rows, fmat_noisy.n_cols);
+  arma::cx_fmat& fmat_noisy = local.BsOutput();
   // Apply Channel
   const bool is_downlink = true;
   bool is_new_frame;
-  if (symbol_id == 0) {
+  if (bs_dl_symbol_idx == 0) {
     is_new_frame = true;
   } else {
     is_new_frame = false;
@@ -788,11 +724,10 @@ void ChannelSim::DoTxUser(WorkerThreadStorage& local, size_t tag) {
   }
 
   DoTx(frame_id, symbol_id, cfg_->UeAntNum(), cfg_->NumUeChannels(),
-       &local.ue_tx_buffer_->at(total_offset_ue), fmat_noisy.memptr(),
-       local.udp_tx_buffer_, ue_comm_);
+       fmat_noisy.memptr(), &local.TxBuffer(), ue_comm_);
 
   RtAssert(message_queue_.enqueue(
-               *task_ptok_[local.tid_],
+               *task_ptok_.at(local.Id()),
                EventData(EventType::kPacketTX,
                          gen_tag_t::FrmSymUe(frame_id, symbol_id, 0).tag_)),
            "UE TX message enqueue failed!\n");

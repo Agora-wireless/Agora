@@ -41,7 +41,7 @@ int main(int argc, char* argv[]) {
           config.get(), FLAGS_bs_threads, FLAGS_ue_threads,
           FLAGS_worker_threads, FLAGS_core_offset, FLAGS_chan_model,
           FLAGS_chan_snr);
-      sim->Start();
+      sim->Run();
       ret = EXIT_SUCCESS;
     } catch (SignalException& e) {
       std::cerr << "chsim: SignalException: " << e.what() << std::endl;

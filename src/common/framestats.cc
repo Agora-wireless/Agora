@@ -145,6 +145,10 @@ size_t FrameStats::GetSymbolIdx(const std::vector<size_t>& search_vector,
   }
 }
 
+size_t FrameStats::GetBeaconSymbolIdx(size_t symbol_number) const {
+  return FrameStats::GetSymbolIdx(this->beacon_symbols_, symbol_number);
+}
+
 size_t FrameStats::GetDLSymbolIdx(size_t symbol_number) const {
   return FrameStats::GetSymbolIdx(this->dl_symbols_, symbol_number);
 }
