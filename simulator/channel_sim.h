@@ -23,110 +23,96 @@
 
 class WorkerThreadStorage {
  public:
-  WorkerThreadStorage(size_t tid, size_t ue_tx_buf_bytes, size_t ue_ant_count,
-                      size_t bs_tx_buf_bytes, size_t bs_ant_count,
+  WorkerThreadStorage(size_t tid, size_t ue_ant_count, size_t bs_ant_count,
                       size_t samples_per_symbol, size_t udp_packet_size)
-      : tid_(tid),
-        ue_tx_buffer_(ue_tx_buf_bytes),
-        bs_tx_buffer_(bs_tx_buf_bytes),
-        udp_tx_buffer_(udp_packet_size) {
+      : tid_(tid), udp_tx_buffer_(udp_packet_size) {
     //UE
     const size_t ue_input_storage_size =
         (ue_ant_count * samples_per_symbol * sizeof(arma::cx_float));
-    auto* ue_input_float_storage =
-        reinterpret_cast<std::byte*>(PaddedAlignedAlloc(
-            Agora_memory::Alignment_t::kAlign64, ue_input_storage_size));
-
-    ue_input_matrix_ =
-        arma::cx_fmat(reinterpret_cast<arma::cx_float*>(ue_input_float_storage),
-                      samples_per_symbol, ue_ant_count, false, true);
-    AGORA_LOG_INFO("Ue input location %zu:%zu  diff %zu size %zu\n",
-                   reinterpret_cast<intptr_t>(ue_input_matrix_.memptr()),
-                   reinterpret_cast<intptr_t>(ue_input_float_storage),
-                   reinterpret_cast<intptr_t>(ue_input_matrix_.memptr()) -
-                       reinterpret_cast<intptr_t>(ue_input_float_storage),
-                   ue_input_storage_size);
-
-    AGORA_LOG_INFO("storage %zu:%zu, matrix %zu:%zu\n",
-                   reinterpret_cast<intptr_t>(&ue_input_float_storage[0u]),
-                   reinterpret_cast<intptr_t>(
-                       &ue_input_float_storage[ue_input_storage_size - 1]),
-                   reinterpret_cast<intptr_t>(&ue_input_matrix_.at(0, 0)),
-                   reinterpret_cast<intptr_t>(&ue_input_matrix_.at(
-                       samples_per_symbol - 1, ue_ant_count - 1)));
-
-    //RtAssert(ue_input_matrix_.memptr() == ue_input_float_storage,
-    //         "Ue Input storage not at correct location");
-    //ue_input_matrix_.zeros(samples_per_symbol, ue_ant_count);
-
     const size_t ue_output_storage_size =
         (bs_ant_count * samples_per_symbol * sizeof(arma::cx_float));
+
+    auto* ue_input_float_storage = PaddedAlignedAlloc(
+        Agora_memory::Alignment_t::kAlign64, ue_input_storage_size);
+    ue_input_matrix_ = std::make_unique<arma::cx_fmat>(
+        reinterpret_cast<arma::cx_float*>(ue_input_float_storage),
+        samples_per_symbol, ue_ant_count, false, true);
+    AGORA_LOG_TRACE("Ue input location %zu:%zu  diff %zu size %zu\n",
+                    reinterpret_cast<intptr_t>(ue_input_matrix_->memptr()),
+                    reinterpret_cast<intptr_t>(ue_input_float_storage),
+                    reinterpret_cast<intptr_t>(ue_input_matrix_->memptr()) -
+                        reinterpret_cast<intptr_t>(ue_input_float_storage),
+                    ue_input_storage_size);
+
+    AGORA_LOG_TRACE("storage %zu:%zu, matrix %zu:%zu memstate %d\n",
+                    reinterpret_cast<intptr_t>(&ue_input_float_storage[0u]),
+                    reinterpret_cast<intptr_t>(&reinterpret_cast<std::byte*>(
+                        ue_input_float_storage)[ue_input_storage_size - 1]),
+                    reinterpret_cast<intptr_t>(&ue_input_matrix_->at(0, 0)),
+                    reinterpret_cast<intptr_t>(&ue_input_matrix_->at(
+                        samples_per_symbol - 1, ue_ant_count - 1)),
+                    ue_input_matrix_->mem_state);
+    //Validate the memory is being reused
+    RtAssert(ue_input_matrix_->memptr() == ue_input_float_storage,
+             "Ue Input storage not at correct location");
+    ue_input_matrix_->zeros(samples_per_symbol, ue_ant_count);
+
     auto* ue_output_float_storage = PaddedAlignedAlloc(
         Agora_memory::Alignment_t::kAlign64, ue_output_storage_size);
-    arma::cx_fmat test(
+    ue_output_matrix_ = std::make_unique<arma::cx_fmat>(
         reinterpret_cast<arma::cx_float*>(ue_output_float_storage),
         samples_per_symbol, bs_ant_count, false, true);
-
-    ue_output_matrix_ = arma::cx_fmat(
-        reinterpret_cast<arma::cx_float*>(ue_output_float_storage),
-        samples_per_symbol, bs_ant_count, false, true);
-    AGORA_LOG_INFO("Ue output location %zu:%zu:%zu diff %zu size %zu:%zu\n",
-                   reinterpret_cast<intptr_t>(ue_output_matrix_.memptr()),
-                   reinterpret_cast<intptr_t>(ue_output_float_storage),
-                   reinterpret_cast<intptr_t>(test.memptr()),
-                   reinterpret_cast<intptr_t>(ue_output_float_storage) -
-                       reinterpret_cast<intptr_t>(ue_output_matrix_.memptr()),
-                   sizeof(arma::cx_float), ue_output_storage_size);
-    RtAssert(ue_output_matrix_.memptr() == ue_output_float_storage,
+    RtAssert(ue_output_matrix_->memptr() == ue_output_float_storage,
              "Ue Input storage not at correct location");
-    ue_output_matrix_.zeros(samples_per_symbol, bs_ant_count);
+    ue_output_matrix_->zeros(samples_per_symbol, bs_ant_count);
 
     //BS
     void* bs_input_float_storage = PaddedAlignedAlloc(
-        Agora_memory::Alignment_t::kAlign64,
-        (bs_ant_count * samples_per_symbol * sizeof(arma::cx_float)));
+        Agora_memory::Alignment_t::kAlign64, ue_output_storage_size);
+    bs_input_matrix_ = std::make_unique<arma::cx_fmat>(
+        reinterpret_cast<arma::cx_float*>(bs_input_float_storage),
+        samples_per_symbol, bs_ant_count, false, true);
+    RtAssert(bs_input_matrix_->memptr() == bs_input_float_storage,
+             "Bs Input storage not at correct location");
+    bs_input_matrix_->zeros(samples_per_symbol, bs_ant_count);
+
     void* bs_output_float_storage = PaddedAlignedAlloc(
-        Agora_memory::Alignment_t::kAlign64,
-        (ue_ant_count * samples_per_symbol * sizeof(arma::cx_float)));
-
-    bs_input_matrix_ =
-        arma::cx_fmat(reinterpret_cast<arma::cx_float*>(bs_input_float_storage),
-                      samples_per_symbol, bs_ant_count, false, true);
-    bs_input_matrix_.zeros(samples_per_symbol, bs_ant_count);
-
-    bs_output_matrix_ = arma::cx_fmat(
+        Agora_memory::Alignment_t::kAlign64, ue_input_storage_size);
+    bs_output_matrix_ = std::make_unique<arma::cx_fmat>(
         reinterpret_cast<arma::cx_float*>(bs_output_float_storage),
         samples_per_symbol, ue_ant_count, false, true);
-    bs_output_matrix_.zeros(samples_per_symbol, ue_ant_count);
+    RtAssert(bs_output_matrix_->memptr() == bs_output_float_storage,
+             "Bs Output storage not at correct location");
+    bs_output_matrix_->zeros(samples_per_symbol, ue_ant_count);
   }
-  ~WorkerThreadStorage(){
-      //std::free(ue_input_matrix_.memptr());
-      //std::free(ue_output_matrix_.memptr());
-      //std::free(bs_input_matrix_.memptr());
-      //std::free(bs_output_matrix_.memptr());
+  ~WorkerThreadStorage() {
+    std::free(ue_input_matrix_->memptr());
+    ue_input_matrix_.reset();
+    std::free(ue_output_matrix_->memptr());
+    ue_output_matrix_.reset();
+    std::free(bs_input_matrix_->memptr());
+    bs_input_matrix_.reset();
+    std::free(bs_output_matrix_->memptr());
+    bs_output_matrix_.reset();
   };
 
   inline size_t Id() const { return tid_; }
-  inline arma::cx_fmat& UeInput() { return ue_input_matrix_; }
-  inline arma::cx_fmat& UeOutput() { return ue_output_matrix_; }
-  inline SimdAlignByteVector& BsTxBuffer() { return bs_tx_buffer_; }
+  inline arma::cx_fmat* UeInput() { return ue_input_matrix_.get(); }
+  inline arma::cx_fmat* UeOutput() { return ue_output_matrix_.get(); }
   inline SimdAlignByteVector& TxBuffer() { return udp_tx_buffer_; }
 
-  inline arma::cx_fmat& BsInput() { return bs_input_matrix_; }
-  inline arma::cx_fmat& BsOutput() { return bs_output_matrix_; }
-  inline SimdAlignByteVector& UeTxBuffer() { return ue_tx_buffer_; }
+  inline arma::cx_fmat* BsInput() { return bs_input_matrix_.get(); }
+  inline arma::cx_fmat* BsOutput() { return bs_output_matrix_.get(); }
 
  private:
   size_t tid_;
   // Aligned
-  SimdAlignByteVector ue_tx_buffer_;
-  arma::cx_fmat ue_input_matrix_;
-  arma::cx_fmat ue_output_matrix_;
+  std::unique_ptr<arma::cx_fmat> ue_input_matrix_;
+  std::unique_ptr<arma::cx_fmat> ue_output_matrix_;
 
   // Aligned
-  SimdAlignByteVector bs_tx_buffer_;
-  arma::cx_fmat bs_input_matrix_;
-  arma::cx_fmat bs_output_matrix_;
+  std::unique_ptr<arma::cx_fmat> bs_input_matrix_;
+  std::unique_ptr<arma::cx_fmat> bs_output_matrix_;
 
   SimdAlignByteVector udp_tx_buffer_;
 };

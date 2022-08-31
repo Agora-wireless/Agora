@@ -17,7 +17,7 @@ static std::atomic<bool> running = true;
 static constexpr bool kPrintChannelOutput = false;
 static const size_t kDefaultQueueSize = 36;
 static const bool kPrintDebugTxUser = false;
-static const bool kPrintDebugTxBs = true;
+static const bool kPrintDebugTxBs = false;
 
 static constexpr size_t kUdpMTU = 9000;
 static constexpr size_t kDequeueBulkSize = 5;
@@ -236,7 +236,7 @@ void ChannelSim::Run() {
               }
               ScheduleTask(EventData(EventType::kPacketTX, event.tags_[0]),
                            &task_queue_user_, ptok_user);
-            } else if (bs_rx_symbol_cnt > cfg_->UeAntNum()) {
+            } else if (bs_rx_symbol_cnt > cfg_->BsAntNum()) {
               throw std::runtime_error("Invalid bs rx count");
             }
           }
@@ -306,15 +306,9 @@ void* ChannelSim::TaskThread(size_t tid) {
   moodycamel::ConsumerToken bs_consumer_token(task_queue_bs_);
   moodycamel::ConsumerToken ue_consumer_token(task_queue_user_);
 
-  const size_t tx_buffer_ue_size =
-      dl_data_plus_beacon_symbols_ * cfg_->UeAntNum() * payload_length_;
-
-  const size_t tx_buffer_bs_size =
-      ul_data_plus_pilot_symbols_ * cfg_->BsAntNum() * payload_length_;
-
-  WorkerThreadStorage thread_store(
-      tid, tx_buffer_ue_size, cfg_->UeAntNum(), tx_buffer_bs_size,
-      cfg_->BsAntNum(), cfg_->SampsPerSymbol(), cfg_->PacketLength());
+  WorkerThreadStorage thread_store(tid, cfg_->UeAntNum(), cfg_->BsAntNum(),
+                                   cfg_->SampsPerSymbol(),
+                                   cfg_->PacketLength());
 
   EventData event;
   while (running) {
@@ -350,7 +344,8 @@ void* ChannelSim::BsRxLoop(size_t tid) {
   }
 
   const size_t rx_packet_size = cfg_->PacketLength();
-  const size_t buffer_size = (rx_packet_size) + kUdpMTU;
+  const size_t buffer_size = kUdpMTU;
+  RtAssert(rx_packet_size < kUdpMTU, "Packet size must be less that kUdpMTU");
   std::vector<SocketRxBuffer> thread_rx_buffers(total_sockets,
                                                 SocketRxBuffer(buffer_size));
 
@@ -454,7 +449,7 @@ void* ChannelSim::UeRxLoop(size_t tid) {
   }
 
   const size_t rx_packet_size = cfg_->PacketLength();
-  const size_t buffer_size = (rx_packet_size) + kUdpMTU;
+  const size_t buffer_size = kUdpMTU;
   std::vector<SocketRxBuffer> thread_rx_buffers(total_sockets,
                                                 SocketRxBuffer(buffer_size));
 
@@ -546,7 +541,6 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
 
 #if defined(CHSIM_DEBUG_MEMORY)
   RtAssert(((convert_length % 16) == 0) &&
-               ((reinterpret_cast<intptr_t>(dst_ptr) % 64) == 0) &&
                ((reinterpret_cast<intptr_t>(source_data) % 64) == 0),
            "Data Alignment not correct before calling into AVX optimizations");
 #endif
@@ -559,19 +553,23 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
     pkt->ant_id_ = ant_id;
     pkt->cell_id_ = 0;
 
-    RtAssert(udp_pkt_buf->size() < (convert_length + Packet::kOffsetOfData),
-             "TX UDP Buffer Overflow");
+    RtAssert(udp_pkt_buf->size() >
+                 (convert_length + Packet::kOffsetOfData + sizeof(short)),
+             "TX UDP Buffer Overflow " + std::to_string(udp_pkt_buf->size()) +
+                 " : " +
+                 std::to_string(
+                     (convert_length + Packet::kOffsetOfData + sizeof(short))));
 
     //Modify this to use SIMD.
-    ConvertFloatToShort(
-        reinterpret_cast<const float*>(&source_data[source_idx]), pkt->data_,
+    SimdConvertFloatToShort(
+        &reinterpret_cast<const float*>(source_data)[source_idx], pkt->data_,
         convert_length);
 
     // Can remove this with some changes
     //std::memcpy(pkt->data_, &tx_buffer[ant_id * payload_length_],
     //            payload_length_);
     //Destination already set by "connect"
-    udp_senders.at(socket)->Send(udp_pkt_buf->data(), udp_pkt_buf->size());
+    udp_senders.at(socket)->Send(udp_pkt_buf->data(), cfg_->PacketLength());
     source_idx += convert_length;
   }
 }
@@ -598,9 +596,9 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
   const auto* src_ptr =
       reinterpret_cast<const short*>(&rx_buffer_ue_.at(total_offset_ue));
 
-  arma::cx_fmat& fmat_src = local.UeInput();
+  auto* fmat_src = local.UeInput();
   // 2 for complex type
-  const size_t convert_length = (2 * fmat_src.n_rows * fmat_src.n_cols);
+  const size_t convert_length = (2 * fmat_src->n_rows * fmat_src->n_cols);
 
   AGORA_LOG_FRAME(
       "Channel Sim[%zu]: DoTxBs processing frame %zu, symbol %zu, ul symbol "
@@ -613,22 +611,21 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
   AGORA_LOG_TRACE(
       "Channel Sim[%zu]: SimdConvertShortToFloat: DoTxBs Length %lld samps "
       "%lld ue ants %lld data size %zu\n",
-      local.Id, fmat_src.n_elem, fmat_src.n_cols, fmat_src.n_rows,
+      local.Id(), fmat_src->n_elem, fmat_src->n_cols, fmat_src->n_rows,
       sizeof(arma::cx_float));
 
 #if defined(CHSIM_DEBUG_MEMORY)
   RtAssert(((convert_length % 16) == 0) &&
                ((reinterpret_cast<intptr_t>(src_ptr) % 64) == 0) &&
-               ((reinterpret_cast<intptr_t>(fmat_src.memptr()) % 64) == 0),
+               ((reinterpret_cast<intptr_t>(fmat_src->memptr()) % 64) == 0),
            "Data Alignment not correct before calling into AVX optimizations");
 #endif
   // convert received data to complex float,
   // apply channel, convert back to complex short to TX
-  SimdConvertShortToFloat(src_ptr, reinterpret_cast<float*>(fmat_src.memptr()),
+  SimdConvertShortToFloat(src_ptr, reinterpret_cast<float*>(fmat_src->memptr()),
                           convert_length);
 
-  arma::cx_fmat& fmat_noisy = local.UeOutput();
-
+  auto* fmat_noisy = local.UeOutput();
   const bool is_downlink = false;
   bool is_new_frame;
   if (ue_ul_symbol_idx == 0) {
@@ -637,17 +634,17 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
     is_new_frame = false;
   }
   // Apply Channel
-  channel_->ApplyChan(fmat_src, fmat_noisy, is_downlink, is_new_frame);
+  channel_->ApplyChan(*fmat_src, *fmat_noisy, is_downlink, is_new_frame);
 
-  AGORA_LOG_TRACE("Noisy dimensions %lld x %lld : %lld\n", fmat_noisy.n_rows,
-                  fmat_noisy.n_cols, fmat_noisy.n_elem);
+  AGORA_LOG_TRACE("Noisy dimensions %lld x %lld : %lld\n", fmat_noisy->n_rows,
+                  fmat_noisy->n_cols, fmat_noisy->n_elem);
 
   if (kPrintChannelOutput) {
-    Utils::PrintMat(fmat_noisy, "rx_ul");
+    Utils::PrintMat(*fmat_noisy, "rx_ul");
   }
 
   DoTx(frame_id, symbol_id, cfg_->BsAntNum(), cfg_->NumChannels(),
-       fmat_noisy.memptr(), &local.TxBuffer(), bs_comm_);
+       fmat_noisy->memptr(), &local.TxBuffer(), bs_comm_);
 
   RtAssert(message_queue_.enqueue(
                *task_ptok_.at(local.Id()),
@@ -678,9 +675,9 @@ void ChannelSim::DoTxUser(WorkerThreadStorage& local, size_t tag) {
   const auto* src_ptr =
       reinterpret_cast<const short*>(&rx_buffer_bs_.at(total_offset_bs));
 
-  arma::cx_fmat& fmat_src = local.BsInput();
+  auto* fmat_src = local.BsInput();
   // 2 for complex type
-  const size_t convert_length = (2 * fmat_src.n_rows * fmat_src.n_cols);
+  const size_t convert_length = (2 * fmat_src->n_rows * fmat_src->n_cols);
 
   AGORA_LOG_FRAME(
       "Channel Sim[%zu]: DoTxUser processing frame %zu, symbol %zu, dl symbol "
@@ -691,21 +688,21 @@ void ChannelSim::DoTxUser(WorkerThreadStorage& local, size_t tag) {
   AGORA_LOG_TRACE(
       "Channel Sim[%zu]: SimdConvertShortToFloat: DoTxUser Length %lld samps "
       "%lld bs ants %lld data size %zu\n",
-      local.Id(), fmat_src.n_elem, fmat_src.n_cols, fmat_src.n_rows,
+      local.Id(), fmat_src->n_elem, fmat_src->n_cols, fmat_src->n_rows,
       sizeof(arma::cx_float));
 
 #if defined(CHSIM_DEBUG_MEMORY)
   RtAssert(((convert_length % 16) == 0) &&
                ((reinterpret_cast<intptr_t>(src_ptr) % 64) == 0) &&
-               ((reinterpret_cast<intptr_t>(fmat_src.memptr()) % 64) == 0),
+               ((reinterpret_cast<intptr_t>(fmat_src->memptr()) % 64) == 0),
            "Data Alignment not correct before calling into AVX optimizations");
 #endif
   // convert received data to complex float,
   // apply channel, convert back to complex short to TX
-  SimdConvertShortToFloat(src_ptr, reinterpret_cast<float*>(fmat_src.memptr()),
+  SimdConvertShortToFloat(src_ptr, reinterpret_cast<float*>(fmat_src->memptr()),
                           convert_length);
 
-  arma::cx_fmat& fmat_noisy = local.BsOutput();
+  auto* fmat_noisy = local.BsOutput();
   // Apply Channel
   const bool is_downlink = true;
   bool is_new_frame;
@@ -714,17 +711,17 @@ void ChannelSim::DoTxUser(WorkerThreadStorage& local, size_t tag) {
   } else {
     is_new_frame = false;
   }
-  channel_->ApplyChan(fmat_src, fmat_noisy, is_downlink, is_new_frame);
+  channel_->ApplyChan(*fmat_src, *fmat_noisy, is_downlink, is_new_frame);
 
-  AGORA_LOG_TRACE("Noisy dimensions %lld x %lld : %lld\n", fmat_noisy.n_rows,
-                  fmat_noisy.n_cols, fmat_noisy.n_elem);
+  AGORA_LOG_TRACE("Noisy dimensions %lld x %lld : %lld\n", fmat_noisy->n_rows,
+                  fmat_noisy->n_cols, fmat_noisy->n_elem);
 
   if (kPrintChannelOutput) {
-    Utils::PrintMat(fmat_noisy, "rx_dl");
+    Utils::PrintMat(*fmat_noisy, "rx_dl");
   }
 
   DoTx(frame_id, symbol_id, cfg_->UeAntNum(), cfg_->NumUeChannels(),
-       fmat_noisy.memptr(), &local.TxBuffer(), ue_comm_);
+       fmat_noisy->memptr(), &local.TxBuffer(), ue_comm_);
 
   RtAssert(message_queue_.enqueue(
                *task_ptok_.at(local.Id()),
