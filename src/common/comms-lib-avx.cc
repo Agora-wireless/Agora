@@ -23,6 +23,7 @@
 #define AVX_PACKED_CS (8)   // complex short int
 
 static constexpr float kShortMaxFloat = SHRT_MAX;
+static constexpr float kCorrScale = 1.0f;
 
 ssize_t CommsLib::FindBeaconAvx(const std::complex<int16_t>* iq,
                                 const std::vector<std::complex<float>>& seq,
@@ -90,7 +91,7 @@ int CommsLib::FindBeaconAvx(const std::vector<std::complex<float>>& iq,
   // perform thresholding and find peak
   clock_gettime(CLOCK_MONOTONIC, &tv);
   for (size_t i = 0; i < gold_corr_avx_2.size(); i++) {
-    if (gold_corr_avx_2[i] > thresh_avx[i]) {
+    if (kCorrScale * gold_corr_avx_2[i] > thresh_avx[i]) {
       valid_peaks.push_back(i);
     }
   }
