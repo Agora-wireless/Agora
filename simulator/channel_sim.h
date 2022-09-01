@@ -117,6 +117,69 @@ class WorkerThreadStorage {
   SimdAlignByteVector udp_tx_buffer_;
 };
 
+class TimeFrameCounters {
+ public:
+  TimeFrameCounters() : counter_() {}
+
+  inline void Init(size_t max_symbol_count, size_t max_task_count = 0) {
+    counter_.Init(max_symbol_count, max_task_count);
+  }
+  inline void Reset(size_t frame_id) { counter_.Reset(frame_id); }
+  inline bool CompleteSymbol(size_t frame_id) {
+    if (counter_.GetSymbolCount(frame_id) == 0) {
+      const size_t frame_idx = frame_id % kFrameWnd;
+      symbol_times_.at(frame_idx) = GetTime::GetTimeUs();
+    }
+    const bool complete = counter_.CompleteSymbol(frame_id);
+    if (complete) {
+      const size_t frame_idx = frame_id % kFrameWnd;
+      symbol_times_.at(frame_idx) =
+          GetTime::GetTimeUs() - symbol_times_.at(frame_idx);
+    }
+    return complete;
+  }
+  inline bool CompleteTask(size_t frame_id, size_t symbol_id) {
+    if (counter_.GetTaskCount(frame_id, symbol_id) == 0) {
+      const size_t frame_idx = frame_id % kFrameWnd;
+      task_times_.at(frame_idx).at(symbol_id) = GetTime::GetTimeUs();
+    }
+    const bool complete = counter_.CompleteTask(frame_id, symbol_id);
+    if (complete) {
+      const size_t frame_idx = frame_id % kFrameWnd;
+      task_times_.at(frame_idx).at(symbol_id) =
+          GetTime::GetTimeUs() - task_times_.at(frame_idx).at(symbol_id);
+    }
+    return complete;
+  }
+  inline bool CompleteTask(size_t frame_id) {
+    if (counter_.GetTaskCount(frame_id) == 0) {
+      const size_t frame_idx = frame_id % kFrameWnd;
+      symbol_times_.at(frame_idx) = GetTime::GetTimeUs();
+    }
+    const bool complete = counter_.CompleteTask(frame_id);
+    if (complete) {
+      const size_t frame_idx = frame_id % kFrameWnd;
+      symbol_times_.at(frame_idx) =
+          GetTime::GetTimeUs() - symbol_times_.at(frame_idx);
+    }
+    return complete;
+  }
+  inline double GetTaskTimeUs(size_t frame_id, size_t symbol_id) const {
+    const size_t frame_idx = frame_id % kFrameWnd;
+    return task_times_.at(frame_idx).at(symbol_id);
+  }
+  //Returns the time from the first completion to the last
+  inline double GetTaskTimeUs(size_t frame_id) const {
+    const size_t frame_idx = frame_id % kFrameWnd;
+    return symbol_times_.at(frame_idx);
+  };
+
+ private:
+  FrameCounters counter_;
+  std::array<std::array<double, kMaxSymbols>, kFrameWnd> task_times_;
+  std::array<double, kMaxSymbols> symbol_times_;
+};
+
 /**
  * @brief Simualtor for many-antenna MU-MIMO channel to work with
  * Agora BS and UE applications. It generates channel matrice(s)
@@ -199,11 +262,10 @@ class ChannelSim {
   std::string channel_type_;
   double channel_snr_;
 
-  //size_t* bs_rx_counter_;
-  std::unique_ptr<size_t[]> bs_rx_counter_;
-  std::unique_ptr<size_t[]> user_rx_counter_;
-  std::array<size_t, kFrameWnd> bs_tx_counter_;
-  std::array<size_t, kFrameWnd> user_tx_counter_;
+  TimeFrameCounters ue_rx_;
+  TimeFrameCounters ue_tx_;
+  TimeFrameCounters bs_rx_;
+  TimeFrameCounters bs_tx_;
 
   //Returns Beacon+Dl symbol index
   inline size_t GetBsDlIdx(size_t symbol_id) const {

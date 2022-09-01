@@ -102,20 +102,6 @@ ChannelSim::ChannelSim(const Config* const config, size_t bs_thread_num,
                                    cfg_->BsAntNum() * payload_length_;
   rx_buffer_bs_.resize(rx_buffer_bs_size);
 
-  // initilize rx and tx counters
-  bs_rx_counter_ =
-      std::make_unique<size_t[]>(dl_data_plus_beacon_symbols_ * kFrameWnd);
-  std::memset(bs_rx_counter_.get(), 0u,
-              sizeof(size_t) * dl_data_plus_beacon_symbols_ * kFrameWnd);
-
-  user_rx_counter_ =
-      std::make_unique<size_t[]>(ul_data_plus_pilot_symbols_ * kFrameWnd);
-  std::memset(user_rx_counter_.get(), 0u,
-              sizeof(size_t) * ul_data_plus_pilot_symbols_ * kFrameWnd);
-
-  bs_tx_counter_.fill(0);
-  user_tx_counter_.fill(0);
-
   // Initialize channel
   channel_ = std::make_unique<Channel>(cfg_, channel_type_, channel_snr_);
 
@@ -129,6 +115,11 @@ ChannelSim::ChannelSim(const Config* const config, size_t bs_thread_num,
   for (size_t i = 0; i < worker_thread_num; i++) {
     task_threads_.at(i) = std::thread(&ChannelSim::TaskThread, this, i);
   }
+
+  ue_rx_.Init(ul_data_plus_pilot_symbols_, cfg_->UeAntNum());
+  ue_tx_.Init(dl_data_plus_beacon_symbols_);
+  bs_rx_.Init(dl_data_plus_beacon_symbols_, cfg_->BsAntNum());
+  bs_tx_.Init(ul_data_plus_pilot_symbols_);
 }
 
 ChannelSim::~ChannelSim() {
@@ -192,87 +183,92 @@ void ChannelSim::Run() {
           const size_t frame_id = gen_tag_t(event.tags_[0u]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0u]).symbol_id_;
           const gen_tag_t::TagType type = gen_tag_t(event.tags_[0u]).tag_type_;
-          const size_t frame_idx = (frame_id % kFrameWnd);
           // received a packet from a client antenna
           if (type == gen_tag_t::TagType::kUsers) {
             const size_t ue_symbol_idx = GetUeUlIdx(symbol_id);
-            const size_t frame_offset =
-                (frame_idx * ul_data_plus_pilot_symbols_) + ue_symbol_idx;
-            size_t& ue_rx_symbol_cnt = user_rx_counter_[frame_offset];
-            ue_rx_symbol_cnt++;
+            const bool last_antenna =
+                ue_rx_.CompleteTask(frame_id, ue_symbol_idx);
             // when received all client antennas on this symbol, kick-off BS TX
-            if (ue_rx_symbol_cnt == cfg_->UeAntNum()) {
-              ue_rx_symbol_cnt = 0;
+            if (last_antenna) {
               if (kDebugPrintPerSymbolDone) {
-                AGORA_LOG_SYMBOL(
+                AGORA_LOG_INFO(
                     "Scheduling uplink transmission of frame %zu, symbol %zu, "
-                    "from %zu user to %zu BS antennas\n",
-                    frame_id, symbol_id, cfg_->UeAntNum(), cfg_->BsAntNum());
+                    "from %zu user to %zu BS antennas, in %.3fuS\n",
+                    frame_id, symbol_id, cfg_->UeAntNum(), cfg_->BsAntNum(),
+                    ue_rx_.GetTaskTimeUs(frame_id, ue_symbol_idx));
               }
               ScheduleTask(EventData(EventType::kPacketTX, event.tags_[0]),
                            &task_queue_bs_, ptok_bs);
-            } else if (ue_rx_symbol_cnt > cfg_->UeAntNum()) {
-              throw std::runtime_error("Invalid user rx count");
+              const bool last_symbol = ue_rx_.CompleteSymbol(frame_id);
+              if (last_symbol) {
+                ue_rx_.Reset(frame_id);
+                AGORA_LOG_INFO(
+                    "Frame %zu: Finished uplink reception of %zu symbols in "
+                    "%.3fuS\n",
+                    frame_id, ul_data_plus_pilot_symbols_,
+                    ue_rx_.GetTaskTimeUs(frame_id));
+              }
             }
-            // received a packet from a BS antenna
           } else if (type == gen_tag_t::TagType::kAntennas) {
             const size_t dl_symbol_id = GetBsDlIdx(symbol_id);
-            const size_t frame_offset =
-                (frame_idx * dl_data_plus_beacon_symbols_) + dl_symbol_id;
-            size_t& bs_rx_symbol_cnt = bs_rx_counter_[frame_offset];
-            bs_rx_symbol_cnt++;
-
-            AGORA_LOG_TRACE("Rx downlink frame %zu, symbol %zu, %zu\n",
-                            frame_id, symbol_id, bs_rx_symbol_cnt);
+            const bool last_antenna =
+                bs_rx_.CompleteTask(frame_id, dl_symbol_id);
+            AGORA_LOG_TRACE("Rx downlink frame %zu, symbol %zu\n", frame_id,
+                            symbol_id);
 
             // when received all BS antennas on this symbol, kick-off client TX
-            if (bs_rx_symbol_cnt == cfg_->BsAntNum()) {
-              bs_rx_symbol_cnt = 0;
+            if (last_antenna) {
               if (kDebugPrintPerSymbolDone) {
-                AGORA_LOG_SYMBOL(
+                AGORA_LOG_INFO(
                     "Scheduling downlink transmission in frame %zu, symbol "
-                    "%zu, from %zu BS to %zu user antennas\n",
-                    frame_id, symbol_id, cfg_->BsAntNum(), cfg_->UeAntNum());
+                    "%zu, from %zu BS to %zu user antennas, in %.3fuS\n",
+                    frame_id, symbol_id, cfg_->BsAntNum(), cfg_->UeAntNum(),
+                    bs_rx_.GetTaskTimeUs(frame_id, dl_symbol_id));
               }
               ScheduleTask(EventData(EventType::kPacketTX, event.tags_[0]),
                            &task_queue_user_, ptok_user);
-            } else if (bs_rx_symbol_cnt > cfg_->BsAntNum()) {
-              throw std::runtime_error("Invalid bs rx count");
+              const bool last_symbol = bs_rx_.CompleteSymbol(frame_id);
+              if (last_symbol) {
+                bs_rx_.Reset(frame_id);
+                AGORA_LOG_INFO(
+                    "Frame %zu: Finished downlink reception of %zu symbols "
+                    "in %.3fuS\n",
+                    frame_id, dl_data_plus_beacon_symbols_,
+                    bs_rx_.GetTaskTimeUs(frame_id));
+              }
             }
+          } else {
+            throw std::runtime_error("Invalid kPacketRx type");
           }
         } break;
 
         case EventType::kPacketTX: {
           const size_t frame_id = gen_tag_t(event.tags_[0u]).frame_id_;
-          const size_t frame_idx = (frame_id % kFrameWnd);
           if (gen_tag_t(event.tags_[0u]).tag_type_ ==
               gen_tag_t::TagType::kUsers) {
-            size_t& tx_counter = user_tx_counter_.at(frame_idx);
-            tx_counter++;
-            if (tx_counter == dl_data_plus_beacon_symbols_) {
+            const bool last_symbol = ue_tx_.CompleteTask(frame_id);
+            if (last_symbol) {
               if (kDebugPrintPerFrameDone) {
                 AGORA_LOG_INFO(
-                    "Finished downlink transmission %zu symbols in frame %zu\n",
-                    dl_data_plus_beacon_symbols_, frame_id);
+                    "Frame %zu: Finished downlink transmission of %zu symbols "
+                    "in %.3fuS\n",
+                    frame_id, dl_data_plus_beacon_symbols_,
+                    ue_tx_.GetTaskTimeUs(frame_id));
               }
-              tx_counter = 0;
-            } else if (tx_counter > dl_data_plus_beacon_symbols_) {
-              throw std::runtime_error("Downlink transmission error");
+              ue_tx_.Reset(frame_id);
             }
           } else if (gen_tag_t(event.tags_[0]).tag_type_ ==
                      gen_tag_t::TagType::kAntennas) {
-            size_t& tx_counter = bs_tx_counter_.at(frame_idx);
-            tx_counter++;
-            if (tx_counter == ul_data_plus_pilot_symbols_) {
+            const bool last_symbol = bs_tx_.CompleteTask(frame_id);
+            if (last_symbol) {
               if (kDebugPrintPerFrameDone) {
                 AGORA_LOG_INFO(
-                    "Finished uplink transmission of %zu symbols in frame "
-                    "%zu\n",
-                    ul_data_plus_pilot_symbols_, frame_id);
+                    "Frame %zu: Finished uplink transmission of %zu symbols in "
+                    "%.3fuS\n",
+                    frame_id, ul_data_plus_pilot_symbols_,
+                    bs_tx_.GetTaskTimeUs(frame_id));
               }
-              tx_counter = 0;
-            } else if (tx_counter > ul_data_plus_pilot_symbols_) {
-              throw std::runtime_error("Uplink transmission error");
+              bs_tx_.Reset(frame_id);
             }
           }
         } break;
@@ -338,8 +334,8 @@ void* ChannelSim::BsRxLoop(size_t tid) {
     //Create a 1:1 connection
     bs_comm_.at(socket_id)->Connect(cfg_->BsServerAddr(), remote_port_id);
     AGORA_LOG_INFO(
-        "ChannelSim::BsRxLoop[%zu]: set up UDP socket server listening to port "
-        "%zu with remote address %s:%zu\n",
+        "ChannelSim::BsRxLoop[%zu]: set up UDP socket server listening to "
+        "port %zu with remote address %s:%zu\n",
         tid, local_port_id, cfg_->BsServerAddr().c_str(), remote_port_id);
   }
 
@@ -680,8 +676,9 @@ void ChannelSim::DoTxUser(WorkerThreadStorage& local, size_t tag) {
   const size_t convert_length = (2 * fmat_src->n_rows * fmat_src->n_cols);
 
   AGORA_LOG_FRAME(
-      "Channel Sim[%zu]: DoTxUser processing frame %zu, symbol %zu, dl symbol "
-      "%zu, samples per symbol %zu bs ant num %zu offset %zu location %zu\n",
+      "Channel Sim[%zu]: DoTxUser processing frame %zu, symbol %zu, dl "
+      "symbol %zu, samples per symbol %zu bs ant num %zu offset %zu location "
+      "%zu\n",
       local.Id(), frame_id, symbol_id, bs_dl_symbol_idx, cfg_->SampsPerSymbol(),
       cfg_->BsAntNum(), total_offset_bs, reinterpret_cast<intptr_t>(src_ptr));
 
