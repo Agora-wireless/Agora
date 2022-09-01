@@ -15,7 +15,7 @@ static constexpr bool kUseInverseForZF = true;
 // static constexpr bool kUseUlZfForDownlink = true; // mag info thrown off, but yielded better BER...
 static constexpr bool kUseUlZfForDownlink = false; // more accurate matrix pinv [fixed]
 
-enum AsmVersion { ASMv1, ASMv2 };
+enum AsmVersion { FASM, ASMv1, ASMv2 };
 static constexpr enum AsmVersion kAsmVersion = ASMv2;
 static constexpr size_t N_OFF = 3;  // num of OFF antennas among all BS antennas
 static constexpr bool kPrintEffGain = true;  // wil be in bs.txt
