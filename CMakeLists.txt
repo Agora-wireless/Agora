@@ -163,8 +163,13 @@ set(MAC_BS_SOURCES
   src/mac/file_receiver.cc
   src/mac/mac_basestation.cc)
 
+  # Intel MKL
+set(BLA_VENDOR Intel10_64lp)
+find_package(BLAS REQUIRED)
+
 #External Libraries
 find_package(Armadillo "11.0.0" REQUIRED)
+message(STATUS "Armadillo: Includes ${ARMADILLO_INCLUDE_DIR} Libraries ${ARMADILLO_LIBRARIES}")
 
 set(ENABLE_HDF5 False CACHE STRING "ENABLE_HDF5 defaulting to 'False'")
 message(STATUS "HDF5 Support Enabled: ${ENABLE_HDF5}")
@@ -198,10 +203,6 @@ include_directories(${SOAPY_INCLUDE_DIRS})
 message(STATUS "SoapySDR_INCLUDE_DIRS: ${SoapySDR_INCLUDE_DIRS}")
 message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
 add_definitions(-DTHREADED_INIT)
-
-# Intel MKL
-set(BLA_VENDOR Intel10_64lp)
-find_package(BLAS REQUIRED)
 
 set(USE_SPDLOG True CACHE STRING "USE_SPDLOG defaulting to 'False'")
 message(STATUS "USE_SPDLOG: ${USE_SPDLOG}")
@@ -409,8 +410,8 @@ set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/install/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/install/lib_common/libcommon.a)
 
-set(COMMON_LIBS ${COMMON_LIBS} armadillo numa ${HDF5_LIBRARIES} ${DPDK_LIBRARIES} ${BLAS_LIBRARIES} ${SOAPY_LIB}
-    ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
+set(COMMON_LIBS ${BLAS_LIBRARIES} ${FLEXRAN_LDPC_LIBS} ${HDF5_LIBRARIES} ${DPDK_LIBRARIES} ${SOAPY_LIB}
+    ${PYTHON_LIB} ${ARMADILLO_LIBRARIES} numa util gflags gtest ${COMMON_LIBS})
 
 # TODO: The main agora executable is performance-critical, so we need to
 # test if compiling against precompiled objects instead of compiling directly

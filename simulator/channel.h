@@ -12,6 +12,8 @@
 #include <iomanip>
 #include <numeric>
 
+#define ARMA_DONT_USE_WRAPPER
+#define ARMA_DONT_USE_FORTRAN_HIDDEN_ARGS
 #include "armadillo"
 #include "config.h"
 #include "gettime.h"

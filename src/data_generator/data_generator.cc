@@ -13,6 +13,8 @@
 #include <iostream>
 #include <memory>
 
+#define ARMA_DONT_USE_WRAPPER
+#define ARMA_DONT_USE_FORTRAN_HIDDEN_ARGS
 #include "armadillo"
 #include "comms-lib.h"
 #include "config.h"
@@ -82,10 +84,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kUplink));
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(
-                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kUplink)) &
-            0xFFFF));
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
+                                pkt->Data(),
+                                cfg_->MacPayloadMaxLength(Direction::kUplink)) &
+                            0xFFFF));
       }
     }
 
@@ -372,10 +374,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kDownlink));
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(
-                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kDownlink)) &
-            0xFFFF));
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(pkt->Data(),
+                                                    cfg_->MacPayloadMaxLength(
+                                                        Direction::kDownlink)) &
+                            0xFFFF));
       }
     }
 

@@ -8,8 +8,9 @@
 #include <sys/resource.h>
 #include <sys/time.h>
 
+#define ARMA_DONT_USE_WRAPPER
+#define ARMA_DONT_USE_FORTRAN_HIDDEN_ARGS
 #include "armadillo"
-// #include <hpctoolkit.h>
 
 static double test_get_time(void) {
   struct timespec tv;

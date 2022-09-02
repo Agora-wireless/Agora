@@ -3,13 +3,14 @@
  * @brief Data generator to generate binary files as inputs to Agora, sender
  * and correctness tests
  */
-
 #include <gflags/gflags.h>
 
 #include <bitset>
 #include <fstream>
 #include <iostream>
 
+#define ARMA_DONT_USE_WRAPPER
+#define ARMA_DONT_USE_FORTRAN_HIDDEN_ARGS
 #include "armadillo"
 #include "data_generator.h"
 #include "logger.h"
