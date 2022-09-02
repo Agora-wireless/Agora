@@ -62,6 +62,14 @@ class ChannelSim {
             SimdAlignByteVector* udp_pkt_buf,
             std::vector<std::unique_ptr<UDPComm>>& udp_clients);
 
+  std::vector<std::pair<std::thread, std::unique_ptr<ChSimRxStorage>>>
+  CreateRxThreads();
+  size_t AddRxThreads(
+      size_t desired_threads, size_t total_interfaces,
+      std::vector<std::unique_ptr<UDPComm>>& comm, ChSimRxBuffer* rx_buffer,
+      std::vector<std::pair<std::thread, std::unique_ptr<ChSimRxStorage>>>&
+          rx_threads_out);
+
   // BS-facing sockets
   std::vector<std::unique_ptr<UDPComm>> bs_comm_;
   // UE-facing sockets

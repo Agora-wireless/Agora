@@ -428,7 +428,8 @@ class Config {
     } else if (type == SymbolType::kDL) {
       symbol_idx = Frame().GetDLSymbolIdx(symbol_id) + Frame().NumBeaconSyms();
     } else {
-      throw std::runtime_error("Invalid BS Beacon or DL symbol id");
+      throw std::runtime_error("Invalid BS Beacon or DL symbol id " +
+                               std::to_string(symbol_id));
     }
     return symbol_idx;
   }
@@ -442,7 +443,8 @@ class Config {
     } else if (type == SymbolType::kUL) {
       symbol_idx = Frame().GetULSymbolIdx(symbol_id) + Frame().NumPilotSyms();
     } else {
-      throw std::runtime_error("Invalid Ue Pilot or UL symbol id");
+      throw std::runtime_error("Invalid Ue Pilot or UL symbol id " +
+                               std::to_string(symbol_id));
     }
     return symbol_idx;
   }

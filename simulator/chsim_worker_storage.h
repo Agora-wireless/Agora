@@ -134,7 +134,11 @@ class ChSimRxBuffer {
     const size_t frame_idx = frame % max_frame_;
     const size_t symbol_idx = GetSymbolIdx(symbol);
     auto* dest = storage_.at(frame_idx).at(symbol_idx).at(ant).data();
-    RtAssert(data_size < storage_.at(frame_idx).at(symbol_idx).at(ant).size(),
+    AGORA_LOG_TRACE(
+        "Adding data %zu:%zu, (Frame %zu:%zu, Symbol %zu:%zu, Ant %zu)\n",
+        data_size, storage_.at(frame_idx).at(symbol_idx).at(ant).size(), frame,
+        frame_idx, symbol, symbol_idx, ant);
+    RtAssert(data_size <= storage_.at(frame_idx).at(symbol_idx).at(ant).size(),
              "Add data must fit inside of the storage element");
     //Can make this faster (the destination is 64byte aligned), input is too
     std::memcpy(dest, input, data_size);

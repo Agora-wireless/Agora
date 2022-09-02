@@ -153,97 +153,7 @@ void ChannelSim::Run() {
   moodycamel::ConsumerToken ctok(message_queue_);
 
   //Setup the rx threads
-  //RxLoop();
-  std::vector<std::thread> rec_threads;
-  std::vector<ChSimRxStorage> rec_thread_storage;
-  //Base station rx
-  {
-    // initialize bs-facing sockets
-    const size_t total_sockets = cfg_->BsAntNum();
-    const size_t num_threads = bs_thread_num_;
-    for (size_t socket_id = 0; socket_id < total_sockets; socket_id++) {
-      const size_t local_port_id = cfg_->BsRruPort() + socket_id;
-      const size_t remote_port_id = cfg_->BsServerPort() + socket_id;
-      bs_comm_.emplace_back(std::make_unique<UDPComm>(
-          cfg_->BsRruAddr(), local_port_id, kSockBufSize, 0));
-      //Create a 1:1 connection
-      bs_comm_.back()->Connect(cfg_->BsServerAddr(), remote_port_id);
-      AGORA_LOG_INFO(
-          "ChannelSim set up UDP socket server listening to port %s:%zu with "
-          "remote address %s:%zu\n",
-          cfg_->BsRruAddr().c_str(), local_port_id,
-          cfg_->BsServerAddr().c_str(), remote_port_id);
-    }
-
-    size_t socket_offset = 0;
-    size_t sockets_per_thread = total_sockets / num_threads;
-    if ((total_sockets % num_threads) > 0) {
-      sockets_per_thread++;
-    }
-    for (size_t i = 0; i < num_threads; i++) {
-      size_t sockets_this_thread = sockets_per_thread;
-      if (socket_offset + sockets_per_thread > total_sockets) {
-        //Grab the remainder
-        sockets_this_thread = total_sockets - socket_offset;
-      }
-
-      if (sockets_this_thread > 0) {
-        auto storage = rec_thread_storage.emplace_back(
-            i, core_offset_ + 1, cfg_->PacketLength(), socket_offset,
-            sockets_this_thread, &bs_comm_, rx_buffer_bs_.get(),
-            &message_queue_);
-        rec_threads.emplace_back(std::thread(&ChannelSim::RxLoop, &storage));
-        socket_offset += sockets_per_thread;
-      } else {
-        AGORA_LOG_WARN("Not launching Bs Rx Thread %zu\n", i);
-        break;
-      }
-    }
-  }
-
-  //User rx
-  {
-    // initialize client-facing sockets
-    const size_t total_sockets = cfg_->UeAntNum();
-    const size_t num_threads = user_thread_num_;
-    for (size_t socket_id = 0; socket_id < total_sockets; socket_id++) {
-      const size_t local_port_id = cfg_->UeRruPort() + socket_id;
-      const size_t remote_port_id = cfg_->UeServerPort() + socket_id;
-      ue_comm_.emplace_back(std::make_unique<UDPComm>(
-          cfg_->UeRruAddr(), local_port_id, kSockBufSize, 0));
-      ue_comm_.back()->Connect(cfg_->UeServerAddr(), remote_port_id);
-
-      AGORA_LOG_INFO(
-          "ChannelSim set up UDP socket server listening to port %zu with "
-          "remote %s:%zu with remote address %s:%zu\n",
-          cfg_->UeRruAddr().c_str(), local_port_id,
-          cfg_->UeServerAddr().c_str(), remote_port_id);
-    }
-
-    size_t socket_offset = 0;
-    size_t sockets_per_thread = total_sockets / num_threads;
-    if ((total_sockets % num_threads) > 0) {
-      sockets_per_thread++;
-    }
-    for (size_t i = 0; i < num_threads; i++) {
-      size_t sockets_this_thread = sockets_per_thread;
-      if (socket_offset + sockets_per_thread > total_sockets) {
-        //Grab the remainder
-        sockets_this_thread = total_sockets - socket_offset;
-      }
-
-      if (sockets_this_thread > 0) {
-        auto storage = rec_thread_storage.emplace_back(
-            i, core_offset_ + 1 + bs_thread_num_, cfg_->PacketLength(),
-            socket_offset, sockets_this_thread, &ue_comm_, rx_buffer_ue_.get(),
-            &message_queue_);
-        rec_threads.emplace_back(std::thread(&ChannelSim::RxLoop, &storage));
-        socket_offset += sockets_per_thread;
-      } else {
-        AGORA_LOG_WARN("Not launching User Rx Thread %zu\n", i);
-      }
-    }
-  }
+  auto rx_thread_tracker = CreateRxThreads();
 
   //Give time for all the threads launch
   std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -261,65 +171,78 @@ void ChannelSim::Run() {
         case EventType::kPacketRX: {
           const size_t frame_id = gen_tag_t(event.tags_[0u]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0u]).symbol_id_;
-          const gen_tag_t::TagType type = gen_tag_t(event.tags_[0u]).tag_type_;
-          // received a packet from a client antenna
-          if (type == gen_tag_t::TagType::kUsers) {
-            const size_t ue_symbol_idx = cfg_->GetPilotUlIdx(symbol_id);
-            const bool last_antenna =
-                ue_rx_.CompleteTask(frame_id, ue_symbol_idx);
-            // when received all client antennas on this symbol, kick-off BS TX
-            if (last_antenna) {
-              if (kDebugPrintPerSymbolDone) {
-                AGORA_LOG_INFO(
-                    "Scheduling uplink transmission of frame %zu, symbol %zu, "
-                    "from %zu user to %zu BS antennas, in %.3fuS\n",
-                    frame_id, symbol_id, cfg_->UeAntNum(), cfg_->BsAntNum(),
-                    ue_rx_.GetTaskTimeUs(frame_id, ue_symbol_idx));
-              }
-              ScheduleTask(EventData(EventType::kPacketTX, event.tags_[0]),
-                           &task_queue_bs_, ptok_bs);
-              const bool last_symbol = ue_rx_.CompleteSymbol(frame_id);
-              if (last_symbol) {
-                ue_rx_.Reset(frame_id);
-                AGORA_LOG_INFO(
-                    "Frame %zu: Finished uplink reception of %zu symbols in "
-                    "%.3fuS\n",
-                    frame_id, ul_data_plus_pilot_symbols_,
-                    ue_rx_.GetTaskTimeUs(frame_id));
-              }
-            }
-          } else if (type == gen_tag_t::TagType::kAntennas) {
-            const size_t dl_symbol_id = cfg_->GetBeaconDlIdx(symbol_id);
-            const bool last_antenna =
-                bs_rx_.CompleteTask(frame_id, dl_symbol_id);
-            AGORA_LOG_TRACE("Rx downlink frame %zu, symbol %zu\n", frame_id,
-                            symbol_id);
+          auto symbol_type = cfg_->GetSymbolType(symbol_id);
 
-            // when received all BS antennas on this symbol, kick-off client TX
-            if (last_antenna) {
-              if (kDebugPrintPerSymbolDone) {
-                AGORA_LOG_INFO(
-                    "Scheduling downlink transmission in frame %zu, symbol "
-                    "%zu, from %zu BS to %zu user antennas, in %.3fuS\n",
-                    frame_id, symbol_id, cfg_->BsAntNum(), cfg_->UeAntNum(),
-                    bs_rx_.GetTaskTimeUs(frame_id, dl_symbol_id));
+          switch (symbol_type) {
+            //Rx from base station
+            case SymbolType::kBeacon:
+            case SymbolType::kDL: {
+              const size_t dl_symbol_id = cfg_->GetBeaconDlIdx(symbol_id);
+              const bool last_antenna =
+                  bs_rx_.CompleteTask(frame_id, dl_symbol_id);
+              AGORA_LOG_TRACE("Rx downlink frame %zu, symbol %zu\n", frame_id,
+                              symbol_id);
+
+              // when received all BS antennas on this symbol, kick-off client TX
+              if (last_antenna) {
+                if (kDebugPrintPerSymbolDone) {
+                  AGORA_LOG_INFO(
+                      "Scheduling downlink transmission in frame %zu, symbol "
+                      "%zu, from %zu BS to %zu user antennas, in %.3fuS\n",
+                      frame_id, symbol_id, cfg_->BsAntNum(), cfg_->UeAntNum(),
+                      bs_rx_.GetTaskTimeUs(frame_id, dl_symbol_id));
+                }
+                ScheduleTask(EventData(EventType::kPacketTX, event.tags_[0]),
+                             &task_queue_user_, ptok_user);
+                const bool last_symbol = bs_rx_.CompleteSymbol(frame_id);
+                if (last_symbol) {
+                  bs_rx_.Reset(frame_id);
+                  AGORA_LOG_INFO(
+                      "Frame %zu: Finished downlink reception of %zu symbols "
+                      "in %.3fuS\n",
+                      frame_id, dl_data_plus_beacon_symbols_,
+                      bs_rx_.GetTaskTimeUs(frame_id));
+                }
               }
-              ScheduleTask(EventData(EventType::kPacketTX, event.tags_[0]),
-                           &task_queue_user_, ptok_user);
-              const bool last_symbol = bs_rx_.CompleteSymbol(frame_id);
-              if (last_symbol) {
-                bs_rx_.Reset(frame_id);
-                AGORA_LOG_INFO(
-                    "Frame %zu: Finished downlink reception of %zu symbols "
-                    "in %.3fuS\n",
-                    frame_id, dl_data_plus_beacon_symbols_,
-                    bs_rx_.GetTaskTimeUs(frame_id));
-              }
+              break;
             }
-          } else {
-            throw std::runtime_error("Invalid kPacketRx type");
+            //Rx from ue
+            case SymbolType::kPilot:
+            case SymbolType::kUL: {
+              const size_t ue_symbol_idx = cfg_->GetPilotUlIdx(symbol_id);
+              const bool last_antenna =
+                  ue_rx_.CompleteTask(frame_id, ue_symbol_idx);
+              // when received all client antennas on this symbol, kick-off BS TX
+              if (last_antenna) {
+                if (kDebugPrintPerSymbolDone) {
+                  AGORA_LOG_INFO(
+                      "Scheduling uplink transmission of frame %zu, symbol "
+                      "%zu, "
+                      "from %zu user to %zu BS antennas, in %.3fuS\n",
+                      frame_id, symbol_id, cfg_->UeAntNum(), cfg_->BsAntNum(),
+                      ue_rx_.GetTaskTimeUs(frame_id, ue_symbol_idx));
+                }
+                ScheduleTask(EventData(EventType::kPacketTX, event.tags_[0]),
+                             &task_queue_bs_, ptok_bs);
+                const bool last_symbol = ue_rx_.CompleteSymbol(frame_id);
+                if (last_symbol) {
+                  ue_rx_.Reset(frame_id);
+                  AGORA_LOG_INFO(
+                      "Frame %zu: Finished uplink reception of %zu symbols in "
+                      "%.3fuS\n",
+                      frame_id, ul_data_plus_pilot_symbols_,
+                      ue_rx_.GetTaskTimeUs(frame_id));
+                }
+              }
+              break;
+            }
+            //Shouldn't happen
+            default: {
+              throw std::runtime_error("Invalid kPacketRx symbol type");
+            }
           }
-        } break;
+          break;
+        }
 
         case EventType::kPacketTX: {
           const size_t frame_id = gen_tag_t(event.tags_[0u]).frame_id_;
@@ -329,8 +252,8 @@ void ChannelSim::Run() {
             if (last_symbol) {
               if (kDebugPrintPerFrameDone) {
                 AGORA_LOG_INFO(
-                    "Frame %zu: Finished downlink transmission of %zu "
-                    "symbols in %.3fuS\n",
+                    "Frame %zu: Finished downlink transmission of %zu symbols "
+                    "in %.3fuS\n",
                     frame_id, dl_data_plus_beacon_symbols_,
                     ue_tx_.GetTaskTimeUs(frame_id));
               }
@@ -342,8 +265,7 @@ void ChannelSim::Run() {
             if (last_symbol) {
               if (kDebugPrintPerFrameDone) {
                 AGORA_LOG_INFO(
-                    "Frame %zu: Finished uplink transmission of %zu symbols "
-                    "in "
+                    "Frame %zu: Finished uplink transmission of %zu symbols in "
                     "%.3fuS\n",
                     frame_id, ul_data_plus_pilot_symbols_,
                     bs_tx_.GetTaskTimeUs(frame_id));
@@ -351,7 +273,8 @@ void ChannelSim::Run() {
               bs_tx_.Reset(frame_id);
             }
           }
-        } break;
+          break;
+        }
         default:
           AGORA_LOG_ERROR("Invalid Event Type!\n");
           break;
@@ -360,11 +283,14 @@ void ChannelSim::Run() {
   }
   running.store(false);
 
-  // Join the joinable threads
-  for (auto& join_thread : rec_threads) {
-    if (join_thread.joinable()) {
-      join_thread.join();
+  // Clean up the rx threads
+  for (auto& tracked : rx_thread_tracker) {
+    auto& rx_thread = tracked.first;
+    if (rx_thread.joinable()) {
+      rx_thread.join();
     }
+    auto& storage = tracked.second;
+    storage.reset();
   }
 }
 
@@ -394,7 +320,7 @@ void* ChannelSim::TaskThread(size_t tid) {
 void* ChannelSim::RxLoop(ChSimRxStorage* rx_storage) {
   const size_t socket_lo = rx_storage->SocketOffset();
   const size_t total_sockets = rx_storage->SocketNumber();
-  const size_t socket_hi = socket_lo + total_sockets;
+  const size_t socket_hi = socket_lo + total_sockets - 1;
 
   moodycamel::ProducerToken local_ptok(rx_storage->ResponseQueue());
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, rx_storage->CoreId(),
@@ -442,12 +368,12 @@ void* ChannelSim::RxLoop(ChSimRxStorage* rx_storage) {
             rx_storage->Id(), frame_id, symbol_id, ant_id, socket_id);
       }
 
-      RtAssert(
-          rx_storage->ResponseQueue().enqueue(
-              local_ptok,
-              EventData(EventType::kPacketRX,
-                        gen_tag_t::FrmSymUe(frame_id, symbol_id, ant_id).tag_)),
-          "kPacketRX message enqueue failed!");
+      RtAssert(rx_storage->ResponseQueue().enqueue(
+                   local_ptok,
+                   EventData(
+                       EventType::kPacketRX,
+                       gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_)),
+               "kPacketRX message enqueue failed!");
 
       // Move to the next socket
       if (socket_id == socket_hi) {
@@ -640,6 +566,86 @@ void ChannelSim::DoTxUser(ChSimWorkerStorage* local, size_t tag) {
   RtAssert(message_queue_.enqueue(
                *task_ptok_.at(local->Id()),
                EventData(EventType::kPacketTX,
-                         gen_tag_t::FrmSymUe(frame_id, symbol_id, 0).tag_)),
+                         gen_tag_t::FrmSymAnt(frame_id, symbol_id, 0).tag_)),
            "UE TX message enqueue failed!\n");
+}
+
+static std::vector<std::unique_ptr<UDPComm>> CreateCommSockets(
+    std::string local_address, int local_port, std::string remote_address,
+    int remote_port, size_t interface_count) {
+  std::vector<std::unique_ptr<UDPComm>> comm_sockets;
+  const size_t total_sockets = interface_count;
+  for (size_t socket_id = 0; socket_id < total_sockets; socket_id++) {
+    const size_t local_port_id = local_port + socket_id;
+    const size_t remote_port_id = remote_port + socket_id;
+    comm_sockets.emplace_back(std::make_unique<UDPComm>(
+        local_address, local_port_id, kSockBufSize, 0));
+    //Create a 1:1 connection
+    comm_sockets.back()->Connect(remote_address, remote_port_id);
+    AGORA_LOG_INFO(
+        "ChannelSim set up UDP socket server listening to %s:%zu for remote "
+        "%s:%zu\n",
+        local_address.c_str(), local_port_id, remote_address.c_str(),
+        remote_port_id);
+  }
+  return comm_sockets;
+}
+
+size_t ChannelSim::AddRxThreads(
+    size_t desired_threads, size_t total_interfaces,
+    std::vector<std::unique_ptr<UDPComm>>& comm, ChSimRxBuffer* rx_buffer,
+    std::vector<std::pair<std::thread, std::unique_ptr<ChSimRxStorage>>>&
+        rx_threads_out) {
+  size_t interfaces_per_thread = total_interfaces / desired_threads;
+  if ((total_interfaces % desired_threads) > 0) {
+    interfaces_per_thread++;
+  }
+
+  size_t interface_count = 0;
+  size_t added_threads = 0;
+  for (added_threads = 0; added_threads < desired_threads; added_threads++) {
+    size_t interfaces = interfaces_per_thread;
+    if (interface_count + interfaces > total_interfaces) {
+      interfaces = total_interfaces - interface_count;
+    }
+
+    if (interfaces > 0) {
+      auto storage = std::make_unique<ChSimRxStorage>(
+          rx_threads_out.size(), core_offset_ + 1, cfg_->PacketLength(),
+          interface_count, interfaces, &comm, rx_buffer, &message_queue_);
+      rx_threads_out.emplace_back(std::make_pair(
+          std::thread(&ChannelSim::RxLoop, storage.get()), std::move(storage)));
+      interface_count += interfaces;
+    } else {
+      AGORA_LOG_WARN("Not launching Rx Thread %zu : %zu\n", added_threads,
+                     rx_threads_out.size());
+      break;
+    }
+  }
+  AGORA_LOG_TRACE("Added %zu Rx Threads\n", added_threads);
+  return added_threads;
+}
+
+std::vector<std::pair<std::thread, std::unique_ptr<ChSimRxStorage>>>
+ChannelSim::CreateRxThreads() {
+  std::vector<std::pair<std::thread, std::unique_ptr<ChSimRxStorage>>>
+      rx_threads;
+
+  //Create communication sockets (Rx + Tx)
+  bs_comm_ = CreateCommSockets(cfg_->BsRruAddr(), cfg_->BsRruPort(),
+                               cfg_->BsServerAddr(), cfg_->BsServerPort(),
+                               cfg_->BsAntNum());
+
+  size_t thread_count = AddRxThreads(bs_thread_num_, cfg_->BsAntNum(), bs_comm_,
+                                     rx_buffer_bs_.get(), rx_threads);
+
+  ue_comm_ = CreateCommSockets(cfg_->UeRruAddr(), cfg_->UeRruPort(),
+                               cfg_->UeServerAddr(), cfg_->UeServerPort(),
+                               cfg_->UeAntNum());
+
+  thread_count += AddRxThreads(user_thread_num_, cfg_->UeAntNum(), ue_comm_,
+                               rx_buffer_ue_.get(), rx_threads);
+
+  RtAssert(thread_count == rx_threads.size(), "Thread count must be the same");
+  return rx_threads;
 }
