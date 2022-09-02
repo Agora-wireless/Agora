@@ -8,177 +8,16 @@
 #include <array>
 #include <cstddef>
 #include <memory>
-#include <string>
 #include <thread>
 #include <vector>
 
-#include "armadillo"
 #include "channel.h"
+#include "chsim_worker_storage.h"
 #include "concurrentqueue.h"
 #include "config.h"
-#include "logger.h"
 #include "message.h"
-#include "simd_types.h"
+#include "time_frame_counters.h"
 #include "udp_comm.h"
-
-class WorkerThreadStorage {
- public:
-  WorkerThreadStorage(size_t tid, size_t ue_ant_count, size_t bs_ant_count,
-                      size_t samples_per_symbol, size_t udp_packet_size)
-      : tid_(tid), udp_tx_buffer_(udp_packet_size) {
-    //UE
-    const size_t ue_input_storage_size =
-        (ue_ant_count * samples_per_symbol * sizeof(arma::cx_float));
-    const size_t ue_output_storage_size =
-        (bs_ant_count * samples_per_symbol * sizeof(arma::cx_float));
-
-    auto* ue_input_float_storage = PaddedAlignedAlloc(
-        Agora_memory::Alignment_t::kAlign64, ue_input_storage_size);
-    ue_input_matrix_ = std::make_unique<arma::cx_fmat>(
-        reinterpret_cast<arma::cx_float*>(ue_input_float_storage),
-        samples_per_symbol, ue_ant_count, false, true);
-    AGORA_LOG_TRACE("Ue input location %zu:%zu  diff %zu size %zu\n",
-                    reinterpret_cast<intptr_t>(ue_input_matrix_->memptr()),
-                    reinterpret_cast<intptr_t>(ue_input_float_storage),
-                    reinterpret_cast<intptr_t>(ue_input_matrix_->memptr()) -
-                        reinterpret_cast<intptr_t>(ue_input_float_storage),
-                    ue_input_storage_size);
-
-    AGORA_LOG_TRACE("storage %zu:%zu, matrix %zu:%zu memstate %d\n",
-                    reinterpret_cast<intptr_t>(&ue_input_float_storage[0u]),
-                    reinterpret_cast<intptr_t>(&reinterpret_cast<std::byte*>(
-                        ue_input_float_storage)[ue_input_storage_size - 1]),
-                    reinterpret_cast<intptr_t>(&ue_input_matrix_->at(0, 0)),
-                    reinterpret_cast<intptr_t>(&ue_input_matrix_->at(
-                        samples_per_symbol - 1, ue_ant_count - 1)),
-                    ue_input_matrix_->mem_state);
-    //Validate the memory is being reused
-    RtAssert(ue_input_matrix_->memptr() == ue_input_float_storage,
-             "Ue Input storage not at correct location");
-    ue_input_matrix_->zeros(samples_per_symbol, ue_ant_count);
-
-    auto* ue_output_float_storage = PaddedAlignedAlloc(
-        Agora_memory::Alignment_t::kAlign64, ue_output_storage_size);
-    ue_output_matrix_ = std::make_unique<arma::cx_fmat>(
-        reinterpret_cast<arma::cx_float*>(ue_output_float_storage),
-        samples_per_symbol, bs_ant_count, false, true);
-    RtAssert(ue_output_matrix_->memptr() == ue_output_float_storage,
-             "Ue Input storage not at correct location");
-    ue_output_matrix_->zeros(samples_per_symbol, bs_ant_count);
-
-    //BS
-    void* bs_input_float_storage = PaddedAlignedAlloc(
-        Agora_memory::Alignment_t::kAlign64, ue_output_storage_size);
-    bs_input_matrix_ = std::make_unique<arma::cx_fmat>(
-        reinterpret_cast<arma::cx_float*>(bs_input_float_storage),
-        samples_per_symbol, bs_ant_count, false, true);
-    RtAssert(bs_input_matrix_->memptr() == bs_input_float_storage,
-             "Bs Input storage not at correct location");
-    bs_input_matrix_->zeros(samples_per_symbol, bs_ant_count);
-
-    void* bs_output_float_storage = PaddedAlignedAlloc(
-        Agora_memory::Alignment_t::kAlign64, ue_input_storage_size);
-    bs_output_matrix_ = std::make_unique<arma::cx_fmat>(
-        reinterpret_cast<arma::cx_float*>(bs_output_float_storage),
-        samples_per_symbol, ue_ant_count, false, true);
-    RtAssert(bs_output_matrix_->memptr() == bs_output_float_storage,
-             "Bs Output storage not at correct location");
-    bs_output_matrix_->zeros(samples_per_symbol, ue_ant_count);
-  }
-  ~WorkerThreadStorage() {
-    std::free(ue_input_matrix_->memptr());
-    ue_input_matrix_.reset();
-    std::free(ue_output_matrix_->memptr());
-    ue_output_matrix_.reset();
-    std::free(bs_input_matrix_->memptr());
-    bs_input_matrix_.reset();
-    std::free(bs_output_matrix_->memptr());
-    bs_output_matrix_.reset();
-  };
-
-  inline size_t Id() const { return tid_; }
-  inline arma::cx_fmat* UeInput() { return ue_input_matrix_.get(); }
-  inline arma::cx_fmat* UeOutput() { return ue_output_matrix_.get(); }
-  inline SimdAlignByteVector& TxBuffer() { return udp_tx_buffer_; }
-
-  inline arma::cx_fmat* BsInput() { return bs_input_matrix_.get(); }
-  inline arma::cx_fmat* BsOutput() { return bs_output_matrix_.get(); }
-
- private:
-  size_t tid_;
-  // Aligned
-  std::unique_ptr<arma::cx_fmat> ue_input_matrix_;
-  std::unique_ptr<arma::cx_fmat> ue_output_matrix_;
-
-  // Aligned
-  std::unique_ptr<arma::cx_fmat> bs_input_matrix_;
-  std::unique_ptr<arma::cx_fmat> bs_output_matrix_;
-
-  SimdAlignByteVector udp_tx_buffer_;
-};
-
-class TimeFrameCounters {
- public:
-  TimeFrameCounters() : counter_() {}
-
-  inline void Init(size_t max_symbol_count, size_t max_task_count = 0) {
-    counter_.Init(max_symbol_count, max_task_count);
-  }
-  inline void Reset(size_t frame_id) { counter_.Reset(frame_id); }
-  inline bool CompleteSymbol(size_t frame_id) {
-    if (counter_.GetSymbolCount(frame_id) == 0) {
-      const size_t frame_idx = frame_id % kFrameWnd;
-      symbol_times_.at(frame_idx) = GetTime::GetTimeUs();
-    }
-    const bool complete = counter_.CompleteSymbol(frame_id);
-    if (complete) {
-      const size_t frame_idx = frame_id % kFrameWnd;
-      symbol_times_.at(frame_idx) =
-          GetTime::GetTimeUs() - symbol_times_.at(frame_idx);
-    }
-    return complete;
-  }
-  inline bool CompleteTask(size_t frame_id, size_t symbol_id) {
-    if (counter_.GetTaskCount(frame_id, symbol_id) == 0) {
-      const size_t frame_idx = frame_id % kFrameWnd;
-      task_times_.at(frame_idx).at(symbol_id) = GetTime::GetTimeUs();
-    }
-    const bool complete = counter_.CompleteTask(frame_id, symbol_id);
-    if (complete) {
-      const size_t frame_idx = frame_id % kFrameWnd;
-      task_times_.at(frame_idx).at(symbol_id) =
-          GetTime::GetTimeUs() - task_times_.at(frame_idx).at(symbol_id);
-    }
-    return complete;
-  }
-  inline bool CompleteTask(size_t frame_id) {
-    if (counter_.GetTaskCount(frame_id) == 0) {
-      const size_t frame_idx = frame_id % kFrameWnd;
-      symbol_times_.at(frame_idx) = GetTime::GetTimeUs();
-    }
-    const bool complete = counter_.CompleteTask(frame_id);
-    if (complete) {
-      const size_t frame_idx = frame_id % kFrameWnd;
-      symbol_times_.at(frame_idx) =
-          GetTime::GetTimeUs() - symbol_times_.at(frame_idx);
-    }
-    return complete;
-  }
-  inline double GetTaskTimeUs(size_t frame_id, size_t symbol_id) const {
-    const size_t frame_idx = frame_id % kFrameWnd;
-    return task_times_.at(frame_idx).at(symbol_id);
-  }
-  //Returns the time from the first completion to the last
-  inline double GetTaskTimeUs(size_t frame_id) const {
-    const size_t frame_idx = frame_id % kFrameWnd;
-    return symbol_times_.at(frame_idx);
-  };
-
- private:
-  FrameCounters counter_;
-  std::array<std::array<double, kMaxSymbols>, kFrameWnd> task_times_;
-  std::array<double, kMaxSymbols> symbol_times_;
-};
 
 /**
  * @brief Simualtor for many-antenna MU-MIMO channel to work with
@@ -198,22 +37,24 @@ class ChannelSim {
 
   void Run();
 
+  static void* RxLoop(ChSimRxStorage* rx_storage);
   // Loop thread receiving symbols from client antennas
   void* UeRxLoop(size_t tid);
 
   // Loop thread receiving symbols from BS antennas
   void* BsRxLoop(size_t tid);
 
-  // Transmits symbol to BS antennas after applying channel
-  void DoTxBs(WorkerThreadStorage& local, size_t tag);
-
-  // Transmit symbols to client antennas after applying channel
-  void DoTxUser(WorkerThreadStorage& local, size_t tag);
-
   void ScheduleTask(EventData do_task,
                     moodycamel::ConcurrentQueue<EventData>* in_queue,
                     moodycamel::ProducerToken const& ptok);
+
+  // Calls DoTxBs / DoTxUser
   void* TaskThread(size_t tid);
+  // Transmits symbol to BS antennas after applying channel
+  void DoTxBs(ChSimWorkerStorage* local, size_t tag);
+
+  // Transmit symbols to client antennas after applying channel
+  void DoTxUser(ChSimWorkerStorage* local, size_t tag);
 
  private:
   void DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
@@ -230,10 +71,10 @@ class ChannelSim {
   std::unique_ptr<Channel> channel_;
 
   // Data buffer for received symbols from BS antennas (downlink)
-  SimdAlignByteVector rx_buffer_bs_;
+  std::unique_ptr<ChSimRxBuffer> rx_buffer_bs_;
 
   // Data buffer for received symbols from client antennas (uplink)
-  SimdAlignByteVector rx_buffer_ue_;
+  std::unique_ptr<ChSimRxBuffer> rx_buffer_ue_;
 
   // Task Queue for tasks related to incoming BS packets
   moodycamel::ConcurrentQueue<EventData> task_queue_bs_;
@@ -266,36 +107,6 @@ class ChannelSim {
   TimeFrameCounters ue_tx_;
   TimeFrameCounters bs_rx_;
   TimeFrameCounters bs_tx_;
-
-  //Returns Beacon+Dl symbol index
-  inline size_t GetBsDlIdx(size_t symbol_id) const {
-    size_t symbol_idx = SIZE_MAX;
-    const auto type = cfg_->GetSymbolType(symbol_id);
-    if (type == SymbolType::kBeacon) {
-      symbol_idx = cfg_->Frame().GetBeaconSymbolIdx(symbol_id);
-    } else if (type == SymbolType::kDL) {
-      symbol_idx = cfg_->Frame().GetDLSymbolIdx(symbol_id) +
-                   cfg_->Frame().NumBeaconSyms();
-    } else {
-      throw std::runtime_error("Invalid BS Beacon or DL symbol id");
-    }
-    return symbol_idx;
-  }
-
-  //Returns Pilot+Ul symbol index
-  inline size_t GetUeUlIdx(size_t symbol_id) const {
-    size_t symbol_idx = SIZE_MAX;
-    const auto type = cfg_->GetSymbolType(symbol_id);
-    if (type == SymbolType::kPilot) {
-      symbol_idx = cfg_->Frame().GetPilotSymbolIdx(symbol_id);
-    } else if (type == SymbolType::kUL) {
-      symbol_idx = cfg_->Frame().GetULSymbolIdx(symbol_id) +
-                   cfg_->Frame().NumPilotSyms();
-    } else {
-      throw std::runtime_error("Invalid Ue Pilot or UL symbol id");
-    }
-    return symbol_idx;
-  }
 };
 
 #endif  // CHANNEL_SIM_H_
