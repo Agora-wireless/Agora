@@ -23,56 +23,76 @@ class TimeFrameCounters {
   inline bool CompleteSymbol(size_t frame_id) {
     if (counter_.GetSymbolCount(frame_id) == 0) {
       const size_t frame_idx = frame_id % kFrameWnd;
-      symbol_times_.at(frame_idx) = GetTime::GetTimeUs();
+      symbol_times_.at(frame_idx).first = GetTime::GetTimeUs();
     }
     const bool complete = counter_.CompleteSymbol(frame_id);
     if (complete) {
       const size_t frame_idx = frame_id % kFrameWnd;
-      symbol_times_.at(frame_idx) =
-          GetTime::GetTimeUs() - symbol_times_.at(frame_idx);
+      symbol_times_.at(frame_idx).second = GetTime::GetTimeUs();
     }
     return complete;
   }
   inline bool CompleteTask(size_t frame_id, size_t symbol_id) {
     if (counter_.GetTaskCount(frame_id, symbol_id) == 0) {
       const size_t frame_idx = frame_id % kFrameWnd;
-      task_times_.at(frame_idx).at(symbol_id) = GetTime::GetTimeUs();
+      task_times_.at(frame_idx).at(symbol_id).first = GetTime::GetTimeUs();
     }
     const bool complete = counter_.CompleteTask(frame_id, symbol_id);
     if (complete) {
       const size_t frame_idx = frame_id % kFrameWnd;
-      task_times_.at(frame_idx).at(symbol_id) =
-          GetTime::GetTimeUs() - task_times_.at(frame_idx).at(symbol_id);
+      task_times_.at(frame_idx).at(symbol_id).second = GetTime::GetTimeUs();
     }
     return complete;
   }
   inline bool CompleteTask(size_t frame_id) {
     if (counter_.GetTaskCount(frame_id) == 0) {
       const size_t frame_idx = frame_id % kFrameWnd;
-      symbol_times_.at(frame_idx) = GetTime::GetTimeUs();
+      symbol_times_.at(frame_idx).first = GetTime::GetTimeUs();
     }
     const bool complete = counter_.CompleteTask(frame_id);
     if (complete) {
       const size_t frame_idx = frame_id % kFrameWnd;
-      symbol_times_.at(frame_idx) =
-          GetTime::GetTimeUs() - symbol_times_.at(frame_idx);
+      symbol_times_.at(frame_idx).second = GetTime::GetTimeUs();
     }
     return complete;
   }
-  inline double GetTaskTimeUs(size_t frame_id, size_t symbol_id) const {
+  inline double GetTaskTotalTimeMs(size_t frame_id, size_t symbol_id) const {
     const size_t frame_idx = frame_id % kFrameWnd;
-    return task_times_.at(frame_idx).at(symbol_id);
+    return (task_times_.at(frame_idx).at(symbol_id).second -
+            task_times_.at(frame_idx).at(symbol_id).first) /
+           1000.0f;
   }
-  //Returns the time from the first completion to the last
-  inline double GetTaskTimeUs(size_t frame_id) const {
+  inline double GetTaskTotalTimeMs(size_t frame_id) const {
     const size_t frame_idx = frame_id % kFrameWnd;
-    return symbol_times_.at(frame_idx);
+    return (symbol_times_.at(frame_idx).second -
+            symbol_times_.at(frame_idx).first) /
+           1000.0f;
+  };
+
+  inline double GetTaskStartTimeUs(size_t frame_id, size_t symbol_id) const {
+    const size_t frame_idx = frame_id % kFrameWnd;
+    return task_times_.at(frame_idx).at(symbol_id).first;
+  }
+  inline double GetTaskStartTimeUs(size_t frame_id) const {
+    const size_t frame_idx = frame_id % kFrameWnd;
+    return symbol_times_.at(frame_idx).first;
+  };
+
+  inline double GetTaskEndTimeUs(size_t frame_id, size_t symbol_id) const {
+    const size_t frame_idx = frame_id % kFrameWnd;
+    return task_times_.at(frame_idx).at(symbol_id).second;
+  }
+  inline double GetTaskEndTimeUs(size_t frame_id) const {
+    const size_t frame_idx = frame_id % kFrameWnd;
+    return symbol_times_.at(frame_idx).second;
   };
 
  private:
   FrameCounters counter_;
-  std::array<std::array<double, kMaxSymbols>, kFrameWnd> task_times_;
-  std::array<double, kMaxSymbols> symbol_times_;
+  //First = Start, Second = End
+  std::array<std::array<std::pair<double, double>, kMaxSymbols>, kFrameWnd>
+      task_times_;
+  std::array<std::pair<double, double>, kMaxSymbols> symbol_times_;
 };
 
 #endif  // TIME_FRAME_COUNTERS_H_
