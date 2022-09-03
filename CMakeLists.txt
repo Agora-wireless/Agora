@@ -30,8 +30,7 @@ if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   message(STATUS "Using GNU compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   set(CMAKE_C_FLAGS "-std=gnu11 -Wall -g -march=native -m64")
   set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -g -march=native -m64")
-  #set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl)
-  #set(MKL_LIBS -lmkl_intel_lp64 -lmkl_tbb_thread -ltbb -lmkl_core -lpthread -lm -ldl)
+  set(MKL_LIBS -lmkl_intel_lp64 -lmkl_tbb_thread)
   if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.2)
     message(STATUS "GCC version: ${CMAKE_CXX_COMPILER_VERSION} (versions newer than 9.2 are suggested for using AVX512 optimizations)")
   endif()
@@ -410,8 +409,9 @@ set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/install/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/install/lib_common/libcommon.a)
 
-set(COMMON_LIBS ${BLAS_LIBRARIES} ${FLEXRAN_LDPC_LIBS} ${HDF5_LIBRARIES} ${DPDK_LIBRARIES} ${SOAPY_LIB}
-    ${PYTHON_LIB} ${ARMADILLO_LIBRARIES} numa util gflags gtest ${COMMON_LIBS})
+set(COMMON_LIBS ${MKL_LIBS} ${BLAS_LIBRARIES} ${FLEXRAN_LDPC_LIBS} ${HDF5_LIBRARIES} ${DPDK_LIBRARIES} ${ARMADILLO_LIBRARIES} ${SOAPY_LIB}
+    ${PYTHON_LIB} numa util gflags gtest ${COMMON_LIBS})
+message(STATUS "Common libs: ${COMMON_LIBS}")
 
 # TODO: The main agora executable is performance-critical, so we need to
 # test if compiling against precompiled objects instead of compiling directly
