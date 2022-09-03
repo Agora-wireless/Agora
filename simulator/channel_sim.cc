@@ -534,7 +534,7 @@ void ChannelSim::DoTxBs(ChSimWorkerStorage* local, size_t tag) {
           "(Frame %zu, Symbol %zu)\n",
           local->Id(), apply_channel_time, frame_id, symbol_id);
     } else {
-      AGORA_LOG_INFO(
+      AGORA_LOG_TRACE(
           "Channel Sim[%zu]: DoTxBs, ApplyChannel completion time %.3fmS for "
           "(Frame %zu, Symbol %zu)\n",
           local->Id(), apply_channel_time, frame_id, symbol_id);
@@ -624,7 +624,7 @@ void ChannelSim::DoTxUser(ChSimWorkerStorage* local, size_t tag) {
           "(Frame %zu, Symbol %zu)\n",
           local->Id(), apply_channel_time, frame_id, symbol_id);
     } else {
-      AGORA_LOG_INFO(
+      AGORA_LOG_TRACE(
           "Channel Sim[%zu]: DoTxUe, ApplyChannel completion time %.3fmS for "
           "(Frame %zu, Symbol %zu)\n",
           local->Id(), apply_channel_time, frame_id, symbol_id);
