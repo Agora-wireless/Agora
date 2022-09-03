@@ -15,9 +15,11 @@
 
 static std::atomic<bool> running = true;
 static constexpr bool kPrintChannelOutput = false;
-static const size_t kDefaultQueueSize = 36;
-static const bool kPrintDebugTxUser = false;
-static const bool kPrintDebugTxBs = false;
+static constexpr size_t kDefaultQueueSize = 36;
+static constexpr bool kPrintDebugTxUser = false;
+static constexpr bool kPrintDebugTxBs = false;
+static constexpr bool kEnableChannelTiming = true;
+static constexpr double kChannelTimeWarning = 2.0f;
 
 static constexpr size_t kUdpMTU = 9000;
 static constexpr size_t kDequeueBulkSize = 5;
@@ -469,7 +471,6 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
 void ChannelSim::DoTxBs(ChSimWorkerStorage* local, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  const size_t ue_ul_symbol_idx = cfg_->GetPilotUlIdx(symbol_id);
   if (kPrintDebugTxBs) {
     AGORA_LOG_INFO(
         "Channel Sim[%zu]: DoTxBs processing frame %zu, symbol %zu, at %f ms\n",
@@ -513,13 +514,32 @@ void ChannelSim::DoTxBs(ChSimWorkerStorage* local, size_t tag) {
   auto* fmat_noisy = local->UeOutput();
   const bool is_downlink = false;
   bool is_new_frame;
-  if (ue_ul_symbol_idx == 0) {
+  if (symbol_id == 0) {
     is_new_frame = true;
   } else {
     is_new_frame = false;
   }
-  // Apply Channel
+
+  [[maybe_unused]] double start_time;
+  if (kEnableChannelTiming) {
+    start_time = GetTime::GetTimeUs();
+  }
   channel_->ApplyChan(*fmat_src, *fmat_noisy, is_downlink, is_new_frame);
+  if (kEnableChannelTiming) {
+    const double apply_channel_time =
+        (GetTime::GetTimeUs() - start_time) / 1000.0f;
+    if (apply_channel_time > kChannelTimeWarning) {
+      AGORA_LOG_WARN(
+          "Channel Sim[%zu]: DoTxBs, ApplyChannel completion time %.3fmS for "
+          "(Frame %zu, Symbol %zu)\n",
+          local->Id(), apply_channel_time, frame_id, symbol_id);
+    } else {
+      AGORA_LOG_INFO(
+          "Channel Sim[%zu]: DoTxBs, ApplyChannel completion time %.3fmS for "
+          "(Frame %zu, Symbol %zu)\n",
+          local->Id(), apply_channel_time, frame_id, symbol_id);
+    }
+  }
   AGORA_LOG_TRACE("Noisy dimensions %lld x %lld : %lld\n", fmat_noisy->n_rows,
                   fmat_noisy->n_cols, fmat_noisy->n_elem);
 
@@ -540,14 +560,12 @@ void ChannelSim::DoTxBs(ChSimWorkerStorage* local, size_t tag) {
 void ChannelSim::DoTxUser(ChSimWorkerStorage* local, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  const size_t bs_dl_symbol_idx = cfg_->GetBeaconDlIdx(symbol_id);
 
   if (kPrintDebugTxUser) {
     AGORA_LOG_INFO(
-        "Channel Sim[%zu]: DoTxUser processing frame %zu, symbol %zu, dl "
-        "symbol %zu, at %f ms\n",
-        local->Id(), frame_id, symbol_id, bs_dl_symbol_idx,
-        GetTime::GetTimeUs() / 1000);
+        "Channel Sim[%zu]: DoTxUser processing frame %zu, symbol %zu at %f "
+        "ms\n",
+        local->Id(), frame_id, symbol_id, GetTime::GetTimeUs() / 1000);
   }
 
   auto* fmat_src = local->BsInput();
@@ -557,11 +575,10 @@ void ChannelSim::DoTxUser(ChSimWorkerStorage* local, size_t tag) {
         rx_buffer_bs_->Read(frame_id, symbol_id, in_ant));
 
     AGORA_LOG_FRAME(
-        "Channel Sim[%zu]: DoTxUser processing frame %zu, symbol %zu, dl "
-        "symbol %zu, samples per symbol %zu bs ant num %zu location %zu\n",
-        local->Id(), frame_id, symbol_id, bs_dl_symbol_idx,
-        cfg_->SampsPerSymbol(), cfg_->BsAntNum(),
-        reinterpret_cast<intptr_t>(src_ptr));
+        "Channel Sim[%zu]: DoTxUser processing frame %zu, symbol %zu, samples "
+        "per symbol %zu bs ant num %zu location %zu\n",
+        local->Id(), frame_id, symbol_id, cfg_->SampsPerSymbol(),
+        cfg_->BsAntNum(), reinterpret_cast<intptr_t>(src_ptr));
 
 #if defined(CHSIM_DEBUG_MEMORY)
     RtAssert(
@@ -587,12 +604,32 @@ void ChannelSim::DoTxUser(ChSimWorkerStorage* local, size_t tag) {
   // Apply Channel
   const bool is_downlink = true;
   bool is_new_frame;
-  if (bs_dl_symbol_idx == 0) {
+  if (symbol_id == 0) {
     is_new_frame = true;
   } else {
     is_new_frame = false;
   }
+
+  [[maybe_unused]] double start_time;
+  if (kEnableChannelTiming) {
+    start_time = GetTime::GetTimeUs();
+  }
   channel_->ApplyChan(*fmat_src, *fmat_noisy, is_downlink, is_new_frame);
+  if (kEnableChannelTiming) {
+    const double apply_channel_time =
+        (GetTime::GetTimeUs() - start_time) / 1000.0f;
+    if (apply_channel_time > kChannelTimeWarning) {
+      AGORA_LOG_WARN(
+          "Channel Sim[%zu]: DoTxUe, ApplyChannel completion time %.3fmS for "
+          "(Frame %zu, Symbol %zu)\n",
+          local->Id(), apply_channel_time, frame_id, symbol_id);
+    } else {
+      AGORA_LOG_INFO(
+          "Channel Sim[%zu]: DoTxUe, ApplyChannel completion time %.3fmS for "
+          "(Frame %zu, Symbol %zu)\n",
+          local->Id(), apply_channel_time, frame_id, symbol_id);
+    }
+  }
 
   AGORA_LOG_TRACE("Noisy dimensions %lld x %lld : %lld\n", fmat_noisy->n_rows,
                   fmat_noisy->n_cols, fmat_noisy->n_elem);
