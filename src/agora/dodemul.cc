@@ -40,7 +40,7 @@ DoDemul::DoDemul(
           cfg_->DemulBlockSize() * kMaxUEs * sizeof(complex_float)));
 
   // phase offset calibration data
-  auto* ue_pilot_ptr =
+  arma::cx_float* ue_pilot_ptr =
       reinterpret_cast<arma::cx_float*>(cfg_->UeSpecificPilot()[0]);
   arma::cx_fmat mat_pilot_data(ue_pilot_ptr, cfg_->OfdmDataNum(),
                                cfg_->UeAntNum(), false);
@@ -211,10 +211,10 @@ EventData DoDemul::Launch(size_t tag) {
       }
       arma::cx_fmat mat_equaled(equal_ptr, cfg_->UeAntNum(), 1, false);
 
-      auto* data_ptr = reinterpret_cast<arma::cx_float*>(
+      arma::cx_float* data_ptr = reinterpret_cast<arma::cx_float*>(
           &data_gather_buffer_[j * cfg_->BsAntNum()]);
       // size_t start_tsc2 = worker_rdtsc();
-      auto* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
+      arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
           ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
 
       size_t start_tsc2 = GetTime::WorkerRdtsc();
@@ -233,14 +233,14 @@ EventData DoDemul::Launch(size_t tag) {
           cfg_->Frame().ClientUlPilotSymbols()) {  // Calc new phase shift
         if (symbol_idx_ul == 0 && cur_sc_id == 0) {
           // Reset previous frame
-          auto* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
+          arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
               ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
           arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(),
                                         cfg_->Frame().ClientUlPilotSymbols(),
                                         false);
           mat_phase_shift.fill(0);
         }
-        auto* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
+        arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
             &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
                                   [symbol_idx_ul * cfg_->UeAntNum()]);
         arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(), 1,
@@ -251,7 +251,7 @@ EventData DoDemul::Launch(size_t tag) {
       }
       // apply previously calc'ed phase shift to data
       else if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
-        auto* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
+        arma::cx_float* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
             ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
         arma::cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeAntNum(),
                                      cfg_->Frame().ClientUlPilotSymbols(),

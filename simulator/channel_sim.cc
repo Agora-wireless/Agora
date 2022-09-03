@@ -477,7 +477,7 @@ void ChannelSim::DoTxBs(ChSimWorkerStorage* local, size_t tag) {
         local->Id(), frame_id, symbol_id, GetTime::GetTimeUs() / 1000);
   }
 
-  auto* fmat_src = local->UeInput();
+  arma::cx_fmat* fmat_src = local->UeInput();
   const size_t convert_length = (2 * cfg_->SampsPerSymbol());
   for (size_t in_ant = 0; in_ant < cfg_->UeAntNum(); in_ant++) {
     const auto* src_ptr = reinterpret_cast<const short*>(
@@ -511,7 +511,7 @@ void ChannelSim::DoTxBs(ChSimWorkerStorage* local, size_t tag) {
       local->Id(), fmat_src->n_elem, fmat_src->n_cols, fmat_src->n_rows,
       sizeof(arma::cx_float));
 
-  auto* fmat_noisy = local->UeOutput();
+  arma::cx_fmat* fmat_noisy = local->UeOutput();
   const bool is_downlink = false;
   bool is_new_frame;
   if (symbol_id == 0) {
@@ -568,7 +568,7 @@ void ChannelSim::DoTxUser(ChSimWorkerStorage* local, size_t tag) {
         local->Id(), frame_id, symbol_id, GetTime::GetTimeUs() / 1000);
   }
 
-  auto* fmat_src = local->BsInput();
+  arma::cx_fmat* fmat_src = local->BsInput();
   const size_t convert_length = (2 * cfg_->SampsPerSymbol());
   for (size_t in_ant = 0; in_ant < cfg_->BsAntNum(); in_ant++) {
     const auto* src_ptr = reinterpret_cast<const short*>(
@@ -600,7 +600,7 @@ void ChannelSim::DoTxUser(ChSimWorkerStorage* local, size_t tag) {
       local->Id(), fmat_src->n_elem, fmat_src->n_cols, fmat_src->n_rows,
       sizeof(arma::cx_float));
 
-  auto* fmat_noisy = local->BsOutput();
+  arma::cx_fmat* fmat_noisy = local->BsOutput();
   // Apply Channel
   const bool is_downlink = true;
   bool is_new_frame;
