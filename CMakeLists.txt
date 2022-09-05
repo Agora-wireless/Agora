@@ -233,7 +233,7 @@ if(USE_SPDLOG)
   message(STATUS "Using spdlog async logger as the default logger")
   add_definitions(-DUSE_SPDLOG=true)
   add_definitions(-DSPDLOG_COMPILED_LIB)
-  add_subdirectory(src/third_party/spdlog)
+  add_subdirectory(third_party/spdlog)
   set(COMMON_LIBS spdlog::spdlog)
 else ()
   message(STATUS "Using agora raw logger")
@@ -305,7 +305,7 @@ include_directories(
   src/client/txrx/workers
   src/data_generator)
 
-include_directories(SYSTEM src/third_party src/third_party/spdlog/include src/third_party/nlohmann/single_include)
+include_directories(SYSTEM third_party third_party/spdlog/include third_party/nlohmann/single_include)
 
 set(RECORDER_SOURCES
   src/recorder/recorder_thread.cc

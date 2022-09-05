@@ -35,7 +35,7 @@ class ChannelSim {
              double in_chan_snr = 20);
   ~ChannelSim();
 
-  void Run();
+  void Run() const;
 
   static void* RxLoop(ChSimRxStorage* rx_storage);
   // Loop thread receiving symbols from client antennas

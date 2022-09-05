@@ -35,7 +35,7 @@ UDPComm::UDPComm(std::string local_addr, std::string local_port,
     local_addr = kDefaultAddress;
   }
 
-  auto local_info = agora_comm::GetAddressInfo(local_addr, local_port);
+  auto* local_info = agora_comm::GetAddressInfo(local_addr, local_port);
   if (kDebugPrintUdpInit) {
     agora_comm::PrintAddressInfo(local_info);
   }
@@ -208,9 +208,9 @@ UDPComm::~UDPComm() {
    * @return Connect for DGRAM sockets just indicates a 1:1 socket
    */
 ssize_t UDPComm::Connect(const std::string& remote_address,
-                         const std::string& remote_port) {
+                         const std::string& remote_port) const {
   /// Find the local interface
-  auto remote_address_info =
+  auto* remote_address_info =
       agora_comm::GetAddressInfo(remote_address, remote_port);
   if (kDebugPrintUdpInit) {
     agora_comm::PrintAddressInfo(remote_address_info);

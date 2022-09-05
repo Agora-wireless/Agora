@@ -191,7 +191,7 @@ void MacSender::StartTxfromMain(double* in_frame_start, double* in_frame_end) {
   CreateWorkerThreads(worker_thread_num_);
 }
 
-void MacSender::LoadFrame(size_t frame) {
+void MacSender::LoadFrame(size_t frame) const {
   auto req_tag_for_data = gen_tag_t::FrmSym(frame, 0);
   for (size_t update = 0; update < update_thread_num_; update++) {
     data_update_queue_.at(update).try_enqueue(req_tag_for_data.tag_);
@@ -519,7 +519,8 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
   return nullptr;
 }
 
-void MacSender::UpdateTxBuffer(MacDataReceiver* data_source, gen_tag_t tag) {
+void MacSender::UpdateTxBuffer(MacDataReceiver* data_source,
+                               gen_tag_t tag) const {
   // Load a frames worth of data
   uint8_t* mac_packet_location = tx_buffers_[TagToTxBuffersIndex(tag)];
 

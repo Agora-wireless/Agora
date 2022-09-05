@@ -37,9 +37,9 @@ class UDPComm {
    * @param remote_address Hostname or IP address of the endpoint
    * @param remote_port UDP port of the endpoint
    */
-  ssize_t Connect(const std::string& endpoint_addr, uint16_t endpoint_port);
-  ssize_t Connect(const std::string& endpoint_addr,
-                  const std::string& endpoint_port);
+  ssize_t Connect(const std::string& remote_address, uint16_t remote_port);
+  ssize_t Connect(const std::string& remote_address,
+                  const std::string& remote_port) const;
 
   /**
    * @brief Send one UDP packet to a remote server. The client caches the
@@ -52,7 +52,7 @@ class UDPComm {
    * @param msg Pointer to the message to send
    * @param len Length in bytes of the message to send
    */
-  void Send(const std::string& to_hostname, uint16_t to_port,
+  void Send(const std::string& rem_hostname, uint16_t rem_port,
             const std::byte* msg, size_t len);
 
   /**

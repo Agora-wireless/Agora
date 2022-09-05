@@ -6,8 +6,8 @@
 
 AgoraBuffer::AgoraBuffer(Config* const cfg)
     : config_(cfg),
-      ul_socket_buf_size(cfg->PacketLength() * cfg->BsAntNum() * kFrameWnd *
-                         cfg->Frame().NumTotalSyms()),
+      ul_socket_buf_size_(cfg->PacketLength() * cfg->BsAntNum() * kFrameWnd *
+                          cfg->Frame().NumTotalSyms()),
       csi_buffer_(kFrameWnd, cfg->UeAntNum(),
                   cfg->BsAntNum() * cfg->OfdmDataNum()),
       ul_beam_matrix_(kFrameWnd, cfg->OfdmDataNum(),
