@@ -14,11 +14,11 @@ class UDPClient {
  public:
   explicit UDPClient(const std::string& src_addr, uint16_t src_port,
                      size_t tx_buffer_size = 0)
-      : comm_object_(std::move(src_addr), src_port, 0, tx_buffer_size) {}
+      : comm_object_(src_addr, src_port, 0, tx_buffer_size) {}
   explicit UDPClient(uint16_t src_port)
       : comm_object_(std::string(), src_port, 0, 0) {}
   explicit UDPClient(const std::string& src_addr)
-      : comm_object_(std::move(src_addr), 0, 0, 0) {}
+      : comm_object_(src_addr, 0, 0, 0) {}
 
   UDPClient& operator=(const UDPClient&) = delete;
   UDPClient(const UDPClient&) = delete;
