@@ -791,7 +791,9 @@ std::vector<std::vector<double>> CommsLib::GetSequence(size_t seq_len,
     if ((seq_len & (seq_len - 1)) == 0) {
       for (size_t i = 0; i < seq_len; i++) {
         matrix[i].resize(seq_len);
-        for (size_t j = 0; j < seq_len; j++) matrix[i][j] = Hadamard2(i, j);
+        for (size_t j = 0; j < seq_len; j++) {
+          matrix[i][j] = Hadamard2(i, j);
+        }
       }
     }
   }

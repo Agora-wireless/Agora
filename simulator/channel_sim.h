@@ -60,7 +60,7 @@ class ChannelSim {
   void DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
             size_t ant_per_socket, const arma::cx_float* source_data,
             SimdAlignByteVector* udp_pkt_buf,
-            std::vector<std::unique_ptr<UDPComm>>& udp_clients);
+            std::vector<std::unique_ptr<UDPComm>>& udp_senders);
 
   std::vector<std::pair<std::thread, std::unique_ptr<ChSimRxStorage>>>
   CreateRxThreads();

@@ -248,7 +248,7 @@ ssize_t UDPComm::Connect(const std::string& remote_address,
 }
 
 ssize_t UDPComm::Connect(const std::string& remote_address,
-                         uint16_t remote_port) {
+                         uint16_t remote_port) const {
   std::string remote = std::to_string(remote_port);
   if (remote == "0") {
     remote.clear();
