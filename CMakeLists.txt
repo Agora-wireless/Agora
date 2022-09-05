@@ -30,7 +30,8 @@ if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   message(STATUS "Using GNU compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   set(CMAKE_C_FLAGS "-std=gnu11 -Wall -g -march=native -m64")
   set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -g -march=native -m64")
-  set(MKL_LIBS -lmkl_intel_lp64 -lmkl_tbb_thread)
+  #Set MKL Threading model here if needed (lmkl_intel_lp64 + lmkl_tbb_thread | lmkl_sequential | lmkl_intel_thread)
+  #Set -lmkl_rt for dynamic setting of mkl_set_interface_layer / mkl_set_threading_layer
   if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.2)
     message(STATUS "GCC version: ${CMAKE_CXX_COMPILER_VERSION} (versions newer than 9.2 are suggested for using AVX512 optimizations)")
   endif()
@@ -162,8 +163,8 @@ set(MAC_BS_SOURCES
   src/mac/file_receiver.cc
   src/mac/mac_basestation.cc)
 
-  # Intel MKL
-set(BLA_VENDOR Intel10_64lp)
+# Intel MKL (threaded Intel10_64lp: Non-threaded Intel10_64lp_seq)
+set(BLA_VENDOR Intel10_64lp_seq)
 find_package(BLAS REQUIRED)
 
 #External Libraries
@@ -409,7 +410,7 @@ set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/install/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/install/lib_common/libcommon.a)
 
-set(COMMON_LIBS ${MKL_LIBS} ${BLAS_LIBRARIES} ${FLEXRAN_LDPC_LIBS} ${HDF5_LIBRARIES} ${DPDK_LIBRARIES} ${ARMADILLO_LIBRARIES} ${SOAPY_LIB}
+set(COMMON_LIBS -Wl,--start-group ${MKL_LIBS} ${BLAS_LIBRARIES} -Wl,--end-group ${FLEXRAN_LDPC_LIBS} ${HDF5_LIBRARIES} ${DPDK_LIBRARIES} ${ARMADILLO_LIBRARIES} ${SOAPY_LIB}
     ${PYTHON_LIB} numa util gflags gtest ${COMMON_LIBS})
 message(STATUS "Common libs: ${COMMON_LIBS}")
 
@@ -503,7 +504,7 @@ foreach(test_name IN LISTS LDPC_TESTS)
 endforeach()
 
 # Unit tests
-set(UNIT_TESTS test_datatype_conversion test_udp_client_server
+set(UNIT_TESTS test_armadillo test_datatype_conversion test_udp_client_server
   test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
   test_ptr_grid test_avx512_complex_mul test_scrambler
   test_256qam_demod)
