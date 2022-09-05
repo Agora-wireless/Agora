@@ -204,7 +204,7 @@ message(STATUS "SoapySDR_INCLUDE_DIRS: ${SoapySDR_INCLUDE_DIRS}")
 message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
 add_definitions(-DTHREADED_INIT)
 
-set(USE_SPDLOG True CACHE STRING "USE_SPDLOG defaulting to 'False'")
+set(USE_SPDLOG True CACHE STRING "USE_SPDLOG defaulting to 'True'")
 message(STATUS "USE_SPDLOG: ${USE_SPDLOG}")
 if(USE_SPDLOG)
   if(LOG_LEVEL STREQUAL "none")
