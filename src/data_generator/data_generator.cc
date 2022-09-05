@@ -305,7 +305,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
     for (size_t j = 0; j < this->cfg_->OfdmCaNum(); j++) {
       arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_matrices[j]),
-                            this->cfg_->BsAntNum(), this->cfg_->UeAntNum());
+                            this->cfg_->BsAntNum(), this->cfg_->UeAntNum(),
+                            false);
       mat_output.row(j + data_start) = mat_input_data.row(j) * mat_csi.st();
     }
     arma::cx_fmat noise_mat(size(mat_output));

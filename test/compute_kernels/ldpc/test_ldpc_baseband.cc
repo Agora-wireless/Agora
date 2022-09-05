@@ -250,7 +250,7 @@ int main(int argc, char* argv[]) {
       for (size_t j = 0; j < cfg->OfdmCaNum(); j++) {
         arma::cx_fmat mat_csi(
             reinterpret_cast<arma::cx_float*>(csi_matrices_data[j]),
-            cfg->BsAntNum(), cfg->UeAntNum());
+            cfg->BsAntNum(), cfg->UeAntNum(), false);
         mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
       }
     }
