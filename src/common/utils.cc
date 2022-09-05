@@ -410,7 +410,7 @@ void Utils::WriteBinaryFile(const std::string& name, size_t elem_size,
   std::fclose(f_handle);
 }
 
-void Utils::SaveMat(arma::cx_fmat& c, const std::string& filename,
+void Utils::SaveMat(const arma::cx_fmat& c, const std::string& filename,
                     const std::string& ss, const bool append) {
   std::stringstream so;
   std::ofstream of;
@@ -434,7 +434,7 @@ void Utils::SaveMat(arma::cx_fmat& c, const std::string& filename,
   of.close();
 }
 
-void Utils::PrintMat(arma::cx_fmat& c, const std::string& ss) {
+void Utils::PrintMat(const arma::cx_fmat& c, const std::string& ss) {
   std::stringstream so;
   so << ss << " = [";
   for (size_t i = 0; i < c.n_cols; i++) {
@@ -450,7 +450,7 @@ void Utils::PrintMat(arma::cx_fmat& c, const std::string& ss) {
   std::cout << so.str();
 }
 
-void Utils::SaveVec(arma::cx_fvec c, const std::string& filename,
+void Utils::SaveVec(const arma::cx_fvec& c, const std::string& filename,
                     const std::string& ss, const bool append) {
   std::stringstream so;
   std::ofstream of;
@@ -470,7 +470,7 @@ void Utils::SaveVec(arma::cx_fvec c, const std::string& filename,
   of.close();
 }
 
-void Utils::PrintVec(arma::cx_fvec c, const std::string& ss) {
+void Utils::PrintVec(const arma::cx_fvec& c, const std::string& ss) {
   std::stringstream so;
   so << ss << " = [";
   for (size_t j = 0; j < c.size(); j++) {
