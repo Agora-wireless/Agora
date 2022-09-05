@@ -310,8 +310,8 @@ std::vector<std::vector<size_t>> Utils::LoadSymbols(
 
   for (size_t f = 0; f < num_frames; f++) {
     std::string frame = frames.at(f);
-    for (size_t g = 0; g < frame.length(); g++) {
-      if (frame.at(g) == sym) {
+    for (char g : frame) {
+      if (g == sym) {
         symbol_index_vector.at(f).push_back(g);
       }
     }

@@ -23,7 +23,7 @@ class UDPComm {
   explicit UDPComm(std::string local_addr, uint16_t local_port,
                    size_t rx_buffer_size, size_t tx_buffer_size);
 
-  explicit UDPComm(std::string local_addr, std::string local_port,
+  explicit UDPComm(std::string local_addr, const std::string& local_port,
                    size_t rx_buffer_size, size_t tx_buffer_size);
 
   UDPComm& operator=(const UDPComm&) = delete;

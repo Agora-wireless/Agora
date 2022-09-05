@@ -348,11 +348,7 @@ class RxCounters {
  */
 class FrameCounters {
  public:
-  FrameCounters()
-      : task_count_(),
-        symbol_count_(),
-        max_symbol_count_(0),
-        max_task_count_(0) {}
+  FrameCounters() : task_count_(), symbol_count_() {}
 
   void Init(size_t max_symbol_count, size_t max_task_count = 0) {
     this->max_symbol_count_ = max_symbol_count;
@@ -479,9 +475,9 @@ class FrameCounters {
   std::array<size_t, kFrameWnd> symbol_count_;
 
   // Maximum number of symbols in a frame
-  size_t max_symbol_count_;
+  size_t max_symbol_count_{0};
   // Maximum number of tasks in a symbol
-  size_t max_task_count_;
+  size_t max_task_count_{0};
 };
 
 #endif  // MESSAGE_H_

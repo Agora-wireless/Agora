@@ -6,19 +6,16 @@
 #ifndef AGORA_WORKER_H_
 #define AGORA_WORKER_H_
 
+#include <memory>
+#include <thread>
+#include <vector>
+
 #include "agora_buffer.h"
-#include "concurrent_queue_wrapper.h"
+#include "config.h"
 #include "csv_logger.h"
-#include "dobeamweights.h"
-#include "dodecode.h"
-#include "dodemul.h"
-#include "doencode.h"
-#include "dofft.h"
-#include "doifft.h"
-#include "doprecode.h"
 #include "mat_logger.h"
-#include "message.h"
 #include "phy_stats.h"
+#include "stats.h"
 
 class AgoraWorker {
  public:
