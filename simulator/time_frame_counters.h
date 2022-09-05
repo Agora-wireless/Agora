@@ -14,7 +14,7 @@
 
 class TimeFrameCounters {
  public:
-  TimeFrameCounters() {}
+  TimeFrameCounters() = default;
 
   inline void Init(size_t max_symbol_count, size_t max_task_count = 0) {
     counter_.Init(max_symbol_count, max_task_count);

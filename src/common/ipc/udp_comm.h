@@ -37,7 +37,8 @@ class UDPComm {
    * @param remote_address Hostname or IP address of the endpoint
    * @param remote_port UDP port of the endpoint
    */
-  ssize_t Connect(const std::string& remote_address, uint16_t remote_port) const;
+  ssize_t Connect(const std::string& remote_address,
+                  uint16_t remote_port) const;
   ssize_t Connect(const std::string& remote_address,
                   const std::string& remote_port) const;
 
