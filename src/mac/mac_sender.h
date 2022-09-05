@@ -71,11 +71,11 @@ class MacSender {
   // Launch threads to run worker with thread IDs from tid_start to tid_end
   void CreateWorkerThreads(size_t num_workers);
 
-  void UpdateTxBuffer(MacDataReceiver* data_source, gen_tag_t tag) const;
+  void UpdateTxBuffer(MacDataReceiver* data_source, gen_tag_t tag);
   void WriteStatsToFile(size_t tx_frame_count) const;
 
   void ScheduleFrame(size_t frame);
-  void LoadFrame(size_t frame) const;
+  void LoadFrame(size_t frame);
   size_t TagToTxBuffersIndex(gen_tag_t tag) const;
 
   Config* cfg_;

@@ -132,7 +132,7 @@ class ChSimRxBuffer {
   }
 
   inline void Copy(size_t frame, size_t symbol, size_t ant, const short* input,
-                   size_t data_size) const {
+                   size_t data_size) {
     const size_t frame_idx = frame % max_frame_;
     const size_t symbol_idx = GetSymbolIdx(symbol);
     auto* dest = storage_.at(frame_idx).at(symbol_idx).at(ant).data();

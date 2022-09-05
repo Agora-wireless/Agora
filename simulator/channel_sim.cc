@@ -145,7 +145,7 @@ void ChannelSim::ScheduleTask(EventData do_task,
   }
 }
 
-void ChannelSim::Run() const {
+void ChannelSim::Run() {
   constexpr size_t kChanSimMasterTid = 0;
   AGORA_LOG_INFO("Starting Channel Simulator ...\n");
   PinToCoreWithOffset(ThreadType::kMaster, core_offset_, kChanSimMasterTid);

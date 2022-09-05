@@ -30,7 +30,7 @@ void AgoraBuffer::AllocateTables() {
       config_->Frame().NumULSyms() * kFrameWnd;
 
   ul_socket_buffer_.Malloc(config_->SocketThreadNum() /* RX */,
-                           ul_socket_buf_size,
+                           ul_socket_buf_size_,
                            Agora_memory::Alignment_t::kAlign64);
 
   fft_buffer_.Malloc(task_buffer_symbol_num_ul,
