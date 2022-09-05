@@ -1,5 +1,5 @@
 /**
- * @file data_generator_main.cpp
+ * @file data_generator_main.cc
  * @brief Data generator to generate binary files as inputs to Agora, sender
  * and correctness tests
  */

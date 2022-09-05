@@ -2,7 +2,7 @@
 // RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 
 /**
- * @file utils.cpp
+ * @file utils.cc
  * @brief Utility functions for file and text processing.
  */
 

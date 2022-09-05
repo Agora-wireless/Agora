@@ -1,5 +1,5 @@
 /**
- * @file cpu_attach.cpp
+ * @file cpu_attach.cc
  * @brief Implementation file for cpu attachment helper functions
  */
 #include "cpu_attach.h"
