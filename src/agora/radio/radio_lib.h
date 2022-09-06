@@ -5,7 +5,9 @@
 #ifndef RADIO_LIB_H_
 #define RADIO_LIB_H_
 
+#include <atomic>
 #include <complex>
+#include <cstdint>
 #include <cstdlib>
 #include <memory>
 #include <vector>

@@ -11,6 +11,7 @@
 #if defined(USE_DPDK)
 #include "packet_txrx_dpdk.h"
 #endif
+#include "concurrent_queue_wrapper.h"
 #include "logger.h"
 #include "modulation.h"
 #include "packet_txrx_radio.h"

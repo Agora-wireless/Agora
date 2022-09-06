@@ -5,17 +5,20 @@
 #ifndef UDP_CLIENT_H_
 #define UDP_CLIENT_H_
 
+#include <utility>
+
 #include "udp_comm.h"
 
 // Basic UDP client class based on OS sockets that supports sending messages
 class UDPClient {
  public:
-  explicit UDPClient(std::string src_addr, uint16_t src_port,
+  explicit UDPClient(const std::string& src_addr, uint16_t src_port,
                      size_t tx_buffer_size = 0)
       : comm_object_(src_addr, src_port, 0, tx_buffer_size) {}
   explicit UDPClient(uint16_t src_port)
       : comm_object_(std::string(), src_port, 0, 0) {}
-  explicit UDPClient(std::string src_addr) : comm_object_(src_addr, 0, 0, 0) {}
+  explicit UDPClient(const std::string& src_addr)
+      : comm_object_(src_addr, 0, 0, 0) {}
 
   UDPClient& operator=(const UDPClient&) = delete;
   UDPClient(const UDPClient&) = delete;
