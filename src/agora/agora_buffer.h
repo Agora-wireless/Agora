@@ -8,7 +8,6 @@
 
 #include <array>
 #include <cstddef>
-#include <iostream>
 
 #include "common_typedef_sdk.h"
 #include "concurrentqueue.h"

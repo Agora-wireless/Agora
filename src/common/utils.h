@@ -15,26 +15,12 @@
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
-#include <numa.h>
-#include <pthread.h>
-#include <unistd.h>
-
-#include <atomic>
-#include <chrono>
 #include <complex>
-#include <condition_variable>
-#include <csignal>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <fstream>  // std::ifstream
-#include <iomanip>
-#include <iostream>
-#include <mutex>
 #include <random>
-#include <sstream>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include "armadillo"

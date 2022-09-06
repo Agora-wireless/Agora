@@ -40,7 +40,7 @@ class ChSimWorkerStorage {
                     ue_input_storage_size);
 
     AGORA_LOG_TRACE("storage %zu:%zu, matrix %zu:%zu memstate %d\n",
-                    reinterpret_cast<intptr_t>(&ue_input_float_storage[0u]),
+                    reinterpret_cast<intptr_t>(ue_input_float_storage),
                     reinterpret_cast<intptr_t>(&reinterpret_cast<std::byte*>(
                         ue_input_float_storage)[ue_input_storage_size - 1]),
                     reinterpret_cast<intptr_t>(&ue_input_matrix_->at(0, 0)),

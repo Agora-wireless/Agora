@@ -5,11 +5,11 @@
  */
 #include <gflags/gflags.h>
 
-#include <bitset>
-#include <fstream>
-#include <iostream>
+#include <cstddef>
+#include <memory>
+#include <string>
 
-#include "armadillo"
+#include "config.h"
 #include "data_generator.h"
 #include "logger.h"
 #include "version_config.h"

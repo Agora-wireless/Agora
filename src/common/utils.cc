@@ -8,9 +8,14 @@
 
 #include "utils.h"
 
+#include <numa.h>
+
 #include <cassert>
+#include <iomanip>   // std::setw
+#include <iostream>  // std::cout, std::endl
 #include <list>
 #include <mutex>
+#include <tuple>
 
 #include "datatype_conversion.h"
 

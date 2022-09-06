@@ -5,11 +5,10 @@
 #ifndef DOIFFT_H_
 #define DOIFFT_H_
 
-#include "armadillo"
 #include "common_typedef_sdk.h"
 #include "config.h"
 #include "doer.h"
-#include "message.h"
+#include "memory_manage.h"
 #include "mkl_dfti.h"
 #include "stats.h"
 

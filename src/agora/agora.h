@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <memory>
 #include <queue>
+#include <thread>
 #include <vector>
 
 #include "agora_buffer.h"
@@ -26,8 +27,8 @@
 
 class Agora {
  public:
-  explicit Agora(
-      Config* /*cfg*/);  /// Create an Agora object and start the worker threads
+  /// Create an Agora object and start the worker threads
+  explicit Agora(Config* cfg);
   ~Agora();
 
   void Start();  /// The main Agora event loop
