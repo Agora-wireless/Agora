@@ -49,7 +49,7 @@ TxRxWorkerSim::TxRxWorkerSim(
     AGORA_LOG_FRAME(
         "TxRxWorkerSim[%zu]: set up UDP socket server listening to %s:%d "
         " sending to %s:%d\n",
-        tid_, config->BsServerPort().c_str(), local_port_id,
+        tid_, config->BsServerAddr().c_str(), local_port_id,
         config->BsRruAddr().c_str(), rem_port_id);
   }
   beacon_buffer_.resize(config->PacketLength());

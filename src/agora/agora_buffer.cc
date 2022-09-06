@@ -6,8 +6,8 @@
 
 AgoraBuffer::AgoraBuffer(Config* const cfg)
     : config_(cfg),
-      ul_socket_buf_size(cfg->PacketLength() * cfg->BsAntNum() * kFrameWnd *
-                         cfg->Frame().NumTotalSyms()),
+      ul_socket_buf_size_(cfg->PacketLength() * cfg->BsAntNum() * kFrameWnd *
+                          cfg->Frame().NumTotalSyms()),
       csi_buffer_(kFrameWnd, cfg->UeAntNum(),
                   cfg->BsAntNum() * cfg->OfdmDataNum()),
       ul_beam_matrix_(kFrameWnd, cfg->OfdmDataNum(),
@@ -30,7 +30,7 @@ void AgoraBuffer::AllocateTables() {
       config_->Frame().NumULSyms() * kFrameWnd;
 
   ul_socket_buffer_.Malloc(config_->SocketThreadNum() /* RX */,
-                           ul_socket_buf_size,
+                           ul_socket_buf_size_,
                            Agora_memory::Alignment_t::kAlign64);
 
   fft_buffer_.Malloc(task_buffer_symbol_num_ul,

@@ -3,6 +3,7 @@
 
 #include <iostream>
 
+#define ARMA_DONT_PRINT_ERRORS
 #include "armadillo"
 #include "timer.h"
 

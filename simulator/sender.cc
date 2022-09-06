@@ -5,6 +5,7 @@
 #include "sender.h"
 
 #include <algorithm>
+#include <csignal>
 #include <thread>
 
 #include "datatype_conversion.h"
@@ -177,7 +178,7 @@ void Sender::StartTx() {
   frame_end_ = new double[kNumStatsFrames]();
 
   CreateWorkerThreads(socket_thread_num_);
-  signal(SIGINT, InterruptHandler);
+  std::signal(SIGINT, InterruptHandler);
   MasterThread(0);  // Start the master thread
 
   delete[](frame_start_);

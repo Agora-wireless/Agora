@@ -475,9 +475,9 @@ class FrameCounters {
   std::array<size_t, kFrameWnd> symbol_count_;
 
   // Maximum number of symbols in a frame
-  size_t max_symbol_count_;
+  size_t max_symbol_count_{0};
   // Maximum number of tasks in a symbol
-  size_t max_task_count_;
+  size_t max_task_count_{0};
 };
 
 #endif  // MESSAGE_H_

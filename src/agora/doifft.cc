@@ -130,7 +130,7 @@ EventData DoIFFT::Launch(size_t tag) {
   const size_t start_tsc2 = GetTime::WorkerRdtsc();
   duration_stat_->task_duration_[2u] += start_tsc2 - start_tsc1;
 
-  auto* pkt = reinterpret_cast<struct Packet*>(
+  auto* pkt = reinterpret_cast<Packet*>(
       &dl_socket_buffer_[offset * cfg_->DlPacketLength()]);
   short* socket_ptr = &pkt->data_[2u * cfg_->OfdmTxZeroPrefix()];
 

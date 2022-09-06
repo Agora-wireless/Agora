@@ -15,26 +15,12 @@
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
-#include <numa.h>
-#include <pthread.h>
-#include <unistd.h>
-
-#include <atomic>
-#include <chrono>
 #include <complex>
-#include <condition_variable>
-#include <csignal>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <fstream>  // std::ifstream
-#include <iomanip>
-#include <iostream>
-#include <mutex>
 #include <random>
-#include <sstream>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include "armadillo"
@@ -95,12 +81,12 @@ class Utils {
   static void PrintVector(const std::vector<std::complex<int16_t>>& data);
   static void WriteBinaryFile(const std::string& name, size_t elem_size,
                               size_t buffer_size, void* buff);
-  static void PrintVec(arma::cx_fvec /*c*/, const std::string& /*ss*/);
-  static void SaveVec(arma::cx_fvec /*c*/, const std::string& /*filename*/,
+  static void PrintVec(const arma::cx_fvec& c, const std::string& ss);
+  static void SaveVec(const arma::cx_fvec& c, const std::string& filename,
                       const std::string& /*ss*/, const bool /*append*/);
-  static void PrintMat(arma::cx_fmat /*c*/, const std::string& /*ss*/);
-  static void SaveMat(arma::cx_fmat /*c*/, const std::string& /*filename*/,
-                      const std::string& /*ss*/, const bool /*append*/);
+  static void PrintMat(const arma::cx_fmat& c, const std::string& ss);
+  static void SaveMat(const arma::cx_fmat& c, const std::string& filename,
+                      const std::string& ss, const bool append);
 };
 
 /// roundup<N>(x) returns x rounded up to the next multiple of N. N must be

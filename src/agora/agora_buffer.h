@@ -8,7 +8,6 @@
 
 #include <array>
 #include <cstddef>
-#include <iostream>
 
 #include "common_typedef_sdk.h"
 #include "concurrentqueue.h"
@@ -57,7 +56,7 @@ class AgoraBuffer {
   inline Table<int8_t>& GetDlBits() { return dl_bits_buffer_; }
   inline Table<int8_t>& GetDlBitsStatus() { return dl_bits_buffer_status_; }
 
-  inline size_t GetUlSocketSize() const { return ul_socket_buf_size; }
+  inline size_t GetUlSocketSize() const { return ul_socket_buf_size_; }
   inline Table<char>& GetUlSocket() { return ul_socket_buffer_; }
   inline char* GetDlSocket() { return dl_socket_buffer_; }
   inline Table<complex_float>& GetCalibUl() { return calib_ul_buffer_; }
@@ -68,7 +67,7 @@ class AgoraBuffer {
   void FreeTables();
 
   Config* const config_;
-  const size_t ul_socket_buf_size;
+  const size_t ul_socket_buf_size_;
 
   PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffer_;
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrix_;

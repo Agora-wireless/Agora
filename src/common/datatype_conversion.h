@@ -279,7 +279,7 @@ static inline void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
 static inline void SimdConvertCxFloatToCxShort(
     const std::complex<float>* in_buf, std::complex<short>* out_buf,
     size_t n_elems, size_t n_prefix, float scale_down_factor) {
-  auto* in = reinterpret_cast<const float*>(in_buf);
+  const auto* in = reinterpret_cast<const float*>(in_buf);
   auto* out = reinterpret_cast<short*>(out_buf);
 #if defined(__AVX512F__)
   SimdConvertFloatToShortAVX512(in, out, n_elems * 2, n_prefix * 2,
