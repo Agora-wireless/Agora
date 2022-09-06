@@ -85,7 +85,7 @@ bool ClientRadioConfig::RadioStart() {
   return true;
 }
 
-void ClientRadioConfig::Go() {
+void ClientRadioConfig::Go() const {
   if (kUseUHD == false) {
     for (size_t i = 0; i < total_radios_; i++) {
       radios_.at(i)->Trigger();

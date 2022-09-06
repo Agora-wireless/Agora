@@ -28,6 +28,8 @@ class FrameStats {
   size_t NumBeaconSyms() const;
   size_t NumTotalSyms() const;
 
+  /* Returns SIZE_MAX if symbol number is not a beacon */
+  size_t GetBeaconSymbolIdx(size_t symbol_number) const;
   size_t GetDLSymbol(size_t location) const;
   inline size_t GetDLDataSymbol(size_t location) const {
     return GetDLSymbol(location + client_dl_pilot_symbols_);

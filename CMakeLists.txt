@@ -3,7 +3,7 @@ include(CheckCSourceRuns)
 cmake_policy(SET CMP0054 NEW)
 #Allow project version
 cmake_policy(SET CMP0048 NEW)
-project(Agora VERSION 1.1.0)
+project(Agora VERSION 1.2.0)
 
 if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
   #Flags is enabled by default for c++17
@@ -25,26 +25,22 @@ endif()
 # performance by around 40%.  Don’t produce a dynamically linked position independent executable. 
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -no-pie")
 
+set(CMAKE_CXX_STANDARD 17)
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   message(STATUS "Using GNU compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
-  set(CMAKE_CXX_STANDARD 17)
   set(CMAKE_C_FLAGS "-std=gnu11 -Wall -g -march=native -m64")
   set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -g -march=native -m64")
-  #set(MKL_LIBS -Wl,--no-as-needed -lmkl_sequential)   -lmkl_tbb_thread -lmkl_intel_thread liomp5 (lmkl_intel_ilp64 causes errors?)
-  set(MKL_LIBS -lmkl_intel_lp64 -lmkl_tbb_thread -ltbb -lmkl_core -lpthread -lm -ldl)
+  #Set MKL Threading model here if needed (lmkl_intel_lp64 + lmkl_tbb_thread | lmkl_sequential | lmkl_intel_thread)
+  #Set -lmkl_rt for dynamic setting of mkl_set_interface_layer / mkl_set_threading_layer
   if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.2)
     message(STATUS "GCC version: ${CMAKE_CXX_COMPILER_VERSION} (versions newer than 9.2 are suggested for using AVX512 optimizations)")
   endif()
 elseif(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
   message(STATUS "Using Intel compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/intel-compile-options.cmake)
-  set(MKL_LIBS -lpthread -lm -ldl)
   set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -g -march=native -mkl=sequential")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
   message(STATUS "Using Clang compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
-  set(CMAKE_CXX_STANDARD 17)
-else()
-  set(CMAKE_CXX_STANDARD 17)
 endif()
 
 option(DEBUG "Enable debugging" OFF)
@@ -140,7 +136,7 @@ if(${USE_DPDK})
   else()
     message(FATAL_ERROR "DPDK include directory not found")
   endif()
-  include_directories(SYSTEM ${DPDK_INCLUDE_DIRS})
+  include_directories(${DPDK_INCLUDE_DIRS})
 
   add_definitions(-DUSE_DPDK)
   if (ISA_AVX512)
@@ -168,7 +164,15 @@ set(MAC_BS_SOURCES
   src/mac/mac_basestation.cc)
 
 #External Libraries
+# Intel MKL (threaded Intel10_64lp: Non-threaded Intel10_64lp_seq)
+set(BLA_VENDOR Intel10_64lp_seq)
+find_package(BLAS REQUIRED)
+include_directories(${BLAS_INCLUDE_DIR})
+
 find_package(Armadillo "11.0.0" REQUIRED)
+message(STATUS "Armadillo: Includes ${ARMADILLO_INCLUDE_DIR} Libraries ${ARMADILLO_LIBRARIES}")
+add_definitions(-DARMA_DONT_USE_WRAPPER -DARMA_DONT_USE_FORTRAN_HIDDEN_ARGS)
+include_directories(${ARMADILLO_INCLUDE_DIR})
 
 set(ENABLE_HDF5 False CACHE STRING "ENABLE_HDF5 defaulting to 'False'")
 message(STATUS "HDF5 Support Enabled: ${ENABLE_HDF5}")
@@ -203,11 +207,7 @@ message(STATUS "SoapySDR_INCLUDE_DIRS: ${SoapySDR_INCLUDE_DIRS}")
 message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
 add_definitions(-DTHREADED_INIT)
 
-# Intel MKL
-set(BLA_VENDOR Intel10_64lp)
-find_package(BLAS)
-
-set(USE_SPDLOG False CACHE STRING "USE_SPDLOG defaulting to 'False'")
+set(USE_SPDLOG True CACHE STRING "USE_SPDLOG defaulting to 'True'")
 message(STATUS "USE_SPDLOG: ${USE_SPDLOG}")
 if(USE_SPDLOG)
   if(LOG_LEVEL STREQUAL "none")
@@ -236,7 +236,7 @@ if(USE_SPDLOG)
   message(STATUS "Using spdlog async logger as the default logger")
   add_definitions(-DUSE_SPDLOG=true)
   add_definitions(-DSPDLOG_COMPILED_LIB)
-  add_subdirectory(src/third_party/spdlog)
+  add_subdirectory(third_party/spdlog)
   set(COMMON_LIBS spdlog::spdlog)
 else ()
   message(STATUS "Using agora raw logger")
@@ -306,10 +306,9 @@ include_directories(
   src/client
   src/client/txrx
   src/client/txrx/workers
-  src/data_generator
-  /usr/include/mkl)
+  src/data_generator)
 
-include_directories(SYSTEM src/third_party src/third_party/spdlog/include src/third_party/nlohmann/single_include)
+include_directories(third_party third_party/spdlog/include third_party/nlohmann/single_include)
 
 set(RECORDER_SOURCES
   src/recorder/recorder_thread.cc
@@ -416,8 +415,9 @@ set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/install/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/install/lib_common/libcommon.a)
 
-set(COMMON_LIBS ${COMMON_LIBS} armadillo numa ${HDF5_LIBRARIES} ${DPDK_LIBRARIES} ${MKL_LIBS} ${SOAPY_LIB}
-    ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
+set(COMMON_LIBS -Wl,--start-group ${MKL_LIBS} ${BLAS_LIBRARIES} -Wl,--end-group ${FLEXRAN_LDPC_LIBS} ${HDF5_LIBRARIES} ${DPDK_LIBRARIES} ${ARMADILLO_LIBRARIES} ${SOAPY_LIB}
+    ${PYTHON_LIB} numa util gflags gtest ${COMMON_LIBS})
+message(STATUS "Common libs: ${COMMON_LIBS}")
 
 # TODO: The main agora executable is performance-critical, so we need to
 # test if compiling against precompiled objects instead of compiling directly
@@ -509,7 +509,7 @@ foreach(test_name IN LISTS LDPC_TESTS)
 endforeach()
 
 # Unit tests
-set(UNIT_TESTS test_datatype_conversion test_udp_client_server
+set(UNIT_TESTS test_armadillo test_datatype_conversion test_udp_client_server
   test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
   test_ptr_grid test_avx512_complex_mul test_scrambler
   test_256qam_demod)
