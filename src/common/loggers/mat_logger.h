@@ -10,8 +10,6 @@
 #include <cstdint>
 #include <string>
 
-#define ARMA_DONT_USE_WRAPPER
-#define ARMA_DONT_USE_FORTRAN_HIDDEN_ARGS
 #include "armadillo"
 #include "csv_logger.h"
 

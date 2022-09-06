@@ -3,8 +3,6 @@
 
 #include <iostream>
 #define ARMA_DONT_PRINT_ERRORS
-#define ARMA_DONT_USE_WRAPPER
-#define ARMA_DONT_USE_FORTRAN_HIDDEN_ARGS
 #include "armadillo"
 #include "timer.h"
 

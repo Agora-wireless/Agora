@@ -136,7 +136,7 @@ if(${USE_DPDK})
   else()
     message(FATAL_ERROR "DPDK include directory not found")
   endif()
-  include_directories(SYSTEM ${DPDK_INCLUDE_DIRS})
+  include_directories(${DPDK_INCLUDE_DIRS})
 
   add_definitions(-DUSE_DPDK)
   if (ISA_AVX512)
@@ -163,13 +163,16 @@ set(MAC_BS_SOURCES
   src/mac/file_receiver.cc
   src/mac/mac_basestation.cc)
 
+#External Libraries
 # Intel MKL (threaded Intel10_64lp: Non-threaded Intel10_64lp_seq)
 set(BLA_VENDOR Intel10_64lp_seq)
 find_package(BLAS REQUIRED)
+include_directories(${BLAS_INCLUDE_DIR})
 
-#External Libraries
 find_package(Armadillo "11.0.0" REQUIRED)
 message(STATUS "Armadillo: Includes ${ARMADILLO_INCLUDE_DIR} Libraries ${ARMADILLO_LIBRARIES}")
+add_definitions(-DARMA_DONT_USE_WRAPPER -DARMA_DONT_USE_FORTRAN_HIDDEN_ARGS)
+include_directories(${ARMADILLO_INCLUDE_DIR})
 
 set(ENABLE_HDF5 False CACHE STRING "ENABLE_HDF5 defaulting to 'False'")
 message(STATUS "HDF5 Support Enabled: ${ENABLE_HDF5}")
@@ -305,7 +308,8 @@ include_directories(
   src/client/txrx/workers
   src/data_generator)
 
-include_directories(SYSTEM third_party third_party/spdlog/include third_party/nlohmann/single_include)
+#include_directories(SYSTEM third_party third_party/spdlog/include third_party/nlohmann/single_include)
+include_directories(third_party third_party/spdlog/include third_party/nlohmann/single_include)
 
 set(RECORDER_SOURCES
   src/recorder/recorder_thread.cc

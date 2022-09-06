@@ -9,8 +9,6 @@
 #include <fstream>
 #include <iostream>
 
-#define ARMA_DONT_USE_WRAPPER
-#define ARMA_DONT_USE_FORTRAN_HIDDEN_ARGS
 #include "armadillo"
 #include "data_generator.h"
 #include "logger.h"

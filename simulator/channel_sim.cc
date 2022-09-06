@@ -649,8 +649,9 @@ void ChannelSim::DoTxUser(ChSimWorkerStorage* local, size_t tag) {
 }
 
 static std::vector<std::unique_ptr<UDPComm>> CreateCommSockets(
-    const std::string& local_address, int local_port, const std::string& remote_address,
-    int remote_port, size_t interface_count) {
+    const std::string& local_address, int local_port,
+    const std::string& remote_address, int remote_port,
+    size_t interface_count) {
   std::vector<std::unique_ptr<UDPComm>> comm_sockets;
   const size_t total_sockets = interface_count;
   for (size_t socket_id = 0; socket_id < total_sockets; socket_id++) {

@@ -5,8 +5,6 @@
 #ifndef DODEMUL_H_
 #define DODEMUL_H_
 
-#define ARMA_DONT_USE_WRAPPER
-#define ARMA_DONT_USE_FORTRAN_HIDDEN_ARGS
 #include "armadillo"
 #include "common_typedef_sdk.h"
 #include "concurrentqueue.h"

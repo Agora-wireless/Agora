@@ -6,8 +6,7 @@
 #include <gtest/gtest.h>
 
 #include <memory>
-#define ARMA_DONT_USE_WRAPPER
-#define ARMA_DONT_USE_FORTRAN_HIDDEN_ARGS
+
 #include "armadillo"
 #include "memory_manage.h"
 
@@ -31,8 +30,9 @@ static void CheckArmaMemoryState(arma::uhword state, bool dynamic) {
   arma::cx_fmat* test_matrix_ptr = nullptr;
   std::unique_ptr<arma::cx_fmat> mem_clean_ptr;
   if (dynamic == false) {
-    test_matrix = arma::cx_fmat(reinterpret_cast<arma::cx_float*>(storage),
-                                x_dim, y_dim, copy_aux_memory, strict);
+    test_matrix =
+        std::move(arma::cx_fmat(reinterpret_cast<arma::cx_float*>(storage),
+                                x_dim, y_dim, copy_aux_memory, strict));
     test_matrix_ptr = &test_matrix;
   } else {
     mem_clean_ptr = std::make_unique<arma::cx_fmat>(
