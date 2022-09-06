@@ -308,7 +308,6 @@ include_directories(
   src/client/txrx/workers
   src/data_generator)
 
-#include_directories(SYSTEM third_party third_party/spdlog/include third_party/nlohmann/single_include)
 include_directories(third_party third_party/spdlog/include third_party/nlohmann/single_include)
 
 set(RECORDER_SOURCES
