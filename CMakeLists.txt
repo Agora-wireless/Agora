@@ -13,7 +13,7 @@ endif()
 set(SOURCE_DIR ".")
 configure_file(${CMAKE_SOURCE_DIR}/src/common/version_config.h.in ${CMAKE_SOURCE_DIR}/src/common/version_config.h)
 
-option(FORCE_BUILD_PATH "Hardcode the build directory path to be 'Agora/build/'" ON)
+option(FORCE_BUILD_PATH "Hardcode the build directory path to be './build/'" ON)
 if(FORCE_BUILD_PATH)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build)
@@ -68,27 +68,8 @@ endif()
 
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
+message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DPROJECT_DIRECTORY=${SOURCE_DIR})
-
-set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
-set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
-set(LOG_LEVEL "info" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
-set(USE_AVX2_ENCODER False CACHE STRING "Use Agora's AVX2 encoder instead of FlexRAN's AVX512 encoder")
-
-message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
-
-set(RADIO_TYPE SIMULATION CACHE STRING "RADIO_TYPE defaulting to 'SIMULATION', valid types are SIMULATION / SOAPY_IRIS / SOAPY_UHD")
-message(STATUS "RADIO_TYPE: ${RADIO_TYPE}")
-
-if(RADIO_TYPE STREQUAL SOAPY_IRIS)
-  message(STATUS "Enabled SOAPY Iris radio type")
-  add_definitions(-DUSE_ARGOS)
-elseif(RADIO_TYPE STREQUAL SOAPY_UHD)
-  message(STATUS "Enabled SOAPY UHD radio type")
-  add_definitions(-DUSE_UHD)
-else()
-  message(STATUS "Enabled SIMULATION radio type")
-endif()
 
 set(FLEXRAN_FEC_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk)
 
@@ -112,17 +93,56 @@ else()
   set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx512-icc)
 endif()
 
-# DPDK
-message(STATUS "Use DPDK for agora: ${USE_DPDK}")
+#Settable values
+message(STATUS "\n-- ----- Configuration values -----")
+message(STATUS "DEBUG:            ${DEBUG}")
+set(RADIO_TYPE SIMULATION CACHE STRING "RADIO_TYPE defaulting to 'SIMULATION', valid types are SIMULATION / SOAPY_IRIS / SOAPY_UHD")
+message(STATUS "RADIO_TYPE:       ${RADIO_TYPE}")
+set(LOG_LEVEL "info" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
+message(STATUS "LOG_LEVEL:        ${LOG_LEVEL}")
+set(USE_SPDLOG True CACHE BOOL "USE_SPDLOG set to true to use the spdlog library for logging support")
+message(STATUS "USE_SPDLOG:       ${USE_SPDLOG}")
+set(ENABLE_MAC False CACHE BOOL "ENABLE_MAC set to true to enable mac support")
+message(STATUS "ENABLE_MAC:       ${ENABLE_MAC}")
+set(ENABLE_CSV_LOG False CACHE BOOL "ENABLE_CSV_LOG set to enable csv log output")
+message(STATUS "ENABLE_CSV_LOG:   ${ENABLE_CSV_LOG}")
+set(ENABLE_MAT_LOG False CACHE BOOL "ENABLE_MAT_LOG set to enable matrix log output")
+message(STATUS "ENABLE_MAT_LOG:   ${ENABLE_MAT_LOG}")
+set(USE_AVX2_ENCODER False CACHE BOOL "Use Agora's AVX2 encoder instead of FlexRAN's AVX512 encoder")
+message(STATUS "USE_AVX2_ENCODER: ${USE_AVX2_ENCODER}")
+set(ENABLE_DPDK False CACHE BOOL "ENABLE_DPDK set to true to enable dpdk support")
+message(STATUS "ENABLE_DPDK:      ${ENABLE_DPDK}")
+set(ENABLE_HDF5 False CACHE BOOL "ENABLE_HDF5 defaulting to 'False'")
+message(STATUS "ENABLE_HDF5:      ${ENABLE_HDF5}")
+message(STATUS "--------------------------------\n--")
 
-if(${USE_DPDK})
+if(RADIO_TYPE STREQUAL SOAPY_IRIS)
+  message(STATUS "Enabled SOAPY Iris radio type")
+  add_definitions(-DUSE_ARGOS)
+elseif(RADIO_TYPE STREQUAL SOAPY_UHD)
+  message(STATUS "Enabled SOAPY UHD radio type")
+  add_definitions(-DUSE_UHD)
+else()
+  message(STATUS "Enabled SIMULATION radio type")
+endif()
+
+#External Libraries / Depends
+find_library(NUMA_LIBRARIES numa REQUIRED)
+message(VERBOSE "  Numa: Libraries ${NUMA_LIBRARIES}")
+
+# Intel MKL (threaded Intel10_64lp: Non-threaded Intel10_64lp_seq)
+set(BLA_VENDOR Intel10_64lp_seq)
+find_package(BLAS REQUIRED)
+include_directories(${BLAS_INCLUDE_DIR})
+
+# DPDK
+if(ENABLE_DPDK)
   find_library(DPDK_LIB dpdk)
   if(NOT DPDK_LIB)
     #If cmake doesn't find DPDK than have pkg-config attempt the same
     find_package(PkgConfig REQUIRED)
     pkg_search_module(DPDK REQUIRED libdpdk>=21.11.1)
     message(STATUS "  DPDK version ${DPDK_VERSION} is enabled for Agora")
-
     set(DPDK_LIBRARIES ${DPDK_LINK_LIBRARIES})
   endif()
 
@@ -131,8 +151,7 @@ if(${USE_DPDK})
   endif()
 
   if (DPDK_INCLUDE_DIRS)
-    message(STATUS "  DPDK include directory = ${DPDK_INCLUDE_DIRS}")
-    message(STATUS "  DPDK_LIBRARIES: ${DPDK_LIBRARIES}")
+    message(VERBOSE "  DPDK include directory = ${DPDK_INCLUDE_DIRS}  Libraries: ${DPDK_LIBRARIES}")
   else()
     message(FATAL_ERROR "DPDK include directory not found")
   endif()
@@ -145,37 +164,13 @@ if(${USE_DPDK})
   endif()
 endif()
 
-# MAC
-if(${ENABLE_MAC})
-  add_definitions(-DENABLE_MAC)
-endif()
-
-set(MAC_CLIENT_SOURCES
-  src/mac/mac_sender.cc
-  src/mac/mac_receiver.cc
-  src/mac/video_receiver.cc
-  src/mac/file_receiver.cc
-  src/mac/mac_client.cc)
-set(MAC_BS_SOURCES
-  src/mac/mac_sender.cc
-  src/mac/mac_receiver.cc
-  src/mac/video_receiver.cc
-  src/mac/file_receiver.cc
-  src/mac/mac_basestation.cc)
-
-#External Libraries
-# Intel MKL (threaded Intel10_64lp: Non-threaded Intel10_64lp_seq)
-set(BLA_VENDOR Intel10_64lp_seq)
-find_package(BLAS REQUIRED)
-include_directories(${BLAS_INCLUDE_DIR})
-
+#Armadillo
 find_package(Armadillo "11.0.0" REQUIRED)
-message(STATUS "Armadillo: Includes ${ARMADILLO_INCLUDE_DIR} Libraries ${ARMADILLO_LIBRARIES}")
+message(VERBOSE "  Armadillo: Includes ${ARMADILLO_INCLUDE_DIR} Libraries: ${ARMADILLO_LIBRARIES}")
 add_definitions(-DARMA_DONT_USE_WRAPPER -DARMA_DONT_USE_FORTRAN_HIDDEN_ARGS)
 include_directories(${ARMADILLO_INCLUDE_DIR})
 
-set(ENABLE_HDF5 False CACHE STRING "ENABLE_HDF5 defaulting to 'False'")
-message(STATUS "HDF5 Support Enabled: ${ENABLE_HDF5}")
+#HDF5 (optional)
 if (${ENABLE_HDF5})
   add_definitions(-DENABLE_HDF5)
   find_package(HDF5 1.10 REQUIRED COMPONENTS CXX)
@@ -183,32 +178,26 @@ if (${ENABLE_HDF5})
       message(FATAL_ERROR "HDF5 development files not found")
       return()
   endif()
-  message(STATUS "HDF5_INCLUDE_DIRS: ${HDF5_INCLUDE_DIRS}")
-  message(STATUS "HDF5_LIBRARIES: ${HDF5_LIBRARIES}")
+  message(VERBOSE "  HDF5 Includes: ${HDF5_INCLUDE_DIRS} Libraries: ${HDF5_LIBRARIES}")
   include_directories(${HDF5_INCLUDE_DIRS})
 endif()
 
+#Python
 find_package(PythonLibs REQUIRED)
 set(PYTHON_LIB ${PYTHON_LIBRARIES})
 include_directories(${PYTHON_INCLUDE_DIRS})
+message(VERBOSE "  PythonLibs Includes: ${PYTHON_INCLUDE_DIRS} Libraries: ${PYTHON_LIBRARIES}")
 
-message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
-message(STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}")
-
-#Soapy
+#Soapy (optional based on radio type, need to finish decoupling requirements)
 find_package(SoapySDR "0.8.0" CONFIG)
 if(NOT SoapySDR_FOUND)
   message(FATAL_ERROR "SoapySDR development files not found")
 endif()
 set(SOAPY_LIB ${SoapySDR_LIBRARIES})
 include_directories(${SOAPY_INCLUDE_DIRS})
+message(VERBOSE "  SoapySDR Includes: ${SoapySDR_INCLUDE_DIRS} Libraries: ${SoapySDR_LIBRARIES}")
 
-message(STATUS "SoapySDR_INCLUDE_DIRS: ${SoapySDR_INCLUDE_DIRS}")
-message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
-add_definitions(-DTHREADED_INIT)
-
-set(USE_SPDLOG True CACHE STRING "USE_SPDLOG defaulting to 'True'")
-message(STATUS "USE_SPDLOG: ${USE_SPDLOG}")
+#SPDLOG
 if(USE_SPDLOG)
   if(LOG_LEVEL STREQUAL "none")
     add_definitions(-DSPDLOG_LEVEL=spdlog::level::off)
@@ -242,10 +231,6 @@ else ()
   message(STATUS "Using agora raw logger")
 endif()
 
-set(ENABLE_CSV_LOG False CACHE STRING "ENABLE_CSV_LOG defaulting to 'False'")
-set(ENABLE_MAT_LOG False CACHE STRING "ENABLE_MAT_LOG defaulting to 'False'")
-message(STATUS "ENABLE_CSV_LOG: ${ENABLE_CSV_LOG}")
-message(STATUS "ENABLE_MAT_LOG: ${ENABLE_MAT_LOG}")
 if(USE_SPDLOG AND ENABLE_CSV_LOG)
   add_definitions(-DENABLE_CSV_LOG=true)
   message(STATUS "Enabled Csv Logger")
@@ -286,12 +271,50 @@ else()
   add_definitions(-DAGORA_LOG_LEVEL=2)
 endif()
 
+#Gflags
 find_package(gflags REQUIRED)
-message(STATUS "gflags include directory found: ${GFLAGS_INCLUDE_DIR}")
+message(VERBOSE "  gflags: Includes ${GFLAGS_INCLUDE_DIR} Libraries: ${GFLAGS_LIBRARIES}")
+include_directories(${GFLAGS_INCLUDE_DIR})
+
+#Flexran
+include_directories(
+  ${FLEXRAN_FEC_LIB_DIR}/install/lib_ldpc_decoder_5gnr
+  ${FLEXRAN_FEC_LIB_DIR}/install/lib_ldpc_encoder_5gnr
+  ${FLEXRAN_FEC_LIB_DIR}/install/lib_common
+  ${SOURCE_DIR}/src/encoder)
+
+set(FLEXRAN_LDPC_LIBS
+  ${FLEXRAN_FEC_LIB_DIR}/install/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a
+  ${FLEXRAN_FEC_LIB_DIR}/install/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
+  ${FLEXRAN_FEC_LIB_DIR}/install/lib_common/libcommon.a)
 
 # Unit tests
 enable_testing()
 find_package(GTest REQUIRED)
+message(VERBOSE "  GTest: Includes ${GTEST_INCLUDE_DIR} Libraries ${GTEST_LIBRARIES}")
+set(GTEST_LIBRARIES ${GTEST_LIBRARIES} -lpthread)
+
+#third party libs included in our repo
+include_directories(third_party third_party/spdlog/include third_party/nlohmann/single_include)
+
+add_definitions(-DTHREADED_INIT)
+# MAC
+if(${ENABLE_MAC})
+  add_definitions(-DENABLE_MAC)
+endif()
+
+set(MAC_CLIENT_SOURCES
+  src/mac/mac_sender.cc
+  src/mac/mac_receiver.cc
+  src/mac/video_receiver.cc
+  src/mac/file_receiver.cc
+  src/mac/mac_client.cc)
+set(MAC_BS_SOURCES
+  src/mac/mac_sender.cc
+  src/mac/mac_receiver.cc
+  src/mac/video_receiver.cc
+  src/mac/file_receiver.cc
+  src/mac/mac_basestation.cc)
 
 include_directories(
   src/common/
@@ -307,8 +330,6 @@ include_directories(
   src/client/txrx
   src/client/txrx/workers
   src/data_generator)
-
-include_directories(third_party third_party/spdlog/include third_party/nlohmann/single_include)
 
 set(RECORDER_SOURCES
   src/recorder/recorder_thread.cc
@@ -403,21 +424,10 @@ set(CLIENT_SOURCES
   src/client/txrx/workers/txrx_worker_client_hw.cc
   src/mac/mac_thread_client.cc)
 add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
-  
-include_directories(
-  ${FLEXRAN_FEC_LIB_DIR}/install/lib_ldpc_decoder_5gnr
-  ${FLEXRAN_FEC_LIB_DIR}/install/lib_ldpc_encoder_5gnr
-  ${FLEXRAN_FEC_LIB_DIR}/install/lib_common
-  ${SOURCE_DIR}/src/encoder)
 
-set(FLEXRAN_LDPC_LIBS
-  ${FLEXRAN_FEC_LIB_DIR}/install/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a
-  ${FLEXRAN_FEC_LIB_DIR}/install/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
-  ${FLEXRAN_FEC_LIB_DIR}/install/lib_common/libcommon.a)
-
-set(COMMON_LIBS -Wl,--start-group ${MKL_LIBS} ${BLAS_LIBRARIES} -Wl,--end-group ${FLEXRAN_LDPC_LIBS} ${HDF5_LIBRARIES} ${DPDK_LIBRARIES} ${ARMADILLO_LIBRARIES} ${SOAPY_LIB}
-    ${PYTHON_LIB} numa util gflags gtest ${COMMON_LIBS})
-message(STATUS "Common libs: ${COMMON_LIBS}")
+set(COMMON_LIBS -Wl,--start-group ${MKL_LIBS} ${BLAS_LIBRARIES} -Wl,--end-group ${NUMA_LIBRARIES} ${FLEXRAN_LDPC_LIBS} ${HDF5_LIBRARIES} ${DPDK_LIBRARIES} ${ARMADILLO_LIBRARIES} ${SOAPY_LIB}
+    ${PYTHON_LIB} ${GFLAGS_LIBRARIES} ${COMMON_LIBS})
+message(VERBOSE "Common libs: ${COMMON_LIBS}")
 
 # TODO: The main agora executable is performance-critical, so we need to
 # test if compiling against precompiled objects instead of compiling directly
@@ -503,8 +513,7 @@ foreach(test_name IN LISTS LDPC_TESTS)
     $<TARGET_OBJECTS:common_sources_lib>)
   # Unit tests should pass without memory errors
   set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")
-
-  target_link_libraries(${test_name} ${COMMON_LIBS})
+  target_link_libraries(${test_name} ${COMMON_LIBS} ${GTEST_LIBRARIES})
   add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
 
@@ -523,6 +532,6 @@ foreach(test_name IN LISTS UNIT_TESTS)
 
   # Unit tests should pass without memory errors
   set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")
-  target_link_libraries(${test_name} ${COMMON_LIBS})
+  target_link_libraries(${test_name} ${COMMON_LIBS} ${GTEST_LIBRARIES})
   add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
