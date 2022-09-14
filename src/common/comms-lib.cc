@@ -696,8 +696,8 @@ std::vector<std::vector<double>> CommsLib::GetSequence(size_t seq_len,
     std::vector<std::complex<float>> sts_freq(kStsSeqArray,
                                               kStsSeqArray + kFftSize_80211);
     // Perform ifft with ifft-shift on sts_freq
-    CommsLib::IFFT(sts_freq, kFftSize_80211, false);
     auto sts_iq = CommsLib::FFTShift(sts_freq);
+    CommsLib::IFFT(sts_iq, kFftSize_80211, false);
 
     size_t out_seq_len = sts_seq_len;
     size_t frac_seq_len = out_seq_len % sts_seq_len;
@@ -722,8 +722,8 @@ std::vector<std::vector<double>> CommsLib::GetSequence(size_t seq_len,
       }
     } else {
       // Perform ifft with ifft-shift on lts_freq
-      CommsLib::IFFT(lts_freq, lts_seq_len, false);
       auto lts_iq = CommsLib::FFTShift(lts_freq);
+      CommsLib::IFFT(lts_iq, lts_seq_len, false);
 
       size_t out_seq_len = lts_seq_len;  // TODO: use 160
       size_t frac_seq_len = out_seq_len % lts_seq_len;
@@ -775,8 +775,8 @@ std::vector<std::vector<double>> CommsLib::GetSequence(size_t seq_len,
     }
 
     // Perform ifft with ifft-shift on gold_freq
-    CommsLib::IFFT(gold_freq, 2 * gold_seq_len, true);
     auto gold_ifft_iq = CommsLib::FFTShift(gold_freq);
+    CommsLib::IFFT(gold_ifft_iq, 2 * gold_seq_len, true);
 
     matrix[0].resize(gold_seq_len);
     matrix[1].resize(gold_seq_len);
