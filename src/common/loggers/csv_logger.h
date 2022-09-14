@@ -21,6 +21,7 @@ enum CsvLogId {
   kRSSI,
   kNOISE,
   kEVM,
+  kEVMSC,
   kEVMSNR,
   kBER,
   kSER,
@@ -34,8 +35,8 @@ constexpr size_t kAllLogs = kCsvLogs + kMatLogs;
 
 #if defined(ENABLE_CSV_LOG)
 const std::array<std::string, kAllLogs> kCsvName = {
-    "snr", "rssi", "noise", "evm",   "evmsnr", "ber",
-    "ser", "csi",  "ulcsi", "dlcsi", "dlbeam"};
+    "snr", "rssi", "noise", "evm",   "evmsc", "evmsnr",
+    "ber", "ser",  "csi",   "ulcsi", "dlcsi", "dlbeam"};
 #endif
 
 class CsvLogger {

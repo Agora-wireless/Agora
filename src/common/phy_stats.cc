@@ -44,6 +44,8 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
 
   evm_buffer_.Calloc(kFrameWnd, cfg->UeAntNum(),
                      Agora_memory::Alignment_t::kAlign64);
+  evm_sc_buffer_.Calloc(kFrameWnd, cfg->OfdmDataNum(),
+                        Agora_memory::Alignment_t::kAlign64);
 
   if (num_rxdata_symbols_ > 0) {
     gt_cube_ = arma::cx_fcube(cfg->UeAntNum(), cfg->OfdmDataNum(),
@@ -102,6 +104,7 @@ PhyStats::~PhyStats() {
   uncoded_bit_error_count_.Free();
 
   evm_buffer_.Free();
+  evm_sc_buffer_.Free();
   bs_noise_.Free();
   csi_cond_.Free();
 
@@ -291,14 +294,21 @@ void PhyStats::RecordUlPilotSnr(size_t frame_id) {
 
 void PhyStats::RecordEvm(size_t frame_id) {
   if (kEnableCsvLog) {
-    std::stringstream ss;
-    ss << frame_id;
+    std::stringstream ss_evm;
+    std::stringstream ss_evm_sc;
+    ss_evm << frame_id;
+    ss_evm_sc << frame_id;
     const size_t num_frame_data = config_->OfdmDataNum() * num_rxdata_symbols_;
     for (size_t i = 0; i < config_->UeAntNum(); i++) {
-      ss << ","
-         << ((evm_buffer_[frame_id % kFrameWnd][i] / num_frame_data) * 100.0f);
+      ss_evm << ","
+             << ((evm_buffer_[frame_id % kFrameWnd][i] / num_frame_data) *
+                 100.0f);
     }
-    csv_loggers_.at(CsvLog::kEVM)->Write(ss.str());
+    for (size_t i = 0; i < config_->OfdmDataNum(); i++) {
+      ss_evm_sc << "," << (evm_sc_buffer_[frame_id % kFrameWnd][i]);
+    }
+    csv_loggers_.at(CsvLog::kEVM)->Write(ss_evm.str());
+    csv_loggers_.at(CsvLog::kEVMSC)->Write(ss_evm_sc.str());
   }
 }
 
@@ -487,6 +497,7 @@ void PhyStats::UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t sc_id,
                          const arma::cx_fvec& eq_vec) {
   arma::fvec evm_vec = arma::square(
       arma::abs(eq_vec - gt_cube_.slice(data_symbol_id).col(sc_id)));
+  evm_sc_buffer_[frame_id % kFrameWnd][sc_id] = arma::mean(evm_vec);
   arma::fvec evm_buf(evm_buffer_[frame_id % kFrameWnd], config_->UeAntNum(),
                      false);
   evm_buf += evm_vec;

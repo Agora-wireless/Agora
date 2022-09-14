@@ -69,6 +69,7 @@ class PhyStats {
   Table<size_t> uncoded_bits_count_;
   Table<size_t> uncoded_bit_error_count_;
   Table<float> evm_buffer_;
+  Table<float> evm_sc_buffer_;
   Table<float> ul_pilot_snr_;
   Table<float> dl_pilot_snr_;
   Table<float> dl_pilot_rssi_;
