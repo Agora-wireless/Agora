@@ -27,7 +27,6 @@ CsvLogger::CsvLogger([[maybe_unused]] size_t log_id,
     const std::string filename = "files/log/" + timestamp + "/log-" +
                                  kCsvName.at(log_id) + "-" + radio_name +
                                  ".csv";
-    std::remove(filename.c_str());  // delete file if already exists
     logger_ = spdlog::create_async_nb<spdlog::sinks::basic_file_sink_mt>(
         kCsvName.at(log_id), filename);
     logger_->set_level(spdlog::level::info);
