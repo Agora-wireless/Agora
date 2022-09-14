@@ -5,8 +5,10 @@
  */
 #include "dobeamweights.h"
 
+#include "comms-lib.h"
 #include "concurrent_queue_wrapper.h"
 #include "doer.h"
+#include "logger.h"
 
 static constexpr bool kUseSIMDGather = true;
 // Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.
@@ -23,7 +25,9 @@ DoBeamWeights::DoBeamWeights(
     Table<complex_float>& calib_ul_msum_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices,
-    PhyStats* in_phy_stats, Stats* stats_manager)
+    PhyStats* in_phy_stats, Stats* stats_manager,
+    std::array<std::shared_ptr<CsvLog::MatLogger>, CsvLog::kMatLogs>&
+        mat_loggers)
     : Doer(config, tid),
       csi_buffers_(csi_buffers),
       calib_dl_buffer_(calib_dl_buffer),
@@ -32,7 +36,8 @@ DoBeamWeights::DoBeamWeights(
       calib_ul_msum_buffer_(calib_ul_msum_buffer),
       ul_beam_matrices_(ul_beam_matrices),
       dl_beam_matrices_(dl_beam_matrices),
-      phy_stats_(in_phy_stats) {
+      phy_stats_(in_phy_stats),
+      mat_loggers_(mat_loggers) {
   duration_stat_ = stats_manager->GetDurationStat(DoerType::kBeam, tid);
   pred_csi_buffer_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
@@ -49,13 +54,6 @@ DoBeamWeights::DoBeamWeights(
   calib_sc_vec_ptr_ = std::make_unique<arma::cx_fvec>(
       reinterpret_cast<arma::cx_float*>(calib_gather_buffer_), cfg_->BfAntNum(),
       false);
-
-  if (kEnableMatLog) {
-    for (size_t i = 0; i < mat_loggers_.size(); i++) {
-      mat_loggers_.at(i) =
-          std::make_unique<CsvLog::BfMatLogger>(i, cfg_->Timestamp(), "BS");
-    }
-  }
 
   //Init to identity
   calib_sc_vec_ptr_->fill(arma::cx_float(1.0f, 0.0f));

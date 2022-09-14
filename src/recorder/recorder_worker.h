@@ -7,10 +7,12 @@
 
 #include <memory>
 
-#include "buffer.h"
 #include "config.h"
+#include "message.h"
 
 namespace Agora_recorder {
+
+static const std::string kOutputFilePath = "files/experiment/";
 
 class RecorderWorker {
  public:

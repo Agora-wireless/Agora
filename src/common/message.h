@@ -1,22 +1,21 @@
 /**
- * @file buffer.h
+ * @file message.h
  * @brief Self defined functions for message storage and passing
  */
-#ifndef BUFFER_H_
-#define BUFFER_H_
+#ifndef MESSAGE_H_
+#define MESSAGE_H_
 
+#include <array>
 #include <atomic>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <sstream>
-#include <vector>
+#include <string>
 
-#include "memory_manage.h"
 #include "ran_config.h"
 #include "symbols.h"
-
-/* boost is required for aligned memory allocation (for SIMD instructions) */
-#include <boost/align/aligned_allocator.hpp>
-
-#include "common_typedef_sdk.h"
 
 // A generic tag type for Agora tasks. The tag for a particular task will
 // have only a subset of the fields initialized.
@@ -244,11 +243,11 @@ using fft_req_tag_t = rx_tag_t;
 #pragma pack(push, 1)
 struct MacPacketHeaderPacked {
  public:
-  inline const uint16_t &Frame() const { return frame_id_; }
-  inline const uint16_t &Symbol() const { return symbol_id_; }
-  inline const uint16_t &Ue() const { return ue_id_; }
-  inline const uint16_t &Crc() const { return crc_; }
-  inline const uint16_t &PayloadLength() const { return datalen_; }
+  inline uint16_t Frame() const { return frame_id_; }
+  inline uint16_t Symbol() const { return symbol_id_; }
+  inline uint16_t Ue() const { return ue_id_; }
+  inline uint16_t Crc() const { return crc_; }
+  inline uint16_t PayloadLength() const { return datalen_; }
 
   // Modifiers
   inline void Set(const uint16_t &f, const uint16_t &s, const uint16_t &u,
@@ -267,7 +266,7 @@ struct MacPacketHeaderPacked {
   uint16_t ue_id_;
   uint16_t datalen_;  // length of payload in bytes or array data[]
   uint16_t crc_;      // 16 bits CRC over calculated for the data[] array
-#if ENABLE_RB_IND
+#if defined(ENABLE_RB_IND)
   RBIndicator rb_indicator_;  // RAN scheduling details for PHY
 #endif
 };
@@ -276,13 +275,11 @@ struct MacPacketPacked {
  public:
   static constexpr size_t kHeaderSize = sizeof(MacPacketHeaderPacked);
 
-  inline const uint16_t &Frame() const { return header_.Frame(); }
-  inline const uint16_t &Symbol() const { return header_.Symbol(); }
-  inline const uint16_t &Ue() const { return header_.Ue(); }
-  inline const uint16_t &Crc() const { return header_.Crc(); }
-  inline const uint16_t &PayloadLength() const {
-    return header_.PayloadLength();
-  }
+  inline uint16_t Frame() const { return header_.Frame(); }
+  inline uint16_t Symbol() const { return header_.Symbol(); }
+  inline uint16_t Ue() const { return header_.Ue(); }
+  inline uint16_t Crc() const { return header_.Crc(); }
+  inline uint16_t PayloadLength() const { return header_.PayloadLength(); }
   inline const unsigned char *Data() const { return data_; };
 
   // Modifiers
@@ -483,4 +480,4 @@ class FrameCounters {
   size_t max_task_count_;
 };
 
-#endif  // BUFFER_H_
+#endif  // MESSAGE_H_

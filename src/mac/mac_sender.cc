@@ -9,9 +9,14 @@
 
 #include "datatype_conversion.h"
 #include "file_receiver.h"
+#include "gettime.h"
 #include "logger.h"
+#include "message.h"
 #include "udp_client.h"
 #include "video_receiver.h"
+
+static const std::string kMacSendFromAddress = "127.0.0.1";
+static constexpr uint16_t kMacSendFromPort = 0;
 
 //#define USE_UDP_DATA_SOURCE
 static constexpr bool kDebugPrintSender = false;
@@ -334,7 +339,8 @@ void* MacSender::WorkerThread(size_t tid) {
     return nullptr;
   }
 
-  UDPClient udp_client;
+  //Send from local address
+  UDPClient udp_client(kMacSendFromAddress, kMacSendFromPort);
 
   double begin = GetTime::GetTimeUs();
   size_t total_tx_packets = 0;
@@ -380,7 +386,7 @@ void* MacSender::WorkerThread(size_t tid) {
               tx_packet->Symbol(), mac_packet_tx_size);
 
           udp_client.Send(server_address_, server_rx_port_,
-                          reinterpret_cast<const uint8_t*>(tx_packet),
+                          reinterpret_cast<const std::byte*>(tx_packet),
                           mac_packet_tx_size);
           mac_packet_location += tx_buffer_pkt_offset_;
         }
@@ -546,8 +552,8 @@ void MacSender::UpdateTxBuffer(MacDataReceiver* data_source, gen_tag_t tag) {
 
 void MacSender::WriteStatsToFile(size_t tx_frame_count) const {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string filename = cur_directory + "/data/tx_result.txt";
-  AGORA_LOG_INFO("Printing sender results to file \"%s\"...\n",
+  std::string filename = cur_directory + "/files/experiment/max_tx_result.txt";
+  AGORA_LOG_INFO("Printing mac sender results to file \"%s\"...\n",
                  filename.c_str());
 
   std::ofstream debug_file;

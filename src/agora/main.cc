@@ -5,11 +5,13 @@
 #include "agora.h"
 #include "gflags/gflags.h"
 #include "logger.h"
+#include "signal_handler.h"
 #include "version_config.h"
 
-DEFINE_string(conf_file,
-              TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-both.json",
-              "Config filename");
+DEFINE_string(
+    conf_file,
+    TOSTRING(PROJECT_DIRECTORY) "/files/config/ci/tddconfig-sim-both.json",
+    "Config filename");
 
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("conf_file : set the configuration filename");

@@ -12,18 +12,19 @@
 #include <unistd.h>
 
 #include <algorithm>
-#include <boost/align/aligned_allocator.hpp>
 #include <chrono>
 #include <iostream>
 #include <numeric>
 #include <thread>
 #include <vector>
 
+#include "common_typedef_sdk.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "datatype_conversion.h"
 #include "gettime.h"
 #include "memory_manage.h"
+#include "message.h"
 #include "mkl_dfti.h"
 #include "symbols.h"
 #include "utils.h"
@@ -134,7 +135,7 @@ class Sender {
 
   // First dimension: symbol_num_perframe * BS_ANT_NUM
   // Second dimension: (CP_LEN + OFDM_CA_NUM) * 2
-  Table<unsigned short> iq_data_short_;
+  Table<short> iq_data_short_;
 
   // Number of packets transmitted for each symbol in a frame
   size_t* packet_count_per_symbol_[kFrameWnd];

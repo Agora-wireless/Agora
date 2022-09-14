@@ -1,6 +1,6 @@
 /**
  * @file mat_logger.cc
- * @brief Implementation file for the BfMatLogger class which records runtime
+ * @brief Implementation file for the MatLogger class which records runtime
  * zero-forcing matrices into csv files. Enabled or disabled by cmake.
  */
 
@@ -13,19 +13,19 @@ namespace CsvLog {
 
 const std::string kMatHeader = "Frame,SC,BS-Ant,UE-Ant,Real,Imag";
 
-BfMatLogger::BfMatLogger(size_t mat_log_id, const std::string& timestamp,
-                         const std::string& radio_name)
+MatLogger::MatLogger(size_t mat_log_id, const std::string& timestamp,
+                     const std::string& radio_name)
     : CsvLogger(kCsvLogs + mat_log_id, timestamp, radio_name) {
 #if defined(ENABLE_MAT_LOG)
   logger_->info(kMatHeader);
 #endif
 }
 
-BfMatLogger::~BfMatLogger() { SaveMatBuf(); }
+MatLogger::~MatLogger() { SaveMatBuf(); }
 
-bool BfMatLogger::UpdateMatBuf([[maybe_unused]] const size_t frame_id,
-                               [[maybe_unused]] const size_t sc_id,
-                               [[maybe_unused]] const arma::cx_fmat& mat_in) {
+bool MatLogger::UpdateMatBuf([[maybe_unused]] const size_t frame_id,
+                             [[maybe_unused]] const size_t sc_id,
+                             [[maybe_unused]] const arma::cx_fmat& mat_in) {
   bool status = false;
 #if defined(ENABLE_MAT_LOG)
   if (frame_id >= kFrameStart && frame_id < kFrameStart + kFrames &&
@@ -41,9 +41,9 @@ bool BfMatLogger::UpdateMatBuf([[maybe_unused]] const size_t frame_id,
   return status;
 }
 
-void BfMatLogger::SaveMatBuf() {
+void MatLogger::SaveMatBuf() {
 #if defined(ENABLE_MAT_LOG)
-  AGORA_LOG_INFO("BfMatLogger: saving %s\n", logger_->name());
+  AGORA_LOG_INFO("MatLogger: saving %s\n", logger_->name());
   for (size_t frame_id = 0; frame_id < kFrames; frame_id++) {
     for (size_t sc_id = 0; sc_id < kSCs; sc_id++) {
       for (size_t i = 0; i < kBSAnts; i++) {

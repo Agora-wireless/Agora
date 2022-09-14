@@ -19,7 +19,6 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#include <armadillo>
 #include <atomic>
 #include <chrono>
 #include <complex>
@@ -38,6 +37,7 @@
 #include <thread>
 #include <vector>
 
+#include "armadillo"
 #include "symbols.h"
 
 // Default argument is to exclude core 0 from the list

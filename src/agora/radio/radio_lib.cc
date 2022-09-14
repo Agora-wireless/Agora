@@ -270,12 +270,11 @@ bool RadioConfig::RadioStart() {
 
   //Speed up the activations (could have a flush)
   std::vector<std::thread> activate_radio_threads;
-  const size_t beacon_radio = radio_num_;
   for (size_t i = 0; i < radio_num_; i++) {
     if (cfg_->HwFramer()) {
       const size_t cell_id = cfg_->CellId().at(i);
       const bool is_ref_radio = (i == cfg_->RefRadio(cell_id));
-      radios_.at(i)->ConfigureTddModeBs(is_ref_radio, beacon_radio);
+      radios_.at(i)->ConfigureTddModeBs(is_ref_radio);
     }
     radios_.at(i)->SetTimeAtTrigger(0);
     activate_radio_threads.emplace_back(&Radio::Activate, radios_.at(i).get(),

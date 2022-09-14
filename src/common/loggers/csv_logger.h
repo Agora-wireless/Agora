@@ -28,9 +28,9 @@ enum CsvLogId {
   kCsvLogs
 };
 
-enum BfMatLogId { kULCSI, kDLCSI, kDlBeam, kBfMatLogs };
+enum MatLogId { kULCSI, kDLCSI, kDlBeam, kMatLogs };
 
-constexpr size_t kAllLogs = kCsvLogs + kBfMatLogs;
+constexpr size_t kAllLogs = kCsvLogs + kMatLogs;
 
 #if defined(ENABLE_CSV_LOG)
 const std::array<std::string, kAllLogs> kCsvName = {

@@ -1,7 +1,9 @@
 #include <gflags/gflags.h>
 #include <mkl.h>
-#include <armadillo>
+
 #include <iostream>
+
+#include "armadillo"
 #include "timer.h"
 
 DEFINE_uint64(n_ants, 64, "Number of matrix rows");
@@ -55,8 +57,8 @@ int main(int argc, char** argv) {
   const arma::cx_fmat A = gen_matrix_with_condition(FLAGS_condition);
   arma::cx_fmat A_lpinv;  // Left pseudo-inverse of A
 
-  std::printf("Input matrix {%lldx%lld}: cond number = %.3f\n", A.n_rows, A.n_cols,
-         arma::cond(A));
+  std::printf("Input matrix {%lldx%lld}: cond number = %.3f\n", A.n_rows,
+              A.n_cols, arma::cond(A));
 
   auto id_mat = arma::cx_fmat(FLAGS_n_users, FLAGS_n_users, arma::fill::zeros);
   for (size_t i = 0; i < FLAGS_n_users; i++)
@@ -81,5 +83,5 @@ int main(int argc, char** argv) {
 
   A_lpinv = pinv(A);
   std::printf("SVD: Sum of absolute differences of (A_lpinv * A - I): %.6f\n",
-         arma::accu(arma::abs(A_lpinv * A - id_mat)));
+              arma::accu(arma::abs(A_lpinv * A - id_mat)));
 }

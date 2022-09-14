@@ -5,16 +5,13 @@
 #ifndef DODEMUL_H_
 #define DODEMUL_H_
 
-#include <armadillo>
-#include <iostream>
-#include <vector>
-
-#include "buffer.h"
+#include "armadillo"
+#include "common_typedef_sdk.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "doer.h"
-#include "gettime.h"
-#include "modulation.h"
+#include "memory_manage.h"
+#include "mkl_dfti.h"
 #include "phy_stats.h"
 #include "stats.h"
 #include "symbols.h"
@@ -76,7 +73,7 @@ class DoDemul : public Doer {
   arma::cx_fmat ue_pilot_data_;
   int ue_num_simd256_;
 
-#if USE_MKL_JIT
+#if defined(USE_MKL_JIT)
   void* jitter_;
   cgemm_jit_kernel_t mkl_jit_cgemm_;
 #endif

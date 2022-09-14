@@ -6,11 +6,14 @@
 #ifndef STATS_H_
 #define STATS_H_
 
-#include <iostream>
+#include <array>
+#include <cstddef>
+#include <string>
 
 #include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"
+#include "message.h"
 #include "symbols.h"
 
 static constexpr size_t kMaxStatBreakdown = 4;
@@ -147,6 +150,12 @@ class Stats {
                                    MasterGetTsc(timestamp_type, frame_id_2),
                                this->freq_ghz_);
   }
+
+  void PrintPerFrameDone(PrintType print_type, size_t frame_id) const;
+  void PrintPerSymbolDone(PrintType print_type, size_t frame_id,
+                          size_t symbol_id, size_t sub_count) const;
+  void PrintPerTaskDone(PrintType print_type, size_t frame_id, size_t symbol_id,
+                        size_t ant_or_sc_id, size_t task_count) const;
 
   /// Get the DurationStat object used by thread thread_id for DoerType
   /// doer_type

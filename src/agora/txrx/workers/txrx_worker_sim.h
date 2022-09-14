@@ -9,10 +9,9 @@
 #include <memory>
 #include <vector>
 
-#include "buffer.h"
+#include "message.h"
 #include "txrx_worker.h"
-#include "udp_client.h"
-#include "udp_server.h"
+#include "udp_comm.h"
 
 class TxRxWorkerSim : public TxRxWorker {
  public:
@@ -38,11 +37,8 @@ class TxRxWorkerSim : public TxRxWorker {
 
   //1 for each responsible interface (ie radio)
   //socket for incomming messages (received data)
-  std::vector<std::unique_ptr<UDPServer>> udp_servers_;
-
-  //socket for outgoing messages (data to transmit)
-  std::vector<std::unique_ptr<UDPClient>> udp_clients_;
-  std::vector<uint8_t> beacon_buffer_;
+  std::vector<std::unique_ptr<UDPComm>> udp_comm_;
+  std::vector<std::byte> beacon_buffer_;
   double beacon_send_time_;
 };
 #endif  // TXRX_WORKER_SIM_H_

@@ -5,19 +5,17 @@
 #ifndef DOBEAMWEIGHTS_H_
 #define DOBEAMWEIGHTS_H_
 
-#include <armadillo>
-#include <iostream>
+#include <memory>
 
-#include "buffer.h"
-#include "concurrentqueue.h"
+#include "armadillo"
+#include "common_typedef_sdk.h"
 #include "config.h"
 #include "doer.h"
-#include "gettime.h"
 #include "mat_logger.h"
+#include "memory_manage.h"
+#include "message.h"
 #include "phy_stats.h"
 #include "stats.h"
-#include "symbols.h"
-#include "utils.h"
 
 class DoBeamWeights : public Doer {
  public:
@@ -30,7 +28,9 @@ class DoBeamWeights : public Doer {
       Table<complex_float>& calib_ul_msum_buffer,
       PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_,
       PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_,
-      PhyStats* in_phy_stats, Stats* stats_manager);
+      PhyStats* in_phy_stats, Stats* stats_manager,
+      std::array<std::shared_ptr<CsvLog::MatLogger>, CsvLog::kMatLogs>&
+          mat_loggers);
   ~DoBeamWeights() override;
 
   /**
@@ -110,7 +110,7 @@ class DoBeamWeights : public Doer {
   arma::uvec ext_ref_id_;
   size_t num_ext_ref_;
 
-  std::array<std::unique_ptr<CsvLog::BfMatLogger>, CsvLog::kBfMatLogs>
+  std::array<std::shared_ptr<CsvLog::MatLogger>, CsvLog::kMatLogs>&
       mat_loggers_;
 };
 

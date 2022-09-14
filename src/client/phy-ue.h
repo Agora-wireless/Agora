@@ -12,17 +12,19 @@
 #include <thread>
 #include <vector>
 
-#include "buffer.h"
+#include "common_typedef_sdk.h"
 #include "comms-lib.h"
 #include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "datatype_conversion.h"
 #include "mac_thread_client.h"
+#include "message.h"
 #include "modulation.h"
 #include "packet_txrx.h"
 #include "phy_stats.h"
 #include "recorder_thread.h"
+#include "simd_types.h"
 #include "stats.h"
 #include "ue_worker.h"
 
@@ -35,10 +37,6 @@ class PhyUe {
     kMacTxComplete = 0x04,
     kFrameComplete = (kDownlinkComplete | kMacTxComplete | kUplinkTxComplete)
   };
-
-  // dequeue bulk size, used to reduce the overhead of dequeue in main
-  // thread
-  static const int kDequeueBulkSizeTXRX = 8;
 
   explicit PhyUe(Config* config);
   ~PhyUe();
@@ -187,7 +185,7 @@ class PhyUe {
    * First dimension: data_symbol_num_perframe * kFrameWnd
    * Second dimension: OFDM_CA_NUM * UE_NUM
    */
-  std::vector<myVec> equal_buffer_;
+  std::vector<SimdAlignCxFltVector> equal_buffer_;
 
   // Data after demodulation. Each buffer has kMaxModType * number of OFDM
   // data subcarriers

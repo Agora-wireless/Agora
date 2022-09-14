@@ -102,6 +102,7 @@ PhyStats::~PhyStats() {
   uncoded_bit_error_count_.Free();
 
   evm_buffer_.Free();
+  bs_noise_.Free();
   csi_cond_.Free();
 
   calib_pilot_snr_.Free();

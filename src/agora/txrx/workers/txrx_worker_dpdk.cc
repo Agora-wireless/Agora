@@ -12,7 +12,9 @@
 #include <utility>
 
 #include "dpdk_transport.h"
+#include "gettime.h"
 #include "logger.h"
+#include "message.h"
 
 static constexpr bool kDebugDPDK = false;
 
@@ -45,6 +47,10 @@ TxRxWorkerDpdk::TxRxWorkerDpdk(
   //A worker should support multiple dpdk eth devices (ports)
   // and multi radios (interfaces, local ports) per device
   //Direct the traffic flow to this thread and its interfaces
+  src_mac_.reserve(num_interfaces_);
+  src_mac_.resize(num_interfaces_);
+  dest_mac_.reserve(num_interfaces_);
+  dest_mac_.resize(num_interfaces_);
   for (size_t interface = 0; interface < num_interfaces_; interface++) {
     const uint16_t dest_port =
         config->BsServerPort() + (interface + interface_offset_);
@@ -54,6 +60,11 @@ TxRxWorkerDpdk::TxRxWorkerDpdk(
     const auto& port_queue_id = dpdk_phy_port_queues_.at(interface);
     const auto& port_id = port_queue_id.first;
     const auto& queue_id = port_queue_id.second;
+
+    auto status = rte_eth_macaddr_get(port_id, &src_mac_.at(interface));
+    //addr.addr_bytes
+    dest_mac_.at(interface) = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+    RtAssert(status == 0, "Could not retreive mac address");
 
     AGORA_LOG_INFO(
         "Adding steering rule for src IP %s, dest IP %s, src port: "
@@ -78,7 +89,7 @@ static void ClassFunctioWrapper(TxRxWorkerDpdk* context) {
 void TxRxWorkerDpdk::Start() {
   rte_eal_wait_lcore(tid_);
   AGORA_LOG_TRACE("TxRxWorkerDpdk[%zu]: starting\n", tid_);
-  int status = rte_eal_remote_launch(
+  const int status = rte_eal_remote_launch(
       (lcore_function_t*)(ClassFunctioWrapper<&TxRxWorkerDpdk::DoTxRx>), this,
       tid_);
   AGORA_LOG_INFO("TxRxWorkerDpdk[%zu]: started on dpdk managed l_core\n", tid_);
@@ -236,39 +247,31 @@ size_t TxRxWorkerDpdk::DequeueSend() {
           gen_tag_t(current_event.tags_[0]).tag_);
     }
 
-    rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
+    const size_t local_interface_idx = interface_id - interface_offset_;
+
+    rte_mbuf* tx_bufs __attribute__((aligned(64)));
+    tx_bufs = DpdkTransport::AllocUdp(
+        mbuf_pool_, src_mac_.at(local_interface_idx),
+        dest_mac_.at(local_interface_idx), bs_server_addr_, bs_rru_addr_,
+        Configuration()->BsServerPort() + interface_id,
+        Configuration()->BsRruPort() + interface_id,
+        Configuration()->DlPacketLength(), 1);
+
     static_assert(
         kTxBatchSize == 1,
         "kTxBatchSize must equal 1 - correct logic or set the value to 1");
-    tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool_);
-    rte_ether_hdr* eth_hdr = rte_pktmbuf_mtod(tx_bufs[0], rte_ether_hdr*);
-    eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
-
-    rte_ipv4_hdr* ip_h =
-        (rte_ipv4_hdr*)((char*)eth_hdr + sizeof(rte_ether_hdr));
-    ip_h->src_addr = bs_server_addr_;
-    ip_h->dst_addr = bs_rru_addr_;
-    ip_h->next_proto_id = IPPROTO_UDP;
-
-    rte_udp_hdr* udp_h = (rte_udp_hdr*)((char*)ip_h + sizeof(rte_ipv4_hdr));
-    udp_h->src_port =
-        rte_cpu_to_be_16(Configuration()->BsServerPort() + interface_id);
-    udp_h->dst_port =
-        rte_cpu_to_be_16(Configuration()->BsRruPort() + interface_id);
-
-    tx_bufs[0]->pkt_len = Configuration()->DlPacketLength() + kPayloadOffset;
-    tx_bufs[0]->data_len = Configuration()->DlPacketLength() + kPayloadOffset;
+    rte_ether_hdr* eth_hdr = rte_pktmbuf_mtod(tx_bufs, rte_ether_hdr*);
     auto* payload = reinterpret_cast<char*>(eth_hdr) + kPayloadOffset;
+
     rte_memcpy(payload, pkt, Configuration()->DlPacketLength());
 
     // Send data (one OFDM symbol)
-    // Must send this out the correct port (dev) + queue that is assigned to this interface (convert gloabl to local index)
-    const auto& tx_info =
-        dpdk_phy_port_queues_.at(interface_id - interface_offset_);
+    // Must send this out the correct port (dev) + queue that is assigned to this interface (convert global to local index)
+    const auto& tx_info = dpdk_phy_port_queues_.at(local_interface_idx);
     size_t nb_tx_new =
-        rte_eth_tx_burst(tx_info.first, tx_info.second, tx_bufs, kTxBatchSize);
+        rte_eth_tx_burst(tx_info.first, tx_info.second, &tx_bufs, kTxBatchSize);
     if (unlikely(nb_tx_new != kTxBatchSize)) {
-      std::printf("TxRxWorkerDpdk[%zu]: rte_eth_tx_burst() failed\n", tid_);
+      AGORA_LOG_ERROR("TxRxWorkerDpdk[%zu]: rte_eth_tx_burst() failed\n", tid_);
       throw std::runtime_error("TxRxWorkerDpdk: rte_eth_tx_burst() failed");
     }
     auto complete_event =
@@ -330,8 +333,8 @@ bool TxRxWorkerDpdk::Filter(rte_mbuf* packet, uint16_t port_id,
       rte_eth_macaddr_get(port_id, &bond_mac_addr);
       arp_hdr->arp_opcode = rte_cpu_to_be_16(RTE_ARP_OP_REPLY);
       // Switch src and dst data and set bonding MAC
-      rte_ether_addr_copy(&eth_hdr->s_addr, &eth_hdr->d_addr);
-      rte_ether_addr_copy(&bond_mac_addr, &eth_hdr->s_addr);
+      rte_ether_addr_copy(&eth_hdr->src_addr, &eth_hdr->dst_addr);
+      rte_ether_addr_copy(&bond_mac_addr, &eth_hdr->src_addr);
       rte_ether_addr_copy(&arp_hdr->arp_data.arp_sha,
                           &arp_hdr->arp_data.arp_tha);
       arp_hdr->arp_data.arp_tip = arp_hdr->arp_data.arp_sip;

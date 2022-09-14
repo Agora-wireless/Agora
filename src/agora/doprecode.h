@@ -5,17 +5,14 @@
 #ifndef DOPRECODE_H_
 #define DOPRECODE_H_
 
-#include <armadillo>
 #include <iostream>
 #include <vector>
 
-#include "buffer.h"
-#include "concurrentqueue.h"
+#include "armadillo"
 #include "config.h"
 #include "doer.h"
-#include "gettime.h"
 #include "memory_manage.h"
-#include "modulation.h"
+#include "message.h"
 #include "stats.h"
 #include "symbols.h"
 
@@ -68,7 +65,7 @@ class DoPrecode : public Doer {
   DurationStat* duration_stat_;
   complex_float* modulated_buffer_temp_;
   complex_float* precoded_buffer_temp_;
-#if USE_MKL_JIT
+#if defined(USE_MKL_JIT)
   void* jitter_;
   cgemm_jit_kernel_t my_cgemm_;
 #endif

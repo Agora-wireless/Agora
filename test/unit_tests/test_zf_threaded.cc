@@ -70,10 +70,18 @@ void MasterToWorkerDynamicWorker(
     // Wait
   }
 
+  std::array<std::shared_ptr<CsvLog::MatLogger>, CsvLog::kMatLogs> mat_loggers;
+  if (kEnableMatLog) {
+    for (size_t i = 0; i < mat_loggers.size(); i++) {
+      mat_loggers.at(i) =
+          std::make_shared<CsvLog::MatLogger>(i, cfg->Timestamp(), "BS");
+    }
+  }
+
   auto compute_beam = std::make_unique<DoBeamWeights>(
       cfg, worker_id, csi_buffers, calib_dl_msum_buffer, calib_ul_msum_buffer,
       calib_dl_buffer, calib_ul_buffer, ul_beam_matrices, dl_beam_matrices,
-      phy_stats, stats);
+      phy_stats, stats, mat_loggers);
 
   size_t start_tsc = GetTime::Rdtsc();
   size_t num_tasks = 0;
@@ -107,7 +115,7 @@ void MasterToWorkerDynamicWorker(
 /// when BsAntNum() varies in runtime
 TEST(TestZF, VaryingConfig) {
   static constexpr size_t kNumIters = 10000;
-  auto cfg = std::make_unique<Config>("data/tddconfig-sim-ul.json");
+  auto cfg = std::make_unique<Config>("files/config/ci/tddconfig-sim-ul.json");
   cfg->GenData();
 
   auto event_queue = moodycamel::ConcurrentQueue<EventData>(2 * kNumIters);
