@@ -27,6 +27,7 @@ static constexpr size_t kMacAlignmentBytes = 64u;
 static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
+static constexpr bool kOutputFreqData = false;
 
 static const std::string kLogFilepath =
     TOSTRING(PROJECT_DIRECTORY) "/files/log/";
@@ -36,6 +37,10 @@ static const std::string kUlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_ul_data_";
 static const std::string kDlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_dl_data_";
+static const std::string kUlPilotFreqPrefix =
+    kExperimentFilepath + "ue_pilot_data_f_";
+static const std::string kUlDataFreqPrefix =
+    kExperimentFilepath + "ul_data_f_";
 
 Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -997,6 +1002,13 @@ void Config::GenData() {
                            : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
       ue_pilot_ifft[i][k] = this->ue_specific_pilot_[i][j];
     }
+    if (kOutputFreqData) {
+      std::string filename_ul_pilot_f =
+          kUlPilotFreqPrefix + std::to_string(i) + ".bin";
+      FILE* fp_tx_f = std::fopen(filename_ul_pilot_f.c_str(), "wb");
+      std::fwrite(ue_pilot_ifft[i], ofdm_ca_num_, sizeof(float) * 2, fp_tx_f);
+      std::fclose(fp_tx_f);
+    }
     CommsLib::IFFT(ue_pilot_ifft[i], ofdm_ca_num_, false);
   }
 
@@ -1176,6 +1188,17 @@ void Config::GenData() {
   ul_iq_ifft.Calloc(this->frame_.NumULSyms(),
                     this->ofdm_ca_num_ * this->ue_ant_num_,
                     Agora_memory::Alignment_t::kAlign64);
+  std::vector<FILE*> vec_fp_tx;
+  if (kOutputFreqData) {
+    for (size_t u = 0; u < this->ue_ant_num_; u++) {
+      std::string filename_ul_data_f = kUlDataFreqPrefix + ul_modulation_ + "_" +
+                                std::to_string(ofdm_data_num_) + "_" +
+                                std::to_string(ofdm_ca_num_) + "_1_" +
+                                std::to_string(this->frame_.NumULSyms()) +
+                                "_1_A_" + std::to_string(u) + ".bin";
+      vec_fp_tx.push_back(std::fopen(filename_ul_data_f.c_str(), "wb"));
+    }
+  }
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
     for (size_t u = 0; u < this->ue_ant_num_; u++) {
       size_t q = u * ofdm_data_num_;
@@ -1190,7 +1213,16 @@ void Config::GenData() {
                                                 : sc + ofdm_ca_num_ / 2;
         ul_iq_ifft[i][u * ofdm_ca_num_ + k] = ul_iq_f_[i][q + j];
       }
+      if (kOutputFreqData) {
+        std::fwrite(&ul_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_,
+                    sizeof(float) * 2, vec_fp_tx.at(u));
+      }
       CommsLib::IFFT(&ul_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
+    }
+  }
+  if (kOutputFreqData) {
+    for (size_t u = 0; u < vec_fp_tx.size(); u++) {
+      std::fclose(vec_fp_tx.at(u));
     }
   }
 
