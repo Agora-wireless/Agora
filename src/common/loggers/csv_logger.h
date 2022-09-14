@@ -31,10 +31,10 @@ enum CsvLogId {
 
 enum MatLogId { kULCSI, kDLCSI, kDlBeam, kMatLogs };
 
-constexpr size_t kAllLogs = kCsvLogs + kMatLogs;
+static constexpr size_t kAllLogs = kCsvLogs + kMatLogs;
 
 #if defined(ENABLE_CSV_LOG)
-const std::array<std::string, kAllLogs> kCsvName = {
+static const std::array<std::string, kAllLogs> kCsvName = {
     "snr", "rssi", "noise", "evm",   "evmsc", "evmsnr",
     "ber", "ser",  "csi",   "ulcsi", "dlcsi", "dlbeam"};
 #endif

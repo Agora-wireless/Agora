@@ -39,8 +39,7 @@ static const std::string kDlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_dl_data_";
 static const std::string kUlPilotFreqPrefix =
     kExperimentFilepath + "ue_pilot_data_f_";
-static const std::string kUlDataFreqPrefix =
-    kExperimentFilepath + "ul_data_f_";
+static const std::string kUlDataFreqPrefix = kExperimentFilepath + "ul_data_f_";
 
 Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -1191,11 +1190,11 @@ void Config::GenData() {
   std::vector<FILE*> vec_fp_tx;
   if (kOutputUlFreqData) {
     for (size_t u = 0; u < this->ue_ant_num_; u++) {
-      std::string filename_ul_data_f = kUlDataFreqPrefix + ul_modulation_ + "_" +
-                                std::to_string(ofdm_data_num_) + "_" +
-                                std::to_string(ofdm_ca_num_) + "_1_" +
-                                std::to_string(this->frame_.NumULSyms()) +
-                                "_1_A_" + std::to_string(u) + ".bin";
+      std::string filename_ul_data_f =
+          kUlDataFreqPrefix + ul_modulation_ + "_" +
+          std::to_string(ofdm_data_num_) + "_" + std::to_string(ofdm_ca_num_) +
+          "_1_" + std::to_string(this->frame_.NumULSyms()) + "_1_A_" +
+          std::to_string(u) + ".bin";
       vec_fp_tx.push_back(std::fopen(filename_ul_data_f.c_str(), "wb"));
     }
   }
