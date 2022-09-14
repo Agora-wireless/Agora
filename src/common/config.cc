@@ -27,7 +27,7 @@ static constexpr size_t kMacAlignmentBytes = 64u;
 static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
-static constexpr bool kOutputFreqData = false;
+static constexpr bool kOutputUlFreqData = false;
 
 static const std::string kLogFilepath =
     TOSTRING(PROJECT_DIRECTORY) "/files/log/";
@@ -1002,7 +1002,7 @@ void Config::GenData() {
                            : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
       ue_pilot_ifft[i][k] = this->ue_specific_pilot_[i][j];
     }
-    if (kOutputFreqData) {
+    if (kOutputUlFreqData) {
       std::string filename_ul_pilot_f =
           kUlPilotFreqPrefix + std::to_string(i) + ".bin";
       FILE* fp_tx_f = std::fopen(filename_ul_pilot_f.c_str(), "wb");
@@ -1189,7 +1189,7 @@ void Config::GenData() {
                     this->ofdm_ca_num_ * this->ue_ant_num_,
                     Agora_memory::Alignment_t::kAlign64);
   std::vector<FILE*> vec_fp_tx;
-  if (kOutputFreqData) {
+  if (kOutputUlFreqData) {
     for (size_t u = 0; u < this->ue_ant_num_; u++) {
       std::string filename_ul_data_f = kUlDataFreqPrefix + ul_modulation_ + "_" +
                                 std::to_string(ofdm_data_num_) + "_" +
@@ -1213,14 +1213,14 @@ void Config::GenData() {
                                                 : sc + ofdm_ca_num_ / 2;
         ul_iq_ifft[i][u * ofdm_ca_num_ + k] = ul_iq_f_[i][q + j];
       }
-      if (kOutputFreqData) {
+      if (kOutputUlFreqData) {
         std::fwrite(&ul_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_,
                     sizeof(float) * 2, vec_fp_tx.at(u));
       }
       CommsLib::IFFT(&ul_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
     }
   }
-  if (kOutputFreqData) {
+  if (kOutputUlFreqData) {
     for (size_t u = 0; u < vec_fp_tx.size(); u++) {
       std::fclose(vec_fp_tx.at(u));
     }
