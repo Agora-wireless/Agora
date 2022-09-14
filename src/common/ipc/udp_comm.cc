@@ -12,6 +12,7 @@
 
 #include <cstring> /* std::strerror, std::memset, std::memcpy */
 #include <stdexcept>
+#include <utility>
 
 #include "logger.h"
 #include "network_utils.h"
@@ -21,12 +22,12 @@ static const std::string kDefaultAddress = "127.0.0.1";
 
 UDPComm::UDPComm(std::string local_addr, uint16_t local_port,
                  size_t rx_buffer_size, size_t tx_buffer_size)
-    : UDPComm(local_addr,
+    : UDPComm(std::move(local_addr),
               (local_port == 0) ? std::string() : std::to_string(local_port),
               rx_buffer_size, tx_buffer_size) {}
 
 /// getaddrinfo() -> socket -> bind (for local address/port assignment)
-UDPComm::UDPComm(std::string local_addr, std::string local_port,
+UDPComm::UDPComm(std::string local_addr, const std::string& local_port,
                  size_t rx_buffer_size, size_t tx_buffer_size) {
   std::string bound_port;
 
@@ -35,7 +36,7 @@ UDPComm::UDPComm(std::string local_addr, std::string local_port,
     local_addr = kDefaultAddress;
   }
 
-  auto local_info = agora_comm::GetAddressInfo(local_addr, local_port);
+  auto* local_info = agora_comm::GetAddressInfo(local_addr, local_port);
   if (kDebugPrintUdpInit) {
     agora_comm::PrintAddressInfo(local_info);
   }
@@ -208,9 +209,9 @@ UDPComm::~UDPComm() {
    * @return Connect for DGRAM sockets just indicates a 1:1 socket
    */
 ssize_t UDPComm::Connect(const std::string& remote_address,
-                         const std::string& remote_port) {
+                         const std::string& remote_port) const {
   /// Find the local interface
-  auto remote_address_info =
+  auto* remote_address_info =
       agora_comm::GetAddressInfo(remote_address, remote_port);
   if (kDebugPrintUdpInit) {
     agora_comm::PrintAddressInfo(remote_address_info);
@@ -247,7 +248,7 @@ ssize_t UDPComm::Connect(const std::string& remote_address,
 }
 
 ssize_t UDPComm::Connect(const std::string& remote_address,
-                         uint16_t remote_port) {
+                         uint16_t remote_port) const {
   std::string remote = std::to_string(remote_port);
   if (remote == "0") {
     remote.clear();

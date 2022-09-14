@@ -5,6 +5,15 @@
 
 #include "agora_worker.h"
 
+#include "concurrent_queue_wrapper.h"
+#include "csv_logger.h"
+#include "dobeamweights.h"
+#include "dodecode.h"
+#include "dodemul.h"
+#include "doencode.h"
+#include "dofft.h"
+#include "doifft.h"
+#include "doprecode.h"
 #include "logger.h"
 
 AgoraWorker::AgoraWorker(Config* cfg, Stats* stats, PhyStats* phy_stats,

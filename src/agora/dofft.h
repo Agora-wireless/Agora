@@ -8,10 +8,10 @@
 #include <complex>
 #include <cstdint>
 
-#include "armadillo"
 #include "common_typedef_sdk.h"
 #include "config.h"
 #include "doer.h"
+#include "memory_manage.h"
 #include "message.h"
 #include "mkl_dfti.h"
 #include "phy_stats.h"

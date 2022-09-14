@@ -5,14 +5,16 @@
 #ifndef DOPRECODE_H_
 #define DOPRECODE_H_
 
+#include <cstdint>
 #include <iostream>
 #include <vector>
 
-#include "armadillo"
+#include "common_typedef_sdk.h"
 #include "config.h"
 #include "doer.h"
 #include "memory_manage.h"
 #include "message.h"
+#include "mkl_dfti.h"
 #include "stats.h"
 #include "symbols.h"
 
