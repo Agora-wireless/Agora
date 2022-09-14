@@ -22,7 +22,7 @@ static constexpr size_t kReSyncRetryCount = 100u;
 static constexpr float kBeaconDetectWindow = 2.33f;
 static constexpr size_t kBeaconsToStart = 2;
 static constexpr bool kPrintClientBeaconSNR = true;
-static constexpr size_t kSampleOffsetThreshold = 5;
+static constexpr ssize_t kMaxBeaconAdjust = 5;
 
 TxRxWorkerClientHw::TxRxWorkerClientHw(
     size_t core_offset, size_t tid, size_t interface_count,
@@ -232,15 +232,21 @@ void TxRxWorkerClientHw::DoTxRx() {
                   rx_pkts.at(kSyncDetectChannel)->data_),
               samples_per_symbol, Configuration()->ClCorrScale().at(tid_));
           if (sync_index >= 0) {
-            rx_adjust_samples = sync_index - Configuration()->BeaconLen() -
-                                Configuration()->OfdmTxZeroPrefix();
-            AGORA_LOG_INFO(
-                "TxRxWorkerClientHw [%zu]: Re-syncing channel %zu, sync_index: "
-                "%ld, rx sample offset: %ld tries %zu\n",
-                tid_, kSyncDetectChannel, sync_index, rx_adjust_samples,
-                resync_retry_cnt);
-            if (static_cast<size_t>(std::abs(rx_adjust_samples)) <
-                kSampleOffsetThreshold) {
+            const ssize_t adjust = sync_index - Configuration()->BeaconLen() -
+                                   Configuration()->OfdmTxZeroPrefix();
+            if (std::abs(adjust) > kMaxBeaconAdjust) {
+              AGORA_LOG_WARN(
+                  "TxRxWorkerClientHw [%zu]: Re-syncing ignored due to excess "
+                  "offset %ld - channel %zu, sync_index: %ld, tries %zu\n ",
+                  tid_, adjust, kSyncDetectChannel, sync_index,
+                  resync_retry_cnt);
+            } else {
+              rx_adjust_samples = adjust;
+              AGORA_LOG_INFO(
+                  "TxRxWorkerClientHw [%zu]: Re-syncing channel %zu, "
+                  "sync_index: %ld, rx sample offset: %ld tries %zu\n ",
+                  tid_, kSyncDetectChannel, sync_index, rx_adjust_samples,
+                  resync_retry_cnt);
               resync_success++;
               resync = false;
               //Display all the other channels
@@ -265,11 +271,6 @@ void TxRxWorkerClientHw::DoTxRx() {
               //Adjust the transmit time offset
               time0 += rx_adjust_samples;
               resync_retry_cnt = 0;
-            } else {
-              AGORA_LOG_WARN(
-                  "TxRxWorkerClientHw [%zu]: Ignoring large rx sample offset\n",
-                  tid_);
-              rx_adjust_samples = 0;
             }
           } else {
             resync_retry_cnt++;

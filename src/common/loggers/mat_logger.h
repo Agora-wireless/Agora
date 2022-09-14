@@ -7,7 +7,7 @@
 #ifndef MAT_LOGGER_H_
 #define MAT_LOGGER_H_
 
-#include <cstdint>
+#include <cstddef>
 #include <string>
 
 #include "armadillo"

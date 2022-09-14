@@ -14,7 +14,8 @@ namespace agora_comm {
 int ListLocalInterfaces();
 //Returns a local interface address in presentation format
 std::string GetLocalAddressFromScope(size_t scope_id);
-::addrinfo* GetAddressInfo(std::string local_address, std::string local_port);
+::addrinfo* GetAddressInfo(const std::string& local_address,
+                           const std::string& local_port);
 void PrintAddressInfo(const ::addrinfo* print_info);
 }  // namespace agora_comm
 

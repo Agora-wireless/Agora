@@ -184,14 +184,14 @@ void DoPrecode::LoadInputData(size_t symbol_idx_dl,
 
 void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
                                size_t sc_id_in_block) {
-  auto* precoder_ptr = reinterpret_cast<arma::cx_float*>(
+  arma::cx_float* precoder_ptr = reinterpret_cast<arma::cx_float*>(
       dl_beam_matrices_[frame_slot][cfg_->GetBeamScId(sc_id)]);
-  auto* data_ptr = reinterpret_cast<arma::cx_float*>(
+  arma::cx_float* data_ptr = reinterpret_cast<arma::cx_float*>(
       modulated_buffer_temp_ +
       (kUseSpatialLocality
            ? (sc_id_in_block % kSCsPerCacheline * cfg_->UeAntNum())
            : 0));
-  auto* precoded_ptr = reinterpret_cast<arma::cx_float*>(
+  arma::cx_float* precoded_ptr = reinterpret_cast<arma::cx_float*>(
       precoded_buffer_temp_ + sc_id_in_block * cfg_->BsAntNum());
 #if defined(USE_MKL_JIT)
   my_cgemm_(jitter_, (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,

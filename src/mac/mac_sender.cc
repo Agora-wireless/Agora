@@ -4,6 +4,7 @@
  */
 #include "mac_sender.h"
 
+#include <csignal>
 #include <thread>
 #include <utility>
 
@@ -176,7 +177,7 @@ void MacSender::StartTx() {
   this->frame_end_ = new double[kNumStatsFrames]();
 
   CreateWorkerThreads(worker_thread_num_);
-  signal(SIGINT, InterruptHandler);
+  std::signal(SIGINT, InterruptHandler);
   // Run the master thread (from current thread)
   MasterThread(kMasterThreadId);
 

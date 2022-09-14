@@ -178,7 +178,8 @@ std::string GetLocalAddressFromScope(size_t scope_id) {
   return local_address;
 }
 
-::addrinfo *GetAddressInfo(std::string address, std::string port) {
+::addrinfo *GetAddressInfo(const std::string &address,
+                           const std::string &port) {
   ::addrinfo *ret_info = nullptr;
   const char *node;
   const char *service;

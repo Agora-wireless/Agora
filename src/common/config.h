@@ -387,6 +387,7 @@ class Config {
   /// TODO document and review
   size_t GetSymbolId(size_t input_id) const;
 
+  bool IsBeacon(size_t /*frame_id*/, size_t /*symbol_id*/) const;
   bool IsPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
   bool IsDlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
   bool IsCalDlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
@@ -416,6 +417,36 @@ class Config {
   inline size_t GetTotalDataSymbolIdxDl(size_t frame_id,
                                         size_t symbol_idx_dl) const {
     return ((frame_id % kFrameWnd) * this->frame_.NumDLSyms() + symbol_idx_dl);
+  }
+
+  //Returns Beacon+Dl symbol index
+  inline size_t GetBeaconDlIdx(size_t symbol_id) const {
+    size_t symbol_idx = SIZE_MAX;
+    const auto type = GetSymbolType(symbol_id);
+    if (type == SymbolType::kBeacon) {
+      symbol_idx = Frame().GetBeaconSymbolIdx(symbol_id);
+    } else if (type == SymbolType::kDL) {
+      symbol_idx = Frame().GetDLSymbolIdx(symbol_id) + Frame().NumBeaconSyms();
+    } else {
+      throw std::runtime_error("Invalid BS Beacon or DL symbol id " +
+                               std::to_string(symbol_id));
+    }
+    return symbol_idx;
+  }
+
+  //Returns Pilot+Ul symbol index
+  inline size_t GetPilotUlIdx(size_t symbol_id) const {
+    size_t symbol_idx = SIZE_MAX;
+    const auto type = GetSymbolType(symbol_id);
+    if (type == SymbolType::kPilot) {
+      symbol_idx = Frame().GetPilotSymbolIdx(symbol_id);
+    } else if (type == SymbolType::kUL) {
+      symbol_idx = Frame().GetULSymbolIdx(symbol_id) + Frame().NumPilotSyms();
+    } else {
+      throw std::runtime_error("Invalid Ue Pilot or UL symbol id " +
+                               std::to_string(symbol_id));
+    }
+    return symbol_idx;
   }
 
   /// Return the frame duration in seconds
