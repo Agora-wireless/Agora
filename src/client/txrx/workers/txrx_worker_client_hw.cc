@@ -7,10 +7,13 @@
 #include "txrx_worker_client_hw.h"
 
 #include <cassert>
-#include <climits>
 #include <complex>
 
+#include "comms-lib.h"
+#include "datatype_conversion.h"
+#include "gettime.h"
 #include "logger.h"
+#include "message.h"
 
 static constexpr bool kDebugBeaconChannels = false;
 static constexpr size_t kSyncDetectChannel = 0;
@@ -20,8 +23,6 @@ static constexpr float kBeaconDetectWindow = 2.33f;
 static constexpr size_t kBeaconsToStart = 2;
 static constexpr bool kPrintClientBeaconSNR = true;
 static constexpr size_t kSampleOffsetThreshold = 5;
-
-static constexpr float kShortMaxFloat = SHRT_MAX;
 
 TxRxWorkerClientHw::TxRxWorkerClientHw(
     size_t core_offset, size_t tid, size_t interface_count,
@@ -172,7 +173,7 @@ void TxRxWorkerClientHw::DoTxRx() {
         for (size_t ch = 0; ch < channels_per_interface_; ch++) {
           const ssize_t sync_index = FindSyncBeacon(
               reinterpret_cast<std::complex<int16_t>*>(rx_pkts.at(ch)->data_),
-              samples_per_symbol);
+              samples_per_symbol, Configuration()->ClCorrScale().at(tid_));
           if (sync_index >= 0) {
             rx_adjust_samples = sync_index - Configuration()->BeaconLen() -
                                 Configuration()->OfdmTxZeroPrefix();
@@ -226,10 +227,10 @@ void TxRxWorkerClientHw::DoTxRx() {
         if (resync &&
             (rx_symbol_id == Configuration()->Frame().GetBeaconSymbolLast())) {
           //This is adding a race condition on this data, it is ok for now but we should fix this
-          const ssize_t sync_index =
-              FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
-                                 rx_pkts.at(kSyncDetectChannel)->data_),
-                             samples_per_symbol);
+          const ssize_t sync_index = FindSyncBeacon(
+              reinterpret_cast<std::complex<int16_t>*>(
+                  rx_pkts.at(kSyncDetectChannel)->data_),
+              samples_per_symbol, Configuration()->ClCorrScale().at(tid_));
           if (sync_index >= 0) {
             rx_adjust_samples = sync_index - Configuration()->BeaconLen() -
                                 Configuration()->OfdmTxZeroPrefix();
@@ -249,7 +250,8 @@ void TxRxWorkerClientHw::DoTxRx() {
                     const ssize_t aux_channel_sync =
                         FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
                                            rx_pkts.at(ch)->data_),
-                                       samples_per_symbol);
+                                       samples_per_symbol,
+                                       Configuration()->ClCorrScale().at(tid_));
                     AGORA_LOG_INFO(
                         "TxRxWorkerClientHw [%zu]: beacon status channel %zu, "
                         "sync_index: %ld, rx sample offset: %ld\n",
@@ -601,13 +603,14 @@ ssize_t TxRxWorkerClientHw::SyncBeacon(size_t local_interface,
 }
 
 ssize_t TxRxWorkerClientHw::FindSyncBeacon(
-    const std::complex<int16_t>* check_data, size_t sample_window) {
+    const std::complex<int16_t>* check_data, size_t sample_window,
+    float corr_scale) {
   ssize_t sync_index = -1;
   assert(sample_window <= (Configuration()->SampsPerSymbol() *
                            Configuration()->Frame().NumTotalSyms()));
 
   sync_index = CommsLib::FindBeaconAvx(check_data, Configuration()->GoldCf32(),
-                                       sample_window);
+                                       sample_window, corr_scale);
 
   if (kPrintClientBeaconSNR && (sync_index >= 0) &&
       ((sync_index + Configuration()->BeaconLen()) < sample_window)) {
@@ -616,14 +619,16 @@ ssize_t TxRxWorkerClientHw::FindSyncBeacon(
     float noise_power = 0;
     for (size_t i = 0; i < Configuration()->BeaconLen(); i++) {
       const size_t power_idx = sync_index - i;
-      const std::complex<float> power_value = (std::complex<float>(
-          static_cast<float>(check_data[power_idx].real()) / kShortMaxFloat,
-          static_cast<float>(check_data[power_idx].imag()) / kShortMaxFloat));
-
       const size_t noise_idx = sync_index + i + 1;
-      const std::complex<float> noise_value = (std::complex<float>(
-          static_cast<float>(check_data[noise_idx].real()) / kShortMaxFloat,
-          static_cast<float>(check_data[noise_idx].imag()) / kShortMaxFloat));
+      std::complex<float> power_value;
+      std::complex<float> noise_value;
+      ConvertShortToFloat(
+          reinterpret_cast<const short*>(&check_data[power_idx]),
+          reinterpret_cast<float*>(&power_value), 2);
+
+      ConvertShortToFloat(
+          reinterpret_cast<const short*>(&check_data[noise_idx]),
+          reinterpret_cast<float*>(&noise_value), 2);
 
       sig_power += std::pow(std::abs(power_value), 2);
       noise_power += std::pow(std::abs(noise_value), 2);

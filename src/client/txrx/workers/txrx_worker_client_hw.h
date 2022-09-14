@@ -10,8 +10,8 @@
 #include <memory>
 #include <vector>
 
-#include "buffer.h"
 #include "client_radio.h"
+#include "message.h"
 #include "rx_status_tracker.h"
 #include "txrx_worker.h"
 
@@ -41,7 +41,7 @@ class TxRxWorkerClientHw : public TxRxWorker {
 
   ssize_t SyncBeacon(size_t local_interface, size_t sample_window);
   ssize_t FindSyncBeacon(const std::complex<int16_t>* check_data,
-                         size_t sample_window);
+                         size_t sample_window, float corr_scale = 1.f);
   void AdjustRx(size_t local_interface, size_t discard_samples);
   bool IsRxSymbol(size_t symbol_id);
   void TxUplinkSymbols(size_t radio_id, size_t frame_id, long long time0);

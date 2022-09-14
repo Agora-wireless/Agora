@@ -9,11 +9,15 @@
 
 #include "config.h"
 
-#include <boost/range/algorithm/count.hpp>
 #include <ctime>
+#include <filesystem>
 #include <utility>
 
+#include "comms-lib.h"
+#include "gettime.h"
 #include "logger.h"
+#include "message.h"
+#include "modulation.h"
 #include "scrambler.h"
 #include "utils_ldpc.h"
 
@@ -23,6 +27,15 @@ static constexpr size_t kMacAlignmentBytes = 64u;
 static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
+
+static const std::string kLogFilepath =
+    TOSTRING(PROJECT_DIRECTORY) "/files/log/";
+static const std::string kExperimentFilepath =
+    TOSTRING(PROJECT_DIRECTORY) "/files/experiment/";
+static const std::string kUlDataFilePrefix =
+    kExperimentFilepath + "LDPC_orig_ul_data_";
+static const std::string kDlDataFilePrefix =
+    kExperimentFilepath + "LDPC_orig_dl_data_";
 
 Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -234,6 +247,7 @@ Config::Config(std::string jsonfilename)
   bs_server_addr_ = tdd_conf.value("bs_server_addr", "127.0.0.1");
   bs_rru_addr_ = tdd_conf.value("bs_rru_addr", "127.0.0.1");
   ue_server_addr_ = tdd_conf.value("ue_server_addr", "127.0.0.1");
+  ue_rru_addr_ = tdd_conf.value("ue_rru_addr", "127.0.0.1");
   mac_remote_addr_ = tdd_conf.value("mac_remote_addr", "127.0.0.1");
   bs_server_port_ = tdd_conf.value("bs_server_port", 8000);
   bs_rru_port_ = tdd_conf.value("bs_rru_port", 9000);
@@ -495,6 +509,23 @@ Config::Config(std::string jsonfilename)
     cl_tx_advance_.assign(tx_advance.begin(), tx_advance.end());
   }
 
+  auto corr_scale = tdd_conf.value("corr_scale", json::array());
+  if (corr_scale.empty()) {
+    cl_corr_scale_.resize(ue_num_, 1.f);
+  } else {
+    RtAssert(corr_scale.size() == ue_num_,
+             "corr_scale size must be same as the number of clients!");
+    cl_corr_scale_.assign(corr_scale.begin(), corr_scale.end());
+  }
+
+  if (std::filesystem::is_directory(kExperimentFilepath) == false) {
+    std::filesystem::create_directory(kExperimentFilepath);
+  }
+
+  if (std::filesystem::is_directory(kLogFilepath) == false) {
+    std::filesystem::create_directory(kLogFilepath);
+  }
+
   // set trace file path
   auto time = std::time(nullptr);
   auto local_time = *std::localtime(&time);
@@ -508,10 +539,10 @@ Config::Config(std::string jsonfilename)
                std::to_string(local_time.tm_hour) + "-" +
                std::to_string(local_time.tm_min) + "-" +
                std::to_string(local_time.tm_sec) + "_";
-  std::string filename = "trace-" + ul_present_str + dl_present_str +
-                         timestamp_ + std::to_string(num_cells_) + "_" +
-                         std::to_string(BsAntNum()) + "x" +
-                         std::to_string(UeAntTotal()) + ".hdf5";
+  std::string filename =
+      kLogFilepath + "trace-" + ul_present_str + dl_present_str + timestamp_ +
+      std::to_string(num_cells_) + "_" + std::to_string(BsAntNum()) + "x" +
+      std::to_string(UeAntTotal()) + ".hdf5";
   trace_file_ = tdd_conf.value("trace_file", filename);
 
   // Agora configurations
@@ -1006,11 +1037,10 @@ void Config::GenData() {
     }
   }
 #else
-  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   if (this->frame_.NumUlDataSyms() > 0) {
-    std::string ul_data_file = cur_directory + "/data/LDPC_orig_ul_data_" +
-                               std::to_string(this->ofdm_ca_num_) + "_ant" +
-                               std::to_string(this->ue_ant_total_) + ".bin";
+    const std::string ul_data_file =
+        kUlDataFilePrefix + std::to_string(this->ofdm_ca_num_) + "_ant" +
+        std::to_string(this->ue_ant_total_) + ".bin";
     AGORA_LOG_SYMBOL("Config: Reading raw ul data from %s\n",
                      ul_data_file.c_str());
     FILE* fd = std::fopen(ul_data_file.c_str(), "rb");
@@ -1056,9 +1086,9 @@ void Config::GenData() {
   }
 
   if (this->frame_.NumDlDataSyms() > 0) {
-    std::string dl_data_file = cur_directory + "/data/LDPC_orig_dl_data_" +
-                               std::to_string(this->ofdm_ca_num_) + "_ant" +
-                               std::to_string(this->ue_ant_total_) + ".bin";
+    const std::string dl_data_file =
+        kDlDataFilePrefix + std::to_string(this->ofdm_ca_num_) + "_ant" +
+        std::to_string(this->ue_ant_total_) + ".bin";
 
     AGORA_LOG_SYMBOL("Config: Reading raw dl data from %s\n",
                      dl_data_file.c_str());
@@ -1243,25 +1273,27 @@ void Config::GenData() {
   }
 
   // Find normalization factor through searching for max value in IFFT results
-  float max_val = CommsLib::FindMaxAbs(ul_iq_ifft, this->frame_.NumULSyms(),
-                                       this->ue_ant_num_ * this->ofdm_ca_num_);
-  float cur_max_val =
+  float ul_max_mag =
+      CommsLib::FindMaxAbs(ul_iq_ifft, this->frame_.NumULSyms(),
+                           this->ue_ant_num_ * this->ofdm_ca_num_);
+  float dl_max_mag =
       CommsLib::FindMaxAbs(dl_iq_ifft, this->frame_.NumDLSyms(),
                            this->ue_ant_num_ * this->ofdm_ca_num_);
-  if (cur_max_val > max_val) {
-    max_val = cur_max_val;
-  }
-  cur_max_val = CommsLib::FindMaxAbs(ue_pilot_ifft, this->ue_ant_num_,
-                                     this->ofdm_ca_num_);
-  if (cur_max_val > max_val) {
-    max_val = cur_max_val;
-  }
-  cur_max_val = CommsLib::FindMaxAbs(pilot_ifft, this->ofdm_ca_num_);
-  if (cur_max_val > max_val) {
-    max_val = cur_max_val;
-  }
+  float ue_pilot_max_mag = CommsLib::FindMaxAbs(
+      ue_pilot_ifft, this->ue_ant_num_, this->ofdm_ca_num_);
+  float pilot_max_mag = CommsLib::FindMaxAbs(pilot_ifft, this->ofdm_ca_num_);
+  // additional 2^2 (6dB) power backoff
+  this->scale_ =
+      2 * std::max({ul_max_mag, dl_max_mag, ue_pilot_max_mag, pilot_max_mag});
 
-  this->scale_ = 2 * max_val;  // additional 2^2 (6dB) power backoff
+  float dl_papr = dl_max_mag /
+                  CommsLib::FindMeanAbs(dl_iq_ifft, this->frame_.NumDLSyms(),
+                                        this->ue_ant_num_ * this->ofdm_ca_num_);
+  float ul_papr = ul_max_mag /
+                  CommsLib::FindMeanAbs(ul_iq_ifft, this->frame_.NumULSyms(),
+                                        this->ue_ant_num_ * this->ofdm_ca_num_);
+  std::printf("Uplink PAPR %2.2f dB, Downlink PAPR %2.2f dB\n",
+              10 * std::log10(ul_papr), 10 * std::log10(dl_papr));
 
   // Generate time domain symbols for downlink
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {

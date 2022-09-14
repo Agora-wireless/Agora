@@ -17,8 +17,10 @@ DEFINE_uint64(
     "Number of worker threads handling packet transmissions to BS and UE "
     "Antennas");
 DEFINE_uint64(core_offset, 0, "Core ID of the first channel_sim thread");
-DEFINE_string(conf_file, TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim.json",
-              "Config filename");
+DEFINE_string(
+    conf_file,
+    TOSTRING(PROJECT_DIRECTORY) "/files/config/ci/tddconfig-sim-both.json",
+    "Config filename");
 DEFINE_string(chan_model, "RAYLEIGH", "Simulator Channel Type: RAYLEIGH/AWGN");
 DEFINE_double(chan_snr, 20.0, "Signal-to-Noise Ratio");
 

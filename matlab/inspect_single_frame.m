@@ -100,29 +100,43 @@ function inspect_single_frame(dataset_filename, inspect_frame, verbose)
 
     clear dataset_filename group_id;
     clear beacon_syms cp_len data_size data_start data_stop dl_pilot_symbols samples_per_slot tx_zero_prefix_len total_dl_symbols fft_size;
-    [demul_data, data_sc_idx, evm, snr] = process_rx_frame(configs, tx_pilot_cxdouble, tx_data_cxdouble, rx_pilot_cxdouble, rx_data_cxdouble);
+    [demul_data, data_sc_idx, evm, snr, rf_snr, tx_waveform] = process_rx_frame(configs, tx_pilot_cxdouble, tx_data_cxdouble, rx_pilot_cxdouble, rx_data_cxdouble);
+
     clear configs tx_pilot_cxdouble rx_pilot_cxdouble rx_data_cxdouble;
 
     %Plot Rx waveform
     for u = 1:total_users
-        combined_rx = vertcat(rx_beacon_cxdouble(:, u), reshape(squeeze(rx_syms_cxdouble(:, u, :)), [], 1));
+        combined_rx = reshape(squeeze(rx_syms_cxdouble(:, u, :)), [], 1);
         figure('Name', ['User ' num2str(u) ', Frame ' num2str(inspect_frame) ' Receive WaveForm' ]);
         tiledlayout(2,1)
         %Top (Real)
         nexttile;
         plot(real(combined_rx));
-        axis([0 inf -1 1]);
+        %axis([0 inf -1 1]);
         title('Rx Real (I)');
         %Bottom (Q)
         nexttile;
         plot(imag(combined_rx));
-        axis([0 inf -1 1]);
+        %axis([0 inf -1 1]);
         title('Rx Imag (Q)');
+        combined_tx = reshape(squeeze(tx_waveform(:, u, :)), [], 1);
+        figure('Name', ['User ' num2str(u) ', Frame ' num2str(inspect_frame) ' Transmit WaveForm' ]);
+        tiledlayout(2,1)
+        %Top (Real)
+        nexttile;
+        plot(real(combined_tx));
+        %axis([0 inf -1 1]);
+        title('Tx Real (I)');
+        %Bottom (Q)
+        nexttile;
+        plot(imag(combined_tx));
+        %axis([0 inf -1 1]);
+        title('Tx Imag (Q)');
     end
 
     for u=1:total_users
         rx_cnstl = demul_data(data_sc_idx, : , u);
-        tx_cnstl = tx_data_cxdouble(data_sc_idx, :, u);
+        tx_cnstl = tx_data_cxdouble(data_sc_idx, u, :);
         figure('Name', ['Constellation [User ', num2str(u), ']']);
         pt_size = 15;
         scatter(real(rx_cnstl(:)), imag(rx_cnstl(:)),pt_size,'r','filled');
@@ -136,6 +150,7 @@ function inspect_single_frame(dataset_filename, inspect_frame, verbose)
     precision = 3;
     disp(['Frame Inspect: ', num2str(inspect_frame)]);
     disp(['Beacon RSSI (dB): ', mat2str(rx_beacon_rssi.', precision)]);
-    disp(['SNR: ', mat2str(snr, precision)]);
-    disp(['EVM: ', mat2str(evm, precision)]);
+    disp(['Pilot SNR (dB): ', mat2str(rf_snr, precision)]);
+    disp(['EVM SNR (dB): ', mat2str(snr, precision)]);
+    disp(['EVM (%): ', mat2str(evm, precision)]);
 end

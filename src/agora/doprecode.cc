@@ -5,6 +5,7 @@
 #include "doprecode.h"
 
 #include "concurrent_queue_wrapper.h"
+#include "modulation.h"
 
 static constexpr bool kUseSpatialLocality = true;
 
@@ -27,7 +28,7 @@ DoPrecode::DoPrecode(
                 cfg_->DemulBlockSize() * cfg_->BsAntNum(),
                 Agora_memory::Alignment_t::kAlign64, 0);
 
-#if USE_MKL_JIT
+#if defined(USE_MKL_JIT)
   MKL_Complex8 alpha = {1, 0};
   MKL_Complex8 beta = {0, 0};
   // Input: A: BsAntNum() x UeAntNum() , B: UeAntNum() x 1
@@ -53,7 +54,7 @@ DoPrecode::~DoPrecode() {
   FreeBuffer1d(&modulated_buffer_temp_);
   FreeBuffer1d(&precoded_buffer_temp_);
 
-#if USE_MKL_JIT
+#if defined(USE_MKL_JIT)
   mkl_jit_status_t status = mkl_jit_destroy(jitter_);
   if (MKL_JIT_ERROR == status) {
     std::fprintf(stderr, "!!!!Error: Error while destorying MKL JIT\n");
@@ -192,7 +193,7 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
            : 0));
   auto* precoded_ptr = reinterpret_cast<arma::cx_float*>(
       precoded_buffer_temp_ + sc_id_in_block * cfg_->BsAntNum());
-#if USE_MKL_JIT
+#if defined(USE_MKL_JIT)
   my_cgemm_(jitter_, (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
             (MKL_Complex8*)precoded_ptr);
 #else

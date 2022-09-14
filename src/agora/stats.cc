@@ -6,7 +6,16 @@
 
 #include <typeinfo>
 
+#include "gettime.h"
 #include "logger.h"
+
+static const std::string kProjectDir = TOSTRING(PROJECT_DIRECTORY);
+static const std::string kStatsOutputFilePath =
+    kProjectDir + "/files/experiment/";
+static const std::string kStatsDataFilename =
+    kStatsOutputFilePath + "timeresult.txt";
+static const std::string kStatsDetailedDataFilename =
+    kStatsOutputFilePath + "timeresult_detail.txt";
 
 Stats::Stats(const Config* const cfg)
     : config_(cfg),
@@ -140,10 +149,9 @@ void Stats::UpdateStats(size_t frame_id) {
 }
 
 void Stats::SaveToFile() {
-  const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  const std::string filename = cur_directory + "/data/timeresult.txt";
-  AGORA_LOG_INFO("Stats: Saving master timestamps to %s\n", filename.c_str());
-  FILE* fp_debug = std::fopen(filename.c_str(), "w");
+  AGORA_LOG_INFO("Stats: Saving master timestamps to %s\n",
+                 kStatsDataFilename.c_str());
+  FILE* fp_debug = std::fopen(kStatsDataFilename.c_str(), "w");
   RtAssert(fp_debug != nullptr,
            std::string("Open file failed ") + std::to_string(errno));
 
@@ -261,12 +269,11 @@ void Stats::SaveToFile() {
   std::fclose(fp_debug);
 
   if (kIsWorkerTimingEnabled == true) {
-    std::string filename_detailed =
-        cur_directory + "/data/timeresult_detail.txt";
     AGORA_LOG_INFO("Stats: Printing detailed results to %s\n",
-                   filename_detailed.c_str());
+                   kStatsDetailedDataFilename.c_str());
 
-    FILE* fp_debug_detailed = std::fopen(filename_detailed.c_str(), "w");
+    FILE* fp_debug_detailed =
+        std::fopen(kStatsDetailedDataFilename.c_str(), "w");
     RtAssert(fp_debug_detailed != nullptr,
              std::string("Open file failed ") + std::to_string(errno));
     // Print the header
@@ -441,4 +448,224 @@ void Stats::PrintSummary() {
       std::printf("\n");
     }
   }  // kIsWorkerTimingEnabled == true
+}
+
+void Stats::PrintPerFrameDone(PrintType print_type, size_t frame_id) const {
+  if (kDebugPrintPerFrameDone == true) {
+    switch (print_type) {
+      case (PrintType::kPacketRXPilots):
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Received all pilots\n",
+                       frame_id,
+                       MasterGetDeltaMs(TsType::kPilotAllRX,
+                                        TsType::kFirstSymbolRX, frame_id));
+        break;
+      case (PrintType::kPacketRX):
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Received all packets\n",
+                       frame_id,
+                       MasterGetDeltaMs(TsType::kRXDone, TsType::kFirstSymbolRX,
+                                        frame_id));
+        break;
+      case (PrintType::kFFTPilots):
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: FFT-ed all pilots\n",
+                       frame_id,
+                       MasterGetDeltaMs(TsType::kFFTPilotsDone,
+                                        TsType::kFirstSymbolRX, frame_id));
+        break;
+      case (PrintType::kFFTCal):
+        AGORA_LOG_INFO(
+            "Main [frame %zu + %.2f ms]: FFT-ed all calibration symbols\n",
+            frame_id, MasterGetUsSince(TsType::kRCAllRX, frame_id) / 1000.0);
+        break;
+      case (PrintType::kBeam):
+        AGORA_LOG_INFO(
+            "Main [frame %zu + %.2f ms]: Completed %s beamweight calc\n",
+            frame_id,
+            MasterGetDeltaMs(TsType::kBeamDone, TsType::kFirstSymbolRX,
+                             frame_id),
+            config_->Beamforming().c_str());
+        break;
+      case (PrintType::kDemul):
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed demodulation\n",
+                       frame_id,
+                       MasterGetDeltaMs(TsType::kDemulDone,
+                                        TsType::kFirstSymbolRX, frame_id));
+        break;
+      case (PrintType::kDecode):
+        AGORA_LOG_INFO(
+            "Main [frame %zu + %.2f ms]: Completed LDPC decoding (%zu UL "
+            "symbols)\n",
+            frame_id,
+            MasterGetDeltaMs(TsType::kDecodeDone, TsType::kFirstSymbolRX,
+                             frame_id),
+            this->config_->Frame().NumULSyms());
+        break;
+      case (PrintType::kPacketFromMac):
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed MAC RX \n",
+                       frame_id,
+                       MasterGetMsSince(TsType::kFirstSymbolRX, frame_id));
+        break;
+      case (PrintType::kEncode):
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed LDPC encoding\n",
+                       frame_id,
+                       MasterGetDeltaMs(TsType::kEncodeDone,
+                                        TsType::kFirstSymbolRX, frame_id));
+        break;
+      case (PrintType::kPrecode):
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed precoding\n",
+                       frame_id,
+                       MasterGetDeltaMs(TsType::kPrecodeDone,
+                                        TsType::kFirstSymbolRX, frame_id));
+        break;
+      case (PrintType::kIFFT):
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed IFFT\n", frame_id,
+                       MasterGetDeltaMs(TsType::kIFFTDone,
+                                        TsType::kFirstSymbolRX, frame_id));
+        break;
+      case (PrintType::kPacketTXFirst):
+        AGORA_LOG_INFO(
+            "Main [frame %zu + %.2f ms]: Completed TX of first symbol\n",
+            frame_id,
+            MasterGetDeltaMs(TsType::kTXProcessedFirst, TsType::kFirstSymbolRX,
+                             frame_id));
+        break;
+      case (PrintType::kPacketTX):
+        AGORA_LOG_INFO(
+            "Main [frame %zu + %.2f ms]: Completed TX (%zu DL symbols)\n",
+            frame_id,
+            MasterGetDeltaMs(TsType::kTXDone, TsType::kFirstSymbolRX, frame_id),
+            this->config_->Frame().NumDLSyms());
+        break;
+      case (PrintType::kPacketToMac):
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed MAC TX \n",
+                       frame_id,
+                       MasterGetMsSince(TsType::kFirstSymbolRX, frame_id));
+        break;
+      default:
+        AGORA_LOG_ERROR("Wrong task type in frame done print!");
+    }
+  }
+}
+
+void Stats::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
+                               size_t symbol_id, size_t sub_count) const {
+  if (kDebugPrintPerSymbolDone == true) {
+    switch (print_type) {
+      case (PrintType::kFFTPilots):
+        AGORA_LOG_INFO(
+            "Main [frame %zu symbol %zu + %.3f ms]: FFT-ed pilot symbol, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            MasterGetMsSince(TsType::kFirstSymbolRX, frame_id), sub_count);
+        break;
+      case (PrintType::kFFTData):
+        AGORA_LOG_INFO(
+            "Main [frame %zu symbol %zu + %.3f ms]: FFT-ed data symbol, "
+            "%zu symbols done\n",  //precoder status: %d\n",
+            frame_id, symbol_id,
+            MasterGetMsSince(TsType::kFirstSymbolRX, frame_id), sub_count);
+        break;
+      case (PrintType::kDemul):
+        AGORA_LOG_INFO(
+            "Main [frame %zu symbol %zu + %.3f ms]: Completed "
+            "demodulation, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            MasterGetMsSince(TsType::kFirstSymbolRX, frame_id), sub_count);
+        break;
+      case (PrintType::kDecode):
+        AGORA_LOG_INFO(
+            "Main [frame %zu symbol %zu + %.3f ms]: Completed decoding, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            MasterGetMsSince(TsType::kFirstSymbolRX, frame_id), sub_count);
+        break;
+      case (PrintType::kEncode):
+        AGORA_LOG_INFO(
+            "Main [frame %zu symbol %zu + %.3f ms]: Completed encoding, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            MasterGetMsSince(TsType::kFirstSymbolRX, frame_id), sub_count);
+        break;
+      case (PrintType::kPrecode):
+        AGORA_LOG_INFO(
+            "Main [frame %zu symbol %zu + %.3f ms]: Completed precoding, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            MasterGetMsSince(TsType::kFirstSymbolRX, frame_id), sub_count);
+        break;
+      case (PrintType::kIFFT):
+        AGORA_LOG_INFO(
+            "Main [frame %zu symbol %zu + %.3f ms]: Completed IFFT, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            MasterGetMsSince(TsType::kFirstSymbolRX, frame_id), sub_count);
+        break;
+      case (PrintType::kPacketTX):
+        AGORA_LOG_INFO(
+            "Main [frame %zu symbol %zu + %.3f ms]: Completed TX, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            MasterGetMsSince(TsType::kFirstSymbolRX, frame_id), sub_count);
+        break;
+      case (PrintType::kPacketToMac):
+        AGORA_LOG_INFO(
+            "Main [frame %zu symbol %zu + %.3f ms]: Completed MAC TX, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            MasterGetMsSince(TsType::kFirstSymbolRX, frame_id), sub_count);
+        break;
+      default:
+        AGORA_LOG_INFO("Wrong task type in symbol done print!");
+    }
+  }
+}
+
+void Stats::PrintPerTaskDone(PrintType print_type, size_t frame_id,
+                             size_t symbol_id, size_t ant_or_sc_id,
+                             size_t task_count) const {
+  if (kDebugPrintPerTaskDone == true) {
+    switch (print_type) {
+      case (PrintType::kBeam):
+        AGORA_LOG_INFO(
+            "Main thread: Beamweights done frame: %zu, subcarrier %zu\n",
+            frame_id, ant_or_sc_id);
+        break;
+      case (PrintType::kRC):
+        AGORA_LOG_INFO("Main thread: RC done frame: %zu, subcarrier %zu\n",
+                       frame_id, ant_or_sc_id);
+        break;
+      case (PrintType::kDemul):
+        AGORA_LOG_INFO(
+            "Main thread: Demodulation done frame: %zu, symbol: %zu, sc: "
+            "%zu, num blocks done: %zu\n",
+            frame_id, symbol_id, ant_or_sc_id, task_count);
+        break;
+      case (PrintType::kDecode):
+        AGORA_LOG_INFO(
+            "Main thread: Decoding done frame: %zu, symbol: %zu, sc: %zu, "
+            "num blocks done: %zu\n",
+            frame_id, symbol_id, ant_or_sc_id, task_count);
+        break;
+      case (PrintType::kPrecode):
+        AGORA_LOG_INFO(
+            "Main thread: Precoding done frame: %zu, symbol: %zu, "
+            "subcarrier: %zu, total SCs: %zu\n",
+            frame_id, symbol_id, ant_or_sc_id, task_count);
+        break;
+      case (PrintType::kIFFT):
+        AGORA_LOG_INFO(
+            "Main thread: IFFT done frame: %zu, symbol: %zu, antenna: %zu, "
+            "total ants: %zu\n",
+            frame_id, symbol_id, ant_or_sc_id, task_count);
+        break;
+      case (PrintType::kPacketTX):
+        AGORA_LOG_INFO(
+            "Main thread: TX done frame: %zu, symbol: %zu, antenna: %zu, "
+            "total packets: %zu\n",
+            frame_id, symbol_id, ant_or_sc_id, task_count);
+        break;
+      default:
+        AGORA_LOG_INFO("Wrong task type in task done print!");
+    }
+  }
 }

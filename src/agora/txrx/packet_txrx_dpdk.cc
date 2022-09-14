@@ -76,7 +76,7 @@ PacketTxRxDpdk::PacketTxRxDpdk(
     // Now assign dev / queues to each worker.
     for (size_t queue = 0; queue < queues_per_nic; queue++) {
       //Assign 1 queue to each interface
-      size_t worker_id = InterfaceToWorker(interface_id);
+      const size_t worker_id = InterfaceToWorker(interface_id);
       worker_dev_queue_assignment_.at(worker_id).push_back(
           std::make_pair(eth_device, queue));
 
@@ -121,8 +121,7 @@ PacketTxRxDpdk::~PacketTxRxDpdk() {
           AGORA_LOG_ERROR("Failed to close device %u: %s", eth_port,
                           rte_strerror(-ret_status));
         }
-        AGORA_LOG_INFO("PacketTxRxDpdk::Shuttdown down dev port %d\n",
-                       eth_port);
+        AGORA_LOG_INFO("PacketTxRxDpdk::Shutdown down dev port %d\n", eth_port);
       }
     }
   }
@@ -135,7 +134,7 @@ bool PacketTxRxDpdk::CreateWorker(size_t tid, size_t interface_count,
                                   size_t* rx_frame_start,
                                   std::vector<RxPacket>& rx_memory,
                                   std::byte* const tx_memory) {
-  RtAssert(kUseDPDK, "DPDK Mode must be enabled fro CreateWorker\n");
+  RtAssert(kUseDPDK, "DPDK Mode must be enabled to CreateWorker\n");
 
   const size_t num_channels = NumChannels();
   AGORA_LOG_INFO(
@@ -147,13 +146,17 @@ bool PacketTxRxDpdk::CreateWorker(size_t tid, size_t interface_count,
 
   //interface_count = number of ports (logical) to monitor
   //interface_offset = starting port (logical)
-  const unsigned int thread_l_core = tid + core_offset_;
+  unsigned int thread_l_core = tid;
+  for (size_t lcore_idx = 0; lcore_idx <= tid; lcore_idx++) {
+    // 1 to skip main core, 0 to disable wrap
+    thread_l_core = rte_get_next_lcore(thread_l_core, 1, 0);
+  }
 
   // Verify the lcore id is enabled (should have be inited with proper id)
-  int enabled = rte_lcore_is_enabled(thread_l_core);
-  if (!enabled) {
-    throw std::runtime_error(
-        "The lcore tid passed to CreateWorker is not enabled");
+  const int enabled = rte_lcore_is_enabled(thread_l_core);
+  if (enabled == false) {
+    throw std::runtime_error("The lcore " + std::to_string(thread_l_core) +
+                             " tid passed to CreateWorker is not enabled");
   }
 
   // launch communication and task thread onto specific core

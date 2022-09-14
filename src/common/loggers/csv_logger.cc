@@ -24,7 +24,7 @@ CsvLogger::CsvLogger([[maybe_unused]] size_t log_id,
   if (log_id >= kAllLogs) {
     AGORA_LOG_ERROR("Invalid log id %zu in CsvLogger\n", log_id);
   } else {
-    const std::string filename = "files/logs/" + timestamp + "/log-" +
+    const std::string filename = "files/log/" + timestamp + "/log-" +
                                  kCsvName.at(log_id) + "-" + radio_name +
                                  ".csv";
     std::remove(filename.c_str());  // delete file if already exists

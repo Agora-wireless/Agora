@@ -20,11 +20,14 @@ DEFINE_uint64(num_sender_update_threads, 1,
 DEFINE_uint64(num_receiver_threads, 1, "Number of mac client receiver threads");
 DEFINE_uint64(core_offset, 1, "Core ID of the first sender thread");
 DEFINE_uint64(frame_duration, 0, "Frame duration in microseconds");
-DEFINE_string(conf_file, TOSTRING(PROJECT_DIRECTORY) "/data/ue-mac-sim.json",
-              "Config filename");
-DEFINE_string(data_file,
-              TOSTRING(PROJECT_DIRECTORY) "/data/ul_increment_file.bin",
-              "Uplink transmit filename");
+DEFINE_string(
+    conf_file,
+    TOSTRING(PROJECT_DIRECTORY) "/files/config/examples/ue-mac-sim.json",
+    "Config filename");
+DEFINE_string(
+    data_file,
+    TOSTRING(PROJECT_DIRECTORY) "/files/experiment/ul_increment_file.bin",
+    "Uplink transmit filename");
 
 DEFINE_string(fwd_udp_address, "", "Forward decoded mac data to address");
 DEFINE_uint64(fwd_udp_port, 0,
@@ -57,7 +60,7 @@ int main(int argc, char* argv[]) {
     if (data_filename.empty()) {
       std::ofstream create_file;
       data_filename = TOSTRING(PROJECT_DIRECTORY) +
-                      std::string("/data/ul_increment_file.bin");
+                      std::string("/files/experiment/ul_increment_file.bin");
       AGORA_LOG_INFO(
           "Generating test binary file for user uplink %s.  Frames: "
           "%zu, Packets: %zu, Packet Size: %zu\n",

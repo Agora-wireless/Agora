@@ -9,7 +9,7 @@
 /// Measure performance of zeroforcing
 TEST(TestZF, Perf) {
   static constexpr size_t kNumIters = 10000;
-  auto cfg = std::make_unique<Config>("data/tddconfig-sim-ul.json");
+  auto cfg = std::make_unique<Config>("files/config/ci/tddconfig-sim-ul.json");
   cfg->GenData();
 
   int tid = 0;
@@ -45,10 +45,18 @@ TEST(TestZF, Perf) {
   auto phy_stats = std::make_unique<PhyStats>(cfg.get(), Direction::kUplink);
   auto stats = std::make_unique<Stats>(cfg.get());
 
+  std::array<std::shared_ptr<CsvLog::MatLogger>, CsvLog::kMatLogs> mat_loggers;
+  if (kEnableMatLog) {
+    for (size_t i = 0; i < mat_loggers.size(); i++) {
+      mat_loggers.at(i) =
+          std::make_shared<CsvLog::MatLogger>(i, cfg->Timestamp(), "BS");
+    }
+  }
+
   auto compute_zf = std::make_unique<DoBeamWeights>(
       cfg.get(), tid, csi_buffers, calib_dl_msum_buffer, calib_ul_msum_buffer,
       calib_dl_buffer, calib_ul_buffer, ul_zf_matrices, dl_zf_matrices,
-      phy_stats.get(), stats.get());
+      phy_stats.get(), stats.get(), mat_loggers);
 
   FastRand fast_rand;
   size_t start_tsc = GetTime::Rdtsc();

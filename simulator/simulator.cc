@@ -6,6 +6,8 @@
 
 #include <memory>
 
+#include "gettime.h"
+
 static const bool kDebugPrintAllRxSymbols = false;
 static const bool kDebugPrintSimSetup = true;
 
@@ -17,10 +19,7 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
       socket_rx_thread_num_(in_task_thread_num),
       socket_tx_thread_num_(in_task_thread_num),
       core_offset_(in_core_offset) {
-  std::string directory = TOSTRING(PROJECT_DIRECTORY);
-
   if (kDebugPrintSimSetup) {
-    std::printf("PROJECT_DIRECTORY: %s\n", directory.c_str());
     std::printf("Simulator: Main thread: on core %d\n", sched_getcpu());
     // setenv("MKL_THREADING_LAYER", "sequential", true /* overwrite */);
     // std::cout << "MKL_THREADING_LAYER =  " << getenv("MKL_THREADING_LAYER")
@@ -121,8 +120,9 @@ void Simulator::Start() {
   }        // end of while
   this->Stop();
   sender_.reset();
-  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string filename = cur_directory + "/data/timeresult_simulator.txt";
+  const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+  const std::string filename =
+      cur_directory + "/files/experiment/timeresult_simulator.txt";
   FILE* fp = std::fopen(filename.c_str(), "w");
   if (fp == nullptr) {
     std::printf("open file failed\n");

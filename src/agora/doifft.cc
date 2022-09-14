@@ -4,8 +4,10 @@
  */
 #include "doifft.h"
 
+#include "comms-lib.h"
 #include "concurrent_queue_wrapper.h"
 #include "datatype_conversion.h"
+#include "logger.h"
 
 static constexpr bool kPrintIFFTOutput = false;
 static constexpr bool kPrintSocketOutput = false;
@@ -133,9 +135,9 @@ EventData DoIFFT::Launch(size_t tag) {
   short* socket_ptr = &pkt->data_[2u * cfg_->OfdmTxZeroPrefix()];
 
   // IFFT scaled results by OfdmCaNum(), we scale down IFFT results
-  // during data type coversion
-  SimdConvertFloatToShort(ifft_out_ptr, socket_ptr, cfg_->OfdmCaNum(),
-                          cfg_->CpLen(), ifft_scale_factor_);
+  // during data type coversion.  * 2 complex float -> float
+  SimdConvertFloatToShort(ifft_out_ptr, socket_ptr, cfg_->OfdmCaNum() * 2,
+                          cfg_->CpLen() * 2, ifft_scale_factor_);
 
   duration_stat_->task_duration_[3u] += GetTime::WorkerRdtsc() - start_tsc2;
 

@@ -1,9 +1,23 @@
+#include <string>
+
 #include "agora.h"
+#include "datatype_conversion.h"
 #include "gflags/gflags.h"
 #include "logger.h"
+#include "signal_handler.h"
 
 static const bool kDebugPrintUlCorr = false;
 static const bool kDebugPrintDlCorr = false;
+
+static const std::string kInputFileDirectory =
+    TOSTRING(PROJECT_DIRECTORY) "/files/experiment/";
+static const std::string kUlCheckFilePrefix =
+    kInputFileDirectory + "LDPC_orig_ul_data_";
+static const std::string kDecodedFilename =
+    kInputFileDirectory + "decode_data.bin";
+static const std::string kDlCheckFilePrefix =
+    kInputFileDirectory + "LDPC_dl_tx_data_";
+static const std::string kTxFilename = kInputFileDirectory + "tx_data.bin";
 
 template <class TableType>
 static void ReadFromFile(const std::string& filename, Table<TableType>& data,
@@ -46,11 +60,9 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg) {
   int ofdm_data_num = cfg->OfdmDataNum();
   int ul_pilot_syms = cfg->Frame().ClientUlPilotSymbols();
 
-  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string raw_data_filename = cur_directory + "/data/LDPC_orig_ul_data_" +
-                                  std::to_string(cfg->OfdmCaNum()) + "_ant" +
-                                  std::to_string(cfg->UeAntNum()) + ".bin";
-  std::string output_data_filename = cur_directory + "/data/decode_data.bin";
+  const std::string raw_data_filename =
+      kUlCheckFilePrefix + std::to_string(cfg->OfdmCaNum()) + "_ant" +
+      std::to_string(cfg->UeAntNum()) + ".bin";
 
   Table<uint8_t> raw_data;
   Table<uint8_t> output_data;
@@ -63,7 +75,7 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg) {
       (cfg->LdpcConfig(Direction::kUplink).NumCbLen() + 7) >>
       3 * cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
   ReadFromFileUl(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
-  ReadFromFileUl(output_data_filename, output_data, num_bytes_per_ue, cfg);
+  ReadFromFileUl(kDecodedFilename, output_data, num_bytes_per_ue, cfg);
 
   std::printf(
       "check_correctness_ul: ue %d, ul syms %d, ofdm %d, ul pilots %d, bytes "
@@ -104,11 +116,9 @@ unsigned int CheckCorrectnessDl(Config const* const cfg) {
   const size_t ofdm_ca_num = cfg->OfdmCaNum();
   const size_t samps_per_symbol = cfg->SampsPerSymbol();
 
-  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string raw_data_filename = cur_directory + "/data/LDPC_dl_tx_data_" +
+  std::string raw_data_filename = kDlCheckFilePrefix +
                                   std::to_string(ofdm_ca_num) + "_ant" +
                                   std::to_string(bs_ant_num) + ".bin";
-  std::string tx_data_filename = cur_directory + "/data/tx_data.bin";
 
   Table<short> raw_data;
   Table<short> tx_data;
@@ -118,7 +128,7 @@ unsigned int CheckCorrectnessDl(Config const* const cfg) {
                  Agora_memory::Alignment_t::kAlign64);
 
   ReadFromFileDl(raw_data_filename, raw_data, samps_per_symbol, cfg);
-  ReadFromFileDl(tx_data_filename, tx_data, samps_per_symbol, cfg);
+  ReadFromFileDl(kTxFilename, tx_data, samps_per_symbol, cfg);
   std::printf(
       "check_correctness_dl: bs ant %zu, dl syms %zu, ofdm %zu, samps per %zu. "
       "\n",
@@ -130,9 +140,9 @@ unsigned int CheckCorrectnessDl(Config const* const cfg) {
     for (size_t ant = 0; ant < bs_ant_num; ant++) {
       sum_diff = 0;
       for (size_t sc = 0; sc < (samps_per_symbol * 2); sc++) {
-        size_t offset = (bs_ant_num * i) + ant;
-        float diff =
-            fabs((raw_data[offset][sc] - tx_data[offset][sc]) / 32768.0);
+        const size_t offset = (bs_ant_num * i) + ant;
+        const float diff = std::fabs(
+            (raw_data[offset][sc] - tx_data[offset][sc]) / kShrtFltConvFactor);
         sum_diff += diff;
         if (kDebugPrintDlCorr) {
           if (i == 0) {
@@ -166,9 +176,10 @@ static unsigned int CheckCorrectness(Config const* const cfg) {
   return ul_error_count + dl_error_count;
 }
 
-DEFINE_string(conf_file,
-              TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-both.json",
-              "Config filename");
+DEFINE_string(
+    conf_file,
+    TOSTRING(PROJECT_DIRECTORY) "/files/config/ci/tddconfig-sim-both.json",
+    "Config filename");
 
 int main(int argc, char* argv[]) {
   std::string conf_file;

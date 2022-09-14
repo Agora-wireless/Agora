@@ -4,11 +4,15 @@
  */
 #include "doifft_client.h"
 
-#include <armadillo>
 #include <vector>
 
+#include "armadillo"
+#include "comms-lib.h"
 #include "concurrent_queue_wrapper.h"
 #include "datatype_conversion.h"
+#include "gettime.h"
+#include "logger.h"
+#include "message.h"
 
 static constexpr bool kPrintIFFTOutput = false;
 static constexpr bool kPrintSocketOutput = false;
@@ -113,8 +117,8 @@ EventData DoIFFTClient::Launch(size_t tag) {
 
   // IFFT scaled results by OfdmCaNum(), we scale down IFFT results
   // during data type coversion
-  SimdConvertFloatToShort(ifft_out_ptr, socket_ptr, cfg_->OfdmCaNum(),
-                          cfg_->CpLen(), ifft_scale_factor_);
+  SimdConvertFloatToShort(ifft_out_ptr, socket_ptr, cfg_->OfdmCaNum() * 2,
+                          cfg_->CpLen() * 2, ifft_scale_factor_);
 
   duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc2;
 

@@ -4,8 +4,10 @@
  */
 #include "dofft.h"
 
+#include "comms-lib.h"
 #include "concurrent_queue_wrapper.h"
 #include "datatype_conversion.h"
+#include "logger.h"
 
 static constexpr bool kPrintFFTInput = false;
 static constexpr bool kPrintInputPilot = false;
