@@ -25,7 +25,10 @@ AgoraWorker::AgoraWorker(Config* cfg, Stats* stats, PhyStats* phy_stats,
       phy_stats_(phy_stats),
       message_(message),
       buffer_(buffer),
-      frame_(frame) {
+      frame_(frame),
+      logger_ul_csi_(CsvLog::kULCSI, cfg->Timestamp(), "BS"),
+      logger_dl_csi_(CsvLog::kDLCSI, cfg->Timestamp(), "BS"),
+      logger_dl_beam_(CsvLog::kDlBeam, cfg->Timestamp(), "BS") {
   CreateThreads();
 }
 
@@ -44,13 +47,6 @@ void AgoraWorker::CreateThreads() {
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
     workers_.emplace_back(&AgoraWorker::WorkerThread, this, i);
   }
-
-  if (kEnableMatLog) {
-    for (size_t i = 0; i < mat_loggers_.size(); i++) {
-      mat_loggers_.at(i) =
-          std::make_shared<CsvLog::MatLogger>(i, config_->Timestamp(), "BS");
-    }
-  }
 }
 
 void AgoraWorker::WorkerThread(int tid) {
@@ -61,7 +57,8 @@ void AgoraWorker::WorkerThread(int tid) {
       config_, tid, buffer_->GetCsi(), buffer_->GetCalibDl(),
       buffer_->GetCalibUl(), buffer_->GetCalibDlMsum(),
       buffer_->GetCalibUlMsum(), buffer_->GetUlBeamMatrix(),
-      buffer_->GetDlBeamMatrix(), phy_stats_, stats_, mat_loggers_);
+      buffer_->GetDlBeamMatrix(), phy_stats_, stats_, logger_ul_csi_,
+      logger_dl_csi_, logger_dl_beam_);
 
   auto compute_fft = std::make_unique<DoFFT>(
       config_, tid, buffer_->GetFft(), buffer_->GetCsi(), buffer_->GetCalibDl(),
