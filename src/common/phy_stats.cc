@@ -9,7 +9,19 @@
 
 #include "logger.h"
 
-PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
+PhyStats::PhyStats(Config* const cfg, Direction dir)
+    : config_(cfg),
+      dir_(dir),
+      dev_name_(dir == Direction::kUplink ? "BS" : cfg->UeRadioName().at(0)),
+      logger_snr_(CsvLog::kSNR, config_->Timestamp(), dev_name_),
+      logger_rssi_(CsvLog::kRSSI, config_->Timestamp(), dev_name_),
+      logger_noise_(CsvLog::kNOISE, config_->Timestamp(), dev_name_),
+      logger_evm_(CsvLog::kEVM, config_->Timestamp(), dev_name_),
+      logger_evm_sc_(CsvLog::kEVMSC, config_->Timestamp(), dev_name_),
+      logger_evm_snr_(CsvLog::kEVMSNR, config_->Timestamp(), dev_name_),
+      logger_ber_(CsvLog::kBER, config_->Timestamp(), dev_name_),
+      logger_ser_(CsvLog::kSER, config_->Timestamp(), dev_name_),
+      logger_csi_(CsvLog::kCSI, config_->Timestamp(), dev_name_) {
   if (dir_ == Direction::kDownlink) {
     num_rx_symbols_ = cfg->Frame().NumDLSyms();
     num_rxdata_symbols_ = cfg->Frame().NumDlDataSyms();
@@ -77,14 +89,6 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
                           Agora_memory::Alignment_t::kAlign64);
   csi_cond_.Calloc(kFrameWnd, cfg->OfdmDataNum(),
                    Agora_memory::Alignment_t::kAlign64);
-
-  if (kEnableCsvLog) {
-    for (size_t i = 0; i < csv_loggers_.size(); i++) {
-      csv_loggers_.at(i) = std::make_unique<CsvLog::CsvLogger>(
-          i, config_->Timestamp(),
-          dir_ == Direction::kUplink ? "BS" : config_->UeRadioName().at(0));
-    }
-  }
 }
 
 PhyStats::~PhyStats() {
@@ -288,7 +292,7 @@ void PhyStats::RecordUlPilotSnr(size_t frame_id) {
            << ul_pilot_snr_[frame_id % kFrameWnd][i * config_->BsAntNum() + j];
       }
     }
-    csv_loggers_.at(CsvLog::kSNR)->Write(ss.str());
+    logger_snr_.Write(ss.str());
   }
 }
 
@@ -307,8 +311,8 @@ void PhyStats::RecordEvm(size_t frame_id) {
     for (size_t i = 0; i < config_->OfdmDataNum(); i++) {
       ss_evm_sc << "," << (evm_sc_buffer_[frame_id % kFrameWnd][i]);
     }
-    csv_loggers_.at(CsvLog::kEVM)->Write(ss_evm.str());
-    csv_loggers_.at(CsvLog::kEVMSC)->Write(ss_evm_sc.str());
+    logger_evm_.Write(ss_evm.str());
+    logger_evm_sc_.Write(ss_evm_sc.str());
   }
 }
 
@@ -322,7 +326,7 @@ void PhyStats::RecordEvmSnr(size_t frame_id) {
          << (-10.0f *
              std::log10(evm_buffer_[frame_id % kFrameWnd][i] / num_frame_data));
     }
-    csv_loggers_.at(CsvLog::kEVMSNR)->Write(ss.str());
+    logger_evm_snr_.Write(ss.str());
   }
 }
 
@@ -345,9 +349,9 @@ void PhyStats::RecordDlPilotSnr(size_t frame_id) {
           ss_noise << "," << dl_pilot_noise_[frame_slot][idx_offset];
         }
       }
-      csv_loggers_.at(CsvLog::kSNR)->Write(ss_snr.str());
-      csv_loggers_.at(CsvLog::kRSSI)->Write(ss_rssi.str());
-      csv_loggers_.at(CsvLog::kNOISE)->Write(ss_noise.str());
+      logger_snr_.Write(ss_snr.str());
+      logger_rssi_.Write(ss_rssi.str());
+      logger_noise_.Write(ss_noise.str());
     }
   }
 }
@@ -366,7 +370,7 @@ void PhyStats::RecordDlCsi(size_t frame_id, size_t num_rec_sc,
         ss << "," << std::abs(csi_buffer_ptr[sc_idx]);
       }
     }
-    csv_loggers_.at(CsvLog::kCSI)->Write(ss.str());
+    logger_csi_.Write(ss.str());
   }
 }
 
@@ -383,7 +387,7 @@ void PhyStats::RecordBer(size_t frame_id) {
       error_bits = 0;
       total_bits = 0;
     }
-    csv_loggers_.at(CsvLog::kBER)->Write(ss.str());
+    logger_ber_.Write(ss.str());
   }
 }
 
@@ -401,7 +405,7 @@ void PhyStats::RecordSer(size_t frame_id) {
       error_symbols = 0;
       total_symbols = 0;
     }
-    csv_loggers_.at(CsvLog::kSER)->Write(ss.str());
+    logger_ser_.Write(ss.str());
   }
 }
 

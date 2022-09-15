@@ -26,8 +26,8 @@ DoBeamWeights::DoBeamWeights(
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices,
     PhyStats* in_phy_stats, Stats* stats_manager,
-    std::array<std::shared_ptr<CsvLog::MatLogger>, CsvLog::kMatLogs>&
-        mat_loggers)
+    CsvLog::MatLogger& logger_ul_csi, CsvLog::MatLogger& logger_dl_csi,
+    CsvLog::MatLogger& logger_dl_beam)
     : Doer(config, tid),
       csi_buffers_(csi_buffers),
       calib_dl_buffer_(calib_dl_buffer),
@@ -37,7 +37,9 @@ DoBeamWeights::DoBeamWeights(
       ul_beam_matrices_(ul_beam_matrices),
       dl_beam_matrices_(dl_beam_matrices),
       phy_stats_(in_phy_stats),
-      mat_loggers_(mat_loggers) {
+      logger_ul_csi_(logger_ul_csi),
+      logger_dl_csi_(logger_dl_csi),
+      logger_dl_beam_(logger_dl_beam) {
   duration_stat_ = stats_manager->GetDurationStat(DoerType::kBeam, tid);
   pred_csi_buffer_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
@@ -103,7 +105,7 @@ float DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
                                      complex_float* ul_beam_mem,
                                      complex_float* dl_beam_mem) {
   if (kEnableMatLog) {
-    mat_loggers_.at(CsvLog::kULCSI)->UpdateMatBuf(frame_id, cur_sc_id, mat_csi);
+    logger_ul_csi_.UpdateMatBuf(frame_id, cur_sc_id, mat_csi);
   }
   arma::cx_fmat mat_ul_beam(reinterpret_cast<arma::cx_float*>(ul_beam_mem),
                             cfg_->UeAntNum(), cfg_->BsAntNum(), false);
@@ -150,8 +152,7 @@ float DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     } else {
       arma::cx_fmat mat_dl_csi = inv(arma::diagmat(calib_sc_vec)) * mat_csi;
       if (kEnableMatLog) {
-        mat_loggers_.at(CsvLog::kDLCSI)
-            ->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_csi);
+        logger_dl_csi_.UpdateMatBuf(frame_id, cur_sc_id, mat_dl_csi);
       }
       switch (cfg_->BeamformingAlgo()) {
         case CommsLib::BeamformingAlgorithm::kZF:
@@ -201,8 +202,7 @@ float DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
                               cfg_->BsAntNum(), cfg_->UeAntNum(), false);
     mat_dl_beam = mat_dl_beam_tmp.st();
     if (kEnableMatLog) {
-      mat_loggers_.at(CsvLog::kDlBeam)
-          ->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_beam);
+      logger_dl_beam_.UpdateMatBuf(frame_id, cur_sc_id, mat_dl_beam);
     }
   }
   for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {

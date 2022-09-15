@@ -82,7 +82,16 @@ class PhyStats {
   size_t num_rx_symbols_;
   size_t num_rxdata_symbols_;
 
-  std::array<std::unique_ptr<CsvLog::CsvLogger>, CsvLog::kCsvLogs> csv_loggers_;
+  std::string dev_name_;
+  CsvLog::CsvLogger logger_snr_;
+  CsvLog::CsvLogger logger_rssi_;
+  CsvLog::CsvLogger logger_noise_;
+  CsvLog::CsvLogger logger_evm_;
+  CsvLog::CsvLogger logger_evm_sc_;
+  CsvLog::CsvLogger logger_evm_snr_;
+  CsvLog::CsvLogger logger_ber_;
+  CsvLog::CsvLogger logger_ser_;
+  CsvLog::CsvLogger logger_csi_;
 };
 
 #endif  // PHY_STATS_H_
