@@ -25,7 +25,7 @@ RadioConfig::RadioConfig(Config* cfg, Radio::RadioType radio_type)
   antenna_num_ = cfg_->BsAntNum();
   std::cout << "BS Radio num is " << radio_num_
             << ", Antenna num: " << antenna_num_ << std::endl;
-  if (kUseUHD == false) {
+  if (kUseUHD == false && kUsePureUHD == false) {
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
       SoapySDR::Device* hub_device = nullptr;
       if (cfg_->HubId().at(i).empty() == false) {
@@ -142,7 +142,7 @@ RadioConfig::RadioConfig(Config* cfg, Radio::RadioType radio_type)
   }
 
   // TODO: For multi-cell, this procedure needs modification
-  if (kUseUHD == false) {
+  if (kUseUHD == false && kUsePureUHD == false) {
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
       if (hubs_.at(i) == nullptr) {
         radios_.at(i)->ClearSyncDelay();
@@ -274,7 +274,7 @@ bool RadioConfig::RadioStart() {
     if (cfg_->HwFramer()) {
       const size_t cell_id = cfg_->CellId().at(i);
       const bool is_ref_radio = (i == cfg_->RefRadio(cell_id));
-      radios_.at(i)->ConfigureTddModeBs(is_ref_radio);
+      radios_.at(i)->ConfigureTddModeBs(is_ref_radio, i);
     }
     radios_.at(i)->SetTimeAtTrigger(0);
     activate_radio_threads.emplace_back(&Radio::Activate, radios_.at(i).get(),
@@ -292,7 +292,7 @@ bool RadioConfig::RadioStart() {
 
 void RadioConfig::Go() {
   // TODO: For multi-cell trigger process needs modification
-  if (kUseUHD == false) {
+  if (kUseUHD == false && kUsePureUHD == false) {
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
       if (hubs_.at(i) == nullptr) {
         radios_.at(i)->Trigger();
