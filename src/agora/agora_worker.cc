@@ -25,10 +25,7 @@ AgoraWorker::AgoraWorker(Config* cfg, Stats* stats, PhyStats* phy_stats,
       phy_stats_(phy_stats),
       message_(message),
       buffer_(buffer),
-      frame_(frame),
-      logger_ul_csi_(CsvLog::kULCSI, cfg->Timestamp(), "BS"),
-      logger_dl_csi_(CsvLog::kDLCSI, cfg->Timestamp(), "BS"),
-      logger_dl_beam_(CsvLog::kDlBeam, cfg->Timestamp(), "BS") {
+      frame_(frame) {
   CreateThreads();
 }
 
@@ -57,8 +54,7 @@ void AgoraWorker::WorkerThread(int tid) {
       config_, tid, buffer_->GetCsi(), buffer_->GetCalibDl(),
       buffer_->GetCalibUl(), buffer_->GetCalibDlMsum(),
       buffer_->GetCalibUlMsum(), buffer_->GetUlBeamMatrix(),
-      buffer_->GetDlBeamMatrix(), phy_stats_, stats_, logger_ul_csi_,
-      logger_dl_csi_, logger_dl_beam_);
+      buffer_->GetDlBeamMatrix(), phy_stats_, stats_);
 
   auto compute_fft = std::make_unique<DoFFT>(
       config_, tid, buffer_->GetFft(), buffer_->GetCsi(), buffer_->GetCalibDl(),

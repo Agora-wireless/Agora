@@ -70,14 +70,10 @@ void MasterToWorkerDynamicWorker(
     // Wait
   }
 
-  CsvLog::MatLogger logger_ul_csi(CsvLog::kULCSI, cfg->Timestamp(), "BS");
-  CsvLog::MatLogger logger_dl_csi(CsvLog::kDLCSI, cfg->Timestamp(), "BS");
-  CsvLog::MatLogger logger_dl_beam(CsvLog::kDlBeam, cfg->Timestamp(), "BS");
-
   auto compute_beam = std::make_unique<DoBeamWeights>(
       cfg, worker_id, csi_buffers, calib_dl_msum_buffer, calib_ul_msum_buffer,
       calib_dl_buffer, calib_ul_buffer, ul_beam_matrices, dl_beam_matrices,
-      phy_stats, stats, logger_ul_csi, logger_dl_csi, logger_dl_beam);
+      phy_stats, stats);
 
   size_t start_tsc = GetTime::Rdtsc();
   size_t num_tasks = 0;

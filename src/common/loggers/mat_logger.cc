@@ -13,9 +13,8 @@ namespace CsvLog {
 
 static const std::string kMatHeader = "Frame,SC,BS-Ant,UE-Ant,Real,Imag";
 
-MatLogger::MatLogger(size_t mat_log_id, const std::string& timestamp,
-                     const std::string& radio_name)
-    : CsvLogger(kCsvLogs + mat_log_id, timestamp, radio_name) {
+MatLogger::MatLogger(size_t mat_log_id, Config* const cfg, Direction dir)
+    : CsvLogger(kCsvLogs + mat_log_id, cfg, dir, true) {
 #if defined(ENABLE_MAT_LOG)
   logger_->info(kMatHeader);
 #endif

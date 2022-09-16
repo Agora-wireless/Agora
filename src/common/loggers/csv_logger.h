@@ -10,6 +10,9 @@
 #include <array>
 #include <string>
 
+#include "config.h"
+#include "symbols.h"
+
 #if defined(ENABLE_CSV_LOG)
 #include "spdlog/spdlog.h"
 #endif
@@ -41,9 +44,9 @@ static const std::array<std::string, kAllLogs> kCsvName = {
 
 class CsvLogger {
  public:
-  CsvLogger([[maybe_unused]] size_t log_id,
-            [[maybe_unused]] const std::string& timestamp,
-            [[maybe_unused]] const std::string& radio_name);
+  CsvLogger([[maybe_unused]] size_t log_id, [[maybe_unused]] Config* const cfg,
+            [[maybe_unused]] Direction dir,
+            [[maybe_unused]] bool bs_only = false);
 
 #if defined(ENABLE_CSV_LOG)
   inline void Write(size_t u1, size_t u2, size_t u3, size_t u4, float f1,

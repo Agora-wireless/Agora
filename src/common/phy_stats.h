@@ -8,7 +8,7 @@
 #include "armadillo"
 #include "common_typedef_sdk.h"
 #include "config.h"
-#include "csv_logger.h"
+#include "mat_logger.h"
 #include "memory_manage.h"
 #include "symbols.h"
 
@@ -54,6 +54,9 @@ class PhyStats {
   void PrintCalibSnrStats(size_t frame_id);
   void UpdateCsiCond(size_t frame_id, size_t sc_id, float cond);
   void PrintBeamStats(size_t frame_id);
+  void UpdateUlCsi(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
+  void UpdateDlCsi(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
+  void UpdateDlBeam(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
 
  private:
   Config const* const config_;
@@ -82,7 +85,6 @@ class PhyStats {
   size_t num_rx_symbols_;
   size_t num_rxdata_symbols_;
 
-  std::string dev_name_;
   CsvLog::CsvLogger logger_snr_;
   CsvLog::CsvLogger logger_rssi_;
   CsvLog::CsvLogger logger_noise_;
@@ -92,6 +94,9 @@ class PhyStats {
   CsvLog::CsvLogger logger_ber_;
   CsvLog::CsvLogger logger_ser_;
   CsvLog::CsvLogger logger_csi_;
+  CsvLog::MatLogger logger_ul_csi_;
+  CsvLog::MatLogger logger_dl_csi_;
+  CsvLog::MatLogger logger_dl_beam_;
 };
 
 #endif  // PHY_STATS_H_
