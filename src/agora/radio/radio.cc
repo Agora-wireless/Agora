@@ -7,12 +7,25 @@
 
 #include "logger.h"
 #include "radio_soapysdr.h"
+#include "radio_uhdsdr.h"
 
 std::unique_ptr<Radio> Radio::Create(Radio::RadioType type) {
   switch (type) {
     case kSoapySdrStream: {
+#if defined(USE_PURE_UHD)
+      std::cout << "UHDSdr is created here" << std::endl;
+      return std::make_unique<RadioUHDSdr>();
+#else
+      std::cout<<"SoapySDR is created here" << std::endl;
       return std::make_unique<RadioSoapySdr>(RadioDataPlane::kSoapyStream);
+#endif
     }
+// #if defined(USE_PURE_UHD)
+//     case kUhdSdrStream:{
+//       std::cout<<"UHDSdr is created here" << std::endl;
+//       return std::make_unique<RadioUHDSdr>();
+//     }
+// #endif
     case kSoapySdrSocket: {
       return std::make_unique<RadioSoapySdr>(RadioDataPlane::kLinuxSocket);
     }
