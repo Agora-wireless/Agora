@@ -180,7 +180,7 @@ Config::Config(std::string jsonfilename)
     }
   }
 
-  if ((kUseArgos == true) || (kUseUHD == true)) {
+  if ((kUseArgos == true) || (kUseUHD == true) || (kUsePureUHD == true)) {
     RtAssert(num_radios_ != 0, "Error: No radios exist in Argos mode");
   }
 
@@ -247,7 +247,6 @@ Config::Config(std::string jsonfilename)
   bs_server_addr_ = tdd_conf.value("bs_server_addr", "127.0.0.1");
   bs_rru_addr_ = tdd_conf.value("bs_rru_addr", "127.0.0.1");
   ue_server_addr_ = tdd_conf.value("ue_server_addr", "127.0.0.1");
-  ue_rru_addr_ = tdd_conf.value("ue_rru_addr", "127.0.0.1");
   mac_remote_addr_ = tdd_conf.value("mac_remote_addr", "127.0.0.1");
   bs_server_port_ = tdd_conf.value("bs_server_port", 8000);
   bs_rru_port_ = tdd_conf.value("bs_rru_port", 9000);
@@ -305,7 +304,7 @@ Config::Config(std::string jsonfilename)
   correct_phase_shift_ = tdd_conf.value("correct_phase_shift", false);
 
   hw_framer_ = tdd_conf.value("hw_framer", true);
-  if (kUseUHD) {
+  if (kUseUHD || kUsePureUHD) {
     hw_framer_ = false;
   } else {
     RtAssert(hw_framer_ == true,
@@ -507,15 +506,6 @@ Config::Config(std::string jsonfilename)
     RtAssert(tx_advance.size() == ue_num_,
              "tx_advance size must be same as the number of clients!");
     cl_tx_advance_.assign(tx_advance.begin(), tx_advance.end());
-  }
-
-  auto corr_scale = tdd_conf.value("corr_scale", json::array());
-  if (corr_scale.empty()) {
-    cl_corr_scale_.resize(ue_num_, 1.f);
-  } else {
-    RtAssert(corr_scale.size() == ue_num_,
-             "corr_scale size must be same as the number of clients!");
-    cl_corr_scale_.assign(corr_scale.begin(), corr_scale.end());
   }
 
   if (std::filesystem::is_directory(kExperimentFilepath) == false) {
@@ -885,7 +875,7 @@ void Config::DumpMcsInfo() {
 }
 
 void Config::GenData() {
-  if ((kUseArgos == true) || (kUseUHD == true)) {
+  if ((kUseArgos == true) || (kUseUHD == true) ) {
     std::vector<std::vector<double>> gold_ifft =
         CommsLib::GetSequence(128, CommsLib::kGoldIfft);
     std::vector<std::complex<int16_t>> gold_ifft_ci16 =
@@ -1273,27 +1263,25 @@ void Config::GenData() {
   }
 
   // Find normalization factor through searching for max value in IFFT results
-  float ul_max_mag =
-      CommsLib::FindMaxAbs(ul_iq_ifft, this->frame_.NumULSyms(),
-                           this->ue_ant_num_ * this->ofdm_ca_num_);
-  float dl_max_mag =
+  float max_val = CommsLib::FindMaxAbs(ul_iq_ifft, this->frame_.NumULSyms(),
+                                       this->ue_ant_num_ * this->ofdm_ca_num_);
+  float cur_max_val =
       CommsLib::FindMaxAbs(dl_iq_ifft, this->frame_.NumDLSyms(),
                            this->ue_ant_num_ * this->ofdm_ca_num_);
-  float ue_pilot_max_mag = CommsLib::FindMaxAbs(
-      ue_pilot_ifft, this->ue_ant_num_, this->ofdm_ca_num_);
-  float pilot_max_mag = CommsLib::FindMaxAbs(pilot_ifft, this->ofdm_ca_num_);
-  // additional 2^2 (6dB) power backoff
-  this->scale_ =
-      2 * std::max({ul_max_mag, dl_max_mag, ue_pilot_max_mag, pilot_max_mag});
+  if (cur_max_val > max_val) {
+    max_val = cur_max_val;
+  }
+  cur_max_val = CommsLib::FindMaxAbs(ue_pilot_ifft, this->ue_ant_num_,
+                                     this->ofdm_ca_num_);
+  if (cur_max_val > max_val) {
+    max_val = cur_max_val;
+  }
+  cur_max_val = CommsLib::FindMaxAbs(pilot_ifft, this->ofdm_ca_num_);
+  if (cur_max_val > max_val) {
+    max_val = cur_max_val;
+  }
 
-  float dl_papr = dl_max_mag /
-                  CommsLib::FindMeanAbs(dl_iq_ifft, this->frame_.NumDLSyms(),
-                                        this->ue_ant_num_ * this->ofdm_ca_num_);
-  float ul_papr = ul_max_mag /
-                  CommsLib::FindMeanAbs(ul_iq_ifft, this->frame_.NumULSyms(),
-                                        this->ue_ant_num_ * this->ofdm_ca_num_);
-  std::printf("Uplink PAPR %2.2f dB, Downlink PAPR %2.2f dB\n",
-              10 * std::log10(ul_papr), 10 * std::log10(dl_papr));
+  this->scale_ = 2 * max_val;  // additional 2^2 (6dB) power backoff
 
   // Generate time domain symbols for downlink
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
