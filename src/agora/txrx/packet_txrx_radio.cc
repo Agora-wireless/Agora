@@ -24,7 +24,12 @@ PacketTxRxRadio::PacketTxRxRadio(
                  tx_producer_tokens, rx_buffer, packet_num_in_buffer,
                  frame_start, tx_buffer) {
   //radio_config_ = std::make_unique<RadioConfig>(cfg, Radio::kSoapySdrSocket);
+  #if defined(USE_PURE_UHD)
+  std::cout << "Using UHD" << std::endl;
+  radio_config_ = std::make_unique<RadioUHDConfig>(cfg, Radio::kSoapySdrStream);
+  #else
   radio_config_ = std::make_unique<RadioConfig>(cfg, Radio::kSoapySdrStream);
+  #endif
 }
 
 PacketTxRxRadio::~PacketTxRxRadio() {
@@ -79,14 +84,15 @@ bool PacketTxRxRadio::CreateWorker(size_t tid, size_t interface_count,
        1));
 
   //This is the spot to choose what type of TxRxWorker you want....
+  #if defined(USE_PURE_UHD)
+  worker_threads_.emplace_back(std::make_unique<TxRxWorkerUsrp>(
+      core_offset_, tid, interface_count, interface_offset, cfg_,
+      rx_frame_start, event_notify_q_, tx_pending_q_,
+      *tx_producer_tokens_[tid], *notify_producer_tokens_[tid], rx_memory,
+      tx_memory, mutex_, cond_, proceed_, *radio_config_.get()));
+  #else
   if (kUseArgos) {
     worker_threads_.emplace_back(std::make_unique<TxRxWorkerHw>(
-        core_offset_, tid, interface_count, interface_offset, cfg_,
-        rx_frame_start, event_notify_q_, tx_pending_q_,
-        *tx_producer_tokens_[tid], *notify_producer_tokens_[tid], rx_memory,
-        tx_memory, mutex_, cond_, proceed_, *radio_config_.get()));
-  } else if (kUseUHD) {
-    worker_threads_.emplace_back(std::make_unique<TxRxWorkerUsrp>(
         core_offset_, tid, interface_count, interface_offset, cfg_,
         rx_frame_start, event_notify_q_, tx_pending_q_,
         *tx_producer_tokens_[tid], *notify_producer_tokens_[tid], rx_memory,
@@ -94,5 +100,6 @@ bool PacketTxRxRadio::CreateWorker(size_t tid, size_t interface_count,
   } else {
     RtAssert(false, "This class does not support the current configuration");
   }
+  #endif
   return true;
 }
