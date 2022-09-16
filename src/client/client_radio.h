@@ -34,13 +34,17 @@ class ClientRadioConfig {
   int RadioRx(size_t radio_id, std::vector<void*>& rx_locs, size_t rx_size,
               Radio::RxFlags& out_flags, long long& rx_time_ns);
 
-  void Go() const;
+  void Go();
 
  private:
   void InitClientRadio(size_t radio_id);
 
   const Config* const cfg_;
+#if defined(USE_PURE_UHD)
+  std::unique_ptr<Radio> radios_;
+#else
   std::vector<std::unique_ptr<Radio>> radios_;
+#endif
   size_t total_radios_;
   size_t total_antennas_;
 
