@@ -12,16 +12,18 @@
 PhyStats::PhyStats(Config* const cfg, Direction dir)
     : config_(cfg),
       dir_(dir),
-      dev_name_(dir == Direction::kUplink ? "BS" : cfg->UeRadioName().at(0)),
-      logger_snr_(CsvLog::kSNR, config_->Timestamp(), dev_name_),
-      logger_rssi_(CsvLog::kRSSI, config_->Timestamp(), dev_name_),
-      logger_noise_(CsvLog::kNOISE, config_->Timestamp(), dev_name_),
-      logger_evm_(CsvLog::kEVM, config_->Timestamp(), dev_name_),
-      logger_evm_sc_(CsvLog::kEVMSC, config_->Timestamp(), dev_name_),
-      logger_evm_snr_(CsvLog::kEVMSNR, config_->Timestamp(), dev_name_),
-      logger_ber_(CsvLog::kBER, config_->Timestamp(), dev_name_),
-      logger_ser_(CsvLog::kSER, config_->Timestamp(), dev_name_),
-      logger_csi_(CsvLog::kCSI, config_->Timestamp(), dev_name_) {
+      logger_snr_(CsvLog::kSNR, cfg, dir),
+      logger_rssi_(CsvLog::kRSSI, cfg, dir),
+      logger_noise_(CsvLog::kNOISE, cfg, dir),
+      logger_evm_(CsvLog::kEVM, cfg, dir),
+      logger_evm_sc_(CsvLog::kEVMSC, cfg, dir),
+      logger_evm_snr_(CsvLog::kEVMSNR, cfg, dir),
+      logger_ber_(CsvLog::kBER, cfg, dir),
+      logger_ser_(CsvLog::kSER, cfg, dir),
+      logger_csi_(CsvLog::kCSI, cfg, dir),
+      logger_ul_csi_(CsvLog::kULCSI, cfg, dir),
+      logger_dl_csi_(CsvLog::kDLCSI, cfg, dir),
+      logger_dl_beam_(CsvLog::kDlBeam, cfg, dir) {
   if (dir_ == Direction::kDownlink) {
     num_rx_symbols_ = cfg->Frame().NumDLSyms();
     num_rxdata_symbols_ = cfg->Frame().NumDlDataSyms();
@@ -562,6 +564,21 @@ void PhyStats::UpdateUncodedBitErrors(size_t ue_id, size_t offset,
 void PhyStats::UpdateUncodedBits(size_t ue_id, size_t offset,
                                  size_t new_bits_num) {
   uncoded_bits_count_[ue_id][offset] += new_bits_num;
+}
+
+void PhyStats::UpdateUlCsi(size_t frame_id, size_t sc_id,
+                           const arma::cx_fmat& mat_in) {
+  logger_ul_csi_.UpdateMatBuf(frame_id, sc_id, mat_in);
+}
+
+void PhyStats::UpdateDlCsi(size_t frame_id, size_t sc_id,
+                           const arma::cx_fmat& mat_in) {
+  logger_dl_csi_.UpdateMatBuf(frame_id, sc_id, mat_in);
+}
+
+void PhyStats::UpdateDlBeam(size_t frame_id, size_t sc_id,
+                            const arma::cx_fmat& mat_in) {
+  logger_dl_beam_.UpdateMatBuf(frame_id, sc_id, mat_in);
 }
 
 float PhyStats::GetNoise(size_t frame_id) {

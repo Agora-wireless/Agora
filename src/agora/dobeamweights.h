@@ -28,9 +28,7 @@ class DoBeamWeights : public Doer {
       Table<complex_float>& calib_ul_msum_buffer,
       PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_,
       PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_,
-      PhyStats* in_phy_stats, Stats* stats_manager,
-      CsvLog::MatLogger& logger_ul_csi, CsvLog::MatLogger& logger_dl_csi,
-      CsvLog::MatLogger& logger_dl_beam);
+      PhyStats* in_phy_stats, Stats* stats_manager);
   ~DoBeamWeights() override;
 
   /**
@@ -109,10 +107,6 @@ class DoBeamWeights : public Doer {
   PhyStats* phy_stats_;
   arma::uvec ext_ref_id_;
   size_t num_ext_ref_;
-
-  CsvLog::MatLogger& logger_ul_csi_;
-  CsvLog::MatLogger& logger_dl_csi_;
-  CsvLog::MatLogger& logger_dl_beam_;
 };
 
 #endif  // DOBEAMWEIGHTS_H_

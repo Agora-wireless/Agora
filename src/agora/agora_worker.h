@@ -38,10 +38,6 @@ class AgoraWorker {
   MessageInfo* message_;
   AgoraBuffer* buffer_;
   FrameInfo* frame_;
-
-  CsvLog::MatLogger logger_ul_csi_;
-  CsvLog::MatLogger logger_dl_csi_;
-  CsvLog::MatLogger logger_dl_beam_;
 };
 
 #endif  // AGORA_WORKER_H_
