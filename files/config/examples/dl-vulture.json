@@ -66,7 +66,6 @@
     "ue_hw_framer": false,
     "hw_framer": true,
     /* Compute configuration */
-    "exclude_cores": [0],
     "ue_core_offset": 14,
     "ue_worker_thread_num": 4,
     "ue_socket_thread_num": 2,

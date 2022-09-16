@@ -47,6 +47,15 @@ Config::Config(std::string jsonfilename)
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       frame_(""),
       config_filename_(std::move(jsonfilename)) {
+  auto time = std::time(nullptr);
+  auto local_time = *std::localtime(&time);
+  timestamp_ = std::to_string(1900 + local_time.tm_year) + "-" +
+               std::to_string(1 + local_time.tm_mon) + "-" +
+               std::to_string(local_time.tm_mday) + "-" +
+               std::to_string(local_time.tm_hour) + "-" +
+               std::to_string(local_time.tm_min) + "-" +
+               std::to_string(local_time.tm_sec);
+
   pilots_ = nullptr;
   pilots_sgn_ = nullptr;
 
@@ -531,22 +540,13 @@ Config::Config(std::string jsonfilename)
   }
 
   // set trace file path
-  auto time = std::time(nullptr);
-  auto local_time = *std::localtime(&time);
-
   const std::string ul_present_str = (frame_.NumULSyms() > 0 ? "uplink-" : "");
   const std::string dl_present_str =
       (frame_.NumDLSyms() > 0 ? "downlink-" : "");
-  timestamp_ = std::to_string(1900 + local_time.tm_year) + "-" +
-               std::to_string(1 + local_time.tm_mon) + "-" +
-               std::to_string(local_time.tm_mday) + "-" +
-               std::to_string(local_time.tm_hour) + "-" +
-               std::to_string(local_time.tm_min) + "-" +
-               std::to_string(local_time.tm_sec) + "_";
   std::string filename =
       kLogFilepath + "trace-" + ul_present_str + dl_present_str + timestamp_ +
-      std::to_string(num_cells_) + "_" + std::to_string(BsAntNum()) + "x" +
-      std::to_string(UeAntTotal()) + ".hdf5";
+      "_" + std::to_string(num_cells_) + "_" + std::to_string(BsAntNum()) +
+      "x" + std::to_string(UeAntTotal()) + ".hdf5";
   trace_file_ = tdd_conf.value("trace_file", filename);
 
   // Agora configurations
@@ -1002,9 +1002,14 @@ void Config::GenData() {
       ue_pilot_ifft[i][k] = this->ue_specific_pilot_[i][j];
     }
     if (kOutputUlFreqData) {
-      std::string filename_ul_pilot_f =
+      const std::string filename_ul_pilot_f =
           kUlPilotFreqPrefix + std::to_string(i) + ".bin";
       FILE* fp_tx_f = std::fopen(filename_ul_pilot_f.c_str(), "wb");
+      if (fp_tx_f == nullptr) {
+        AGORA_LOG_ERROR("Failed to create antenna file %s. Error %s.\n",
+                        filename_ul_pilot_f.c_str(), strerror(errno));
+        throw std::runtime_error("Config: Failed to create ul antenna file");
+      }
       std::fwrite(ue_pilot_ifft[i], ofdm_ca_num_, sizeof(float) * 2, fp_tx_f);
       std::fclose(fp_tx_f);
     }
@@ -1190,12 +1195,18 @@ void Config::GenData() {
   std::vector<FILE*> vec_fp_tx;
   if (kOutputUlFreqData) {
     for (size_t u = 0; u < this->ue_ant_num_; u++) {
-      std::string filename_ul_data_f =
+      const std::string filename_ul_data_f =
           kUlDataFreqPrefix + ul_modulation_ + "_" +
           std::to_string(ofdm_data_num_) + "_" + std::to_string(ofdm_ca_num_) +
           "_1_" + std::to_string(this->frame_.NumULSyms()) + "_1_A_" +
           std::to_string(u) + ".bin";
-      vec_fp_tx.push_back(std::fopen(filename_ul_data_f.c_str(), "wb"));
+      FILE* fp_tx_f = std::fopen(filename_ul_data_f.c_str(), "wb");
+      if (fp_tx_f == nullptr) {
+        AGORA_LOG_ERROR("Failed to create antenna file %s. Error %s.\n",
+                        filename_ul_data_f.c_str(), strerror(errno));
+        throw std::runtime_error("Config: Failed to create ul antenna file");
+      }
+      vec_fp_tx.push_back(fp_tx_f);
     }
   }
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
