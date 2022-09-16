@@ -30,9 +30,9 @@ static constexpr bool kPrintDlTxData = false;
 static constexpr bool kPrintDlModData = false;
 static constexpr bool kPrintUplinkInformationBytes = false;
 static constexpr bool kPrintDownlinkInformationBytes = false;
-static constexpr bool kOutputSounderData = false;
-static constexpr size_t kSounderSymbolPerSlot = 1;
-static constexpr size_t kSounderDataFrameNum = 1;
+static constexpr bool kOutputOfdmSymbols = false;
+static constexpr size_t kOfdmSymbolPerSlot = 1;
+static constexpr size_t kOutputFrameNum = 1;
 
 ///Output files
 static const std::string kUlDataPrefix = "orig_ul_data_";
@@ -183,12 +183,12 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       }
     }
 
-    if (kOutputSounderData) {
+    if (kOutputOfdmSymbols) {
       std::vector<std::vector<std::vector<std::vector<std::vector<uint8_t>>>>>
           sounder_data(
               this->cfg_->UeNum(),
               std::vector<std::vector<std::vector<std::vector<uint8_t>>>>(
-                  kSounderDataFrameNum,
+                  kOutputFrameNum,
                   std::vector<std::vector<std::vector<uint8_t>>>(
                       this->cfg_->Frame().NumULSyms(),
                       std::vector<std::vector<uint8_t>>(
@@ -206,7 +206,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
             odfm_symbol.data(),
             this->cfg_->LdpcConfig(Direction::kUplink).NumEncodedBytes(),
             this->cfg_->ModOrderBits(Direction::kUplink));
-        for (size_t f = 0; f < kSounderDataFrameNum; f++) {
+        for (size_t f = 0; f < kOutputFrameNum; f++) {
           sounder_data.at(cl_sdr).at(f).at(ul_slot).at(cl_sdr_ch) = odfm_symbol;
         }
       }
@@ -216,14 +216,14 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
             this->cfg_->Modulation(Direction::kUplink) + "_" +
             std::to_string(this->cfg_->OfdmDataNum()) + "_" +
             std::to_string(this->cfg_->OfdmCaNum()) + "_" +
-            std::to_string(kSounderSymbolPerSlot) + "_" +
+            std::to_string(kOfdmSymbolPerSlot) + "_" +
             std::to_string(this->cfg_->Frame().NumULSyms()) + "_" +
-            std::to_string(kSounderDataFrameNum) + "_" +
-            this->cfg_->UeChannel() + "_" + std::to_string(i) + ".bin";
+            std::to_string(kOutputFrameNum) + "_" + this->cfg_->UeChannel() +
+            "_" + std::to_string(i) + ".bin";
         AGORA_LOG_INFO("Saving uplink Sounder data to %s\n",
                        filename_input.c_str());
         FILE* fp_tx_b = std::fopen(filename_input.c_str(), "wb");
-        for (size_t f = 0; f < kSounderDataFrameNum; f++) {
+        for (size_t f = 0; f < kOutputFrameNum; f++) {
           for (size_t u = 0; u < this->cfg_->Frame().NumULSyms(); u++) {
             for (size_t h = 0; h < this->cfg_->NumUeChannels(); h++) {
               std::fwrite(sounder_data.at(i).at(f).at(u).at(h).data(),
