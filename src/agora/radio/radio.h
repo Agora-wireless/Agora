@@ -14,10 +14,10 @@
 
 class Radio {
  public:
-  enum RadioType { kSoapySdrStream, kSoapySdrSocket };
+  enum RadioType { kSoapySdrStream, kSoapySdrSocket, kUhdSdrStream };
   //EndReceive is set when the samples returned are the last of a contiguous set
   enum RxFlags { kRxFlagNone = 0, kEndReceive = 1 };
-  enum TxFlags { kTxFlagNone = 0, kEndTransmit = 1, kTxWaitTrigger = 2 };
+  enum TxFlags { kTxFlagNone = 0, kEndTransmit = 1, kTxWaitTrigger = 2 }; // add own UHD_flags in if needed
   static std::unique_ptr<Radio> Create(RadioType type);
 
   enum ActivationTypes { kActivate, kActivateWaitTrigger };
@@ -55,7 +55,9 @@ class Radio {
   virtual int Rx(std::vector<void*>& rx_locs, size_t rx_size,
                  RxFlags& out_flags, long long& rx_time_ns) = 0;
 
-  inline virtual void ConfigureTddModeBs([[maybe_unused]] bool is_ref_radio) {}
+  inline virtual void ConfigureTddModeBs(
+      [[maybe_unused]] bool is_ref_radio,
+      [[maybe_unused]] size_t beacon_radio_id) {}
   inline virtual void ConfigureTddModeUe() {}
   inline virtual void ClearSyncDelay() {}
   inline virtual void PrintSettings() const {}
