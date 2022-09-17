@@ -14,13 +14,12 @@ namespace CsvLog {
 static const std::string kMatHeader = "Frame,SC,BS-Ant,UE-Ant,Real,Imag";
 
 MatLogger::MatLogger(size_t mat_log_id, Config* const cfg, Direction dir)
-    : CsvLogger(kCsvLogs + mat_log_id, cfg, dir, true) {
-#if defined(ENABLE_MAT_LOG)
-  logger_->info(kMatHeader);
-#endif
-}
+    : CsvLogger(kCsvLogs + mat_log_id, cfg, dir, true) {}
 
-MatLogger::~MatLogger() { SaveMatBuf(); }
+MatLogger::~MatLogger() {
+  Write(kMatHeader);
+  SaveMatBuf();
+}
 
 bool MatLogger::UpdateMatBuf([[maybe_unused]] const size_t frame_id,
                              [[maybe_unused]] const size_t sc_id,
@@ -42,17 +41,20 @@ bool MatLogger::UpdateMatBuf([[maybe_unused]] const size_t frame_id,
 
 void MatLogger::SaveMatBuf() {
 #if defined(ENABLE_MAT_LOG)
-  AGORA_LOG_INFO("MatLogger: saving %s\n", logger_->name());
-  for (size_t frame_id = 0; frame_id < kFrames; frame_id++) {
-    for (size_t sc_id = 0; sc_id < kSCs; sc_id++) {
-      for (size_t i = 0; i < kBSAnts; i++) {
-        for (size_t j = 0; j < kUEAnts; j++) {
-          const arma::cx_float& cx = mat_buffer_.at(frame_id).at(sc_id)(i, j);
-          Write(frame_id + kFrameStart, sc_id, i, j, cx.real(), cx.imag());
-        }  // end kUEAnts
-      }    // end kBSAnts
-    }      // end kSCs
-  }        // end kFrames
+  if (logger_) {
+    AGORA_LOG_INFO("MatLogger: saving %s\n", logger_->name());
+    for (size_t frame_id = 0; frame_id < kFrames; frame_id++) {
+      for (size_t sc_id = 0; sc_id < kSCs; sc_id++) {
+        for (size_t i = 0; i < kBSAnts; i++) {
+          for (size_t j = 0; j < kUEAnts; j++) {
+            const arma::cx_float& cx = mat_buffer_.at(frame_id).at(sc_id)(i, j);
+            logger_->info("{},{},{},{},{},{}", frame_id + kFrameStart, sc_id, i,
+                          j, cx.real(), cx.imag());
+          }  // end kUEAnts
+        }    // end kBSAnts
+      }      // end kSCs
+    }        // end kFrames
+  }
 #endif
 }
 

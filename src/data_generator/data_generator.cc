@@ -30,7 +30,7 @@ static constexpr bool kPrintDlTxData = false;
 static constexpr bool kPrintDlModData = false;
 static constexpr bool kPrintUplinkInformationBytes = false;
 static constexpr bool kPrintDownlinkInformationBytes = false;
-static constexpr bool kOutputOfdmSymbols = false;
+static constexpr bool kOutputUlOfdmSymbols = false;
 static constexpr size_t kOfdmSymbolPerSlot = 1;
 static constexpr size_t kOutputFrameNum = 1;
 
@@ -183,7 +183,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       }
     }
 
-    if (kOutputOfdmSymbols) {
+    if (kOutputUlOfdmSymbols) {
       std::vector<std::vector<std::vector<std::vector<std::vector<uint8_t>>>>>
           sounder_data(
               this->cfg_->UeNum(),
@@ -220,18 +220,29 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
             std::to_string(this->cfg_->Frame().NumULSyms()) + "_" +
             std::to_string(kOutputFrameNum) + "_" + this->cfg_->UeChannel() +
             "_" + std::to_string(i) + ".bin";
-        AGORA_LOG_INFO("Saving uplink Sounder data to %s\n",
+        AGORA_LOG_INFO("Saving uplink ofdm symbols to %s\n",
                        filename_input.c_str());
         FILE* fp_tx_b = std::fopen(filename_input.c_str(), "wb");
+        if (fp_tx_b == nullptr) {
+          throw std::runtime_error(
+              "DataGenerator: Failed to create ul ofdm symbol file");
+        }
         for (size_t f = 0; f < kOutputFrameNum; f++) {
           for (size_t u = 0; u < this->cfg_->Frame().NumULSyms(); u++) {
             for (size_t h = 0; h < this->cfg_->NumUeChannels(); h++) {
-              std::fwrite(sounder_data.at(i).at(f).at(u).at(h).data(),
-                          this->cfg_->OfdmDataNum(), sizeof(uint8_t), fp_tx_b);
+              if (std::fwrite(sounder_data.at(i).at(f).at(u).at(h).data(),
+                              sizeof(uint8_t), this->cfg_->OfdmDataNum(),
+                              fp_tx_b) != this->cfg_->OfdmDataNum()) {
+                throw std::runtime_error(
+                    "DataGenerator: Failed to write ul ofdm symbol file");
+              }
             }
           }
         }
-        std::fclose(fp_tx_b);
+        if (std::fclose(fp_tx_b) != 0) {
+          throw std::runtime_error(
+              "DataGenerator: Failed to finish ul ofdm symbol file");
+        }
       }
     }
 
