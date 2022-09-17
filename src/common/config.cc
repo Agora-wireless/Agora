@@ -1010,8 +1010,13 @@ void Config::GenData() {
                         filename_ul_pilot_f.c_str(), strerror(errno));
         throw std::runtime_error("Config: Failed to create ul antenna file");
       }
-      std::fwrite(ue_pilot_ifft[i], ofdm_ca_num_, sizeof(float) * 2, fp_tx_f);
-      std::fclose(fp_tx_f);
+      if (std::fwrite(ue_pilot_ifft[i], sizeof(float) * 2, ofdm_ca_num_,
+                      fp_tx_f) != ofdm_ca_num_) {
+        throw std::runtime_error("Config: Failed to write ul antenna file");
+      }
+      if (std::fclose(fp_tx_f) != 0) {
+        throw std::runtime_error("Config: Failed to finish ul antenna file");
+      }
     }
     CommsLib::IFFT(ue_pilot_ifft[i], ofdm_ca_num_, false);
   }
@@ -1224,15 +1229,19 @@ void Config::GenData() {
         ul_iq_ifft[i][u * ofdm_ca_num_ + k] = ul_iq_f_[i][q + j];
       }
       if (kOutputUlFreqData) {
-        std::fwrite(&ul_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_,
-                    sizeof(float) * 2, vec_fp_tx.at(u));
+        if (std::fwrite(&ul_iq_ifft[i][u * ofdm_ca_num_], sizeof(float) * 2,
+                        ofdm_ca_num_, vec_fp_tx.at(u)) != ofdm_ca_num_) {
+          throw std::runtime_error("Config: Failed to write ul antenna file");
+        }
       }
       CommsLib::IFFT(&ul_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
     }
   }
   if (kOutputUlFreqData) {
     for (size_t u = 0; u < vec_fp_tx.size(); u++) {
-      std::fclose(vec_fp_tx.at(u));
+      if (std::fclose(vec_fp_tx.at(u)) != 0) {
+        throw std::runtime_error("Config: Failed to finish ul antenna file");
+      }
     }
   }
 
