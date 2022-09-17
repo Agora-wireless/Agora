@@ -15,12 +15,10 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg,
 #else
   total_radios_ = cfg_->UeNum();
 #endif
-
   total_antennas_ = cfg_->UeAntNum();
   std::cout << "Total Number of Client Radios " << total_radios_ << " with "
             << total_antennas_ << " antennas" << std::endl;
 
-// could be further optimized with the previous ifdef, but for debugging purpose, will seperate for now
 #if defined(USE_PURE_UHD)
   radios_ = Radio::Create(radio_type);
 #else
@@ -67,6 +65,7 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg,
     radio->PrintSettings();
   }
 #endif
+
   AGORA_LOG_INFO("ClientRadioConfig: Radio init complete\n");
 }
 
@@ -116,7 +115,7 @@ bool ClientRadioConfig::RadioStart() {
   return true;
 }
 
-void ClientRadioConfig::Go() {
+void ClientRadioConfig::Go() const {
   #if defined(USE_PURE_UHD)
   #else
   if ((kUseUHD == false) || (kUsePureUHD == false)) {
@@ -187,7 +186,6 @@ void ClientRadioConfig::RadioStop() {
 }
 
 ClientRadioConfig::~ClientRadioConfig() {
-
 #if defined(USE_PURE_UHD)
   radios_->Close();
 #else
