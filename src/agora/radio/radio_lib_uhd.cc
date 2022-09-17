@@ -30,13 +30,17 @@ RadioUHDConfig::RadioUHDConfig(Config* cfg, Radio::RadioType radio_type)
   radios_ = Radio::Create(radio_type);
   std::cout<<"radio UHD created here" << std::endl;
 
-  std::thread init_bs_threads;
+  // std::thread init_bs_threads;
 
+std::vector<std::thread> init_bs_threads;
+
+  for (size_t i = 0; i < radio_num_; i++) {
 #ifdef THREADED_INIT
-  // init_bs_threads = &RadioUHDConfig::InitBsRadio, this, 0;
+    init_bs_threads.emplace_back(&RadioUHDConfig::InitBsRadio, this, i);
 #else
-  InitBsRadio(0);
+    InitBsRadio(i);
 #endif
+}
 
   // Block until all radios are initialized
   size_t num_checks = 0;
@@ -51,26 +55,29 @@ RadioUHDConfig::RadioUHDConfig(Config* cfg, Radio::RadioType radio_type)
     }
     num_radios_init = num_radios_initialized_.load();
   }
-
-  init_bs_threads.join();
-
-
-  // Perform DC Offset & IQ Imbalance Calibration
-  if (cfg_->ImbalanceCalEn()) {
-    if (cfg_->Channel().find('A') != std::string::npos) {
-      // DciqCalibrationProc(0);
-    }
-    if (cfg_->Channel().find('B') != std::string::npos) {
-      // DciqCalibrationProc(1);
-    }
+  
+  for (auto& join_thread : init_bs_threads) {
+    join_thread.join();
   }
 
-  std::thread config_bs_threads;
+  // Perform DC Offset & IQ Imbalance Calibration
+  // if (cfg_->ImbalanceCalEn()) {
+  //   if (cfg_->Channel().find('A') != std::string::npos) {
+  //     // DciqCalibrationProc(0);
+  //   }
+  //   if (cfg_->Channel().find('B') != std::string::npos) {
+  //     // DciqCalibrationProc(1);
+  //   }
+  // }
+
+  std::vector<std::thread> config_bs_threads;
+  for (size_t i = 0; i < radio_num_; i++) {
 #ifdef THREADED_INIT
-    // config_bs_threads = &RadioUHDConfig::InitBsRadio, this, 0;
+    config_bs_threads.emplace_back(&RadioUHDConfig::ConfigureBsRadio, this, i);
 #else
-    ConfigureBsRadio(0);
+    ConfigureBsRadio(i);
 #endif
+  }
 
   num_checks = 0;
   // Block until all radios are configured
@@ -87,8 +94,11 @@ RadioUHDConfig::RadioUHDConfig(Config* cfg, Radio::RadioType radio_type)
   //   num_radios_config = num_radios_configured_.load();
   // }
 
-  config_bs_threads.join();
+  // config_bs_threads.join();
 
+  for (auto& join_thread : config_bs_threads) {
+    join_thread.join();
+  }
   radios_->PrintSettings();
 
   AGORA_LOG_INFO("RadioUHDConfig init complete!\n");
@@ -215,7 +225,7 @@ bool RadioUHDConfig::RadioStart() {
     if (cfg_->HwFramer()) {
       const size_t cell_id = cfg_->CellId().at(i);
       const bool is_ref_radio = (i == cfg_->RefRadio(cell_id));
-      radios_->ConfigureTddModeBs(is_ref_radio, i);
+      radios_->ConfigureTddModeBs(is_ref_radio);
     }
     radios_->SetTimeAtTrigger(0);
     activate_radio_threads.emplace_back(&Radio::Activate, radios_.get(),
