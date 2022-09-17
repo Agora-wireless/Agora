@@ -34,7 +34,7 @@ class ClientRadioConfig {
   int RadioRx(size_t radio_id, std::vector<void*>& rx_locs, size_t rx_size,
               Radio::RxFlags& out_flags, long long& rx_time_ns);
 
-  void Go();
+  void Go() const;
 
  private:
   void InitClientRadio(size_t radio_id);
@@ -44,7 +44,7 @@ class ClientRadioConfig {
   std::unique_ptr<Radio> radios_;
 #else
   std::vector<std::unique_ptr<Radio>> radios_;
-#endif
+#endif  
   size_t total_radios_;
   size_t total_antennas_;
 
