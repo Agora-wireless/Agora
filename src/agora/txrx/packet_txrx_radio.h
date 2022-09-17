@@ -44,7 +44,6 @@ class PacketTxRxRadio : public PacketTxRx {
 #else
   std::unique_ptr<RadioConfig> radio_config_;
 #endif
-
 };
 
 #endif  // PACKETTXRX_RADIO_H_
