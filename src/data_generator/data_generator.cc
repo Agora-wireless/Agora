@@ -30,9 +30,6 @@ static constexpr bool kPrintDlTxData = false;
 static constexpr bool kPrintDlModData = false;
 static constexpr bool kPrintUplinkInformationBytes = false;
 static constexpr bool kPrintDownlinkInformationBytes = false;
-static constexpr bool kOutputUlOfdmSymbols = false;
-static constexpr size_t kOfdmSymbolPerSlot = 1;
-static constexpr size_t kOutputFrameNum = 1;
 
 ///Output files
 static const std::string kUlDataPrefix = "orig_ul_data_";
@@ -41,7 +38,7 @@ static const std::string kDlDataPrefix = "orig_dl_data_";
 static const std::string kDlLdpcDataPrefix = "LDPC_orig_dl_data_";
 static const std::string kRxLdpcPrefix = "LDPC_rx_data_";
 static const std::string kDlTxPrefix = "LDPC_dl_tx_data_";
-static const std::string kUlSounderPrefix = "ul_data_b_";
+static const std::string kUlScBitsPrefix = "ul_data_b_";
 
 static float RandFloatFromShort(float min, float max) {
   float rand_val = ((float(rand()) / float(RAND_MAX)) * (max - min)) + min;
@@ -86,10 +83,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kUplink));
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
-                                pkt->Data(),
-                                cfg_->MacPayloadMaxLength(Direction::kUplink)) &
-                            0xFFFF));
+        pkt->Crc((uint16_t)(
+            crc_obj->CalculateCrc24(
+                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kUplink)) &
+            0xFFFF));
       }
     }
 
@@ -213,7 +210,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       }
     }
 
-    if (kOutputUlOfdmSymbols) {
+    if (kOutputUlScData) {
       std::vector<std::vector<std::vector<std::vector<std::vector<uint8_t>>>>>
           ul_ofdm_data(
               this->cfg_->UeNum(),
@@ -242,7 +239,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       }
       for (size_t i = 0; i < this->cfg_->UeNum(); i++) {
         const std::string filename_input =
-            directory + kUlSounderPrefix +
+            directory + kUlScBitsPrefix +
             this->cfg_->Modulation(Direction::kUplink) + "_" +
             std::to_string(this->cfg_->OfdmDataNum()) + "_" +
             std::to_string(this->cfg_->OfdmCaNum()) + "_" +
@@ -250,12 +247,11 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
             std::to_string(this->cfg_->Frame().NumULSyms()) + "_" +
             std::to_string(kOutputFrameNum) + "_" + this->cfg_->UeChannel() +
             "_" + std::to_string(i) + ".bin";
-        AGORA_LOG_INFO("Saving uplink ofdm symbols to %s\n",
-                       filename_input.c_str());
+        AGORA_LOG_INFO("Saving uplink sc bits to %s\n", filename_input.c_str());
         auto* fp_tx_b = std::fopen(filename_input.c_str(), "wb");
         if (fp_tx_b == nullptr) {
           throw std::runtime_error(
-              "DataGenerator: Failed to create ul ofdm symbol file");
+              "DataGenerator: Failed to create ul sc bits file");
         }
         for (size_t f = 0; f < kOutputFrameNum; f++) {
           for (size_t u = 0; u < this->cfg_->Frame().NumULSyms(); u++) {
@@ -265,7 +261,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
                   this->cfg_->OfdmDataNum(), fp_tx_b);
               if (write_status != this->cfg_->OfdmDataNum()) {
                 throw std::runtime_error(
-                    "DataGenerator: Failed to write ul ofdm symbol file");
+                    "DataGenerator: Failed to write ul sc bits file");
               }
             }
           }
@@ -273,7 +269,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         const auto close_status = std::fclose(fp_tx_b);
         if (close_status != 0) {
           throw std::runtime_error(
-              "DataGenerator: Failed to finish ul ofdm symbol file");
+              "DataGenerator: Failed to close ul sc bits file");
         }
       }
     }
@@ -487,10 +483,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kDownlink));
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(pkt->Data(),
-                                                    cfg_->MacPayloadMaxLength(
-                                                        Direction::kDownlink)) &
-                            0xFFFF));
+        pkt->Crc((uint16_t)(
+            crc_obj->CalculateCrc24(
+                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kDownlink)) &
+            0xFFFF));
       }
     }
 

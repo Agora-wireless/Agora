@@ -27,7 +27,6 @@ static constexpr size_t kMacAlignmentBytes = 64u;
 static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
-static constexpr bool kOutputUlFreqData = false;
 
 static const std::string kLogFilepath =
     TOSTRING(PROJECT_DIRECTORY) "/files/log/";
@@ -1001,22 +1000,22 @@ void Config::GenData() {
                            : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
       ue_pilot_ifft[i][k] = this->ue_specific_pilot_[i][j];
     }
-    if (kOutputUlFreqData) {
+    if (kOutputUlScData) {
       const std::string filename_ul_pilot_f =
           kUlPilotFreqPrefix + std::to_string(i) + ".bin";
       FILE* fp_tx_f = std::fopen(filename_ul_pilot_f.c_str(), "wb");
       if (fp_tx_f == nullptr) {
-        AGORA_LOG_ERROR("Failed to create antenna file %s. Error %s.\n",
+        AGORA_LOG_ERROR("Failed to create ul sc pilot file %s. Error %s.\n",
                         filename_ul_pilot_f.c_str(), strerror(errno));
       } else {
         const auto write_status = std::fwrite(
             ue_pilot_ifft[i], sizeof(complex_float), ofdm_ca_num_, fp_tx_f);
         if (write_status != ofdm_ca_num_) {
-          AGORA_LOG_ERROR("Config: Failed to write ul antenna file\n");
+          AGORA_LOG_ERROR("Config: Failed to write ul sc pilot file\n");
         }
         const auto close_status = std::fclose(fp_tx_f);
         if (close_status != 0) {
-          AGORA_LOG_ERROR("Config: Failed to finish ul antenna file\n");
+          AGORA_LOG_ERROR("Config: Failed to close ul sc pilot file\n");
         }
       }
     }
@@ -1202,18 +1201,19 @@ void Config::GenData() {
                     this->ofdm_ca_num_ * this->ue_ant_num_,
                     Agora_memory::Alignment_t::kAlign64);
   std::vector<FILE*> vec_fp_tx;
-  if (kOutputUlFreqData) {
-    for (size_t u = 0; u < this->ue_ant_num_; u++) {
+  if (kOutputUlScData) {
+    for (size_t i = 0; i < this->ue_num_; i++) {
       const std::string filename_ul_data_f =
           kUlDataFreqPrefix + ul_modulation_ + "_" +
           std::to_string(ofdm_data_num_) + "_" + std::to_string(ofdm_ca_num_) +
-          "_1_" + std::to_string(this->frame_.NumULSyms()) + "_1_A_" +
-          std::to_string(u) + ".bin";
+          "_" + std::to_string(kOfdmSymbolPerSlot) + "_" +
+          std::to_string(this->frame_.NumULSyms()) + "_" +
+          std::to_string(kOutputFrameNum) + "_" + ue_channel_ + "_" +
+          std::to_string(i) + ".bin";
       FILE* fp_tx_f = std::fopen(filename_ul_data_f.c_str(), "wb");
       if (fp_tx_f == nullptr) {
-        AGORA_LOG_ERROR("Failed to create antenna file %s. Error %s.\n",
+        AGORA_LOG_ERROR("Failed to create ul sc data file %s. Error %s.\n",
                         filename_ul_data_f.c_str(), strerror(errno));
-        throw std::runtime_error("Config: Failed to create ul antenna file");
       }
       vec_fp_tx.push_back(fp_tx_f);
     }
@@ -1232,22 +1232,22 @@ void Config::GenData() {
                                                 : sc + ofdm_ca_num_ / 2;
         ul_iq_ifft[i][u * ofdm_ca_num_ + k] = ul_iq_f_[i][q + j];
       }
-      if (kOutputUlFreqData) {
+      if (kOutputUlScData) {
         const auto write_status =
             std::fwrite(&ul_iq_ifft[i][u * ofdm_ca_num_], sizeof(complex_float),
-                        ofdm_ca_num_, vec_fp_tx.at(u));
+                        ofdm_ca_num_, vec_fp_tx.at(u / num_ue_channels_));
         if (write_status != ofdm_ca_num_) {
-          AGORA_LOG_ERROR("Config: Failed to write ul antenna file\n");
+          AGORA_LOG_ERROR("Config: Failed to write ul sc data file\n");
         }
       }
       CommsLib::IFFT(&ul_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
     }
   }
-  if (kOutputUlFreqData) {
-    for (size_t u = 0; u < vec_fp_tx.size(); u++) {
-      const auto close_status = std::fclose(vec_fp_tx.at(u));
+  if (kOutputUlScData) {
+    for (size_t i = 0; i < vec_fp_tx.size(); i++) {
+      const auto close_status = std::fclose(vec_fp_tx.at(i));
       if (close_status != 0) {
-        AGORA_LOG_ERROR("Config: Failed to close ul antenna file %d\n", u);
+        AGORA_LOG_ERROR("Config: Failed to close ul sc data file %zu\n", i);
       }
     }
   }
