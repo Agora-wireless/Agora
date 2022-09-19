@@ -28,11 +28,11 @@ RadioUHDConfig::RadioUHDConfig(Config* cfg, Radio::RadioType radio_type)
             << ", Antenna num: " << antenna_num_ << std::endl;
 
   radios_ = Radio::Create(radio_type);
-  std::cout<<"radio UHD created here" << std::endl;
+  std::cout << "radio UHD created here" << std::endl;
 
   // std::thread init_bs_threads;
 
-std::vector<std::thread> init_bs_threads;
+  std::vector<std::thread> init_bs_threads;
 
   for (size_t i = 0; i < radio_num_; i++) {
 #ifdef THREADED_INIT
@@ -40,7 +40,7 @@ std::vector<std::thread> init_bs_threads;
 #else
     InitBsRadio(i);
 #endif
-}
+  }
 
   // Block until all radios are initialized
   size_t num_checks = 0;
@@ -49,13 +49,14 @@ std::vector<std::thread> init_bs_threads;
     num_checks++;
     if (num_checks > 1e9) {
       std::printf(
-          "RadioUHDConfig: Waiting for radio initialization, %zu of %zu ready\n",
+          "RadioUHDConfig: Waiting for radio initialization, %zu of %zu "
+          "ready\n",
           num_radios_init, radio_num_);
       num_checks = 0;
     }
     num_radios_init = num_radios_initialized_.load();
   }
-  
+
   for (auto& join_thread : init_bs_threads) {
     join_thread.join();
   }
@@ -106,13 +107,12 @@ std::vector<std::thread> init_bs_threads;
 
 void RadioUHDConfig::InitBsRadio(size_t radio_id) {
   radios_->Init(cfg_, radio_id, cfg_->RadioId().at(radio_id),
-                             Utils::StrToChannels(cfg_->Channel()),
-                             cfg_->HwFramer());
+                Utils::StrToChannels(cfg_->Channel()), cfg_->HwFramer());
   num_radios_initialized_.fetch_add(1);
 }
 
 void RadioUHDConfig::ConfigureBsRadio(size_t radio_id) {
-  (void) radio_id;
+  (void)radio_id;
   std::vector<double> tx_gains;
   tx_gains.emplace_back(cfg_->TxGainA());
   tx_gains.emplace_back(cfg_->TxGainB());
@@ -241,14 +241,12 @@ bool RadioUHDConfig::RadioStart() {
   return true;
 }
 
-void RadioUHDConfig::Go() {
-}
+void RadioUHDConfig::Go() {}
 
 int RadioUHDConfig::RadioTx(size_t radio_id, const void* const* buffs,
-                         Radio::TxFlags flags, long long& tx_time) {
-  (void) radio_id;
-  return radios_->Tx(buffs, cfg_->SampsPerSymbol(), flags,
-                                  tx_time);
+                            Radio::TxFlags flags, long long& tx_time) {
+  (void)radio_id;
+  return radios_->Tx(buffs, cfg_->SampsPerSymbol(), flags, tx_time);
 }
 
 int RadioUHDConfig::RadioTx(
@@ -262,8 +260,7 @@ int RadioUHDConfig::RadioTx(
   for (size_t i = 0; i < tx_data.size(); i++) {
     buffs.at(i) = tx_data.at(i).data();
   }
-  return radios_->Tx(buffs.data(), cfg_->SampsPerSymbol(), flags,
-                                  tx_time);
+  return radios_->Tx(buffs.data(), cfg_->SampsPerSymbol(), flags, tx_time);
 }
 
 int RadioUHDConfig::RadioRx(
@@ -281,15 +278,13 @@ int RadioUHDConfig::RadioRx(
 }
 
 int RadioUHDConfig::RadioRx(size_t radio_id, std::vector<void*>& rx_locs,
-                         size_t rx_size, Radio::RxFlags& out_flags,
-                         long long& rx_time_ns) {
+                            size_t rx_size, Radio::RxFlags& out_flags,
+                            long long& rx_time_ns) {
   (void)radio_id;
   return radios_->Rx(rx_locs, rx_size, out_flags, rx_time_ns);
 }
 
-void RadioUHDConfig::ReadSensors() {
-    radios_->ReadSensor();
-}
+void RadioUHDConfig::ReadSensors() { radios_->ReadSensor(); }
 
 void RadioUHDConfig::RadioStop() {
   //Could add a threaded deactivate if it speeds things up.
@@ -342,7 +337,6 @@ RadioUHDConfig::~RadioUHDConfig() {
 
   std::vector<std::thread> close_radio_threads;
   close_radio_threads.emplace_back(&Radio::Close, radios_.get());
-  
 
   AGORA_LOG_INFO("~RadioUHDConfig waiting for close\n");
   for (auto& join_thread : close_radio_threads) {
