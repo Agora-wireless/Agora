@@ -298,6 +298,17 @@ void PhyStats::RecordUlPilotSnr(size_t frame_id) {
   }
 }
 
+void PhyStats::RecordCsiCond(size_t frame_id) {
+  if (kEnableCsvLog) {
+    std::stringstream ss;
+    ss << frame_id;
+    for (size_t i = 0; i < config_->OfdmDataNum(); i++) {
+      ss << "," << (csi_cond_[frame_id % kFrameWnd][i]);
+    }
+    logger_csi_.Write(ss.str());
+  }
+}
+
 void PhyStats::RecordEvm(size_t frame_id) {
   if (kEnableCsvLog) {
     std::stringstream ss_evm;
