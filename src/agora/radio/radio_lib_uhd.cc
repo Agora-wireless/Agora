@@ -14,7 +14,7 @@ static constexpr bool kPrintCalibrationMats = false;
 static constexpr size_t kSoapyMakeMaxAttempts = 3;
 static constexpr size_t kHubMissingWaitMs = 100;
 
-// only one BS radio object, since, no embrack_back is needed, and the thread number for BS is also set to be 1
+// only one BS radio object, since, no emplack_back is needed, and the thread number for BS is also set to be 1
 RadioUHDConfig::RadioUHDConfig(Config* cfg, Radio::RadioType radio_type)
     : cfg_(cfg), num_radios_initialized_(0), num_radios_configured_(0) {
   std::map<std::string, std::string> args;
@@ -29,13 +29,10 @@ RadioUHDConfig::RadioUHDConfig(Config* cfg, Radio::RadioType radio_type)
 
   radios_ = Radio::Create(radio_type);
   std::cout << "radio UHD created here" << std::endl;
-
-  // std::thread init_bs_threads;
-
   std::vector<std::thread> init_bs_threads;
 
   for (size_t i = 0; i < radio_num_; i++) {
-#ifdef THREADED_INIT
+#if defined(THREADED_INIT)
     init_bs_threads.emplace_back(&RadioUHDConfig::InitBsRadio, this, i);
 #else
     InitBsRadio(i);
@@ -61,19 +58,9 @@ RadioUHDConfig::RadioUHDConfig(Config* cfg, Radio::RadioType radio_type)
     join_thread.join();
   }
 
-  // Perform DC Offset & IQ Imbalance Calibration
-  // if (cfg_->ImbalanceCalEn()) {
-  //   if (cfg_->Channel().find('A') != std::string::npos) {
-  //     // DciqCalibrationProc(0);
-  //   }
-  //   if (cfg_->Channel().find('B') != std::string::npos) {
-  //     // DciqCalibrationProc(1);
-  //   }
-  // }
-
   std::vector<std::thread> config_bs_threads;
   for (size_t i = 0; i < radio_num_; i++) {
-#ifdef THREADED_INIT
+#if defined(THREADED_INIT)
     config_bs_threads.emplace_back(&RadioUHDConfig::ConfigureBsRadio, this, i);
 #else
     ConfigureBsRadio(i);
@@ -82,26 +69,22 @@ RadioUHDConfig::RadioUHDConfig(Config* cfg, Radio::RadioType radio_type)
 
   num_checks = 0;
   // Block until all radios are configured
-  // this is being commented out since there is only one BS radio
-  // size_t num_radios_config = num_radios_configured_.load();
-  // while (num_radios_config != radio_num_) {
-  //   num_checks++;
-  //   if (num_checks > 1e9) {
-  //     AGORA_LOG_WARN(
-  //         "RadioUHDConfig: Waiting for radio initialization, %zu of %zu ready\n",
-  //         num_radios_config, radio_num_);
-  //     num_checks = 0;
-  //   }
-  //   num_radios_config = num_radios_configured_.load();
-  // }
-
-  // config_bs_threads.join();
-
+  size_t num_radios_config = num_radios_configured_.load();
+  while (num_radios_config != radio_num_) {
+    num_checks++;
+    if (num_checks > 1e9) {
+      AGORA_LOG_WARN(
+          "RadioUHDConfig: Waiting for radio initialization, %zu of %zu "
+          "ready\n",
+          num_radios_config, radio_num_);
+      num_checks = 0;
+    }
+    num_radios_config = num_radios_configured_.load();
+  }
   for (auto& join_thread : config_bs_threads) {
     join_thread.join();
   }
   radios_->PrintSettings();
-
   AGORA_LOG_INFO("RadioUHDConfig init complete!\n");
 }
 
@@ -126,9 +109,6 @@ void RadioUHDConfig::ConfigureBsRadio(size_t radio_id) {
 }
 
 bool RadioUHDConfig::RadioStart() {
-  if (cfg_->SampleCalEn()) {
-    // CalibrateSampleOffset();
-  }
   bool good_calib = false;
   AllocBuffer1d(&init_calib_dl_processed_,
                 cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),

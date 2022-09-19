@@ -3,12 +3,16 @@
  * @brief Implementation of PacketTxRxClientRadio initialization functions, and datapath
  * functions for communicating with user hardware.
  */
-
 #include "packet_txrx_client_radio.h"
 
 #include "logger.h"
 #include "txrx_worker_client_hw.h"
-//#include "txrx_worker_usrp.h"
+
+#if defined(USE_PURE_UHD)
+static constexpr kRadioType = Radio::kUhdNative;
+#else
+static constexpr kRadioType = Radio::kSoapySdrStream;
+#endif
 
 static constexpr size_t kRadioTriggerWaitMs = 100;
 
@@ -23,13 +27,7 @@ PacketTxRxClientRadio::PacketTxRxClientRadio(
                  event_notify_q, tx_pending_q, notify_producer_tokens,
                  tx_producer_tokens, rx_buffer, packet_num_in_buffer,
                  frame_start, tx_buffer) {
-#if defined(USE_PURE_UHD)
-  radio_config_ =
-      std::make_unique<ClientRadioConfig>(cfg, Radio::kSoapySdrStream);
-#else
-  radio_config_ =
-      std::make_unique<ClientRadioConfig>(cfg, Radio::kSoapySdrStream);
-#endif
+  radio_config_ = std::make_unique<ClientRadioConfig>(cfg, kRadioType);
 }
 
 PacketTxRxClientRadio::~PacketTxRxClientRadio() {

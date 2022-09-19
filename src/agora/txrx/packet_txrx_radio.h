@@ -10,7 +10,10 @@
 #include "common_typedef_sdk.h"
 #include "packet_txrx.h"
 #include "radio_lib.h"
+
+#if defined(USE_PURE_UHD)
 #include "radio_lib_uhd.h"
+#endif
 
 /**
  * @brief Implementations of this class provide packet I/O for Agora.

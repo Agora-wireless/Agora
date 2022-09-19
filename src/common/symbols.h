@@ -162,7 +162,7 @@ static constexpr bool kUseUHD = true;
 static constexpr bool kUseUHD = false;
 #endif
 
-#ifdef USE_PURE_UHD
+#if defined(USE_PURE_UHD)
 static constexpr bool kUsePureUHD = true;
 #else
 static constexpr bool kUsePureUHD = false;
