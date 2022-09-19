@@ -215,7 +215,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
     if (kOutputUlOfdmSymbols) {
       std::vector<std::vector<std::vector<std::vector<std::vector<uint8_t>>>>>
-          sounder_data(
+          ul_ofdm_data(
               this->cfg_->UeNum(),
               std::vector<std::vector<std::vector<std::vector<uint8_t>>>>(
                   kOutputFrameNum,
@@ -237,7 +237,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
             this->cfg_->LdpcConfig(Direction::kUplink).NumEncodedBytes(),
             this->cfg_->ModOrderBits(Direction::kUplink));
         for (size_t f = 0; f < kOutputFrameNum; f++) {
-          sounder_data.at(cl_sdr).at(f).at(ul_slot).at(cl_sdr_ch) = odfm_symbol;
+          ul_ofdm_data.at(cl_sdr).at(f).at(ul_slot).at(cl_sdr_ch) = odfm_symbol;
         }
       }
       for (size_t i = 0; i < this->cfg_->UeNum(); i++) {
@@ -261,7 +261,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
           for (size_t u = 0; u < this->cfg_->Frame().NumULSyms(); u++) {
             for (size_t h = 0; h < this->cfg_->NumUeChannels(); h++) {
               const auto write_status = std::fwrite(
-                  sounder_data.at(i).at(f).at(u).at(h).data(), sizeof(uint8_t),
+                  ul_ofdm_data.at(i).at(f).at(u).at(h).data(), sizeof(uint8_t),
                   this->cfg_->OfdmDataNum(), fp_tx_b);
               if (write_status != this->cfg_->OfdmDataNum()) {
                 throw std::runtime_error(
