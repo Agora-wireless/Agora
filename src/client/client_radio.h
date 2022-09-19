@@ -40,11 +40,7 @@ class ClientRadioConfig {
   void InitClientRadio(size_t radio_id);
 
   const Config* const cfg_;
-#if defined(USE_PURE_UHD)
-  std::unique_ptr<Radio> radios_;
-#else
   std::vector<std::unique_ptr<Radio>> radios_;
-#endif
   size_t total_radios_;
   size_t total_antennas_;
 
