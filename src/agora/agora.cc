@@ -1115,19 +1115,20 @@ void Agora::SaveDecodeDataToFile(int frame_id) {
   } else {
     for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
       for (size_t j = 0; j < cfg->UeAntNum(); j++) {
-        int8_t* ptr = agora_memory_->GetDecod()[(frame_id % kFrameWnd)][i][j];
+        const int8_t* ptr =
+            agora_memory_->GetDecod()[(frame_id % kFrameWnd)][i][j];
         const auto write_status =
             std::fwrite(ptr, sizeof(uint8_t), num_decoded_bytes, fp);
         if (write_status != num_decoded_bytes) {
           AGORA_LOG_ERROR("SaveDecodeDataToFile error while writting file\n")
         }
       }
-      const auto close_status = std::fclose(fp);
-      if (close_status != 0) {
-        AGORA_LOG_ERROR("SaveDecodeDataToFile error while closing file\n")
-      }
     }  // end for
-  }    // end else
+    const auto close_status = std::fclose(fp);
+    if (close_status != 0) {
+      AGORA_LOG_ERROR("SaveDecodeDataToFile error while closing file\n")
+    }
+  }  // end else
 }
 
 void Agora::SaveTxDataToFile(int frame_id) {
@@ -1139,13 +1140,14 @@ void Agora::SaveTxDataToFile(int frame_id) {
     AGORA_LOG_ERROR("SaveTxDataToFile error creating file pointer\n")
   } else {
     for (size_t i = 0; i < cfg->Frame().NumDLSyms(); i++) {
-      size_t total_data_symbol_id = cfg->GetTotalDataSymbolIdxDl(frame_id, i);
+      const size_t total_data_symbol_id =
+          cfg->GetTotalDataSymbolIdxDl(frame_id, i);
 
       for (size_t ant_id = 0; ant_id < cfg->BsAntNum(); ant_id++) {
-        size_t offset = total_data_symbol_id * cfg->BsAntNum() + ant_id;
+        const size_t offset = total_data_symbol_id * cfg->BsAntNum() + ant_id;
         auto* pkt = reinterpret_cast<Packet*>(
             &agora_memory_->GetDlSocket()[offset * cfg->DlPacketLength()]);
-        short* socket_ptr = pkt->data_;
+        const short* socket_ptr = pkt->data_;
         const auto write_status = std::fwrite(socket_ptr, sizeof(short),
                                               cfg->SampsPerSymbol() * 2, fp);
         if (write_status != cfg->SampsPerSymbol() * 2) {

@@ -771,7 +771,7 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
         "Exceeded possible range of LDPC lifting Zc for uplink! Setting "
         "lifting size to max possible value(%zu).\nThis may lead to too many "
         "unused subcarriers. For better use of the PHY resources, you may "
-        "reduce your coding or modulation rate.",
+        "reduce your coding or modulation rate.\n",
         kMaxSupportedZc);
     zc = kMaxSupportedZc;
   }
