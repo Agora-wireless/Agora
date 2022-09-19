@@ -86,10 +86,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kUplink));
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(
-                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kUplink)) &
-            0xFFFF));
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
+                                pkt->Data(),
+                                cfg_->MacPayloadMaxLength(Direction::kUplink)) &
+                            0xFFFF));
       }
     }
 
@@ -98,12 +98,27 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
           directory + kUlDataPrefix + std::to_string(this->cfg_->OfdmCaNum()) +
           "_ant" + std::to_string(this->cfg_->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving uplink MAC data to %s\n", filename_input.c_str());
-      FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
-      for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
-        std::fwrite(reinterpret_cast<uint8_t*>(ul_mac_info.at(i).data()),
-                    num_ul_mac_bytes, sizeof(uint8_t), fp_input);
+      auto* fp_input = std::fopen(filename_input.c_str(), "wb");
+      if (fp_input == nullptr) {
+        AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
+        throw std::runtime_error("Failed to create file" + filename_input);
+      } else {
+        for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
+          const auto write_status =
+              std::fwrite(reinterpret_cast<uint8_t*>(ul_mac_info.at(i).data()),
+                          sizeof(uint8_t), num_ul_mac_bytes, fp_input);
+          if (write_status != num_ul_mac_bytes) {
+            AGORA_LOG_ERROR("Wrote %zu out of %zu to file %s\n", write_status,
+                            num_ul_mac_bytes, filename_input.c_str());
+            throw std::runtime_error("Failed to write to file" +
+                                     filename_input);
+          }
+        }
+        const auto close_status = std::fclose(fp_input);
+        if (close_status != 0) {
+          throw std::runtime_error("Failed to close file" + filename_input);
+        }
       }
-      std::fclose(fp_input);
 
       if (kPrintUplinkInformationBytes) {
         std::printf("Uplink information bytes\n");
@@ -162,12 +177,27 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
           std::to_string(this->cfg_->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving raw uplink data (using LDPC) to %s\n",
                      filename_input.c_str());
-      FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
-      for (size_t i = 0; i < num_ul_codeblocks; i++) {
-        std::fwrite(reinterpret_cast<uint8_t*>(&ul_information.at(i).at(0)),
-                    ul_cb_bytes, sizeof(uint8_t), fp_input);
+      auto* fp_input = std::fopen(filename_input.c_str(), "wb");
+      if (fp_input == nullptr) {
+        AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
+        throw std::runtime_error("Failed to create file" + filename_input);
+      } else {
+        for (size_t i = 0; i < num_ul_codeblocks; i++) {
+          const auto write_status = std::fwrite(
+              reinterpret_cast<uint8_t*>(&ul_information.at(i).at(0)),
+              sizeof(uint8_t), ul_cb_bytes, fp_input);
+          if (write_status != ul_cb_bytes) {
+            AGORA_LOG_ERROR("Wrote %zu out of %zu to file %s\n", write_status,
+                            ul_cb_bytes, filename_input.c_str());
+            throw std::runtime_error("Failed to write to file" +
+                                     filename_input);
+          }
+        }
+        const auto close_status = std::fclose(fp_input);
+        if (close_status != 0) {
+          throw std::runtime_error("Failed to close file" + filename_input);
+        }
       }
-      std::fclose(fp_input);
 
       if (kPrintUplinkInformationBytes) {
         std::printf("Uplink information bytes\n");
@@ -222,7 +252,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
             "_" + std::to_string(i) + ".bin";
         AGORA_LOG_INFO("Saving uplink ofdm symbols to %s\n",
                        filename_input.c_str());
-        FILE* fp_tx_b = std::fopen(filename_input.c_str(), "wb");
+        auto* fp_tx_b = std::fopen(filename_input.c_str(), "wb");
         if (fp_tx_b == nullptr) {
           throw std::runtime_error(
               "DataGenerator: Failed to create ul ofdm symbol file");
@@ -230,16 +260,18 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         for (size_t f = 0; f < kOutputFrameNum; f++) {
           for (size_t u = 0; u < this->cfg_->Frame().NumULSyms(); u++) {
             for (size_t h = 0; h < this->cfg_->NumUeChannels(); h++) {
-              if (std::fwrite(sounder_data.at(i).at(f).at(u).at(h).data(),
-                              sizeof(uint8_t), this->cfg_->OfdmDataNum(),
-                              fp_tx_b) != this->cfg_->OfdmDataNum()) {
+              const auto write_status = std::fwrite(
+                  sounder_data.at(i).at(f).at(u).at(h).data(), sizeof(uint8_t),
+                  this->cfg_->OfdmDataNum(), fp_tx_b);
+              if (write_status != this->cfg_->OfdmDataNum()) {
                 throw std::runtime_error(
                     "DataGenerator: Failed to write ul ofdm symbol file");
               }
             }
           }
         }
-        if (std::fclose(fp_tx_b) != 0) {
+        const auto close_status = std::fclose(fp_tx_b);
+        if (close_status != 0) {
           throw std::runtime_error(
               "DataGenerator: Failed to finish ul ofdm symbol file");
         }
@@ -392,13 +424,28 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       directory + kRxLdpcPrefix + std::to_string(this->cfg_->OfdmCaNum()) +
       "_ant" + std::to_string(this->cfg_->BsAntNum()) + ".bin";
   AGORA_LOG_INFO("Saving rx data to %s\n", filename_rx.c_str());
-  FILE* fp_rx = std::fopen(filename_rx.c_str(), "wb");
-  for (size_t i = 0; i < this->cfg_->Frame().NumTotalSyms(); i++) {
-    auto* ptr = reinterpret_cast<float*>(rx_data_all_symbols[i]);
-    std::fwrite(ptr, this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum() * 2,
-                sizeof(float), fp_rx);
+  auto* fp_rx = std::fopen(filename_rx.c_str(), "wb");
+  if (fp_rx == nullptr) {
+    AGORA_LOG_ERROR("Failed to create file %s\n", filename_rx.c_str());
+    throw std::runtime_error("Failed to create file" + filename_rx);
+  } else {
+    for (size_t i = 0; i < this->cfg_->Frame().NumTotalSyms(); i++) {
+      const auto* ptr = reinterpret_cast<float*>(rx_data_all_symbols[i]);
+      const auto write_status = std::fwrite(
+          ptr, sizeof(float),
+          this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum() * 2, fp_rx);
+      if (write_status !=
+          this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum() * 2) {
+        AGORA_LOG_ERROR("Write %zu out of %zu to file %s\n", write_status,
+                        num_ul_mac_bytes, filename_rx.c_str());
+        throw std::runtime_error("Failed to write to file" + filename_rx);
+      }
+    }
+    const auto close_status = std::fclose(fp_rx);
+    if (close_status != 0) {
+      throw std::runtime_error("Failed to close file" + filename_rx);
+    }
   }
-  std::fclose(fp_rx);
 
   if (kDebugPrintRxData) {
     std::printf("rx data\n");
@@ -440,10 +487,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kDownlink));
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(
-                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kDownlink)) &
-            0xFFFF));
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(pkt->Data(),
+                                                    cfg_->MacPayloadMaxLength(
+                                                        Direction::kDownlink)) &
+                            0xFFFF));
       }
     }
 
@@ -454,11 +501,26 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       AGORA_LOG_INFO("Saving downlink MAC data to %s\n",
                      filename_input.c_str());
       FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
-      for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
-        std::fwrite(reinterpret_cast<uint8_t*>(dl_mac_info.at(i).data()),
-                    num_dl_mac_bytes, sizeof(uint8_t), fp_input);
+      if (fp_input == nullptr) {
+        AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
+        throw std::runtime_error("Failed to create file" + filename_input);
+      } else {
+        for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
+          const auto write_status =
+              std::fwrite(reinterpret_cast<uint8_t*>(dl_mac_info.at(i).data()),
+                          sizeof(uint8_t), num_dl_mac_bytes, fp_input);
+          if (write_status != num_dl_mac_bytes) {
+            AGORA_LOG_ERROR("Wrote %zu out of %zu to file %s\n", write_status,
+                            num_dl_mac_bytes, filename_input.c_str());
+            throw std::runtime_error("Failed to write to file" +
+                                     filename_input);
+          }
+        }
+        const auto close_status = std::fclose(fp_input);
+        if (close_status != 0) {
+          throw std::runtime_error("Failed to close file" + filename_input);
+        }
       }
-      std::fclose(fp_input);
 
       if (kPrintDownlinkInformationBytes) {
         std::printf("Downlink information bytes\n");
@@ -522,12 +584,27 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
           std::to_string(this->cfg_->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving raw dl data (using LDPC) to %s\n",
                      filename_input.c_str());
-      FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
-      for (size_t i = 0; i < num_dl_codeblocks; i++) {
-        std::fwrite(reinterpret_cast<uint8_t*>(&dl_information.at(i).at(0)),
-                    dl_cb_bytes, sizeof(uint8_t), fp_input);
+      auto* fp_input = std::fopen(filename_input.c_str(), "wb");
+      if (fp_input == nullptr) {
+        AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
+        throw std::runtime_error("Failed to create file" + filename_input);
+      } else {
+        for (size_t i = 0; i < num_dl_codeblocks; i++) {
+          const auto write_status = std::fwrite(
+              reinterpret_cast<uint8_t*>(&dl_information.at(i).at(0)),
+              sizeof(uint8_t), dl_cb_bytes, fp_input);
+          if (write_status != dl_cb_bytes) {
+            AGORA_LOG_ERROR("Wrote %zu out of %zu to file %s\n", write_status,
+                            dl_cb_bytes, filename_input.c_str());
+            throw std::runtime_error("Failed to write to file" +
+                                     filename_input);
+          }
+        }
+        const auto close_status = std::fclose(fp_input);
+        if (close_status != 0) {
+          throw std::runtime_error("Failed to close file" + filename_input);
+        }
       }
-      std::fclose(fp_input);
 
       if (kPrintDownlinkInformationBytes == true) {
         std::printf("Downlink information bytes\n");
@@ -691,14 +768,31 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         directory + kDlTxPrefix + std::to_string(this->cfg_->OfdmCaNum()) +
         "_ant" + std::to_string(this->cfg_->BsAntNum()) + ".bin";
     AGORA_LOG_INFO("Saving dl tx data to %s\n", filename_dl_tx.c_str());
-    FILE* fp_dl_tx = std::fopen(filename_dl_tx.c_str(), "wb");
-    for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {
-      short* ptr = dl_tx_data[i];
-      std::fwrite(ptr,
-                  this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum() * 2,
-                  sizeof(short), fp_dl_tx);
+    auto* fp_dl_tx = std::fopen(filename_dl_tx.c_str(), "wb");
+    if (fp_dl_tx == nullptr) {
+      AGORA_LOG_ERROR("Failed to create file %s\n", filename_dl_tx.c_str());
+      throw std::runtime_error("Failed to create file" + filename_dl_tx);
+    } else {
+      for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {
+        const short* ptr = dl_tx_data[i];
+        const auto write_status = std::fwrite(
+            ptr, sizeof(short),
+            this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum() * 2,
+            fp_dl_tx);
+        if (write_status !=
+            this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum() * 2) {
+          AGORA_LOG_ERROR(
+              "Wrote %zu out of %zu to file %s\n", write_status,
+              this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum() * 2,
+              filename_dl_tx.c_str());
+          throw std::runtime_error("Failed to write to file" + filename_dl_tx);
+        }
+      }
+      const auto close_status = std::fclose(fp_dl_tx);
+      if (close_status != 0) {
+        throw std::runtime_error("Failed to close file" + filename_dl_tx);
+      }
     }
-    std::fclose(fp_dl_tx);
 
     if (kPrintDlTxData) {
       std::printf("rx data\n");
