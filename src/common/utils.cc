@@ -410,9 +410,19 @@ void Utils::PrintVector(const std::vector<std::complex<int16_t>>& data) {
 
 void Utils::WriteBinaryFile(const std::string& name, size_t elem_size,
                             size_t buffer_size, void* buff) {
-  FILE* f_handle = std::fopen(name.c_str(), "wb");
-  std::fwrite(buff, elem_size, buffer_size, f_handle);
-  std::fclose(f_handle);
+  auto* f_handle = std::fopen(name.c_str(), "wb");
+  if (f_handle == nullptr) {
+    throw std::runtime_error("Failed to open binary file " + name);
+  }
+
+  const auto write_status = std::fwrite(buff, elem_size, buffer_size, f_handle);
+  if (write_status != buffer_size) {
+    throw std::runtime_error("Failed to write binary file " + name);
+  }
+  const auto close_status = std::fclose(f_handle);
+  if (close_status != 0) {
+    throw std::runtime_error("Failed to close binary file " + name);
+  }
 }
 
 void Utils::SaveMat(const arma::cx_fmat& c, const std::string& filename,

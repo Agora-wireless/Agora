@@ -1008,22 +1008,25 @@ void Config::GenData() {
       if (fp_tx_f == nullptr) {
         AGORA_LOG_ERROR("Failed to create antenna file %s. Error %s.\n",
                         filename_ul_pilot_f.c_str(), strerror(errno));
-        throw std::runtime_error("Config: Failed to create ul antenna file");
-      }
-      if (std::fwrite(ue_pilot_ifft[i], sizeof(float) * 2, ofdm_ca_num_,
-                      fp_tx_f) != ofdm_ca_num_) {
-        throw std::runtime_error("Config: Failed to write ul antenna file");
-      }
-      if (std::fclose(fp_tx_f) != 0) {
-        throw std::runtime_error("Config: Failed to finish ul antenna file");
+      } else {
+        const auto write_status = std::fwrite(
+            ue_pilot_ifft[i], sizeof(complex_float), ofdm_ca_num_, fp_tx_f);
+        if (write_status != ofdm_ca_num_) {
+          AGORA_LOG_ERROR("Config: Failed to write ul antenna file\n");
+        }
+        const auto close_status = std::fclose(fp_tx_f);
+        if (close_status != 0) {
+          AGORA_LOG_ERROR("Config: Failed to finish ul antenna file\n");
+        }
       }
     }
     CommsLib::IFFT(ue_pilot_ifft[i], ofdm_ca_num_, false);
   }
 
   // Get uplink and downlink raw bits either from file or random numbers
-  size_t dl_num_bytes_per_ue_pad = Roundup<64>(this->dl_num_bytes_per_cb_) *
-                                   this->dl_ldpc_config_.NumBlocksInSymbol();
+  const size_t dl_num_bytes_per_ue_pad =
+      Roundup<64>(this->dl_num_bytes_per_cb_) *
+      this->dl_ldpc_config_.NumBlocksInSymbol();
   dl_bits_.Malloc(this->frame_.NumDLSyms(),
                   dl_num_bytes_per_ue_pad * this->ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
@@ -1033,8 +1036,9 @@ void Config::GenData() {
                   this->samps_per_symbol_ * this->ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
 
-  size_t ul_num_bytes_per_ue_pad = Roundup<64>(this->ul_num_bytes_per_cb_) *
-                                   this->ul_ldpc_config_.NumBlocksInSymbol();
+  const size_t ul_num_bytes_per_ue_pad =
+      Roundup<64>(this->ul_num_bytes_per_cb_) *
+      this->ul_ldpc_config_.NumBlocksInSymbol();
   ul_bits_.Malloc(this->frame_.NumULSyms(),
                   ul_num_bytes_per_ue_pad * this->ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
@@ -1216,10 +1220,10 @@ void Config::GenData() {
   }
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
     for (size_t u = 0; u < this->ue_ant_num_; u++) {
-      size_t q = u * ofdm_data_num_;
+      const size_t q = u * ofdm_data_num_;
 
       for (size_t j = 0; j < ofdm_data_num_; j++) {
-        size_t sc = j + ofdm_data_start_;
+        const size_t sc = j + ofdm_data_start_;
         int8_t* mod_input_ptr =
             GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, u, j);
         ul_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, ul_mod_table_);
@@ -1229,9 +1233,11 @@ void Config::GenData() {
         ul_iq_ifft[i][u * ofdm_ca_num_ + k] = ul_iq_f_[i][q + j];
       }
       if (kOutputUlFreqData) {
-        if (std::fwrite(&ul_iq_ifft[i][u * ofdm_ca_num_], sizeof(float) * 2,
-                        ofdm_ca_num_, vec_fp_tx.at(u)) != ofdm_ca_num_) {
-          throw std::runtime_error("Config: Failed to write ul antenna file");
+        const auto write_status =
+            std::fwrite(&ul_iq_ifft[i][u * ofdm_ca_num_], sizeof(complex_float),
+                        ofdm_ca_num_, vec_fp_tx.at(u));
+        if (write_status != ofdm_ca_num_) {
+          AGORA_LOG_ERROR("Config: Failed to write ul antenna file\n");
         }
       }
       CommsLib::IFFT(&ul_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
@@ -1239,8 +1245,9 @@ void Config::GenData() {
   }
   if (kOutputUlFreqData) {
     for (size_t u = 0; u < vec_fp_tx.size(); u++) {
-      if (std::fclose(vec_fp_tx.at(u)) != 0) {
-        throw std::runtime_error("Config: Failed to finish ul antenna file");
+      const auto close_status = std::fclose(vec_fp_tx.at(u));
+      if (close_status != 0) {
+        AGORA_LOG_ERROR("Config: Failed to close ul antenna file %d\n", u);
       }
     }
   }
