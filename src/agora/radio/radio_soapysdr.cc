@@ -98,7 +98,10 @@ void RadioSoapySdr::Close() {
       dev_->closeStream(txs_);
       txs_ = nullptr;
     }
-    dev_->writeSetting("RESET_DATA_LOGIC", "");
+
+    if (kUseUHD == false) {
+      dev_->writeSetting("RESET_DATA_LOGIC", "");
+    }
     SoapySDR::Device::unmake(dev_);
     dev_ = nullptr;
     Radio::Close();
@@ -206,9 +209,13 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
       }
     }
 
-    if (ip_address_.empty()) {
-      AGORA_LOG_ERROR("Iris Device IP address not found");
-      throw std::runtime_error("Device IP address not found");
+    if (kUseUHD) {
+      ip_address_ = SerialNumber();
+    } else {
+      if (ip_address_.empty()) {
+        AGORA_LOG_ERROR("Device IP address not found");
+        throw std::runtime_error("Device IP address not found");
+      }
     }
 
     if (kPrintRadioSettings) {
@@ -250,10 +257,15 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
     // resets the DATA_clk domain logic.
     SoapySDR::Kwargs hw_info = dev_->getHardwareInfo();
     if (hw_info["revision"].find("Iris") != std::string::npos) {
+      AGORA_LOG_INFO(
+          "RadioSoapySdr::Init[%zu] - resetting the data logic on iris\n", id);
       dev_->writeSetting("RESET_DATA_LOGIC", "");
-    } else {
-      AGORA_LOG_ERROR(
-          "RadioSoapySdr::Init[%zu] - Not resetting the data logic\n", id);
+
+      auto clk_status = dev_->readSensor("CLKBUFF_LOCKED");
+      if (clk_status.compare("false") == 0) {
+        AGORA_LOG_WARN("RadioSoapySdr::Init[%zu] clk_status %s\n", id,
+                       clk_status.c_str());
+      }
     }
 
     if (rxp_ == nullptr) {
@@ -262,15 +274,8 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
           "configured\n",
           id);
     }
-
-    auto clk_status = dev_->readSensor("CLKBUFF_LOCKED");
-    if (clk_status.compare("false") == 0) {
-      AGORA_LOG_WARN("RadioSoapySdr::Init[%zu] clk_status %s\n", id,
-                     clk_status.c_str());
-    }
     rxp_->Init(this, cfg_, hw_framer);
     rxp_->Setup();
-
     txs_ = dev_->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CS16, enabled_channels,
                              sargs);
 
@@ -408,9 +413,11 @@ void RadioSoapySdr::Setup(const std::vector<double>& tx_gains,
     }
   }
 
-  auto clk_status = dev_->readSensor("CLKBUFF_LOCKED");
-  if (clk_status.compare("false") == 0) {
-    AGORA_LOG_WARN("Radio - clk_status %s\n", clk_status.c_str());
+  if (kUseUHD == false) {
+    auto clk_status = dev_->readSensor("CLKBUFF_LOCKED");
+    if (clk_status.compare("false") == 0) {
+      AGORA_LOG_WARN("Radio - clk_status %s\n", clk_status.c_str());
+    }
   }
 }
 
@@ -589,20 +596,24 @@ void RadioSoapySdr::SetTimeAtTrigger(long long time_ns) {
         "not the expected value %lld : %lld\n",
         Id(), time_dev, time_ns);
   }
-  auto clk_status = dev_->readSensor("CLKBUFF_LOCKED");
-  if (clk_status.compare("false") == 0) {
-    AGORA_LOG_WARN("RadioSoapySdr::Activate[%zu] clk_status %s\n", Id(),
-                   clk_status.c_str());
+
+  if (kUseUHD == false) {
+    auto clk_status = dev_->readSensor("CLKBUFF_LOCKED");
+    if (clk_status.compare("false") == 0) {
+      AGORA_LOG_WARN("RadioSoapySdr::Activate[%zu] clk_status %s\n", Id(),
+                     clk_status.c_str());
+    }
   }
 }
 
 long long RadioSoapySdr::GetTimeNs() {
-  auto clk_status = dev_->readSensor("CLKBUFF_LOCKED");
-  if (clk_status.compare("false") == 0) {
-    AGORA_LOG_WARN("RadioSoapySdr::Activate[%zu] clk_status %s\n", Id(),
-                   clk_status.c_str());
+  if (kUseUHD == false) {
+    auto clk_status = dev_->readSensor("CLKBUFF_LOCKED");
+    if (clk_status.compare("false") == 0) {
+      AGORA_LOG_WARN("RadioSoapySdr::Activate[%zu] clk_status %s\n", Id(),
+                     clk_status.c_str());
+    }
   }
-
   auto time_dev = dev_->getHardwareTime();
   AGORA_LOG_TRACE("RadioSoapySdr::GetTimeNs[%zu] the hardware time is %lld\n",
                   Id(), time_dev);

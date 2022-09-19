@@ -14,9 +14,10 @@ std::unique_ptr<Radio> Radio::Create(Radio::RadioType type) {
     case kSoapySdrStream: {
 #if defined(USE_PURE_UHD)
       std::cout << "UHDSdr is created here" << std::endl;
-      return std::make_unique<RadioUHDSdr>();c
+      return std::make_unique<RadioUHDSdr>();
+      c
 #else
-      std::cout<<"SoapySDR is created here" << std::endl;
+      std::cout << "SoapySDR is created here" << std::endl;
       return std::make_unique<RadioSoapySdr>(RadioDataPlane::kSoapyStream);
 #endif
     }
