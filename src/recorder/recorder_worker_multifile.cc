@@ -69,15 +69,25 @@ int RecorderWorkerMultiFile::Record(const Packet* pkt) {
       if (is_data) {
         const std::string fname_rxdata =
             kOutputFilePath + "rxdata_" + pkt_id + "_" + short_serial + ".bin";
-        FILE* fp_rxdata = std::fopen(fname_rxdata.c_str(), "wb");
+        auto* fp_rxdata = std::fopen(fname_rxdata.c_str(), "wb");
         if (fp_rxdata == nullptr) {
           throw std::runtime_error(
               "RecorderWorkerMultiFile failed to open rxdata file for "
               "writing");
         }
-        std::fwrite(pkt->data_, 2 * sizeof(int16_t), cfg_->SampsPerSymbol(),
-                    fp_rxdata);
-        std::fclose(fp_rxdata);
+
+        auto write_status = std::fwrite(pkt->data_, 2 * sizeof(short),
+                                        cfg_->SampsPerSymbol(), fp_rxdata);
+        if (write_status != cfg_->SampsPerSymbol()) {
+          throw std::runtime_error(
+              "RecorderWorkerMultiFile failed to write rxdata file");
+        }
+        auto close_status = std::fclose(fp_rxdata);
+        if (close_status != 0) {
+          throw std::runtime_error(
+              "RecorderWorkerMultiFile failed to close rxdata file");
+        }
+
         ///Tx data
         const std::string fname_txdata =
             kOutputFilePath + "txdata_" + pkt_id + ".bin";
@@ -87,22 +97,39 @@ int RecorderWorkerMultiFile::Record(const Packet* pkt) {
               "RecorderWorkerMultiFile failed to open txdata file for "
               "writing");
         }
-        std::fwrite(const_cast<Config*>(cfg_)->DlIqF()[dl_symbol_id] +
-                        ant_id * cfg_->OfdmCaNum(),
-                    2 * sizeof(float), cfg_->OfdmCaNum(), fp_txdata);
-        std::fclose(fp_txdata);
+        write_status =
+            std::fwrite(const_cast<Config*>(cfg_)->DlIqF()[dl_symbol_id] +
+                            ant_id * cfg_->OfdmCaNum(),
+                        2 * sizeof(float), cfg_->OfdmCaNum(), fp_txdata);
+        if (write_status != cfg_->OfdmCaNum()) {
+          throw std::runtime_error(
+              "RecorderWorkerMultiFile failed to write txdata file");
+        }
+        close_status = std::fclose(fp_txdata);
+        if (close_status != 0) {
+          throw std::runtime_error(
+              "RecorderWorkerMultiFile failed to close txdata file");
+        }
       } else {
         const std::string fname_rxpilot =
             kOutputFilePath + "rxpilot_" + pkt_id + "_" + short_serial + ".bin";
-        FILE* fp_rxpilot = std::fopen(fname_rxpilot.c_str(), "wb");
+        auto* fp_rxpilot = std::fopen(fname_rxpilot.c_str(), "wb");
         if (fp_rxpilot == nullptr) {
           throw std::runtime_error(
               "RecorderWorkerMultiFile failed to open rxpilot file for "
               "writing");
         }
-        std::fwrite(pkt->data_, 2 * sizeof(int16_t), cfg_->SampsPerSymbol(),
-                    fp_rxpilot);
-        std::fclose(fp_rxpilot);
+        auto write_status = std::fwrite(pkt->data_, 2 * sizeof(short),
+                                        cfg_->SampsPerSymbol(), fp_rxpilot);
+        if (write_status != cfg_->SampsPerSymbol()) {
+          throw std::runtime_error(
+              "RecorderWorkerMultiFile failed to write rxpilot file");
+        }
+        auto close_status = std::fclose(fp_rxpilot);
+        if (close_status != 0) {
+          throw std::runtime_error(
+              "RecorderWorkerMultiFile failed to close rxpilot file");
+        }
         ///Tx pilot
         const std::string fname_txpilot =
             kOutputFilePath + "txpilot_" + pkt_id + ".bin";
@@ -112,9 +139,18 @@ int RecorderWorkerMultiFile::Record(const Packet* pkt) {
               "RecorderWorkerMultiFile failed to open txpilot file for "
               "writing");
         }
-        std::fwrite(const_cast<Config*>(cfg_)->UeSpecificPilot()[ant_id],
-                    2 * sizeof(float), cfg_->OfdmDataNum(), fp_txpilot);
-        std::fclose(fp_txpilot);
+        write_status =
+            std::fwrite(const_cast<Config*>(cfg_)->UeSpecificPilot()[ant_id],
+                        2 * sizeof(float), cfg_->OfdmDataNum(), fp_txpilot);
+        if (write_status != cfg_->OfdmDataNum()) {
+          throw std::runtime_error(
+              "RecorderWorkerMultiFile failed to write txpilot file");
+        }
+        close_status = std::fclose(fp_txpilot);
+        if (close_status != 0) {
+          throw std::runtime_error(
+              "RecorderWorkerMultiFile failed to close txpilot file");
+        }
       }
     }
   }

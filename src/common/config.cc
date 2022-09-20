@@ -36,6 +36,9 @@ static const std::string kUlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_ul_data_";
 static const std::string kDlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_dl_data_";
+static const std::string kUlPilotFreqPrefix =
+    kExperimentFilepath + "ue_pilot_data_f_";
+static const std::string kUlDataFreqPrefix = kExperimentFilepath + "ul_data_f_";
 
 Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -43,6 +46,15 @@ Config::Config(std::string jsonfilename)
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       frame_(""),
       config_filename_(std::move(jsonfilename)) {
+  auto time = std::time(nullptr);
+  auto local_time = *std::localtime(&time);
+  timestamp_ = std::to_string(1900 + local_time.tm_year) + "-" +
+               std::to_string(1 + local_time.tm_mon) + "-" +
+               std::to_string(local_time.tm_mday) + "-" +
+               std::to_string(local_time.tm_hour) + "-" +
+               std::to_string(local_time.tm_min) + "-" +
+               std::to_string(local_time.tm_sec);
+
   pilots_ = nullptr;
   pilots_sgn_ = nullptr;
 
@@ -527,22 +539,13 @@ Config::Config(std::string jsonfilename)
   }
 
   // set trace file path
-  auto time = std::time(nullptr);
-  auto local_time = *std::localtime(&time);
-
   const std::string ul_present_str = (frame_.NumULSyms() > 0 ? "uplink-" : "");
   const std::string dl_present_str =
       (frame_.NumDLSyms() > 0 ? "downlink-" : "");
   std::string filename =
-      kLogFilepath + "trace-" + ul_present_str + dl_present_str +
-      std::to_string(1900 + local_time.tm_year) + "-" +
-      std::to_string(1 + local_time.tm_mon) + "-" +
-      std::to_string(local_time.tm_mday) + "-" +
-      std::to_string(local_time.tm_hour) + "-" +
-      std::to_string(local_time.tm_min) + "-" +
-      std::to_string(local_time.tm_sec) + "_" + std::to_string(num_cells_) +
-      "_" + std::to_string(BsAntNum()) + "x" + std::to_string(UeAntTotal()) +
-      ".hdf5";
+      kLogFilepath + "trace-" + ul_present_str + dl_present_str + timestamp_ +
+      "_" + std::to_string(num_cells_) + "_" + std::to_string(BsAntNum()) +
+      "x" + std::to_string(UeAntTotal()) + ".hdf5";
   trace_file_ = tdd_conf.value("trace_file", filename);
 
   // Agora configurations
@@ -767,7 +770,7 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
         "Exceeded possible range of LDPC lifting Zc for uplink! Setting "
         "lifting size to max possible value(%zu).\nThis may lead to too many "
         "unused subcarriers. For better use of the PHY resources, you may "
-        "reduce your coding or modulation rate.",
+        "reduce your coding or modulation rate.\n",
         kMaxSupportedZc);
     zc = kMaxSupportedZc;
   }
@@ -997,12 +1000,33 @@ void Config::GenData() {
                            : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
       ue_pilot_ifft[i][k] = this->ue_specific_pilot_[i][j];
     }
+    if (kOutputUlScData) {
+      const std::string filename_ul_pilot_f =
+          kUlPilotFreqPrefix + std::to_string(i) + ".bin";
+      FILE* fp_tx_f = std::fopen(filename_ul_pilot_f.c_str(), "wb");
+      if (fp_tx_f == nullptr) {
+        AGORA_LOG_ERROR("Failed to create ul sc pilot file %s. Error %s.\n",
+                        filename_ul_pilot_f.c_str(), strerror(errno));
+        throw std::runtime_error("Config: Failed to create ul sc pilot file");
+      } else {
+        const auto write_status = std::fwrite(
+            ue_pilot_ifft[i], sizeof(complex_float), ofdm_ca_num_, fp_tx_f);
+        if (write_status != ofdm_ca_num_) {
+          AGORA_LOG_ERROR("Config: Failed to write ul sc pilot file\n");
+        }
+        const auto close_status = std::fclose(fp_tx_f);
+        if (close_status != 0) {
+          AGORA_LOG_ERROR("Config: Failed to close ul sc pilot file\n");
+        }
+      }
+    }
     CommsLib::IFFT(ue_pilot_ifft[i], ofdm_ca_num_, false);
   }
 
   // Get uplink and downlink raw bits either from file or random numbers
-  size_t dl_num_bytes_per_ue_pad = Roundup<64>(this->dl_num_bytes_per_cb_) *
-                                   this->dl_ldpc_config_.NumBlocksInSymbol();
+  const size_t dl_num_bytes_per_ue_pad =
+      Roundup<64>(this->dl_num_bytes_per_cb_) *
+      this->dl_ldpc_config_.NumBlocksInSymbol();
   dl_bits_.Malloc(this->frame_.NumDLSyms(),
                   dl_num_bytes_per_ue_pad * this->ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
@@ -1012,8 +1036,9 @@ void Config::GenData() {
                   this->samps_per_symbol_ * this->ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
 
-  size_t ul_num_bytes_per_ue_pad = Roundup<64>(this->ul_num_bytes_per_cb_) *
-                                   this->ul_ldpc_config_.NumBlocksInSymbol();
+  const size_t ul_num_bytes_per_ue_pad =
+      Roundup<64>(this->ul_num_bytes_per_cb_) *
+      this->ul_ldpc_config_.NumBlocksInSymbol();
   ul_bits_.Malloc(this->frame_.NumULSyms(),
                   ul_num_bytes_per_ue_pad * this->ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
@@ -1176,12 +1201,31 @@ void Config::GenData() {
   ul_iq_ifft.Calloc(this->frame_.NumULSyms(),
                     this->ofdm_ca_num_ * this->ue_ant_num_,
                     Agora_memory::Alignment_t::kAlign64);
+  std::vector<FILE*> vec_fp_tx;
+  if (kOutputUlScData) {
+    for (size_t i = 0; i < this->ue_num_; i++) {
+      const std::string filename_ul_data_f =
+          kUlDataFreqPrefix + ul_modulation_ + "_" +
+          std::to_string(ofdm_data_num_) + "_" + std::to_string(ofdm_ca_num_) +
+          "_" + std::to_string(kOfdmSymbolPerSlot) + "_" +
+          std::to_string(this->frame_.NumULSyms()) + "_" +
+          std::to_string(kOutputFrameNum) + "_" + ue_channel_ + "_" +
+          std::to_string(i) + ".bin";
+      FILE* fp_tx_f = std::fopen(filename_ul_data_f.c_str(), "wb");
+      if (fp_tx_f == nullptr) {
+        AGORA_LOG_ERROR("Failed to create ul sc data file %s. Error %s.\n",
+                        filename_ul_data_f.c_str(), strerror(errno));
+        throw std::runtime_error("Config: Failed to create ul sc data file");
+      }
+      vec_fp_tx.push_back(fp_tx_f);
+    }
+  }
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
     for (size_t u = 0; u < this->ue_ant_num_; u++) {
-      size_t q = u * ofdm_data_num_;
+      const size_t q = u * ofdm_data_num_;
 
       for (size_t j = 0; j < ofdm_data_num_; j++) {
-        size_t sc = j + ofdm_data_start_;
+        const size_t sc = j + ofdm_data_start_;
         int8_t* mod_input_ptr =
             GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, u, j);
         ul_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, ul_mod_table_);
@@ -1190,7 +1234,23 @@ void Config::GenData() {
                                                 : sc + ofdm_ca_num_ / 2;
         ul_iq_ifft[i][u * ofdm_ca_num_ + k] = ul_iq_f_[i][q + j];
       }
+      if (kOutputUlScData) {
+        const auto write_status =
+            std::fwrite(&ul_iq_ifft[i][u * ofdm_ca_num_], sizeof(complex_float),
+                        ofdm_ca_num_, vec_fp_tx.at(u / num_ue_channels_));
+        if (write_status != ofdm_ca_num_) {
+          AGORA_LOG_ERROR("Config: Failed to write ul sc data file\n");
+        }
+      }
       CommsLib::IFFT(&ul_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
+    }
+  }
+  if (kOutputUlScData) {
+    for (size_t i = 0; i < vec_fp_tx.size(); i++) {
+      const auto close_status = std::fclose(vec_fp_tx.at(i));
+      if (close_status != 0) {
+        AGORA_LOG_ERROR("Config: Failed to close ul sc data file %zu\n", i);
+      }
     }
   }
 
