@@ -11,17 +11,19 @@
 
 namespace CsvLog {
 
-MatLogger::MatLogger(size_t mat_log_id, const std::string& radio_name)
-    : CsvLogger(kCsvLogs + mat_log_id, radio_name) {
-#if defined(ENABLE_MAT_LOG)
-  logger_->info(kMatHeader.at(mat_log_id));
-#endif
+static const std::string kMatHeader = "Frame,SC,BS-Ant,UE-Ant,Real,Imag";
+
+MatLogger::MatLogger(size_t mat_log_id, Config* const cfg, Direction dir)
+    : CsvLogger(kCsvLogs + mat_log_id, cfg, dir, true) {}
+
+MatLogger::~MatLogger() {
+  Write(kMatHeader);
+  SaveMatBuf();
 }
 
-MatLogger::~MatLogger() { SaveMatBuf(); }
-
-bool MatLogger::UpdateMatBuf(const size_t frame_id, const size_t sc_id,
-                             const arma::cx_fmat& mat_in) {
+bool MatLogger::UpdateMatBuf([[maybe_unused]] const size_t frame_id,
+                             [[maybe_unused]] const size_t sc_id,
+                             [[maybe_unused]] const arma::cx_fmat& mat_in) {
   bool status = false;
 #if defined(ENABLE_MAT_LOG)
   if (frame_id >= kFrameStart && frame_id < kFrameStart + kFrames &&
@@ -33,27 +35,26 @@ bool MatLogger::UpdateMatBuf(const size_t frame_id, const size_t sc_id,
         mat_in(0, 0, mat_copy_size);
     status = true;
   }
-#else
-  unused(frame_id);
-  unused(sc_id);
-  unused(mat_in);
 #endif
   return status;
 }
 
 void MatLogger::SaveMatBuf() {
 #if defined(ENABLE_MAT_LOG)
-  AGORA_LOG_INFO("MatLogger: saving %s\n", logger_->name());
-  for (size_t frame_id = 0; frame_id < kFrames; frame_id++) {
-    for (size_t sc_id = 0; sc_id < kSCs; sc_id++) {
-      for (size_t i = 0; i < kBSAnts; i++) {
-        for (size_t j = 0; j < kUEAnts; j++) {
-          const arma::cx_float& cx = mat_buffer_.at(frame_id).at(sc_id)(i, j);
-          Write(frame_id + kFrameStart, sc_id, i, j, cx.real(), cx.imag());
-        }  // end kUEAnts
-      }    // end kBSAnts
-    }      // end kSCs
-  }        // end kFrames
+  if (logger_) {
+    AGORA_LOG_INFO("MatLogger: saving %s\n", logger_->name());
+    for (size_t frame_id = 0; frame_id < kFrames; frame_id++) {
+      for (size_t sc_id = 0; sc_id < kSCs; sc_id++) {
+        for (size_t i = 0; i < kBSAnts; i++) {
+          for (size_t j = 0; j < kUEAnts; j++) {
+            const arma::cx_float& cx = mat_buffer_.at(frame_id).at(sc_id)(i, j);
+            logger_->info("{},{},{},{},{},{}", frame_id + kFrameStart, sc_id, i,
+                          j, cx.real(), cx.imag());
+          }  // end kUEAnts
+        }    // end kBSAnts
+      }      // end kSCs
+    }        // end kFrames
+  }
 #endif
 }
 

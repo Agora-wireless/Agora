@@ -845,8 +845,12 @@ void RadioSoapySdr::ConfigureTddModeBs(bool is_ref_radio) {
   size_t ant_idx = 0;
   for (const auto& channel : EnabledChannels()) {
     if (cfg_->Beamsweep()) {
-      for (size_t j = 0; j < beacon_weights.size(); j++) {
-        beacon_weights.at(j) = CommsLib::Hadamard2(ant_idx, j);
+      if (is_ref_radio) {
+        std::fill(beacon_weights.begin(), beacon_weights.end(), 0);
+      } else {
+        for (size_t j = 0; j < beacon_weights.size(); j++) {
+          beacon_weights.at(j) = CommsLib::Hadamard2(ant_idx, j);
+        }
       }
     } else {
       const size_t ant_id = (Id() * cfg_->NumChannels()) + ant_idx;
