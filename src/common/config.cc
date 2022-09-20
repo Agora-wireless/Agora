@@ -1007,6 +1007,7 @@ void Config::GenData() {
       if (fp_tx_f == nullptr) {
         AGORA_LOG_ERROR("Failed to create ul sc pilot file %s. Error %s.\n",
                         filename_ul_pilot_f.c_str(), strerror(errno));
+        throw std::runtime_error("Config: Failed to create ul sc pilot file");
       } else {
         const auto write_status = std::fwrite(
             ue_pilot_ifft[i], sizeof(complex_float), ofdm_ca_num_, fp_tx_f);
@@ -1214,6 +1215,7 @@ void Config::GenData() {
       if (fp_tx_f == nullptr) {
         AGORA_LOG_ERROR("Failed to create ul sc data file %s. Error %s.\n",
                         filename_ul_data_f.c_str(), strerror(errno));
+        throw std::runtime_error("Config: Failed to create ul sc data file");
       }
       vec_fp_tx.push_back(fp_tx_f);
     }
