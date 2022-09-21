@@ -3,6 +3,8 @@
  * @brief Implementation file for the digital (baseband) calibration 
  * functions such as sample offset and reciprocity calibration
  */
+#include <chrono>
+
 #include "comms-lib.h"
 #include "datatype_conversion.h"
 #include "logger.h"
@@ -16,6 +18,7 @@ static constexpr bool kReciprocalCalibPlot = false;
 static constexpr bool kPrintCalibrationMats = false;
 static constexpr bool kVerboseCalibration = false;
 static constexpr size_t kRefChannel = 0;
+static constexpr float kMaxSampleRxTimeSec = 1.0f;
 
 auto RadioConfig::TxArrayToRef(
     const std::vector<std::complex<int16_t>>& tx_vec) {
@@ -43,6 +46,9 @@ auto RadioConfig::TxArrayToRef(
 
   // Send a separate pilot from each antenna (each loop)
   for (size_t ant_i = 0; ant_i < tx_antennas; ant_i++) {
+    auto start_time = std::chrono::steady_clock::now();
+    std::chrono::duration<float> elapsed_seconds{0.0};
+
     const size_t radio_i = ant_i / cfg_->NumChannels();
     const size_t current_channel = ant_i % cfg_->NumChannels();
     // set up tx/rx buffers
@@ -67,24 +73,39 @@ auto RadioConfig::TxArrayToRef(
     Go();
 
     auto rx_flags = Radio::RxFlags::kRxFlagNone;
-    int rx_status;
-    do {
+    int rx_status = 0;
+    while ((rx_status == 0) &&
+           (elapsed_seconds.count() < kMaxSampleRxTimeSec)) {
       rx_status =
           radios_.at(ref)->Rx(rx_buffs, read_samples, rx_flags, rx_time);
+      elapsed_seconds = std::chrono::duration_cast<std::chrono::seconds>(
+          std::chrono::steady_clock::now() - start_time);
+    }
 
-      if (rx_status > 0) {
-        auto rx_samples = static_cast<size_t>(rx_status);
-        if (rx_samples < read_samples) {
-          AGORA_LOG_WARN("Radio %zu Rx less than requested samples %zu:%zu\n",
-                         radio_i, rx_samples, read_samples);
-        }
-      } else if (rx_status < 0) {
-        AGORA_LOG_ERROR(
-            "Radio %zu Rx Failure with status %d:%zu from ref node %zu\n",
-            radio_i, rx_status, read_samples, ref);
+    if (rx_status > 0) {
+      auto rx_samples = static_cast<size_t>(rx_status);
+      if (rx_samples == read_samples) {
+        //Success
+        AGORA_LOG_INFO(
+            "Radio %zu Rx Success with %d:%zu from ref node %zu at time %lld\n",
+            radio_i, rx_status, read_samples, ref, rx_time);
+
+      } else {
+        //Short samples
+        AGORA_LOG_WARN("Radio %zu Rx less than requested samples %zu:%zu\n",
+                       ref, rx_samples, read_samples);
       }
-    } while (rx_status == 0);
-
+    } else if (rx_status < 0) {
+      //Rx failure
+      AGORA_LOG_ERROR("Radio %zu Rx Failure with status %d:%zu from node %zu\n",
+                      ref, rx_status, read_samples, radio_i);
+    } else {
+      //Timeout
+      AGORA_LOG_WARN(
+          "Radio %zu Rx Timeout Failure after %f sec from node %zu\n", ref,
+          elapsed_seconds.count(), radio_i);
+      //todo fill rx buffer section with zeros?
+    }
     radios_.at(radio_i)->Deactivate();
     radios_.at(ref)->Deactivate();
     //Reset rx / tx buffers to zeros / dummies
@@ -139,34 +160,49 @@ auto RadioConfig::TxRefToArray(
 
   auto rx_flags = Radio::RxFlags::kRxFlagNone;
   for (size_t radio_i = 0; radio_i < rx_radios; radio_i++) {
+    auto start_time = std::chrono::steady_clock::now();
+    std::chrono::duration<float> elapsed_seconds{0.0};
+
     const size_t base_ant = radio_i * num_channels;
     for (size_t ch = 0; ch < num_channels; ch++) {
       rx_buffs.at(ch) = &ul_buff.at(base_ant + ch);
     }
 
-    int rx_status;
-    do {
+    int rx_status = 0;
+    while ((rx_status == 0) &&
+           (elapsed_seconds.count() < kMaxSampleRxTimeSec)) {
       rx_status =
           radios_.at(radio_i)->Rx(rx_buffs, read_samples, rx_flags, rx_time);
+      elapsed_seconds = std::chrono::duration_cast<std::chrono::seconds>(
+          std::chrono::steady_clock::now() - start_time);
+    }
 
-      if (rx_status > 0) {
-        auto rx_samples = static_cast<size_t>(rx_status);
-        if (rx_samples < read_samples) {
-          AGORA_LOG_WARN("Radio %zu Rx less than requested samples %zu:%zu\n",
-                         radio_i, rx_samples, read_samples);
-        }
-      } else if (rx_status < 0) {
-        AGORA_LOG_ERROR(
-            "Radio %zu Rx Failure with status %d:%zu from ref node %zu\n",
-            radio_i, rx_status, read_samples, ref);
+    if (rx_status > 0) {
+      auto rx_samples = static_cast<size_t>(rx_status);
+      if (rx_samples == read_samples) {
+        //Success
+        AGORA_LOG_INFO(
+            "Radio %zu Rx Success with %d:%zu from ref node %zu at time %lld\n",
+            radio_i, rx_status, read_samples, ref, rx_time);
+      } else {
+        //Short Samples
+        AGORA_LOG_WARN("Radio %zu Rx less than requested samples %zu:%zu\n",
+                       radio_i, rx_samples, read_samples);
       }
-    } while (rx_status == 0);
-    AGORA_LOG_WARN(
-        "Radio %zu Rx Success with %d:%zu from ref node %zu at time %lld\n",
-        radio_i, rx_status, read_samples, ref, rx_time);
+    } else if (rx_status < 0) {
+      //Rx error
+      AGORA_LOG_ERROR(
+          "Radio %zu Rx Failure with status %d:%zu from ref node %zu\n",
+          radio_i, rx_status, read_samples, ref);
+    } else {
+      //Timeout
+      AGORA_LOG_WARN(
+          "Radio %zu Rx Timeout Failure after %f sec from ref node %zu\n",
+          radio_i, elapsed_seconds.count(), ref);
+      //todo fill rx buffer section with zeros?
+    }
     radios_.at(radio_i)->Deactivate();
   }
-
   //All rx done, deactivate the tx
   radios_.at(ref)->Deactivate();
   return ul_buff;
@@ -227,18 +263,18 @@ void RadioConfig::AdjustDelays(std::vector<int> offset) {
 void RadioConfig::CalibrateSampleOffset() {
   const size_t num_radios = cfg_->BfAntNum() / cfg_->NumChannels();
 
-  size_t n = 0;
+  size_t attempt = 0;
   const size_t max_retries = 10;
   AGORA_LOG_INFO("Calibrating with uplink\n");
   // Transmit from Ref to Array and Adjust Delays Until Synced
-  while (n < max_retries) {
+  while (attempt < max_retries) {
     auto ul_buff = TxRefToArray(cfg_->PilotCi16());
     std::vector<int> ul_offset(cfg_->BfAntNum(), 0);
     const bool bad_data = this->FindTimeOffset(ul_buff, ul_offset);
     if (bad_data) {
-      n++;
-      std::cout << "Time offset returned bad data = " << bad_data << " count "
-                << n << std::endl;
+      attempt++;
+      AGORA_LOG_WARN("Time offset returned bad data = %d count = %d\n",
+                     bad_data, attempt);
       continue;
     }
 
@@ -308,24 +344,24 @@ void RadioConfig::CalibrateSampleOffset() {
       cfg_->OfdmRxZeroPrefixCalUl(ul_min_offset - (ul_min_offset % 4));
       break;
     }
-    n++;
+    attempt++;
   }
 
-  if (n >= max_retries) {
+  if (attempt >= max_retries) {
     std::cout << "Reached max retries for sample offset calibration (uplink)"
               << std::endl;
     return;
   }
 
   // Transmit from Array to Ref and ensure they are all synced
-  n = 0;
+  attempt = 0;
   AGORA_LOG_INFO("Calibrating with downlink\n");
-  while (n < max_retries) {
+  while (attempt < max_retries) {
     auto dl_buff = TxArrayToRef(cfg_->PilotCi16());
     std::vector<int> dl_offset(cfg_->BfAntNum(), 0);
     const bool bad_data = this->FindTimeOffset(dl_buff, dl_offset);
     if (bad_data) {
-      n++;
+      attempt++;
       continue;
     }
 
@@ -359,8 +395,8 @@ void RadioConfig::CalibrateSampleOffset() {
     std::cout << "Max dl_offset: " << max_offset
               << ", Min dl_offset: " << min_offset << std::endl;
     if (max_offset - min_offset > 4) {
-      if (n + 1 < max_retries) {
-        std::cout << "Downlink offsets mismatch: Try " << n + 1 << std::endl;
+      if (attempt + 1 < max_retries) {
+        std::cout << "Downlink offsets mismatch: Try " << attempt << std::endl;
       } else {
         std::cout << "Downlink pilot offsets not synced!" << std::endl;
         return;
@@ -398,9 +434,9 @@ void RadioConfig::CalibrateSampleOffset() {
       cfg_->OfdmRxZeroPrefixCalDl(min_offset - (min_offset % 4));
       break;
     }
-    n++;
+    attempt++;
   }
-  if (n >= max_retries) {
+  if (attempt >= max_retries) {
     std::cout << "Reached max retries for sample offset calibration (downlink)"
               << std::endl;
     return;

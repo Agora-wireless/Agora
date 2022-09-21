@@ -251,8 +251,6 @@ Config::Config(std::string jsonfilename)
   beamforming_str_ = tdd_conf.value("beamforming", "ZF");
   beamforming_algo_ = kBeamformingStr.at(beamforming_str_);
 
-  RtAssert(sample_cal_en_ == false,
-           "Digital / Sample offset calibration is not supported at this time");
   RtAssert(imbalance_cal_en_ == false,
            "Analog / imbalance calibration is not supported at this time");
 
