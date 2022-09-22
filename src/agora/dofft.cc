@@ -297,6 +297,7 @@ void DoFFT::PartialTranspose(complex_float* out_buf, size_t ant_id,
 
 #ifdef __AVX512F__
       // AVX-512.
+      assert(reinterpret_cast<size_t>(src) % 64 == 0);
       __m512 fft_result = _mm512_load_ps(reinterpret_cast<const float*>(src));
       if (symbol_type == SymbolType::kPilot) {
         __m512 pilot_tx = _mm512_set_ps(
