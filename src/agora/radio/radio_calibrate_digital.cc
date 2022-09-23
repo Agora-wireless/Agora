@@ -228,12 +228,22 @@ bool RadioConfig::FindTimeOffset(
             static_cast<int>(kMaxArraySampleOffset)) {
       // make sure offsets are not too different from each other
       AGORA_LOG_WARN(
-          "Difference in pilot offsets exceeds threshold %zu at %zu (%zu)\n",
-          std::abs((int)offset.at(i) - (int)offset.at(i - cfg_->NumChannels())),
-          i, kMaxArraySampleOffset);
+          "Difference in pilot offsets exceeds threshold %zu:%zu between "
+          "channel %zu:%zu\n",
+          std::abs(offset.at(i) - offset.at(i - cfg_->NumChannels())),
+          kMaxArraySampleOffset, i, i - cfg_->NumChannels());
       bad_data = true;
-      break;
     }
+  }
+
+  if (bad_data) {
+    std::stringstream print_offsets;
+    char separator = ' ';
+    for (const auto& offset_value : offset) {
+      print_offsets << separator << offset_value;
+      separator = ',';
+    }
+    AGORA_LOG_WARN("All offsets:%s\n", print_offsets.str().c_str());
   }
   return bad_data;
 }
@@ -350,7 +360,7 @@ bool RadioConfig::CalibrateSampleOffsetUplink(size_t max_attempts) {
     if (bad_data) {
       AGORA_LOG_WARN(
           "Uplink Time offset count not be found during attempt: %d\n",
-          bad_data, attempt);
+          attempt);
     } else {
       //Data looks ok, eval offsets
       const auto ch0_offsets =
