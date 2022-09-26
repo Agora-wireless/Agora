@@ -28,6 +28,20 @@ static const std::string kTxDataFilename = kOutputFilepath + "tx_data.bin";
 static const std::string kDecodeDataFilename =
     kOutputFilepath + "decode_data.bin";
 
+//Recording parameters
+static constexpr size_t kRecordFrameInterval = 1;
+static constexpr size_t kDefaultQueueSize = 36;
+#if defined(ENABLE_HDF5)
+static constexpr bool kRecordUplinkFrame = true;
+
+//set the recording types, can add multiple
+static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
+    kRecorderTypes{Agora_recorder::RecorderWorker::RecorderWorkerTypes::
+                       kRecorderWorkerHdf5};
+#else
+static constexpr bool kRecordUplinkFrame = false;
+#endif
+
 Agora::Agora(Config* const cfg)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
       config_(cfg),
@@ -50,6 +64,19 @@ Agora::Agora(Config* const cfg)
   InitializeQueues();
   InitializeCounters();
   InitializeThreads();
+
+  if (kRecordUplinkFrame) {
+    auto& new_recorder = recorders_.emplace_back(
+        std::make_unique<Agora_recorder::RecorderThread>(
+            config_, 0,
+            cfg->CoreOffset() + config_->WorkerThreadNum() +
+                config_->SocketThreadNum(),
+            kFrameWnd * config_->Frame().NumTotalSyms() * config_->BsAntNum() *
+                kDefaultQueueSize,
+            0, config_->BsAntNum(), kRecordFrameInterval, kRecorderTypes,
+            true));
+    new_recorder->Start();
+  }
 }
 
 Agora::~Agora() {
@@ -58,6 +85,12 @@ Agora::~Agora() {
   }
 
   worker_set_.reset();
+
+  for (size_t i = 0; i < recorders_.size(); i++) {
+    AGORA_LOG_INFO("Waiting for Recording to complete %zu\n", i);
+    recorders_.at(i)->Stop();
+  }
+  recorders_.clear();
   stats_.reset();
   phy_stats_.reset();
   FreeQueues();
@@ -337,7 +370,13 @@ void Agora::Start() {
       // FFT processing is scheduled after falling through the switch
       switch (event.event_type_) {
         case EventType::kPacketRX: {
-          Packet* pkt = rx_tag_t(event.tags_[0]).rx_packet_->RawPacket();
+          RxPacket* rx = rx_tag_t(event.tags_[0u]).rx_packet_;
+          Packet* pkt = rx->RawPacket();
+
+          if (recorders_.size() == 1) {
+            rx->Use();
+            recorders_.at(0)->DispatchWork(event);
+          }
 
           if (pkt->frame_id_ >=
               ((frame_tracking_.cur_sche_frame_id_ + kFrameWnd))) {
