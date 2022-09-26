@@ -9,6 +9,7 @@
 
 #include "config.h"
 #include "message.h"
+#include "symbols.h"
 
 namespace Agora_recorder {
 
@@ -20,7 +21,8 @@ class RecorderWorker {
   RecorderWorker([[maybe_unused]] const Config* in_cfg,
                  [[maybe_unused]] size_t antenna_offset,
                  [[maybe_unused]] size_t num_antennas,
-                 [[maybe_unused]] size_t record_interval){};
+                 [[maybe_unused]] size_t record_interval,
+                 [[maybe_unused]] Direction rx_direction){};
   virtual ~RecorderWorker() = default;
 
   virtual void Init() = 0;
