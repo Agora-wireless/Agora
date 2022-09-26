@@ -12,6 +12,9 @@
 #include "logger.h"
 #include "message.h"
 
+static constexpr size_t kFirstBeaconFrameAdvance = 40;
+static constexpr size_t kBeaconFrameAdvance = 5;
+
 TxRxWorkerUsrp::TxRxWorkerUsrp(
     size_t core_offset, size_t tid, size_t radio_hi, size_t radio_lo,
     Config* const config, size_t* rx_frame_start,
@@ -38,155 +41,188 @@ void TxRxWorkerUsrp::DoTxRx() {
                  interface_offset_, (interface_offset_ + num_interfaces_) - 1,
                  num_interfaces_);
 
-  // prepare BS beacon in host buffer
-  std::vector<void*> beaconbuff(2);
-  void* zeros =
-      std::calloc(Configuration()->SampsPerSymbol(), sizeof(int16_t) * 2);
+  /// For multi-uhd    num_interfaces_ = 1. (all radios are handled with 1 rx call)
+  /// Determine the number of channels (A + B) / radios
+  /// cfg_->NumRadios() * cfg_->NumChannels()?
+  const size_t number_bs_radios =
+      Configuration()->NumRadios() * Configuration()->NumChannels();
 
-  beaconbuff.at(0) = Configuration()->BeaconCi16().data();
-  beaconbuff.at(1) = zeros;
+  //Allocate a tx vector of zeros;
+  //Overallocated by 1 (replaced by the beacon)
+  std::vector<std::vector<std::complex<short>>> tx_zero_memory(
+      number_bs_radios,
+      std::vector<std::complex<short>>(Configuration()->SampsPerSymbol(),
+                                       std::complex<short>(0, 0)));
+  std::vector<void*> tx_locs(number_bs_radios);
+  for (size_t i = 0; i < number_bs_radios; i++) {
+    if (i == 0) {
+      tx_locs.at(i) = Configuration()->BeaconCi16().data();
+    } else {
+      tx_locs.at(i) = tx_zero_memory.at(i).data();
+    }
+  }
 
-  std::vector<std::complex<int16_t>> samp_buffer0(
-      Configuration()->SampsPerSymbol() * 14, 0);
-  std::vector<std::complex<int16_t>> samp_buffer1(
-      Configuration()->SampsPerSymbol() * 14, 0);
-  std::vector<std::vector<std::complex<int16_t>>*> samp_buffer(2);
-  samp_buffer.at(0) = &samp_buffer0;
-  if (true) {
-    samp_buffer.at(1) = &samp_buffer1;
+  std::vector<void*> rx_locs;
+  std::vector<std::vector<std::complex<short>>> rx_ignore_memory(
+      number_bs_radios,
+      std::vector<std::complex<short>>(Configuration()->SampsPerSymbol()));
+  for (size_t i = 0; i < number_bs_radios; i++) {
+    rx_locs.emplace_back(rx_ignore_memory.at(i).data());
   }
 
   rx_time_bs_ = 0;
   tx_time_bs_ = 0;
-
-  Radio::RxFlags rx_flags;
-  std::cout << "Sync BS host and FGPA timestamp..." << std::endl;
-  radio_config_.RadioRx(0, samp_buffer, Configuration()->SampsPerSymbol(),
-                        rx_flags, rx_time_bs_);
-  // Schedule the first beacon in the future
-  tx_time_bs_ = rx_time_bs_ + Configuration()->SampsPerSymbol() *
-                                  Configuration()->Frame().NumTotalSyms() * 40;
-  radio_config_.RadioTx(0, beaconbuff.data(), Radio::TxFlags::kEndTransmit,
-                        tx_time_bs_);
-  long long bs_init_rx_offset = tx_time_bs_ - rx_time_bs_;
-  for (int it = 0;
-       it < std::floor(bs_init_rx_offset / Configuration()->SampsPerSymbol());
-       it++) {
-    radio_config_.RadioRx(0, samp_buffer, Configuration()->SampsPerSymbol(),
-                          rx_flags, rx_time_bs_);
-  }
-
-  std::cout << std::endl;
-  std::cout << "Init BS sync done..." << std::endl;
-  std::cout << "Start BS main recv loop..." << std::endl;
-
-  size_t global_frame_id = 0;
-  size_t global_symbol_id = 0;
-
-  int prev_frame_id = -1;
-  size_t local_interface = 0;
+  const size_t radio_id = 0;
 
   running_ = true;
   WaitSync();
 
-  while (Configuration()->Running() == true) {
-    // transmit data
-    // if (-1 != dequeue_send_usrp(tid))
-    //   continue;
-    // receive data
-    std::vector<Packet*> rx_pkts =
-        RecvEnqueue(local_interface, global_frame_id, global_symbol_id);
+  //Should this be end rx?
+  Radio::RxFlags rx_flags = Radio::RxFlags::kRxFlagNone;
+  std::cout << "Sync BS host and FGPA timestamp..." << std::endl;
+  auto rx_status = radio_config_.RadioRx(radio_id, rx_locs,
+                                         Configuration()->SampsPerSymbol(),
+                                         rx_flags, rx_time_bs_);
+  std::cout << "First Rx Status " << rx_status << std::endl;
+  if (rx_status <= 0) {
+    AGORA_LOG_WARN("DoTxRx: Rx status is unexpected %zu\n", rx_status);
+  }
 
-    // Schedule beacon in the future
-    if (global_symbol_id == 0) {
-      tx_time_bs_ = rx_time_bs_ + Configuration()->SampsPerSymbol() *
-                                      Configuration()->Frame().NumTotalSyms() *
-                                      20;
-      int tx_ret = radio_config_.RadioTx(
-          0, beaconbuff.data(), Radio::TxFlags::kEndTransmit, tx_time_bs_);
-      if (tx_ret != (int)Configuration()->SampsPerSymbol()) {
-        std::cerr << "BAD Transmit(" << tx_ret << "/"
-                  << Configuration()->SampsPerSymbol() << ") at Time "
-                  << tx_time_bs_ << ", frame count " << global_frame_id
-                  << std::endl;
-      }
-    }
+  // Schedule the first beacon in the future
+  //Assumes there is only 1 beacon and it is the first symbol... fix this when time allows
+  tx_time_bs_ = rx_time_bs_ + ((Configuration()->SampsPerSymbol() *
+                                Configuration()->Frame().NumTotalSyms()) *
+                               kFirstBeaconFrameAdvance);
+  auto tx_status = radio_config_.RadioTx(
+      radio_id, tx_locs.data(), Radio::TxFlags::kEndTransmit, tx_time_bs_);
+  if (rx_status <= 0) {
+    AGORA_LOG_WARN("DoTxRx: Tx status is unexpected %zu\n", tx_status);
+  }
 
-    if (++local_interface == num_interfaces_) {
-      local_interface = 0;
-    }
+  //Wait until the radio is about to tx the beacon
+  //todo -- Verify there shouldn't be a minus 1 here................
+  const size_t read_symbols =
+      Configuration()->Frame().NumTotalSyms() * kFirstBeaconFrameAdvance;
+  for (size_t i = 0; i < read_symbols; i++) {
+    rx_status = radio_config_.RadioRx(radio_id, rx_locs,
+                                      Configuration()->SampsPerSymbol(),
+                                      rx_flags, rx_time_bs_);
 
-    // Update global frame_id and symbol_id
-    global_symbol_id++;
-    if (global_symbol_id == Configuration()->Frame().NumTotalSyms()) {
-      global_symbol_id = 0;
-      global_frame_id++;
-    }
-
-    if (rx_pkts.empty()) {
-      continue;
-    }
-    if (kIsWorkerTimingEnabled) {
-      int frame_id = rx_pkts.front()->frame_id_;
-      if (frame_id > prev_frame_id) {
-        rx_frame_start_[frame_id % kNumStatsFrames] = GetTime::Rdtsc();
-        prev_frame_id = frame_id;
-      }
+    if (rx_status <= 0) {
+      AGORA_LOG_WARN("DoTxRx:Rx status is unexpected %zu\n", rx_status);
     }
   }
 
-  std::free(zeros);
-  zeros = nullptr;
+  // rx_time_bs_ should be 1 symbol / slot time before the tx beacon time;
+  if (rx_time_bs_ >= tx_time_bs_) {
+    AGORA_LOG_ERROR("Rx time is greater than the tx beacon time");
+    throw std::runtime_error("Rx time is greater than the tx beacon time");
+  }
+
+  //Schedule tx beacons advanced.
+  for (size_t i = 0; i < kBeaconFrameAdvance; i++) {
+    //Schedule kBeaconFrameAdvance -1 frames ahead
+    tx_time_bs_ += (Configuration()->SampsPerSymbol() *
+                    Configuration()->Frame().NumTotalSyms());
+    const int tx_ret = radio_config_.RadioTx(
+        radio_id, tx_locs.data(), Radio::TxFlags::kEndTransmit, tx_time_bs_);
+    if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
+      AGORA_LOG_ERROR("BAD Transmit(%d:%zu) at Time %lld and frame count %zu\n",
+                      tx_ret, Configuration()->SampsPerSymbol(), tx_time_bs_,
+                      i);
+    }
+  }
+  AGORA_LOG_INFO("Start BS main recv loop...\n");
+
+  size_t global_frame_id = 0;
+  size_t global_symbol_id = 0;
+  size_t local_interface = 0;
+
+  while (Configuration()->Running()) {
+    // receive data
+    RecvEnqueue(local_interface, global_frame_id, global_symbol_id, rx_locs);
+
+    //if rx is successful than update the counter / times
+    // Schedule the next beacon
+    if (global_symbol_id == Configuration()->Frame().GetBeaconSymbol(0)) {
+      tx_time_bs_ = rx_time_bs_ + Configuration()->SampsPerSymbol() *
+                                      Configuration()->Frame().NumTotalSyms() *
+                                      kBeaconFrameAdvance;
+      const int tx_ret = radio_config_.RadioTx(
+          radio_id, tx_locs.data(), Radio::TxFlags::kEndTransmit, tx_time_bs_);
+      if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
+        AGORA_LOG_ERROR(
+            "BAD Transmit(%d:%zu) at Time %lld and frame count %zu\n", tx_ret,
+            Configuration()->SampsPerSymbol(), tx_time_bs_, global_frame_id);
+      }
+    }
+
+    // If we received the first symbol from the first interface
+    if (kIsWorkerTimingEnabled && (local_interface == 0) &&
+        (global_symbol_id == 0)) {
+      rx_frame_start_[global_frame_id % kNumStatsFrames] = GetTime::Rdtsc();
+    }
+
+    local_interface++;
+    if (local_interface == num_interfaces_) {
+      local_interface = 0;
+      // Update global frame_id and symbol_id
+      global_symbol_id++;
+      if (global_symbol_id == Configuration()->Frame().NumTotalSyms()) {
+        global_symbol_id = 0;
+        global_frame_id++;
+      }
+    }  // interface rollover
+  }
   running_ = false;
 }
 
-//RX data
-std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(size_t radio_id,
-                                                 size_t frame_id,
-                                                 size_t symbol_id) {
+//RX data and pass the samples to the scheduler
+std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(
+    size_t radio_id, size_t frame_id, size_t symbol_id,
+    const std::vector<void*>& discard_locs) {
   std::vector<Packet*> rx_packets;
   std::vector<RxPacket*> memory_tracking;
 
-  size_t n_channels = Configuration()->NumChannels();
-  std::vector<void*> samp(n_channels);
-  for (size_t ch = 0; ch < n_channels; ++ch) {
-    RxPacket& rx = GetRxPacket();
-    memory_tracking.push_back(&rx);
-    samp.at(ch) = rx.RawPacket();
-  }
+  const size_t total_channels = discard_locs.size();
+  const bool publish_symbol = Configuration()->IsPilot(frame_id, symbol_id) ||
+                              Configuration()->IsUplink(frame_id, symbol_id);
 
-  bool dummy_read = false;
-  if ((Configuration()->IsPilot(frame_id, symbol_id) == false) &&
-      (Configuration()->IsUplink(frame_id, symbol_id) == false)) {
-    dummy_read = true;
+  std::vector<void*> rx_locs(total_channels);
+  for (size_t ch = 0; ch < total_channels; ch++) {
+    if (publish_symbol) {
+      //Allocate memory if we care about the results
+      RxPacket& rx = GetRxPacket();
+      memory_tracking.push_back(&rx);
+      rx_locs.at(ch) = rx.RawPacket()->data_;
+    } else {
+      rx_locs.at(ch) = discard_locs.at(ch);
+    }
   }
 
   Radio::RxFlags rx_flags;
-  const int tmp_ret = radio_config_.RadioRx(
-      radio_id, samp, Configuration()->SampsPerSymbol(), rx_flags, rx_time_bs_);
+  const int rx_status = radio_config_.RadioRx(radio_id, rx_locs,
+                                              Configuration()->SampsPerSymbol(),
+                                              rx_flags, rx_time_bs_);
 
-  if ((tmp_ret > 0) && (dummy_read == false)) {
-    const size_t ant_id = radio_id * n_channels;
-    if (Configuration()->IsPilot(frame_id, symbol_id) ||
-        Configuration()->IsUplink(frame_id, symbol_id)) {
-      for (size_t ch = 0; ch < n_channels; ++ch) {
+  if (rx_status == static_cast<int>(Configuration()->SampsPerSymbol())) {
+    //Process the rx data
+    if (publish_symbol) {
+      const size_t ant_offset = radio_id * total_channels;
+      for (size_t ch = 0; ch < total_channels; ++ch) {
         RxPacket& rx = *memory_tracking.at(ch);
-        memory_tracking.at(ch) = nullptr;
-        new (rx.RawPacket()) Packet(frame_id, symbol_id, 0, ant_id + ch);
+        new (rx.RawPacket()) Packet(frame_id, symbol_id, 0, ant_offset + ch);
         rx_packets.push_back(rx.RawPacket());
-        // Push kPacketRX event into the queue
         EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
         NotifyComplete(rx_message);
       }
     }
-    return rx_packets;
-  }
-  //Free memory from most recent allocated to latest
-  for (size_t idx = (memory_tracking.size() - 1); idx > 0; idx--) {
-    auto* memory_location = memory_tracking.at(idx);
-    if (memory_location != nullptr) {
-      ReturnRxPacket(*memory_location);
-    }
+  } else {
+    AGORA_LOG_ERROR(
+        "TxRxWorkerUsrp::RecvEnqueue: Unexpected Rx return status %dn\n",
+        rx_status);
+    throw std::runtime_error(
+        "TxRxWorkerUsrp::RecvEnqueue:Unexpected Rx return status");
   }
   return rx_packets;
 }
