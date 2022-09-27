@@ -157,7 +157,8 @@ Config::Config(std::string jsonfilename)
 
     //Add in serial numbers
     for (size_t radio = 0; radio < num_radios_; radio++) {
-      radio_id_.emplace_back("SIM_RADIO_" + std::to_string(radio));
+      AGORA_LOG_INFO("Adding BS_SIM_RADIO_%d\n", radio);
+      radio_id_.emplace_back("BS_SIM_RADIO_" + std::to_string(radio));
     }
   }
 
@@ -172,8 +173,12 @@ Config::Config(std::string jsonfilename)
     }
   } else {
     ue_num_ = tdd_conf.value("ue_radio_num", 8);
-    for (size_t i = 0; i < ue_num_; i++) {
-      ue_radio_name_.push_back("UE" + std::to_string(i));
+    for (size_t ue_radio = 0; ue_radio < ue_num_; ue_radio++) {
+      AGORA_LOG_INFO("Adding UE_SIM_RADIO_%d\n", ue_radio);
+      const std::string ue_name = "UE_SIM_RADIO_" + std::to_string(ue_radio);
+      ue_radio_id_.push_back(ue_name);
+      ue_radio_name_.emplace_back(
+          ue_name.substr(ue_name.length() - kShortIdLen));
     }
   }
 
