@@ -79,7 +79,7 @@ Agora::Agora(Config* const cfg)
             config_->SocketThreadNum() + 1,
         kFrameWnd * config_->Frame().NumTotalSyms() * config_->BsAntNum() *
             kDefaultQueueSize,
-        0, config_->BsAntNum(), kRecordFrameInterval, Direction::kDownlink,
+        0, config_->BsAntNum(), kRecordFrameInterval, Direction::kUplink,
         kRecorderTypes, true);
     recorder_->Start();
   }
