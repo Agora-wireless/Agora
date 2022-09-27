@@ -485,7 +485,6 @@ def main():
     verify = options.verify
     analyze = options.analyze
     sub_sample = options.sub_sample
-    legacy = options.legacy
     corr_thresh = options.corr_thresh
     bs_nodes_str = options.bs_nodes
     exclude_bs_nodes_str = options.exclude_bs_nodes
@@ -505,60 +504,54 @@ def main():
     print(">> frame to plot = {}, ref. ant = {}, ref. user = {}, ref ofdm_sym = {}, no. of frames to inspect = {}, starting frame = {} <<".format(ref_frame, ref_ant, ref_user, ref_ofdm_sym, n_frames, fr_strt))
 
     # Instantiate
-    if legacy:
-        # TODO: Needs to be thoroughly tested!
-        # filename = 'ArgosCSI-96x8-2016-11-03-03-03-45_5GHz_static.hdf5'
-        hdf5 = h5py.File(str(filename), 'r')
-        compute_legacy(hdf5)
-    else:
-        hdf5 = hdf5_lib(filename, n_frames, fr_strt, sub_sample)
-        pilot_samples = hdf5.pilot_samples
-        uplink_samples = hdf5.uplink_samples
-        noise_samples = hdf5.noise_samples
-        downlink_samples = hdf5.downlink_samples
+    hdf5 = hdf5_lib(filename, n_frames, fr_strt, sub_sample)
+    pilot_samples = hdf5.pilot_samples
+    uplink_samples = hdf5.uplink_samples
+    noise_samples = hdf5.noise_samples
+    downlink_samples = hdf5.downlink_samples
 
-        # Check which data we have available
-        pilots_avail = len(pilot_samples) > 0
-        ul_data_avail = len(uplink_samples) > 0
-        noise_avail = len(noise_samples) > 0
-        dl_data_avail = len(downlink_samples) > 0
-        exclude_bs_nodes = []
-        if pilots_avail:
-            num_bs_ants = pilot_samples.shape[4]
-            if len(bs_nodes_str) > 0:
-                ant_ids = bs_nodes_str.split(',')
-                bs_nodes = [int(i) for i in ant_ids]
-                exclude_bs_nodes = list(set(range(num_bs_ants)) - set(bs_nodes))
-            else:
-                exclude_bs_nodes = []
-                if len(exclude_bs_nodes_str) > 0:
-                    exclude_ant_ids = exclude_bs_nodes_str.split(',')
-                    exclude_bs_nodes = [int(i) for i in exclude_ant_ids]
-            print("HDF5 pilot data size:")
-            print(pilot_samples.shape)
-        if noise_avail:
-            print("HDF5 noise data size:")
-            print(noise_samples.shape)
-        if ul_data_avail:
-            print("HDF5 uplink data size:")
-            print(uplink_samples.shape)
-        if dl_data_avail:
-            print("HDF5 downlink data size:")
-            print(downlink_samples.shape)
-
-        if show_metadata:
-            print(hdf5.metadata)
+    # Check which data we have available
+    pilots_avail = len(pilot_samples) > 0
+    ul_data_avail = len(uplink_samples) > 0
+    noise_avail = len(noise_samples) > 0
+    dl_data_avail = len(downlink_samples) > 0
+    exclude_bs_nodes = []
+    if pilots_avail:
+        num_bs_ants = pilot_samples.shape[4]
+        if len(bs_nodes_str) > 0:
+            ant_ids = bs_nodes_str.split(',')
+            bs_nodes = [int(i) for i in ant_ids]
+            exclude_bs_nodes = list(set(range(num_bs_ants)) - set(bs_nodes))
         else:
-            if not ul_data_avail and demodulate != "":
-                demodulate = ""
-                print("Uplink data is not available, ignoring demodulate option...")
+            exclude_bs_nodes = []
+            if len(exclude_bs_nodes_str) > 0:
+                exclude_ant_ids = exclude_bs_nodes_str.split(',')
+                exclude_bs_nodes = [int(i) for i in exclude_ant_ids]
+        print("HDF5 pilot data size:")
+        print(pilot_samples.shape)
+    if noise_avail:
+        print("HDF5 noise data size:")
+        print(noise_samples.shape)
+    if ul_data_avail:
+        print("HDF5 uplink data size:")
+        print(uplink_samples.shape)
+    if dl_data_avail:
+        print("HDF5 downlink data size:")
+        print(downlink_samples.shape)
 
-            if verify:
-                verify_hdf5(hdf5, ref_frame, ref_cell, ref_ofdm_sym, ref_ant,
-                            ref_user, ref_ul_slot, ref_dl_slot, ref_subcarrier,
-                            signal_offset, downlink_calib_offset,
-                            uplink_calib_offset, thresh, deep_inspect,
-                            corr_thresh, exclude_bs_nodes, demodulate, analyze)
+    if show_metadata:
+        print(hdf5.metadata)
+    else:
+        if not ul_data_avail and demodulate != "":
+            demodulate = ""
+            print("Uplink data is not available, ignoring demodulate option...")
+
+        if verify:
+            verify_hdf5(hdf5, ref_frame, ref_cell, ref_ofdm_sym, ref_ant,
+                        ref_user, ref_ul_slot, ref_dl_slot, ref_subcarrier,
+                        signal_offset, downlink_calib_offset,
+                        uplink_calib_offset, thresh, deep_inspect,
+                        corr_thresh, exclude_bs_nodes, demodulate, analyze)
     scrpt_end = time.time()
     print(">>>> Script Duration: time: %f \n" % ( scrpt_end - scrpt_strt) )
 
