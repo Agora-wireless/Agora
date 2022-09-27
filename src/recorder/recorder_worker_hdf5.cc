@@ -100,7 +100,7 @@ void RecorderWorkerHDF5::Init() {
   hdf5_->WriteAttribute("BS_SDR_ID", cfg_->RadioId());
 
   // Number of Base Station Cells
-  hdf5_->WriteAttribute("BS_NUM_CELLS", cfg_->CellId().size());
+  hdf5_->WriteAttribute("BS_NUM_CELLS", cfg_->NumCells());
 
   // How many RF channels per Iris board are enabled ("single" or "dual")
   hdf5_->WriteAttribute("BS_CH_PER_RADIO", cfg_->NumChannels());
