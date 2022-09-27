@@ -81,7 +81,7 @@ Config::Config(std::string jsonfilename)
 
   std::string serials_str;
   std::string serial_file = tdd_conf.value("serial_file", "");
-  if (!serial_file.empty()) {
+  if (serial_file.empty() == false) {
     Utils::LoadTddConfig(serial_file, serials_str);
   }
   if (serials_str.empty() == false) {
@@ -150,10 +150,15 @@ Config::Config(std::string jsonfilename)
         "Hardware is enabled but the serials files was not accessable");
   }
 
-  if (radio_id_.empty() == true) {
+  if (radio_id_.empty()) {
     num_radios_ = tdd_conf.value("bs_radio_num", 8);
     external_ref_node_.resize(num_cells_, false);
     cell_id_.resize(num_radios_, 0);
+
+    //Add in serial numbers
+    for (size_t radio = 0; radio < num_radios_; radio++) {
+      radio_id_.emplace_back("SIM_RADIO_" + std::to_string(radio));
+    }
   }
 
   if (ue_radio_id_.empty() == false) {

@@ -20,7 +20,7 @@ function inspect_agora_ul_results(dataset_filename, verbose)
     cp_len = double(h5readatt(dataset_filename, group_id, 'CP_LEN'));
     total_ul_symbols = double(h5readatt(dataset_filename, group_id, 'UL_SLOTS'));
     ul_pilot_symbols = double(h5readatt(dataset_filename, group_id, 'UL_PILOT_SLOTS'));
-    cl_sdr_id = h5readatt(dataset_filename, group_id, 'CL_SDR_ID');
+    %cl_sdr_id = h5readatt(dataset_filename, group_id, 'CL_SDR_ID');
 
     %Choose the Beacon data
     dataset_id = '/Pilot_Samples';
@@ -35,16 +35,11 @@ function inspect_agora_ul_results(dataset_filename, verbose)
     total_users = size(rx_pilots_hdf5, 2);
     %Convert to double and scale
     rx_pilots_scaled_double = double(rx_pilots_hdf5) ./ double(intmax('int16'));
-    clear rx_pilots_scaled_double;
+    clear rx_pilots_hdf5;
     %Convert to complex double
     % Samples x User x Symbol
     rx_pilots_cxdouble = complex(rx_pilots_scaled_double(1:2:end, :, :, 1:total_frames), rx_pilots_scaled_double(2:2:end,:, :, 1:total_frames));
     clear rx_pilots_scaled_double;
-
-    experiment = 'MU-MIMO';
-    if total_users == 1
-        experiment = 'SU-MIMO';
-    end
 
     %Choose the downlink data
     dataset_id = '/UplinkData';
