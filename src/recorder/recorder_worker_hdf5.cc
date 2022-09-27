@@ -126,6 +126,10 @@ void RecorderWorkerHDF5::Init() {
   // Beacon Antenna
   hdf5_->WriteAttribute("BS_BEACON_ANT", cfg_->BeaconAnt());
 
+  hdf5_->WriteAttribute("ANT_OFFSET", antenna_offset_);
+  hdf5_->WriteAttribute("ANT_NUM", num_antennas_);
+  hdf5_->WriteAttribute("ANT_TOTAL", cfg_->BsAntNum());
+
   // Number of symbols in a frame
   hdf5_->WriteAttribute("BS_FRAME_LEN", cfg_->Frame().NumTotalSyms());
 
