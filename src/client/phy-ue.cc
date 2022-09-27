@@ -147,8 +147,8 @@ PhyUe::PhyUe(Config* config)
             config_, 0, core_offset_worker + config_->UeWorkerThreadNum(),
             kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntNum() *
                 kDefaultQueueSize,
-            0, config_->UeAntNum(), kRecordFrameInterval, kRecorderTypes,
-            true));
+            0, config_->UeAntNum(), kRecordFrameInterval, Direction::kDownlink,
+            kRecorderTypes, true));
     new_recorder->Start();
   }
 

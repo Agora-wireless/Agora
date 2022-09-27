@@ -17,18 +17,19 @@ namespace Agora_recorder {
 RecorderThread::RecorderThread(
     const Config* in_cfg, size_t thread_id, int core, size_t queue_size,
     size_t antenna_offset, size_t num_antennas, size_t interval,
+    Direction rx_direction,
     const std::vector<RecorderWorker::RecorderWorkerTypes>& types,
     bool wait_signal)
     : event_queue_(queue_size),
       producer_token_(event_queue_),
-
       id_(thread_id),
       core_alloc_(core),
       wait_signal_(wait_signal) {
   /// Create Workers
   for (const auto& worker_type : types) {
-    workers_.emplace_back(RecorderWorker::Create(
-        worker_type, in_cfg, antenna_offset, num_antennas, interval));
+    workers_.emplace_back(RecorderWorker::Create(worker_type, in_cfg,
+                                                 antenna_offset, num_antennas,
+                                                 interval, rx_direction));
   }
 
   for (auto& worker : workers_) {
