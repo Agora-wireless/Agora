@@ -17,7 +17,6 @@ namespace Agora_recorder {
 
 static constexpr bool kDebugPrint = false;
 static constexpr size_t kFrameInc = 2000;
-static constexpr size_t kDsDimSymbol = 2;
 static constexpr ssize_t kFixedDimensions = -1;
 static const std::string kHdf5Group = "Data";
 
@@ -261,7 +260,7 @@ void RecorderWorkerHDF5::Init() {
       datasets_.emplace_back(
           std::make_pair<std::string, std::array<hsize_t, kDsDimsNum>>(
               std::string("Pilot_Samples"),
-              {kFrameInc, cfg_->NumCells(), cfg_->Frame().NumBeaconSyms(),
+              {kFrameInc, cfg_->NumCells(), cfg_->Frame().NumPilotSyms(),
                num_antennas_, data_chunk_dims_.back()}));
       auto& current_dataset = datasets_.back();
       hdf5_->CreateDataset(current_dataset.first, data_chunk_dims_,
@@ -272,7 +271,7 @@ void RecorderWorkerHDF5::Init() {
       datasets_.emplace_back(
           std::make_pair<std::string, std::array<hsize_t, kDsDimsNum>>(
               std::string("UplinkData"),
-              {kFrameInc, cfg_->NumCells(), cfg_->Frame().NumBeaconSyms(),
+              {kFrameInc, cfg_->NumCells(), cfg_->Frame().NumULSyms(),
                num_antennas_, data_chunk_dims_.back()}));
       auto& current_dataset = datasets_.back();
       hdf5_->CreateDataset(current_dataset.first, data_chunk_dims_,
@@ -321,10 +320,13 @@ void RecorderWorkerHDF5::WriteDatasetValue(const Packet* pkt,
   const size_t frame_id = pkt->frame_id_;
   const size_t ant_id = pkt->ant_id_;
   const uint32_t antenna_index = ant_id - antenna_offset_;
-  std::array<hsize_t, kDsDimsNum> start = {frame_id, pkt->cell_id_, 0,
-                                           antenna_index, 0};
+  const std::array<hsize_t, kDsDimsNum> start = {
+      frame_id, pkt->cell_id_, symbol_index, antenna_index, 0};
 
   auto& dataset = datasets_.at(dataset_index);
+  AGORA_LOG_TRACE("Writting to dataset %s - [%lld, %lld, %lld, %lld, %lld]\n",
+                  dataset.first.c_str(), start.at(0), start.at(1), start.at(2),
+                  start.at(3), start.at(4));
   ///If the frame id is > than the current 0 indexed dimension then we need to extend
   if (frame_id >= dataset.second.at(0)) {
     dataset.second.at(0) = dataset.second.at(0) + kFrameInc;
@@ -332,7 +334,6 @@ void RecorderWorkerHDF5::WriteDatasetValue(const Packet* pkt,
              "Frame ID must be less than extended dimension");
     hdf5_->ExtendDataset(dataset.first, dataset.second);
   }
-  start[kDsDimSymbol] = symbol_index;
   hdf5_->WriteDataset(dataset.first, start, data_chunk_dims_, pkt->data_);
 }
 
@@ -366,7 +367,7 @@ int RecorderWorkerHDF5::Record(const Packet* pkt) {
   } else if ((frame_id % interval_) == 0) {
     if (kDebugPrint) {
       const size_t ant_id = pkt->ant_id_;
-      std::printf(
+      AGORA_LOG_INFO(
           "RecorderWorkerHDF5::record [frame %zu, symbol %zu, cell %d, "
           "ant %zu] samples: %d %d %d %d %d %d %d %d ....\n",
           frame_id, symbol_id, pkt->cell_id_, ant_id, pkt->data_[0u],
