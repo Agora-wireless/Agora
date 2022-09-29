@@ -9,6 +9,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 
+#include "comms-lib.h"
 #include "logger.h"
 #include "utils.h"
 #include "version_config.h"
@@ -174,6 +175,42 @@ void RecorderWorkerHDF5::Init() {
   hdf5_->WriteAttribute("CL_SDR_ID", cfg_->UeRadioId());
   // ********************* //
 
+  // *****Temp compatibility values
+  //hdf5_->WriteAttribute("DATA_SUBCARRIER_NUM", cfg_->OfdmDataNum());
+  const size_t fft_size = cfg_->OfdmCaNum();
+  const size_t sym_data_sc_num = cfg_->OfdmDataNum();
+  hdf5_->WriteAttribute("FFT_SIZE", fft_size);
+  hdf5_->WriteAttribute("PILOT_NUM", cfg_->Frame().NumPilotSyms());
+  hdf5_->WriteAttribute("PREFIX_LEN", cfg_->OfdmTxZeroPrefix());
+  hdf5_->WriteAttribute("POSTFIX_LEN", cfg_->OfdmTxZeroPostfix());
+  hdf5_->WriteAttribute("PILOT_SEQ_TYPE", std::string("zadoff-chu"));
+
+  // Data subcarriers
+  const auto data_idx = CommsLib::GetDataSc(fft_size, sym_data_sc_num);
+  if (data_idx.size() > 0) {
+    hdf5_->WriteAttribute("OFDM_DATA_SC", data_idx);
+  }
+  // Pilot subcarriers (indexes)
+  const auto pilot_sc_idx = CommsLib::GetPilotScIdx(fft_size, sym_data_sc_num);
+  if (pilot_sc_idx.size() > 0) {
+    hdf5_->WriteAttribute("OFDM_PILOT_SC", pilot_sc_idx);
+  }
+
+  const auto pilot_sc = CommsLib::GetPilotScValue(fft_size, sym_data_sc_num);
+  if (pilot_sc.size() > 0) {
+    hdf5_->WriteAttribute("OFDM_PILOT_SC_VALS", pilot_sc);
+  }
+
+  // Number of frames for UL data recorded in bit source files
+  //hdf5_->WriteAttribute("CL_MODULATION", cfg_->cl_data_mod());
+  hdf5_->WriteAttribute("UL_DATA_FRAME_NUM", 1);
+
+  // Names of Files including uplink tx frequency-domain data
+  //if (cfg_->ul_tx_fd_data_files().size() > 0) {
+  //  hdf5_->WriteAttribute("TX_FD_DATA_FILENAMES", cfg_->ul_tx_fd_data_files());
+  //}
+  // *****Temp compatibility values
+
   if (rx_direction_ == Direction::kDownlink) {
     if (cfg_->Frame().NumBeaconSyms() > 0) {
       datasets_.emplace_back(
@@ -216,8 +253,8 @@ void RecorderWorkerHDF5::Init() {
           for (size_t sym = 0; sym < num_dl_syms; sym++) {
             const std::array<hsize_t, kDsDimsNum> start = {0, 0, sym, ant, 0};
             AGORA_LOG_TRACE(
-                "Attempting to write TxData for Symbol %zu, Antenna %zu total "
-                "syms %zu\n",
+                "Attempting to write TxData for Symbol %zu, Antenna %zu "
+                "total syms %zu\n",
                 sym, ant, num_dl_syms);
             //DlIqF is indexed by complex float
             hdf5_->WriteDataset(
