@@ -202,7 +202,7 @@ void RecorderWorkerHDF5::Init() {
   }
 
   // Number of frames for UL data recorded in bit source files
-  //hdf5_->WriteAttribute("CL_MODULATION", cfg_->cl_data_mod());
+  hdf5_->WriteAttribute("CL_MODULATION", cfg_->Modulation(Direction::kUplink));
   hdf5_->WriteAttribute("UL_DATA_FRAME_NUM", 1);
 
   // Names of Files including uplink tx frequency-domain data
