@@ -333,10 +333,12 @@ std::vector<size_t> CommsLib::GetDataSc(size_t fft_size, size_t data_sc_num,
   } else {  // Allocate the center subcarriers as data
     size_t start_sc = (fft_size - data_sc_num) / 2;
     size_t stop_sc = start_sc + data_sc_num;
+    unused(pilot_sc_offset);
     for (size_t i = start_sc; i < stop_sc; i++) {
-      if ((i - start_sc) % kPilotSubcarrierSpacing != pilot_sc_offset) {
-        data_sc.push_back(i);
-      }
+      ///\todo temp
+      //if ((i - start_sc) % kPilotSubcarrierSpacing != pilot_sc_offset) {
+      data_sc.push_back(i);
+      //}
     }
   }
   return data_sc;
@@ -371,21 +373,12 @@ std::vector<std::complex<float>> CommsLib::GetPilotScValue(
         std::complex<float>(-1.0f, 0.0f), std::complex<float>(1.0f, 0.0f)};
     pilot_sc.assign(sc_val, sc_val + 4u);
   } else {
-    const size_t start_sc = (fft_size - data_sc_num) / 2;
-    const size_t stop_sc = start_sc + data_sc_num;
-    const auto pilot_sym =
+    const auto zc_seq_double =
         CommsLib::GetSequence(data_sc_num, CommsLib::kLteZadoffChu);
-    std::vector<std::complex<float>> pilot_sym_cf32;
-    for (size_t i = 0; i < pilot_sym.at(0).size(); i++) {
-      pilot_sym_cf32.push_back(
-          std::complex<float>(static_cast<float>(pilot_sym.at(0).at(i)),
-                              static_cast<float>(pilot_sym.at(1).at(i))));
-    }
-    //Inplace fft
-    CommsLib::FFT(pilot_sym_cf32, fft_size);
-    for (size_t i = start_sc + pilot_sc_offset; i < stop_sc;
+    const auto zc_seq = Utils::DoubleToCfloat(zc_seq_double);
+    for (size_t i = pilot_sc_offset; i < zc_seq.size();
          i += kPilotSubcarrierSpacing) {
-      pilot_sc.push_back(pilot_sym_cf32.at(i));
+      pilot_sc.push_back(zc_seq.at(i));
     }
   }
   return pilot_sc;
