@@ -65,7 +65,7 @@ def verify_hdf5(hdf5, frame_i=100, cell_i=0, ofdm_sym_i=0, ant_i =0,
     nonzero_sc_size = fft_size
     if 'DATA_SUBCARRIER_NUM' in metadata:
         nonzero_sc_size = metadata['DATA_SUBCARRIER_NUM']
-    ofdm_pilot = np.array(metadata['OFDM_PILOT'])
+    #ofdm_pilot = np.array(metadata['OFDM_PILOT'])
     if "OFDM_PILOT_F" in metadata.keys():
         ofdm_pilot_f = np.array(metadata['OFDM_PILOT_F'])
     else:
@@ -332,9 +332,9 @@ def verify_hdf5(hdf5, frame_i=100, cell_i=0, ofdm_sym_i=0, ant_i =0,
                 noise_f = noise[:, ul_slot_i, :, :, :]
             else:
                 noise_f = None
-            tx_data = hdf5_lib.load_tx_data(metadata, hdf5.dirpath)
+            tx_data, ue_pilot = hdf5_lib.load_tx_data(metadata, hdf5.dirpath, userCSI.shape[1])
             equalized_symbols, demod_symbols, tx_symbols, slot_evm, slot_evm_snr, slot_ser = \
-                hdf5_lib.demodulate(ul_samps, userCSI, tx_data, metadata, ue_frame_offset, offset, ul_slot_i, noise_f, demod, fft_shifted_dataset)
+                hdf5_lib.demodulate(ul_samps, userCSI, tx_data, ue_pilot, metadata, ue_frame_offset, offset, ul_slot_i, noise_f, demod, fft_shifted_dataset)
             plot_constellation_stats(slot_evm, slot_evm_snr, slot_ser, equalized_symbols, tx_symbols, ref_frame, ul_slot_i)
 
     # Plot DL data symbols
