@@ -17,6 +17,7 @@
 #include "packet_txrx_radio.h"
 #include "packet_txrx_sim.h"
 #include "signal_handler.h"
+#include "recorder_thread.h"
 
 static const bool kDebugPrintPacketsFromMac = false;
 static const bool kDebugDeferral = true;
@@ -27,6 +28,27 @@ static const std::string kOutputFilepath =
 static const std::string kTxDataFilename = kOutputFilepath + "tx_data.bin";
 static const std::string kDecodeDataFilename =
     kOutputFilepath + "decode_data.bin";
+
+//Recording parameters
+static constexpr size_t kRecordFrameInterval = 1;
+static constexpr size_t kDefaultQueueSize = 36;
+#if defined(ENABLE_HDF5)
+static constexpr bool kRecordUplinkFrame = true;
+
+//set the recording types, can add multiple
+static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
+    kRecorderTypes{Agora_recorder::RecorderWorker::RecorderWorkerTypes::
+                       kRecorderWorkerHdf5};
+#else
+static constexpr bool kRecordUplinkFrame = false;
+
+static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
+    kRecorderTypes{Agora_recorder::RecorderWorker::RecorderWorkerTypes::
+                       kRecorderWorkerMultiFile};
+#endif
+
+static std::unique_ptr<Agora_recorder::RecorderThread> recorder_;
+
 
 Agora::Agora(Config* const cfg)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
@@ -50,14 +72,34 @@ Agora::Agora(Config* const cfg)
   InitializeQueues();
   InitializeCounters();
   InitializeThreads();
+
+  if (kRecordUplinkFrame) {
+    recorder_ = std::make_unique<Agora_recorder::RecorderThread>(
+        config_, 0,
+        cfg->CoreOffset() + config_->WorkerThreadNum() +
+            config_->SocketThreadNum() + 1,
+        kFrameWnd * config_->Frame().NumTotalSyms() * config_->BsAntNum() *
+            kDefaultQueueSize,
+        0, config_->BsAntNum(), kRecordFrameInterval, Direction::kDownlink,
+        kRecorderTypes, true);
+    recorder_->Start();
+    std::cout<<"recorder being started"<<std::endl;
+  }
+
 }
 
 Agora::~Agora() {
   if (kEnableMac == true) {
     mac_std_thread_.join();
   }
-
   worker_set_.reset();
+
+  if (recorder_ != nullptr) {
+    AGORA_LOG_INFO("Waiting for Recording to complete\n");
+    recorder_->Stop();
+  }
+  recorder_.reset();
+
   stats_.reset();
   phy_stats_.reset();
   FreeQueues();
@@ -337,7 +379,20 @@ void Agora::Start() {
       // FFT processing is scheduled after falling through the switch
       switch (event.event_type_) {
         case EventType::kPacketRX: {
+          // Packet* pkt = rx_tag_t(event.tags_[0]).rx_packet_->RawPacket();
+
+          RxPacket* rx = rx_tag_t(event.tags_[0u]).rx_packet_;
           Packet* pkt = rx_tag_t(event.tags_[0]).rx_packet_->RawPacket();
+          // Packet* pkt = rx->RawPacket();
+          Packet* pkt1 = rx->RawPacket();
+
+          if (recorder_ != nullptr) {
+            // std::cout<<"no problem here 11"<<std::endl;
+            rx->Use();
+            // std::cout<<"no problem here 22"<<std::endl;
+            recorder_->DispatchWork(event);
+            // std::cout<<"no problem here 33"<<std::endl;
+          }
 
           if (pkt->frame_id_ >=
               ((frame_tracking_.cur_sche_frame_id_ + kFrameWnd))) {
