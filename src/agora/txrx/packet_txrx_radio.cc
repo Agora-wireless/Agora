@@ -97,11 +97,15 @@ bool PacketTxRxRadio::CreateWorker(size_t tid, size_t interface_count,
         *tx_producer_tokens_[tid], *notify_producer_tokens_[tid], rx_memory,
         tx_memory, mutex_, cond_, proceed_, *radio_config_.get()));
   } else if (kUseUHD) {
+#if defined(USE_PURE_UHD)
     worker_threads_.emplace_back(std::make_unique<TxRxWorkerUsrp>(
         core_offset_, tid, interface_count, interface_offset, cfg_,
         rx_frame_start, event_notify_q_, tx_pending_q_,
         *tx_producer_tokens_[tid], *notify_producer_tokens_[tid], rx_memory,
         tx_memory, mutex_, cond_, proceed_, *radio_config_.get()));
+#else
+    std::runtime_error("SOAPY UHD NOT SUPPORTED AT THIS TIME");
+#endif
   } else {
     RtAssert(false, "This class does not support the current configuration");
   }
