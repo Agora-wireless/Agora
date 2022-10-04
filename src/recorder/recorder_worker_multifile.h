@@ -33,7 +33,6 @@ class RecorderWorkerMultiFile : public RecorderWorker {
   size_t num_antennas_;
   size_t interval_;
   Direction rx_direction_;
-
 };
 }; /* End namespace Agora_recorder */
 

@@ -16,8 +16,8 @@
 #include "modulation.h"
 #include "packet_txrx_radio.h"
 #include "packet_txrx_sim.h"
-#include "signal_handler.h"
 #include "recorder_thread.h"
+#include "signal_handler.h"
 
 static const bool kDebugPrintPacketsFromMac = false;
 static const bool kDebugDeferral = true;
@@ -48,7 +48,6 @@ static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
 #endif
 
 static std::unique_ptr<Agora_recorder::RecorderThread> recorder_;
-
 
 Agora::Agora(Config* const cfg)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
@@ -83,9 +82,8 @@ Agora::Agora(Config* const cfg)
         0, config_->BsAntNum(), kRecordFrameInterval, Direction::kDownlink,
         kRecorderTypes, true);
     recorder_->Start();
-    std::cout<<"recorder being started"<<std::endl;
+    std::cout << "recorder being started" << std::endl;
   }
-
 }
 
 Agora::~Agora() {
