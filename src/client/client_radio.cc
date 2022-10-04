@@ -10,7 +10,11 @@
 ClientRadioConfig::ClientRadioConfig(const Config* const cfg,
                                      Radio::RadioType radio_type)
     : cfg_(cfg) {
-  total_radios_ = cfg_->UeNum();
+  if (radio_type == Radio::RadioType::kUhdNative) {
+    total_radios_ = 1;
+  } else {
+    total_radios_ = cfg_->UeNum();
+  }
   total_antennas_ = cfg_->UeAntNum();
   std::cout << "Total Number of Client Radios " << total_radios_ << " with "
             << total_antennas_ << " antennas" << std::endl;
@@ -22,16 +26,15 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg,
   std::vector<std::thread> radio_threads;
   num_client_radios_initialized_ = 0;
   for (size_t i = 0; i < total_radios_; i++) {
-#ifdef THREADED_INIT
+#if defined(THREADED_INIT)
     radio_threads.emplace_back(&ClientRadioConfig::InitClientRadio, this, i);
 #else
     InitClientRadio(i);
 #endif
   }  // end for (size_t i = 0; i < total_radios_; i++)
 
-#ifdef THREADED_INIT
+#if defined(THREADED_INIT)
   size_t num_checks = 0;
-
   size_t num_client_radios_init = num_client_radios_initialized_.load();
   while (num_client_radios_init != total_radios_) {
     num_checks++;
@@ -86,7 +89,7 @@ bool ClientRadioConfig::RadioStart() {
 }
 
 void ClientRadioConfig::Go() const {
-  if (kUseUHD == false) {
+  if ((kUseUHD == false) || (kUsePureUHD == false)) {
     for (size_t i = 0; i < total_radios_; i++) {
       radios_.at(i)->Trigger();
     }

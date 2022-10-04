@@ -96,7 +96,7 @@ endif()
 #Settable values
 message(STATUS "\n-- ----- Configuration values -----")
 message(STATUS "DEBUG:            ${DEBUG}")
-set(RADIO_TYPE SIMULATION CACHE STRING "RADIO_TYPE defaulting to 'SIMULATION', valid types are SIMULATION / SOAPY_IRIS / SOAPY_UHD")
+set(RADIO_TYPE SIMULATION CACHE STRING "RADIO_TYPE defaulting to 'SIMULATION', valid types are SIMULATION / SOAPY_IRIS / SOAPY_UHD / PURE_UHD")
 message(STATUS "RADIO_TYPE:       ${RADIO_TYPE}")
 set(LOG_LEVEL "info" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 message(STATUS "LOG_LEVEL:        ${LOG_LEVEL}")
@@ -122,6 +122,9 @@ if(RADIO_TYPE STREQUAL SOAPY_IRIS)
 elseif(RADIO_TYPE STREQUAL SOAPY_UHD)
   message(STATUS "Enabled SOAPY UHD radio type")
   add_definitions(-DUSE_UHD)
+elseif(RADIO_TYPE STREQUAL PURE_UHD)
+  message(STATUS "Enabled Pure UHD radio type")
+  add_definitions(-DUSE_PURE_UHD)
 else()
   message(STATUS "Enabled SIMULATION radio type")
 endif()
@@ -298,6 +301,39 @@ set(GTEST_LIBRARIES ${GTEST_LIBRARIES} -lpthread)
 include_directories(third_party third_party/spdlog/include third_party/nlohmann/single_include)
 
 add_definitions(-DTHREADED_INIT)
+
+if(RADIO_TYPE STREQUAL PURE_UHD)
+  message(STATUS "Enabled PURE_UHD radio")
+  add_definitions(-DUSE_UHD)
+  # Adding dependency of UHD and boost external libraries
+  find_package(UHD "3.15.0" REQUIRED)
+  message(STATUS "Using UHD Version: ${UHD_VERSION}")
+
+  ########################################################################
+  # PURE UHD dependencies
+  ########################################################################
+  # Adding dependency of Boost to souder
+  set(BOOST_REQUIRED_COMPONENTS
+      program_options
+      system
+      thread)
+
+  if(MSVC)
+      set(BOOST_ALL_DYN_LINK "${BOOST_ALL_DYN_LINK}" CACHE BOOL "boost enable dynamic linking")
+      if(BOOST_ALL_DYN_LINK)
+          add_definitions(-DBOOST_ALL_DYN_LINK) #setup boost auto-linking in msvc
+      else(BOOST_ALL_DYN_LINK)
+          set(BOOST_REQUIRED_COMPONENTS) #empty components list for static link
+      endif(BOOST_ALL_DYN_LINK)
+  endif(MSVC)
+  find_package(Boost "1.65" REQUIRED ${BOOST_REQUIRED_COMPONENTS})
+  message(STATUS "Using Boost Version: ${Boost_VERSION}")
+
+  set(PUREUHD_SOURCES
+      src/agora/radio/radio_uhdsdr.cc
+      src/agora/radio/radio_lib_uhd.cc
+      )
+  message(STATUS "pure_uhd_lib library initalized")
 # MAC
 if(${ENABLE_MAC})
   add_definitions(-DENABLE_MAC)
@@ -309,6 +345,7 @@ set(MAC_CLIENT_SOURCES
   src/mac/video_receiver.cc
   src/mac/file_receiver.cc
   src/mac/mac_client.cc)
+
 set(MAC_BS_SOURCES
   src/mac/mac_sender.cc
   src/mac/mac_receiver.cc
@@ -345,6 +382,7 @@ endif()
 add_library(recorder_sources_lib OBJECT ${RECORDER_SOURCES})
 
 set(COMMON_SOURCES
+  ${PUREUHD_SOURCES}
   src/agora/stats.cc
   src/common/phy_stats.cc
   src/common/framestats.cc
@@ -424,7 +462,7 @@ set(CLIENT_SOURCES
 add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
 
 set(COMMON_LIBS -Wl,--start-group ${MKL_LIBS} ${BLAS_LIBRARIES} -Wl,--end-group ${NUMA_LIBRARIES} ${FLEXRAN_LDPC_LIBS} ${HDF5_LIBRARIES} ${DPDK_LIBRARIES} ${ARMADILLO_LIBRARIES} ${SOAPY_LIB}
-    ${PYTHON_LIB} ${GFLAGS_LIBRARIES} ${COMMON_LIBS})
+    ${PYTHON_LIB} ${Boost_LIBRARIES} ${GFLAGS_LIBRARIES} ${UHD_LIBRARIES} ${COMMON_LIBS})
 message(VERBOSE "Common libs: ${COMMON_LIBS}")
 
 # TODO: The main agora executable is performance-critical, so we need to
