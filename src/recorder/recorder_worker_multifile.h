@@ -12,7 +12,8 @@ namespace Agora_recorder {
 class RecorderWorkerMultiFile : public RecorderWorker {
  public:
   explicit RecorderWorkerMultiFile(const Config* in_cfg, size_t antenna_offset,
-                                   size_t num_antennas, size_t record_interval);
+                                   size_t num_antennas, size_t record_interval,
+                                   Direction rx_direction);
   ~RecorderWorkerMultiFile() override;
 
   void Init() final;
@@ -31,6 +32,8 @@ class RecorderWorkerMultiFile : public RecorderWorker {
   size_t antenna_offset_;
   size_t num_antennas_;
   size_t interval_;
+  Direction rx_direction_;
+
 };
 }; /* End namespace Agora_recorder */
 
