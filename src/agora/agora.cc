@@ -41,13 +41,7 @@ static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
                        kRecorderWorkerHdf5};
 #else
 static constexpr bool kRecordUplinkFrame = false;
-
-static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
-    kRecorderTypes{Agora_recorder::RecorderWorker::RecorderWorkerTypes::
-                       kRecorderWorkerMultiFile};
 #endif
-
-static std::unique_ptr<Agora_recorder::RecorderThread> recorder_;
 
 Agora::Agora(Config* const cfg)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
@@ -73,16 +67,16 @@ Agora::Agora(Config* const cfg)
   InitializeThreads();
 
   if (kRecordUplinkFrame) {
-    recorder_ = std::make_unique<Agora_recorder::RecorderThread>(
-        config_, 0,
-        cfg->CoreOffset() + config_->WorkerThreadNum() +
-            config_->SocketThreadNum() + 1,
-        kFrameWnd * config_->Frame().NumTotalSyms() * config_->BsAntNum() *
-            kDefaultQueueSize,
-        0, config_->BsAntNum(), kRecordFrameInterval, Direction::kDownlink,
-        kRecorderTypes, true);
-    recorder_->Start();
-    std::cout << "recorder being started" << std::endl;
+    auto& new_recorder = recorders_.emplace_back(
+        std::make_unique<Agora_recorder::RecorderThread>(
+            config_, 0,
+            cfg->CoreOffset() + config_->WorkerThreadNum() +
+                config_->SocketThreadNum(),
+            kFrameWnd * config_->Frame().NumTotalSyms() * config_->BsAntNum() *
+                kDefaultQueueSize,
+            0, config_->BsAntNum(), kRecordFrameInterval, kRecorderTypes,
+            true));
+    new_recorder->Start();
   }
 }
 
@@ -92,12 +86,11 @@ Agora::~Agora() {
   }
   worker_set_.reset();
 
-  if (recorder_ != nullptr) {
-    AGORA_LOG_INFO("Waiting for Recording to complete\n");
-    recorder_->Stop();
+  for (size_t i = 0; i < recorders_.size(); i++) {
+    AGORA_LOG_INFO("Waiting for Recording to complete %zu\n", i);
+    recorders_.at(i)->Stop();
   }
-  recorder_.reset();
-
+  recorders_.clear();
   stats_.reset();
   phy_stats_.reset();
   FreeQueues();
@@ -377,19 +370,12 @@ void Agora::Start() {
       // FFT processing is scheduled after falling through the switch
       switch (event.event_type_) {
         case EventType::kPacketRX: {
-          // Packet* pkt = rx_tag_t(event.tags_[0]).rx_packet_->RawPacket();
-
           RxPacket* rx = rx_tag_t(event.tags_[0u]).rx_packet_;
-          Packet* pkt = rx_tag_t(event.tags_[0]).rx_packet_->RawPacket();
-          // Packet* pkt = rx->RawPacket();
-          Packet* pkt1 = rx->RawPacket();
+          Packet* pkt = rx->RawPacket();
 
-          if (recorder_ != nullptr) {
-            // std::cout<<"no problem here 11"<<std::endl;
+          if (recorders_.size() == 1) {
             rx->Use();
-            // std::cout<<"no problem here 22"<<std::endl;
-            recorder_->DispatchWork(event);
-            // std::cout<<"no problem here 33"<<std::endl;
+            recorders_.at(0)->DispatchWork(event);
           }
 
           if (pkt->frame_id_ >=

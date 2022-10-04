@@ -44,8 +44,8 @@ void TxRxWorkerUsrp::DoTxRx() {
   /// For multi-uhd    num_interfaces_ = 1. (all radios are handled with 1 rx call)
   /// Determine the number of channels (A + B) / radios
   /// cfg_->NumRadios() * cfg_->NumChannels()?
-  const size_t number_bs_radios = Configuration()->NumChannels();
-  // const size_t number_bs_radios = 1;
+  const size_t number_bs_radios =
+      Configuration()->NumRadios() * Configuration()->NumChannels();
 
   //Allocate a tx vector of zeros;
   //Overallocated by 1 (replaced by the beacon)
@@ -218,9 +218,11 @@ std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(
   const int rx_status = radio_config_.RadioRx(radio_id, rx_locs,
                                               Configuration()->SampsPerSymbol(),
                                               rx_flags, rx_time_bs_);
+
   // added to test
   count++;
-  if (Configuration()->IsUplink(frame_id, symbol_id) == true &&
+  if (rx_status == static_cast<int>(Configuration()->SampsPerSymbol() && 
+      Configuration()->IsUplink(frame_id, symbol_id) == true &&
       count >= 1000000) {
     // added to test if recv is getting the correct samples:
 

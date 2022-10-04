@@ -7,22 +7,24 @@
 
 #include "logger.h"
 #include "radio_soapysdr.h"
+#if defined(USE_PURE_UHD)
 #include "radio_uhdsdr.h"
+#endif
 
 std::unique_ptr<Radio> Radio::Create(Radio::RadioType type) {
   switch (type) {
     case kSoapySdrStream: {
-#if defined(USE_PURE_UHD)
-      std::cout << "UHDSdr is created here" << std::endl;
-      return std::make_unique<RadioUHDSdr>();
-#else
-      std::cout << "SoapySDR is created here" << std::endl;
       return std::make_unique<RadioSoapySdr>(RadioDataPlane::kSoapyStream);
-#endif
     }
     case kSoapySdrSocket: {
       return std::make_unique<RadioSoapySdr>(RadioDataPlane::kLinuxSocket);
     }
+#if defined(USE_PURE_UHD)
+    case kUhdNative: {
+      std::cout << "UHDSdr is created here" << std::endl;
+      return std::make_unique<RadioUHDSdr>();
+    }
+#endif
     default: {
       AGORA_LOG_ERROR("Unknown or unsupported radio type\n");
       return std::unique_ptr<Radio>();
