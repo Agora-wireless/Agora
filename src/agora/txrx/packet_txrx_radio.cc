@@ -11,9 +11,9 @@
 #include "txrx_worker_usrp.h"
 
 #if defined(USE_PURE_UHD)
-static constexpr kRadioType = Radio::kUhdNative;
+static constexpr Radio::RadioType kRadioType = Radio::kUhdNative;
 #else
-static constexpr kRadioType = Radio::kSoapySdrStream;
+static constexpr Radio::RadioType kRadioType = Radio::kSoapySdrStream;
 #endif
 
 static constexpr size_t kRadioTriggerWaitMs = 100;

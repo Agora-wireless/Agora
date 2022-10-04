@@ -221,7 +221,7 @@ std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(
 
   // added to test
   count++;
-  if (rx_status == static_cast<int>(Configuration()->SampsPerSymbol() && 
+  if (rx_status == static_cast<int>(Configuration()->SampsPerSymbol()) &&
       Configuration()->IsUplink(frame_id, symbol_id) == true &&
       count >= 1000000) {
     // added to test if recv is getting the correct samples:
