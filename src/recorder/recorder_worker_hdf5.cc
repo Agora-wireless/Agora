@@ -201,14 +201,29 @@ void RecorderWorkerHDF5::Init() {
     hdf5_->WriteAttribute("OFDM_PILOT_SC_VALS", pilot_sc);
   }
 
+  // Freq. Domain Pilot symbols (2 for complex)
+  auto pilot_sym_f =
+      CommsLib::GetSequence(sym_data_sc_num, CommsLib::kLteZadoffChu);
+  RtAssert(pilot_sym_f.size() == 2,
+           "pilot_sym_f must be complex (dimension 2)");
+  const size_t pilot_f_samples = pilot_sym_f.at(0).size();
+  RtAssert(pilot_sym_f.at(0).size() == pilot_sym_f.at(1).size(),
+           "pilot_sym_f must have equal dimensions");
+  std::vector<double> split_vec_pilot_f(2 * pilot_f_samples);
+  for (size_t i = 0; i < pilot_f_samples; i++) {
+    split_vec_pilot_f[(2 * i) + 0] = pilot_sym_f.at(0).at(i);
+    split_vec_pilot_f[(2 * i) + 1] = pilot_sym_f.at(1).at(i);
+  }
+  hdf5_->WriteAttribute("OFDM_PILOT_F", split_vec_pilot_f);
+
   // Number of frames for UL data recorded in bit source files
   hdf5_->WriteAttribute("CL_MODULATION", cfg_->Modulation(Direction::kUplink));
   hdf5_->WriteAttribute("UL_DATA_FRAME_NUM", 1);
 
   // Names of Files including uplink tx frequency-domain data
-  //if (cfg_->ul_tx_fd_data_files().size() > 0) {
-  //  hdf5_->WriteAttribute("TX_FD_DATA_FILENAMES", cfg_->ul_tx_fd_data_files());
-  //}
+  if (cfg_->UlTxFreqDataFiles().size() > 0) {
+    hdf5_->WriteAttribute("TX_FD_DATA_FILENAMES", cfg_->UlTxFreqDataFiles());
+  }
   // *****Temp compatibility values
 
   if (rx_direction_ == Direction::kDownlink) {

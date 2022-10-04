@@ -554,6 +554,9 @@ class Config {
   inline const std::string& ConfigFilename() const { return config_filename_; }
   inline const std::string& TraceFilename() const { return trace_file_; }
   inline const std::string& Timestamp() const { return timestamp_; }
+  inline const std::vector<std::string>& UlTxFreqDataFiles(void) const {
+    return ul_tx_f_data_files_;
+  }
 
  private:
   void Print() const;
@@ -888,5 +891,6 @@ class Config {
   const std::string config_filename_;
   std::string trace_file_;
   std::string timestamp_;
+  std::vector<std::string> ul_tx_f_data_files_;
 };
 #endif /* CONFIG_HPP_ */

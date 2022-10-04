@@ -1221,6 +1221,8 @@ void Config::GenData() {
           std::to_string(this->frame_.NumULSyms()) + "_" +
           std::to_string(kOutputFrameNum) + "_" + ue_channel_ + "_" +
           std::to_string(i) + ".bin";
+      ul_tx_f_data_files_.push_back(filename_ul_data_f.substr(
+          filename_ul_data_f.find_last_of("/\\") + 1));
       FILE* fp_tx_f = std::fopen(filename_ul_data_f.c_str(), "wb");
       if (fp_tx_f == nullptr) {
         AGORA_LOG_ERROR("Failed to create ul sc data file %s. Error %s.\n",
