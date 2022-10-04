@@ -10,6 +10,12 @@
 #include "txrx_worker_hw.h"
 #include "txrx_worker_usrp.h"
 
+#if defined(USE_PURE_UHD)
+static constexpr kRadioType = Radio::kUhdNative;
+#else
+static constexpr kRadioType = Radio::kSoapySdrStream;
+#endif
+
 static constexpr size_t kRadioTriggerWaitMs = 100;
 
 PacketTxRxRadio::PacketTxRxRadio(
@@ -23,8 +29,13 @@ PacketTxRxRadio::PacketTxRxRadio(
                  event_notify_q, tx_pending_q, notify_producer_tokens,
                  tx_producer_tokens, rx_buffer, packet_num_in_buffer,
                  frame_start, tx_buffer) {
-  //radio_config_ = std::make_unique<RadioConfig>(cfg, Radio::kSoapySdrSocket);
-  radio_config_ = std::make_unique<RadioConfig>(cfg, Radio::kSoapySdrStream);
+#if defined(USE_PURE_UHD)
+  std::cout << "Using UHD" << std::endl;
+  radio_config_ = std::make_unique<RadioUHDConfig>(cfg, kRadioType);
+#else
+  std::cout << "Using SoapySDR" << std::endl;
+  radio_config_ = std::make_unique<RadioConfig>(cfg, kRadioType);
+#endif
 }
 
 PacketTxRxRadio::~PacketTxRxRadio() {
