@@ -44,7 +44,7 @@ class ClientRadioConfig {
   std::unique_ptr<Radio> radios_;
 #else
   std::vector<std::unique_ptr<Radio>> radios_;
-#endif
+#endif  
   size_t total_radios_;
   size_t total_antennas_;
 
