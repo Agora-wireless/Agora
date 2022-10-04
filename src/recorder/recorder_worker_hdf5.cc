@@ -253,8 +253,8 @@ void RecorderWorkerHDF5::Init() {
           for (size_t sym = 0; sym < num_dl_syms; sym++) {
             const std::array<hsize_t, kDsDimsNum> start = {0, 0, sym, ant, 0};
             AGORA_LOG_TRACE(
-                "Attempting to write TxData for Symbol %zu, Antenna %zu "
-                "total syms %zu\n",
+                "Attempting to write TxData for Symbol %zu, Antenna %zu total "
+                "syms %zu\n",
                 sym, ant, num_dl_syms);
             //DlIqF is indexed by complex float
             hdf5_->WriteDataset(
