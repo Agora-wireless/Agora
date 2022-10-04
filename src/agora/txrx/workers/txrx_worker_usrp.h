@@ -35,7 +35,9 @@ class TxRxWorkerUsrp : public TxRxWorker {
   int DequeueSend();
   int DequeueSend(int frame_id, int symbol_id);
   std::vector<Packet*> RecvEnqueue(size_t radio_id, size_t frame_id,
-                                   size_t symbol_id, const std::vector<void*>& discard_locs, int &count);
+                                   size_t symbol_id,
+                                   const std::vector<void*>& discard_locs,
+                                   int& count);
 
   long long rx_time_bs_;
   long long tx_time_bs_;

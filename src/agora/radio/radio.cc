@@ -16,7 +16,7 @@ std::unique_ptr<Radio> Radio::Create(Radio::RadioType type) {
       std::cout << "UHDSdr is created here" << std::endl;
       return std::make_unique<RadioUHDSdr>();
 #else
-      std::cout<<"SoapySDR is created here" << std::endl;
+      std::cout << "SoapySDR is created here" << std::endl;
       return std::make_unique<RadioSoapySdr>(RadioDataPlane::kSoapyStream);
 #endif
     }

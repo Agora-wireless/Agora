@@ -274,8 +274,7 @@ void TxRxWorkerClientHw::DoTxRx() {
               time0 += rx_adjust_samples;
               resync_retry_cnt = 0;
             }
-          } 
-          else {
+          } else {
             resync_retry_cnt++;
             if (resync_retry_cnt > kReSyncRetryCount) {
               AGORA_LOG_ERROR(
