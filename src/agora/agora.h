@@ -24,6 +24,8 @@
 #include "ran_config.h"
 #include "stats.h"
 #include "symbols.h"
+#include "recorder_thread.h"
+
 
 class Agora {
  public:
@@ -179,6 +181,8 @@ class Agora {
 
   uint8_t schedule_process_flags_;
   std::queue<size_t> encode_deferral_;
+  // std::vector<std::unique_ptr<Agora_recorder::RecorderThread>> recorders_;
+
 };
 
 #endif  // AGORA_H_
