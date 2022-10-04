@@ -17,6 +17,7 @@
 #include "radio.h"
 #include "uhd/usrp/multi_usrp.hpp"
 
+
 class RadioUHDConfig {
  public:
   RadioUHDConfig(Config* cfg, Radio::RadioType radio_type);
@@ -73,7 +74,7 @@ class RadioUHDConfig {
                            double tx_center_tone);
   static void SetIqBalance(Radio* dev, int direction, size_t channel, int gcorr,
                            int iqcorr);
-
+  
   // TODO: should not be a vector, instead should be a single object; Modify when testing
   static void AdjustCalibrationGains(std::vector<Radio*>& rx_devs,
                                      Radio* tx_dev, size_t channel,
