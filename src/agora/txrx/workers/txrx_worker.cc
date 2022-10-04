@@ -103,8 +103,8 @@ std::vector<EventData> TxRxWorker::GetPendingTxEvents(size_t max_events) {
 // This function as implmented is not thread safe
 RxPacket& TxRxWorker::GetRxPacket() {
   RxPacket& new_packet = rx_memory_.at(rx_memory_idx_);
-  AGORA_LOG_INFO("TxRxWorker [%zu]: Getting new rx packet at location %ld\n",
-                 tid_, reinterpret_cast<intptr_t>(&new_packet));
+  AGORA_LOG_TRACE("TxRxWorker [%zu]: Getting new rx packet at location %ld\n",
+                  tid_, reinterpret_cast<intptr_t>(&new_packet));
 
   // if rx_buffer is full, exit
   if (new_packet.Empty() == false) {
