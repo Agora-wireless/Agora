@@ -333,7 +333,9 @@ if(RADIO_TYPE STREQUAL PURE_UHD)
       src/agora/radio/radio_uhdsdr.cc
       src/agora/radio/radio_lib_uhd.cc
       )
-  message(STATUS "pure_uhd_lib library initalized")
+  message(STATUS "pure_uhd_lib library initialized")
+endif()
+
 # MAC
 if(${ENABLE_MAC})
   add_definitions(-DENABLE_MAC)
