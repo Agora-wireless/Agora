@@ -332,6 +332,7 @@ if(RADIO_TYPE STREQUAL PURE_UHD)
   set(PUREUHD_SOURCES
       src/agora/radio/radio_uhdsdr.cc
       src/agora/radio/radio_lib_uhd.cc
+      src/agora/txrx/workers/txrx_worker_usrp.cc
       )
   message(STATUS "pure_uhd_lib library initialized")
 endif()
@@ -445,8 +446,7 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/txrx/packet_txrx_sim.cc
   src/agora/txrx/packet_txrx_radio.cc
   src/agora/txrx/workers/txrx_worker_sim.cc
-  src/agora/txrx/workers/txrx_worker_hw.cc
-  src/agora/txrx/workers/txrx_worker_usrp.cc)
+  src/agora/txrx/workers/txrx_worker_hw.cc)
 
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
