@@ -8,9 +8,9 @@
 
 #include "logger.h"
 #include "txrx_worker_hw.h"
-#include "txrx_worker_usrp.h"
 
 #if defined(USE_PURE_UHD)
+#include "txrx_worker_usrp.h"
 static constexpr Radio::RadioType kRadioType = Radio::kUhdNative;
 #else
 static constexpr Radio::RadioType kRadioType = Radio::kSoapySdrStream;
