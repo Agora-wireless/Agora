@@ -23,13 +23,12 @@ PacketTxRxClientRadio::PacketTxRxClientRadio(
                  event_notify_q, tx_pending_q, notify_producer_tokens,
                  tx_producer_tokens, rx_buffer, packet_num_in_buffer,
                  frame_start, tx_buffer) {
-#if defined(USE_PURE_UHD)
+  #if defined(USE_PURE_UHD)
+  radio_config_ = std::make_unique<ClientRadioConfig>(cfg, Radio::kSoapySdrStream);
+  #else
   radio_config_ =
       std::make_unique<ClientRadioConfig>(cfg, Radio::kSoapySdrStream);
-#else
-  radio_config_ =
-      std::make_unique<ClientRadioConfig>(cfg, Radio::kSoapySdrStream);
-#endif
+  #endif
 }
 
 PacketTxRxClientRadio::~PacketTxRxClientRadio() {
@@ -74,7 +73,7 @@ bool PacketTxRxClientRadio::CreateWorker(size_t tid, size_t interface_count,
        1));
 
   //This is the spot to choose what type of TxRxWorker you want....
-  if (kUseArgos) {
+  if (kUseArgos || kUsePureUHD) {
     worker_threads_.emplace_back(std::make_unique<TxRxWorkerClientHw>(
         core_offset_, tid, interface_count, interface_offset, cfg_,
         rx_frame_start, event_notify_q_, tx_pending_q_,
