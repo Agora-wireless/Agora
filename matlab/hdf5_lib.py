@@ -22,7 +22,6 @@ import extract_pilots_data as epd
 from find_lts import *
 from ofdmtxrx import ofdmTxRx
 
-useAgoraUL = True
 
 #@staticmethod
 def csi_from_pilots(pilots_dump, z_padding=150, fft_size=64, cp=16, frm_st_idx=0, frame_to_plot=0, ref_ant=0, ref_user = 0):
@@ -393,12 +392,13 @@ class hdf5_lib:
             self.metadata['OFDM_PILOT_F'] = pilot_complex
 
         # Time-domain Pilot
-        #pilot_vec = self.metadata['OFDM_PILOT']
-        # some_list[start:stop:step]
-        #I = pilot_vec[0::2]
-        #Q = pilot_vec[1::2]
-        #pilot_complex = I + Q * 1j
-        #self.metadata['OFDM_PILOT'] = pilot_complex
+        if "OFDM_PILOT" in self.metadata.keys():
+            pilot_vec = self.metadata['OFDM_PILOT']
+            # some_list[start:stop:step]
+            I = pilot_vec[0::2]
+            Q = pilot_vec[1::2]
+            pilot_complex = I + Q * 1j
+            self.metadata['OFDM_PILOT'] = pilot_complex
 
         if 'UL_SYMS' in self.metadata:
             n_ul_slots = self.metadata['UL_SYMS']
@@ -904,18 +904,13 @@ class hdf5_lib:
         cl_ch_num = int(metadata['CL_CH_PER_RADIO'])
         num_cl = int(metadata['CL_NUM'])
         data_sc_ind = np.array(metadata['OFDM_DATA_SC'])
-        print('OFDM_DATA_SC', data_sc_ind)
         pilot_sc_ind = np.array(metadata['OFDM_PILOT_SC'])
-        print('OFDM_PILOT_SC', pilot_sc_ind)
         pilot_sc_val = np.array(metadata['OFDM_PILOT_SC_VALS'])
         zero_sc_ind = np.setdiff1d(range(fft_size), data_sc_ind)
         zero_sc_ind = np.setdiff1d(zero_sc_ind, pilot_sc_ind)
         nonzero_sc_ind = np.setdiff1d(range(fft_size), zero_sc_ind)
         ul_data_frame_num = int(metadata['UL_DATA_FRAME_NUM'])
-        if useAgoraUL:
-            tx_file_names = ['ul_data_f_16QAM_304_512_1_3_1_A_0.bin']
-        else:
-            tx_file_names = metadata['TX_FD_DATA_FILENAMES'].astype(str)
+        tx_file_names = metadata['TX_FD_DATA_FILENAMES'].astype(str)
         txdata = np.empty((ul_data_frame_num, num_cl, ul_slot_num,
                      symbol_per_slot,  fft_size), dtype='complex64')
         read_size = 2 * ul_data_frame_num * ul_slot_num * cl_ch_num * symbol_per_slot * fft_size
@@ -949,7 +944,7 @@ class hdf5_lib:
                 IQ = I + Q * 1j
                 IQ = np.fft.fftshift(IQ, 0)
                 ue_pilot[i, :] = IQ[data_sc_ind] 
-                print('pilot compare diff', ue_pilot[i, :] - pilot_sc_val)
+                #print('pilot compare diff', ue_pilot[i, :] - pilot_sc_val)
         return txdata, ue_pilot
 
     @staticmethod
@@ -972,10 +967,7 @@ class hdf5_lib:
             ul_slot_num = int(metadata['UL_SYMS'])
         elif 'UL_SLOTS' in metadata:
             ul_slot_num = int(metadata['UL_SLOTS'])
-        if useAgoraUL:
-            data_sc_ind = np.array(metadata['OFDM_DATA_SC'])
-        else:
-            data_sc_ind = np.array(metadata['OFDM_PILOT_SC'])
+        data_sc_ind = np.array(metadata['OFDM_DATA_SC'])
         pilot_sc_ind = np.array(metadata['OFDM_PILOT_SC'])
         pilot_sc_val = np.array(metadata['OFDM_PILOT_SC_VALS'])
         zero_sc_ind = np.setdiff1d(range(fft_size), data_sc_ind)
@@ -1033,24 +1025,18 @@ class hdf5_lib:
 
         if method != 'ml':
             ul_syms_f_tp = np.transpose(ul_syms_f[:, :, :, :, nonzero_sc_ind], (0, 1, 3, 2, 4))
-            if useAgoraUL: #why this difference?
-                csi_nz = csi[:, :, :, nonzero_sc_ind]
-            else:
-                csi_nz = csi
-            print("size of csi_nz = ", csi_nz.shape)
-            print("size of ul_syms_f_tp = ", ul_syms_f_tp.shape)
             # UL DEMULT: #Frames, #OFDM Symbols, #User, #Sample (DATA + PILOT SCs)
             # We assume the first two slots are pilots used for phase tracking
             # Slot 2 onwards in Agora are data 
-            ul_demult0 = demult(csi_nz, ul_syms_f_tp[:, 0, :, :, :], noise_samps_f, method=method)
+            ul_demult0 = demult(csi, ul_syms_f_tp[:, 0, :, :, :], noise_samps_f, method=method)
             phase_corr = np.sum(ul_demult0 * np.conj(ue_pilot), axis=3)
             phase_shift0 = np.angle(phase_corr) 
-            ul_demult1 = demult(csi_nz, ul_syms_f_tp[:, 1, :, :, :], noise_samps_f, method=method)
+            ul_demult1 = demult(csi, ul_syms_f_tp[:, 1, :, :, :], noise_samps_f, method=method)
             phase_corr = np.sum(ul_demult1 * np.conj(ue_pilot), axis=3)
             phase_shift1 = np.angle(phase_corr)
             phase_shift = phase_shift1 - phase_shift0
             phase_err = phase_shift1 + phase_shift
-            ul_demult = demult(csi_nz, ul_syms_f_tp[:, 2, :, :, :], noise_samps_f, method=method)
+            ul_demult = demult(csi, ul_syms_f_tp[:, 2, :, :, :], noise_samps_f, method=method)
             phase_comp = np.exp(-1j*phase_err)
             phase_comp_ext = np.tile(np.expand_dims(phase_comp, axis=3), (1, 1, 1, data_sc_len))
             ul_equal_syms = np.multiply(ul_demult, phase_comp_ext) #phase_comp_exp
