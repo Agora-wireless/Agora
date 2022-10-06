@@ -1238,7 +1238,7 @@ void Config::GenData() {
 
       for (size_t j = 0; j < ofdm_data_num_; j++) {
         const size_t sc = j + ofdm_data_start_;
-        if (i > this->frame_.ClientUlPilotSymbols()) {
+        if (i >= this->frame_.ClientUlPilotSymbols()) {
           int8_t* mod_input_ptr =
               GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, u, j);
           ul_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, ul_mod_table_);
