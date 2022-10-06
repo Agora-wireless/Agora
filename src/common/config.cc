@@ -304,8 +304,11 @@ Config::Config(std::string jsonfilename)
   RtAssert(ofdm_data_num_ % kTransposeBlockSize == 0,
            "Transpose block size must divide number of OFDM data subcarriers");
   ofdm_pilot_spacing_ = tdd_conf.value("ofdm_pilot_spacing", 16);
-  ofdm_data_start_ =
-      tdd_conf.value("ofdm_data_start", (ofdm_ca_num_ - ofdm_data_num_) / 2);
+  ofdm_data_start_ = tdd_conf.value("ofdm_data_start",
+                                    ((ofdm_ca_num_ - ofdm_data_num_) / 2) /
+                                        kSCsPerCacheline * kSCsPerCacheline);
+  RtAssert(ofdm_data_start_ % kSCsPerCacheline == 0,
+           "ofdm_data_start must be a multiple of subcarriers per cacheline");
   ofdm_data_stop_ = ofdm_data_start_ + ofdm_data_num_;
 
   // Build subcarrier map for data ofdm symbols
