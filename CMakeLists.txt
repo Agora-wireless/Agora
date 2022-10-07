@@ -304,24 +304,26 @@ include_directories(third_party third_party/spdlog/include third_party/nlohmann/
 
 add_definitions(-DTHREADED_INIT)
 
-find_package(UHD "3.15.0" REQUIRED)
-message(STATUS "Using UHD Version: ${UHD_VERSION}")
+if(RADIO_TYPE STREQUAL PURE_UHD)
+  find_package(UHD "3.15.0" REQUIRED)
+  message(STATUS "Using UHD Version: ${UHD_VERSION}")
 
-set(BOOST_REQUIRED_COMPONENTS
-program_options
-system
-thread)
+  set(BOOST_REQUIRED_COMPONENTS
+  program_options
+  system
+  thread)
 
-if(MSVC)
-  set(BOOST_ALL_DYN_LINK "${BOOST_ALL_DYN_LINK}" CACHE BOOL "boost enable dynamic linking")
-  if(BOOST_ALL_DYN_LINK)
-    add_definitions(-DBOOST_ALL_DYN_LINK) #setup boost auto-linking in msvc
-  else(BOOST_ALL_DYN_LINK)
-    set(BOOST_REQUIRED_COMPONENTS) #empty components list for static link
-  endif(BOOST_ALL_DYN_LINK)
-endif(MSVC)
-find_package(Boost "1.65" REQUIRED ${BOOST_REQUIRED_COMPONENTS})
-message(STATUS "Using Boost Version: ${Boost_VERSION}")
+  if(MSVC)
+    set(BOOST_ALL_DYN_LINK "${BOOST_ALL_DYN_LINK}" CACHE BOOL "boost enable dynamic linking")
+    if(BOOST_ALL_DYN_LINK)
+      add_definitions(-DBOOST_ALL_DYN_LINK) #setup boost auto-linking in msvc
+    else(BOOST_ALL_DYN_LINK)
+      set(BOOST_REQUIRED_COMPONENTS) #empty components list for static link
+    endif(BOOST_ALL_DYN_LINK)
+  endif(MSVC)
+  find_package(Boost "1.65" REQUIRED ${BOOST_REQUIRED_COMPONENTS})
+  message(STATUS "Using Boost Version: ${Boost_VERSION}")
+endif()
 
 # MAC
 if(${ENABLE_MAC})
@@ -369,24 +371,6 @@ if (${ENABLE_HDF5})
 endif()
 add_library(recorder_sources_lib OBJECT ${RECORDER_SOURCES})
 
-if (${ENABLE_PURE_UHD})
-  set(PUREUHD_SOURCES
-      ${PUREUHD_SOURCES}
-      # src/client/txrx/packet_txrx_client_radio.cc
-      # src/agora/radio/radiouhd.cc
-      src/agora/radio/radio_uhdsdr.cc
-      src/agora/radio/radio_lib_uhd.cc
-      # src/agora/radio/radio_data_planeuhd.cc
-      # src/agora/radio/radio_data_plane_uhd.cc
-      # src/agora/radio/radio_data_plane_socketuhd.cc     
-      # src/agora/radio/radio_calibrate_digitaluhd.cc
-      # src/agora/radio/radio_calibrate_analoguhd.cc
-      # src/agora/txrx/packet_txrx_radiouhd.cc
-      )
-  message(STATUS "pure_uhd_lib library initalized")
-endif() 
-add_library(pure_uhd_lib OBJECT ${PUREUHD_SOURCES})
-
 set(COMMON_SOURCES
   src/agora/stats.cc
   src/common/phy_stats.cc
@@ -416,6 +400,12 @@ set(COMMON_SOURCES
   src/encoder/cyclic_shift.cc
   src/encoder/encoder.cc
   src/encoder/iobuffer.cc)
+
+  if(RADIO_TYPE STREQUAL PURE_UHD)
+    set(COMMON_SOURCES ${COMMON_SOURCES}
+      src/agora/radio/radio_uhdsdr.cc
+      )
+  endif()
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(SHARED_TXRX_SOURCES
@@ -449,8 +439,15 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/txrx/packet_txrx_radio.cc
   src/agora/txrx/workers/txrx_worker_sim.cc
   src/agora/txrx/workers/txrx_worker_hw.cc
-  src/agora/txrx/workers/txrx_worker_usrp.cc)
+  )
 
+  if(RADIO_TYPE STREQUAL PURE_UHD)
+    set(AGORA_SOURCES ${AGORA_SOURCES}
+      src/agora/radio/radio_lib_uhd.cc  
+      src/agora/radio/radio_calibrate_digital_uhd.cc
+      src/agora/txrx/workers/txrx_worker_usrp.cc
+      )
+  endif()
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
 set(CLIENT_SOURCES
@@ -477,16 +474,22 @@ add_executable(agora
   src/agora/main.cc
   $<TARGET_OBJECTS:agora_sources_lib>
   $<TARGET_OBJECTS:shared_txrx_sources_lib>
-  $<TARGET_OBJECTS:common_sources_lib>
-  $<TARGET_OBJECTS:pure_uhd_lib>)
-target_link_libraries(agora ${COMMON_LIBS} ${UHD_LIBRARIES})
+  $<TARGET_OBJECTS:recorder_sources_lib>
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(agora ${COMMON_LIBS})
+if(RADIO_TYPE STREQUAL PURE_UHD)
+  target_link_libraries(agora ${UHD_LIBRARIES})
+endif()
+
 
 add_executable(data_generator
   ${CMAKE_CURRENT_SOURCE_DIR}/src/data_generator/data_generator_main.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/data_generator/data_generator.cc
-  $<TARGET_OBJECTS:common_sources_lib>
-  $<TARGET_OBJECTS:pure_uhd_lib>)
-target_link_libraries(data_generator ${COMMON_LIBS} ${UHD_LIBRARIES})
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(data_generator ${COMMON_LIBS})
+if(RADIO_TYPE STREQUAL PURE_UHD)
+  target_link_libraries(data_generator ${UHD_LIBRARIES})
+endif()
 target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
 add_executable(user
@@ -495,16 +498,21 @@ add_executable(user
   $<TARGET_OBJECTS:client_sources_lib>
   $<TARGET_OBJECTS:shared_txrx_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>
-  $<TARGET_OBJECTS:pure_uhd_lib>)
-target_link_libraries(user ${COMMON_LIBS} ${UHD_LIBRARIES})
+  $<TARGET_OBJECTS:agora_sources_lib>)
+target_link_libraries(user ${COMMON_LIBS})
+if(RADIO_TYPE STREQUAL PURE_UHD)
+  target_link_libraries(user ${UHD_LIBRARIES})
+endif()
 
 add_executable(sender
   simulator/sender_cli.cc
   simulator/sender.cc
   src/common/dpdk_transport.cc
-  $<TARGET_OBJECTS:common_sources_lib>
-  $<TARGET_OBJECTS:pure_uhd_lib>)
-target_link_libraries(sender ${COMMON_LIBS} ${UHD_LIBRARIES})
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(sender ${COMMON_LIBS})
+if(RADIO_TYPE STREQUAL PURE_UHD)
+  target_link_libraries(sender ${UHD_LIBRARIES})
+endif()
 
 add_executable(sim
   simulator/main.cc
@@ -512,29 +520,39 @@ add_executable(sim
   simulator/sender.cc
   simulator/receiver.cc
   src/common/dpdk_transport.cc
-  $<TARGET_OBJECTS:common_sources_lib>
-  $<TARGET_OBJECTS:pure_uhd_lib>)
-target_link_libraries(sim ${COMMON_LIBS} ${UHD_LIBRARIES})
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(sim ${COMMON_LIBS})
+if(RADIO_TYPE STREQUAL PURE_UHD)
+  target_link_libraries(sim ${UHD_LIBRARIES})
+endif()
 
 add_executable(chsim
   simulator/chsim_main.cc
   simulator/channel_sim.cc
   simulator/channel.cc
-  $<TARGET_OBJECTS:common_sources_lib>
-  $<TARGET_OBJECTS:pure_uhd_lib>)
-target_link_libraries(chsim ${COMMON_LIBS} ${UHD_LIBRARIES})
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(chsim ${COMMON_LIBS})
+if(RADIO_TYPE STREQUAL PURE_UHD)
+  target_link_libraries(chsim ${UHD_LIBRARIES})
+endif()
 
 add_executable(macuser
      ${MAC_CLIENT_SOURCES}
      ${COMMON_SOURCES}
      ${PUREUHD_SOURCES})
-target_link_libraries(macuser ${COMMON_LIBS} ${UHD_LIBRARIES})
+target_link_libraries(macuser ${COMMON_LIBS})
+if(RADIO_TYPE STREQUAL PURE_UHD)
+  target_link_libraries(macuser ${UHD_LIBRARIES})
+endif()
 
 add_executable(macbs
      ${MAC_BS_SOURCES}
      ${COMMON_SOURCES}
      ${PUREUHD_SOURCES})
-target_link_libraries(macbs ${COMMON_LIBS} ${UHD_LIBRARIES})
+target_link_libraries(macbs ${COMMON_LIBS})
+if(RADIO_TYPE STREQUAL PURE_UHD)
+  target_link_libraries(macbs ${UHD_LIBRARIES})
+endif()
 
 if(RADIO_TYPE STREQUAL SOAPY_IRIS)
 add_executable(radio_test
@@ -551,20 +569,26 @@ endif()
 add_executable(test_agora
   test/test_agora/main.cc
   $<TARGET_OBJECTS:agora_sources_lib>
+  $<TARGET_OBJECTS:recorder_sources_lib>
   $<TARGET_OBJECTS:shared_txrx_sources_lib>
-  $<TARGET_OBJECTS:common_sources_lib>
-  $<TARGET_OBJECTS:pure_uhd_lib>)
-target_link_libraries(test_agora ${COMMON_LIBS} ${UHD_LIBRARIES})
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(test_agora ${COMMON_LIBS})
+if(RADIO_TYPE STREQUAL PURE_UHD)
+  target_link_libraries(test_agora ${UHD_LIBRARIES})
+endif()
 
 set(LDPC_TESTS test_ldpc test_ldpc_mod test_ldpc_baseband)
 foreach(test_name IN LISTS LDPC_TESTS)
   add_executable(${test_name}
     test/compute_kernels/ldpc/${test_name}.cc
-    $<TARGET_OBJECTS:common_sources_lib>
-    $<TARGET_OBJECTS:pure_uhd_lib>)
+    $<TARGET_OBJECTS:common_sources_lib>)
+
   # Unit tests should pass without memory errors
   set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")
-  target_link_libraries(${test_name} ${COMMON_LIBS} ${GTEST_LIBRARIES} ${UHD_LIBRARIES})
+  target_link_libraries(${test_name} ${COMMON_LIBS} ${GTEST_LIBRARIES})
+  if(RADIO_TYPE STREQUAL PURE_UHD)
+  target_link_libraries(${test_name} ${UHD_LIBRARIES})
+endif()
   add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
 
@@ -580,10 +604,13 @@ foreach(test_name IN LISTS UNIT_TESTS)
     $<TARGET_OBJECTS:agora_sources_lib>
     $<TARGET_OBJECTS:shared_txrx_sources_lib>
     $<TARGET_OBJECTS:common_sources_lib>
-    $<TARGET_OBJECTS:pure_uhd_lib>)
+    $<TARGET_OBJECTS:recorder_sources_lib>)
 
   # Unit tests should pass without memory errors
   set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")
-  target_link_libraries(${test_name} ${COMMON_LIBS} ${GTEST_LIBRARIES} ${UHD_LIBRARIES})
+  target_link_libraries(${test_name} ${COMMON_LIBS} ${GTEST_LIBRARIES})
+  if(RADIO_TYPE STREQUAL PURE_UHD)
+  target_link_libraries(${test_name} ${UHD_LIBRARIES})
+endif()
   add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
