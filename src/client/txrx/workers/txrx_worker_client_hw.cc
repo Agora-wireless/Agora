@@ -674,7 +674,7 @@ void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
       if (kDebugUplink) {
         tx_data.at(ch) = reinterpret_cast<void*>(
             &Configuration()
-                 ->UlIqT()[tx_symbol_id]
+                 ->UlIqT()[ul_symbol_idx]
                           [tx_ant * Configuration()->SampsPerSymbol()]);
       } else {
         auto* pkt = GetUlTxPacket(frame_id, tx_symbol_id, tx_ant);
