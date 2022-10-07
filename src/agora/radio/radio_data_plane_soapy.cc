@@ -121,8 +121,13 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
           AGORA_LOG_WARN(
               "RadioDataPlaneSoapy::Rx - expected SOAPY_SDR_END_BURST but "
               "didn't happen samples count %zu requested %zu symbols with "
-              "flags %d\n",
-              rx_samples, rx_size, soapy_rx_flags);
+              "flags %d at time %lld\n",
+              rx_samples, rx_size, soapy_rx_flags, frame_time_ns);
+        } else {
+          AGORA_LOG_TRACE(
+              "RadioDataPlaneSoapy::Rx - good rx samples count %zu requested "
+              "%zu symbols with flags %d at time %lld\n",
+              rx_samples, rx_size, soapy_rx_flags, frame_time_ns);
         }
       }
 
@@ -130,8 +135,9 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
           SOAPY_SDR_MORE_FRAGMENTS) {
         AGORA_LOG_WARN(
             "RadioDataPlaneSoapy::Rx - fragments remaining on rx call for "
-            "sample count %zu requested %zu symbols with flags %d\n",
-            rx_samples, rx_size, soapy_rx_flags);
+            "sample count %zu requested %zu symbols with flags %d at time "
+            "%lld\n",
+            rx_samples, rx_size, soapy_rx_flags, frame_time_ns);
       }
       rx_time_ns = frame_time_ns;
     } else {
@@ -141,10 +147,11 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
     }
 
     if (kDebugPrintRx) {
-      std::printf(
+      AGORA_LOG_INFO(
           "Rx Radio %s(%zu) RadioSoapy RX return count %d out of "
           "requested %zu - flags: %d - HAS TIME: %d | END BURST: %d | MORE "
-          "FRAGS: %d | SINGLE PKT: %d\n",
+          "FRAGS: %d | END_ABRUPT: %d | SINGLE PKT: %d | received at "
+          "%lld:%lld (Frame %zu, Symbol %zu)\n",
           radio_->SerialNumber().c_str(), radio_->Id(), rx_status, rx_size,
           soapy_rx_flags,
           static_cast<int>((soapy_rx_flags & SOAPY_SDR_HAS_TIME) ==
@@ -153,21 +160,28 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
                            SOAPY_SDR_END_BURST),
           static_cast<int>((soapy_rx_flags & SOAPY_SDR_MORE_FRAGMENTS) ==
                            SOAPY_SDR_MORE_FRAGMENTS),
+          static_cast<int>((soapy_rx_flags & SOAPY_SDR_END_ABRUPT) ==
+                           SOAPY_SDR_END_ABRUPT),
           static_cast<int>((soapy_rx_flags & SOAPY_SDR_ONE_PACKET) ==
-                           SOAPY_SDR_ONE_PACKET));
+                           SOAPY_SDR_ONE_PACKET),
+          rx_time_ns, frame_time_ns, static_cast<size_t>(frame_time_ns >> 32),
+          static_cast<size_t>((frame_time_ns >> 16) & 0xFFFF));
     }
 
-    if (kDebugRadioRX) {
-      if (rx_status == static_cast<int>(Configuration()->SampsPerSymbol())) {
-        std::cout << "Radio " << radio_->SerialNumber() << "(" << radio_->Id()
-                  << ") received " << rx_status << " flags: " << out_flags
-                  << " MTU " << device->getStreamMTU(remote_stream_)
-                  << std::endl;
+    if (kDebugPrintRx) {
+      if (rx_status == static_cast<int>(rx_size)) {
+        AGORA_LOG_INFO("Radio %s(%zu) received %d:%zu flags: %d MTU %zu\n",
+                       radio_->SerialNumber().c_str(), radio_->Id(), rx_status,
+                       Configuration()->SampsPerSymbol(), (int)out_flags,
+                       device->getStreamMTU(remote_stream_));
       } else {
-        if (!((rx_status == SOAPY_SDR_TIMEOUT) && (out_flags == 0))) {
-          std::cout << "Unexpected RadioRx return value " << rx_status
-                    << " from radio " << radio_->SerialNumber() << "("
-                    << radio_->Id() << ") flags: " << out_flags << std::endl;
+        if ((rx_status != SOAPY_SDR_TIMEOUT) &&
+            (out_flags == Radio::RxFlags::kEndReceive)) {
+          AGORA_LOG_INFO(
+              "Unexpected RadioRx return value %d from radio %s(%zu) flags: "
+              "%d\n",
+              rx_status, radio_->SerialNumber().c_str(), radio_->Id(),
+              out_flags);
         }
       }
     }

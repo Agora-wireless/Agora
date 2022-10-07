@@ -123,6 +123,7 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
       // remote::type = faros for hub controlled radios
       args["remote:mtu"] = "1500";
       args["remote:ipver"] = "6";
+      sargs["SYNC_ACTIVATE"] = "false";
     } else {
       args["driver"] = "uhd";
       args["addr"] = SerialNumber();
@@ -476,9 +477,8 @@ void RadioSoapySdr::Deactivate() {
     AGORA_LOG_WARN("Deactivate soapy tx stream with status %d %s\n", status,
                    SoapySDR_errToStr(status));
   }
-
-  //This stops the data flow to the socket
-  //dev_->writeSetting("RESET_DATA_LOGIC", "");
+  //Iris only... is this necessary?
+  dev_->writeSetting("RESET_DATA_LOGIC", "");
   //If this flush is not here before setting TDD_MODE to false.  This will sometimes
   //cause errors with the next rx sequence
   rxp_->Flush();
