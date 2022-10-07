@@ -14,7 +14,7 @@ static constexpr bool kPrintCalibrationMats = false;
 static constexpr size_t kSoapyMakeMaxAttempts = 3;
 static constexpr size_t kHubMissingWaitMs = 100;
 
-// only one BS radio object, since, no emplace_back is needed, and the thread number for BS is also set to be 1
+// only one BS radio object, since, no embrack_back is needed, and the thread number for BS is also set to be 1
 RadioUHDConfig::RadioUHDConfig(Config* cfg, Radio::RadioType radio_type)
     : cfg_(cfg), num_radios_initialized_(0), num_radios_configured_(0) {
   std::map<std::string, std::string> args;
@@ -60,14 +60,14 @@ RadioUHDConfig::RadioUHDConfig(Config* cfg, Radio::RadioType radio_type)
 
   std::vector<std::thread> config_bs_threads;
   for (size_t i = 0; i < radio_num_; i++) {
-#if defined(THREADED_INIT)
+#if THREADED_INIT
     config_bs_threads.emplace_back(&RadioUHDConfig::ConfigureBsRadio, this, i);
 #else
     ConfigureBsRadio(i);
 #endif
   }
-  std::cout << "radio UHD configured here" << std::endl;
 
+  std::cout << "radio UHD configured here" << std::endl;
   num_checks = 0;
   // Block until all radios are configured
   size_t num_radios_config = num_radios_configured_.load();
@@ -82,6 +82,7 @@ RadioUHDConfig::RadioUHDConfig(Config* cfg, Radio::RadioType radio_type)
     }
     num_radios_config = num_radios_configured_.load();
   }
+
   for (auto& join_thread : config_bs_threads) {
     join_thread.join();
   }
@@ -132,18 +133,18 @@ bool RadioUHDConfig::RadioStart() {
                           cfg_->OfdmDataNum() * cfg_->BfAntNum(),
                           Agora_memory::Alignment_t::kAlign64);
     if (cfg_->Frame().NumDLSyms() > 0) {
-      // int iter = 0;
-      // int max_iter = 1;
+      int iter = 0;
+      int max_iter = 1;
       std::cout << "Start initial reciprocity calibration..." << std::endl;
-      // while (good_calib == false) {
-      //   good_calib = InitialCalib();
-      //   iter++;
-      //   if ((iter == max_iter) && (good_calib == false)) {
-      //     std::cout << "attempted " << max_iter
-      //               << " unsucessful calibration, stopping ..." << std::endl;
-      //     break;
-      //   }
-      // }
+      while (good_calib == false) {
+        good_calib = InitialCalib();
+        iter++;
+        if ((iter == max_iter) && (good_calib == false)) {
+          std::cout << "attempted " << max_iter
+                    << " unsucessful calibration, stopping ..." << std::endl;
+          break;
+        }
+      }
       if (good_calib == false) {
         return good_calib;
       } else {
@@ -281,7 +282,7 @@ void RadioUHDConfig::RadioStop() {
 
 long long RadioUHDConfig::SyncArrayTime() {
   //1ms
-  // constexpr long long kTimeSyncMaxLimit = 1000000;
+  constexpr long long kTimeSyncMaxLimit = 1000000;
   //Use the trigger to sync the array
   AGORA_LOG_TRACE("SyncArrayTime: Setting trigger time\n");
   radios_->SetTimeAtTrigger();
@@ -289,7 +290,7 @@ long long RadioUHDConfig::SyncArrayTime() {
   Go();
 
   ///Wait for enough time for the boards to update
-  auto wait_time = std::chrono::milliseconds(500);
+  auto wait_time = std::chrono::milliseconds(5000);
   AGORA_LOG_TRACE("SyncArrayTime: Waiting for %ld ms\n", wait_time.count());
   std::this_thread::sleep_for(wait_time);
   AGORA_LOG_TRACE("SyncArrayTime: Time Check!\n");
@@ -297,18 +298,17 @@ long long RadioUHDConfig::SyncArrayTime() {
   //Get first time
   auto radio_time = radios_->GetTimeNs();
   //Verify all times are within 1ms (typical .35ms - .85 between calls) - since only one object in UHD setting, this is being deleted
-  // for (size_t i = 1; i < radios_.size(); i++) {
-  //   auto time_now = radios_->GetTimeNs();
-  //   auto time_diff_ns = time_now - radio_time;
-  //   if (time_diff_ns > kTimeSyncMaxLimit) {
-  //     AGORA_LOG_WARN(
-  //         "SyncArrayTime: Radio UHD time out of bounds during alignment.  Radio UHD "
-  //         "%zu, time %lld, reference %lld, difference %lld, tolerance %lld\n",
-  //         i, time_now, radio_time, time_diff_ns, kTimeSyncMaxLimit);
-  //   }
-  //   //Update the check time with the current time
-  //   radio_time = time_now;
-  // }
+  auto time_now = radios_->GetTimeNs();
+  auto time_diff_ns = time_now - radio_time;
+  if (time_diff_ns > kTimeSyncMaxLimit) {
+    AGORA_LOG_WARN(
+        "SyncArrayTime: Radio UHD time out of bounds during alignment.  Radio "
+        "UHD "
+        "time %lld, reference %lld, difference %lld, tolerance %lld\n",
+        time_now, radio_time, time_diff_ns, kTimeSyncMaxLimit);
+  }
+  //Update the check time with the current time
+  radio_time = time_now;
   return radio_time;
 }
 
