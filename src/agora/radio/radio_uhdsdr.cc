@@ -5,17 +5,16 @@
 */
 #include "radio_uhdsdr.h"
 
+#include <uhd/property_tree.hpp>
+#include <uhd/utils/log_add.hpp>
+#include <uhd/version.hpp>
+
 #include "SoapySDR/Formats.hpp"
 #include "SoapySDR/Logger.hpp"
 #include "SoapySDR/Time.hpp"
 #include "SoapySDR/Version.hpp"
 #include "comms-lib.h"
 #include "logger.h"
-// #include "radio_data_plane_uhd.h"
-#include <uhd/property_tree.hpp>
-#include <uhd/utils/log_add.hpp>
-#include <uhd/version.hpp>
-
 #include "symbols.h"
 #include "uhd/usrp/multi_usrp.hpp"
 
@@ -23,22 +22,12 @@ static constexpr size_t kSoapyMakeMaxAttempts = 3;
 static constexpr bool kPrintRadioSettings = true;
 static constexpr double kAttnMax = -18.0f;
 
-//Soapy sdr version
-static constexpr int kSoapyMajorMinAPI = 0;
-static constexpr int kSoapyMinorMinAPI = 8;
-static constexpr int kSoapyBuildMinAPI = 0;
-
-//Iris driver version
-static constexpr int kIrisDriverYearMinAPI = 2022;
-static constexpr int kIrisDriverMonthMinAPI = 5;
-static constexpr int kIrisDriverDayMinAPI = 0;
-static constexpr int kIrisDriverRelMinAPI = 0;
-
 // radio init time for UHD devices
-static constexpr size_t kUhdInitTimeSec = 5;
+// increase the wait time for radio init to get rid of the late packet issue
+static constexpr size_t kUhdInitTimeSec = 6;
 
 RadioUHDSdr::RadioUHDSdr() : dev_(nullptr), rxs_(nullptr), txs_(nullptr) {
-  std::cout << "calling pure uhd version of radio constructor" << std::endl;
+  AGORA_LOG_INFO("calling pure uhd version of radio constructor.\n");
 }
 
 RadioUHDSdr::~RadioUHDSdr() {
@@ -98,47 +87,22 @@ void RadioUHDSdr::Init(const Config* cfg, size_t id, const std::string& serial,
     }
 
     std::stringstream device_info;
-    // device_info << "Driver   = " << dev_->getDriverKey() << std::endl;
-    // The UHD does not have appropriate function to do getDriverKey(), which the
-    // SoapyUHD way of doing it is to directly get info from args, so decided to get rid of this for now
-
     device_info << "Hardware = " << dev_->get_mboard_name() << std::endl;
-    // commented out for now as not main funciton
-    //Get the Ip address from the driver
-
-    // hard coded
-    // ip_address_ = SerialNumber();
-    // if (ip_address_.empty()) {
-    //   AGORA_LOG_ERROR("UHD Device IP address not found");
-    //   throw std::runtime_error("Device IP address not found");
-    // }
 
     if (kPrintRadioSettings) {
       auto clock_sources = dev_->get_clock_source(0);
-      // for ([[maybe_unused]] const auto& source : clock_sources) {
       AGORA_LOG_INFO("Clock source %s\n", clock_sources);
-      // }
-
       auto time_sources = dev_->get_time_source(0);
-      // for ([[maybe_unused]] const auto& source : time_sources) {
       AGORA_LOG_INFO("Time source %s\n", time_sources);
-      // }
-
-      // TODO
-      // Did not consider so far, will add when main function is done
-
-      // auto register_interfaces = dev_->listRegisterInterfaces();
       AGORA_LOG_INFO("%s\n", device_info.str().c_str());
     }
 
     // this is a UHD version of setting up stream:
-
     uhd::stream_args_t stream_args("sc16");
     stream_args.channels = enabled_channels;
     stream_args.args = sargs;
 
     rxs_ = dev_->get_rx_stream(stream_args);
-
     txs_ = dev_->get_tx_stream(stream_args);
 
     if (txs_ == nullptr || rxs_ == nullptr) {
@@ -156,14 +120,14 @@ void RadioUHDSdr::Init(const Config* cfg, size_t id, const std::string& serial,
 void RadioUHDSdr::Setup(const std::vector<double>& tx_gains,
                         const std::vector<double>& rx_gains) {
   AGORA_LOG_TRACE("Setup RadioUHD Sdr %s(%zu)\n", SerialNumber().c_str(), Id());
-  for (auto ch : EnabledChannels()) {
-    dev_->set_rx_rate(cfg_->Rate(), ch);
-    dev_->set_tx_rate(cfg_->Rate(), ch);
-  }
+  // for (auto ch : EnabledChannels()) {
+  dev_->set_rx_rate(cfg_->Rate());
+  dev_->set_tx_rate(cfg_->Rate());
+  // }
 
   // use the TRX antenna port for both tx and rx
   for (auto ch : EnabledChannels()) {
-    dev_->set_rx_antenna("TX/RX", ch);
+    dev_->set_rx_antenna("RX2", ch);
     dev_->set_tx_antenna("TX/RX", ch);
   }
 
@@ -192,27 +156,10 @@ void RadioUHDSdr::Setup(const std::vector<double>& tx_gains,
     dev_->set_rx_gain(rx_gains.at(ch), "PGA0", ch);
     dev_->set_tx_gain(tx_gains.at(ch), "PGA0", ch);
   }  // end for (const auto& ch : EnabledChannels())
-
-  // for (auto ch : EnabledChannels()) {
-  //   // Clients??
-  //   // dev_->writeSetting(SOAPY_SDR_RX, ch, "CALIBRATE", "SKLK");
-  //   // dev_->writeSetting(SOAPY_SDR_TX, ch, "CALIBRATE", "");
-  //   if (kUseUHD == false) {
-  //     dev_->setDCOffsetMode(SOAPY_SDR_RX, ch, true);
-  //   }
-  // }
-
-  // auto clk_status = dev_->get_mboard_sensor("CLKBUFF_LOCKED").value;
-  // if (clk_status.compare("false") == 0) {
-  //   AGORA_LOG_WARN("Radio - clk_status %s\n", clk_status.c_str());
-  // }
 }
 
 void RadioUHDSdr::Activate(Radio::ActivationTypes type, long long act_time_ns,
                            size_t samples) {
-  (void)type;
-  (void)act_time_ns;
-  (void)samples;
   AGORA_LOG_INFO(
       "Activate RadioUHDSdr %s(%zu) at time %lld with samples %zu and type "
       "%d\n",
@@ -220,54 +167,40 @@ void RadioUHDSdr::Activate(Radio::ActivationTypes type, long long act_time_ns,
       static_cast<int>(type));
   const bool is_ue = false;
   if (is_ue) {
-    std::cout << "setting sources to internal" << std::endl;
+    AGORA_LOG_INFO("setting sources to internal \n");
     dev_->set_time_source("internal");
     dev_->set_clock_source("internal");
     uhd::time_spec_t time1 = uhd::time_spec_t::from_ticks(0, 1e9);
     dev_->set_time_unknown_pps(time1);
   } else {
-    std::cout << "setting sources to external" << std::endl;
+    AGORA_LOG_INFO("setting sources to external \n");
     dev_->set_clock_source("external");
     dev_->set_time_source("external");
     uhd::time_spec_t time2 = uhd::time_spec_t::from_ticks(0, 1e9);
     dev_->set_time_next_pps(time2);
   }
-  std::cout << "in/external clock set" << std::endl;
+  AGORA_LOG_INFO("in/external clock set \n");
 
   // Wait for pps sync pulse ??`
-  //std::this_thread::sleep_for(std::chrono::seconds(kUhdInitTimeSec -1));
-  //dev_->activateStream(rxs_, SOAPY_SDR_HAS_TIME, kUhdInitTimeSec * 1e9, 0);
+  int uhd_flags = 0;
+
+  if (type == Radio::ActivationTypes::kActivateWaitTrigger) {
+    uhd_flags |= SOAPY_SDR_WAIT_TRIGGER;
+  } else if (act_time_ns != 0) {
+    uhd_flags |= SOAPY_SDR_HAS_TIME;
+  }
+
   uhd::stream_cmd_t::stream_mode_t mode;
-  // const size_t numElems = 0;
-  // if (numElems == 0) {
   mode = uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
-  // }
-  // else if ((SOAPY_SDR_HAS_TIME & SOAPY_SDR_END_BURST) != 0) {
-  //   mode = uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE;
-  // } else {
-  //   mode = uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_MORE;
-  // }
-
   uhd::stream_cmd_t cmd(mode);
-  // cmd.stream_now = (SOAPY_SDR_HAS_TIME & SOAPY_SDR_HAS_TIME) == 0;
-  cmd.stream_now = true;
-  cmd.time_spec = uhd::time_spec_t::from_ticks(kUhdInitTimeSec * 1e9, 1e9);
-  cmd.num_samps = 0;
+  cmd.stream_now = false;
+  cmd.time_spec = dev_->get_time_now() + uhd::time_spec_t(0.1);
+  cmd.num_samps = samples;
 
-  std::cout << "before issue stream" << std::endl;
-
+  AGORA_LOG_INFO("RadioUHDSdr::xmit activate defaulted\n");
+  AGORA_LOG_INFO("before issue stream \n");
   rxs_->issue_stream_cmd(cmd);
-
-  // std::cout << "after issue stream" << std::endl;
-
-  // there is not issue_stream_cmd in uhd::tx_streamer
-  // const auto status = 0;
-
-  // if (status < 0) {
-  //   AGORA_LOG_WARN("Activate UHD tx stream with status % d %s\n", status,
-  //                   SoapySDR_errToStr(status));
-  // }
-  std::cout << "activation success" << std::endl;
+  AGORA_LOG_INFO("activation success \n");
 }
 
 void RadioUHDSdr::Deactivate() {
@@ -278,7 +211,7 @@ void RadioUHDSdr::Deactivate() {
   uhd::stream_cmd_t::stream_mode_t mode;
   mode = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
   uhd::stream_cmd_t cmd(mode);
-  int flags = 0;
+  const int flags = 0;
   cmd.stream_now = (flags & SOAPY_SDR_HAS_TIME) == 0;
   const long long timeNs = 0;
   cmd.time_spec = uhd::time_spec_t::from_ticks(timeNs, 1e9);
@@ -324,41 +257,15 @@ int RadioUHDSdr::Tx(const void* const* tx_buffs, size_t tx_size,
                                             stream->get_num_channels());
   int ret = stream->send(stream_buffs, tx_size, md, kTxTimeoutUs / 1e6);
   soapy_flags = 0;
-  // const int write_status = dev_->writeStream(
-  //     txs_, tx_buffs, tx_size, soapy_flags, tx_time_ns, kTxTimeoutUs);
+
   const int write_status = ret;
 
   if (kDebugRadioTX) {
-    // size_t chan_mask;
-    // long timeout_us(0);
     int status_flag = 0;
-
     uhd::async_metadata_t md_debug;
-    // int s;
-    // const int s = dev_->readStreamStatus(txs_, chan_mask, status_flag,
-    //                                      tx_time_ns, timeout_us);
-    // if (not stream->recv_async_msg(md_debug, timeout_us/1e6)){
-    //   s = SOAPY_SDR_TIMEOUT
-    // }
-    // chan_mask = (1 << md_debug.channel);
     status_flag = 0;
     if (md.has_time_spec) status_flag |= SOAPY_SDR_HAS_TIME;
     tx_time_ns = md_debug.time_spec.to_ticks(1e9);
-
-    // switch (md_debug.event_code)
-    //     {
-    //     case uhd::async_metadata_t::EVENT_CODE_BURST_ACK: status_flag |= SOAPY_SDR_END_BURST; break;
-    //     case uhd::async_metadata_t::EVENT_CODE_UNDERFLOW: s = -7;
-    //     case uhd::async_metadata_t::EVENT_CODE_SEQ_ERROR: s = -3;
-    //     case uhd::async_metadata_t::EVENT_CODE_TIME_ERROR: s = -6;
-    //     case uhd::async_metadata_t::EVENT_CODE_UNDERFLOW_IN_PACKET: s = -7;
-    //     case uhd::async_metadata_t::EVENT_CODE_SEQ_ERROR_IN_BURST: s = -3;
-    //     case uhd::async_metadata_t::EVENT_CODE_USER_PAYLOAD: break;
-    //     }
-
-    // std::cout << "radio " << SerialNumber() << "(" << Id() << ") tx returned "
-    //           << write_status << " and status " << s << " when flags was "
-    //           << flags << std::endl;
   }
   return write_status;
 }
@@ -366,6 +273,7 @@ int RadioUHDSdr::Tx(const void* const* tx_buffs, size_t tx_size,
 int RadioUHDSdr::Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,
                     size_t rx_size, Radio::RxFlags& out_flags,
                     long long& rx_time_ns) {
+  rx_time_ns = 0;
   std::vector<void*> rx_locations;
   rx_locations.reserve(rx_data.size());
 
@@ -378,6 +286,7 @@ int RadioUHDSdr::Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,
 int RadioUHDSdr::Rx(std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
                     size_t rx_size, Radio::RxFlags& out_flags,
                     long long& rx_time_ns) {
+  rx_time_ns = 0;
   std::vector<void*> rx_locations;
   rx_locations.reserve(rx_buffs.size());
 
@@ -389,22 +298,15 @@ int RadioUHDSdr::Rx(std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
 
 int RadioUHDSdr::Rx(std::vector<void*>& rx_locs, size_t rx_size,
                     Radio::RxFlags& out_flags, long long& rx_time_ns) {
+  rx_time_ns = 0;
   static constexpr long kRxTimeout = 1;  // 1uS
   out_flags = Radio::RxFlags::kRxFlagNone;
   int soapy_rx_flags = (1 << 29);
 
   int rx_status = 0;
   long long frame_time_ns(0);
-  // uhd::usrp::multi_usrp::sptr device = dynamic_cast<RadioUHDSdr*>(radio_)->UHDDevice();
 
   uhd::rx_metadata_t md;
-
-  // if (rx_locs.size() == rxs_->get_num_channels()){
-  // } else {
-  //   AGORA_LOG_ERROR("not correct size of rx_locs");
-  //   throw std::runtime_error("Rx didn't have enough rx locations");
-  // }
-
   uhd::rx_streamer::buffs_type stream_buffs(rx_locs.data(),
                                             rxs_->get_num_channels());
   // double check with if/assert
@@ -441,7 +343,6 @@ int RadioUHDSdr::Rx(std::vector<void*>& rx_locs, size_t rx_size,
           out_flags = Radio::RxFlags::kEndReceive;
         }
       } else {
-        /// rx_samples == rx_size
         if ((soapy_rx_flags & SOAPY_SDR_END_BURST) == 0) {
           //This usually happens when the timeout is not long enough to wait for multiple packets for a given requested rx length
           AGORA_LOG_WARN(
@@ -464,38 +365,6 @@ int RadioUHDSdr::Rx(std::vector<void*>& rx_locs, size_t rx_size,
       // for UHD device (or software framer) recv using ticks
       rx_time_ns = SoapySDR::timeNsToTicks(frame_time_ns, cfg_->Rate());
     }
-
-    // if (kDebugPrintRx) {
-    //   std::printf(
-    //       "Rx Radio UHD %s(%zu) RadioUHD RX return count %d out of "
-    //       "requested %zu - flags: %d - HAS TIME: %d | END BURST: %d | MORE "
-    //       "FRAGS: %d | SINGLE PKT: %d\n",
-    //       radio_->SerialNumber().c_str(), radio_->Id(), rx_status, rx_size,
-    //       soapy_rx_flags,
-    //       static_cast<int>((soapy_rx_flags & SOAPY_SDR_HAS_TIME) ==
-    //                        SOAPY_SDR_HAS_TIME),
-    //       static_cast<int>((soapy_rx_flags & SOAPY_SDR_END_BURST) ==
-    //                        SOAPY_SDR_END_BURST),
-    //       static_cast<int>((soapy_rx_flags & SOAPY_SDR_MORE_FRAGMENTS) ==
-    //                        SOAPY_SDR_MORE_FRAGMENTS),
-    //       static_cast<int>((soapy_rx_flags & SOAPY_SDR_ONE_PACKET) ==
-    //                        SOAPY_SDR_ONE_PACKET));
-    // }
-
-    // if (kDebugRadioRX) {
-    //   if (rx_status == static_cast<int>(cfg_->SampsPerSymbol())) {
-    //     std::cout << "Radio UHD " << radio_->SerialNumber() << "(" << radio_->Id()
-    //               << ") received " << rx_status << " flags: " << out_flags
-    //               << " MTU " << rxs_>get_max_num_samps()
-    //               << std::endl;
-    //   } else {
-    //     if (!((rx_status == SOAPY_SDR_TIMEOUT) && (out_flags == 0))) {
-    //       std::cout << "Unexpected RadioRx return value " << rx_status
-    //                 << " from radio " << radio_->SerialNumber() << "("
-    //                 << radio_->Id() << ") flags: " << out_flags << std::endl;
-    //     }
-    //   }
-    // }
   } else if (rx_status == SOAPY_SDR_TIMEOUT) {
     /// If a timeout occurs tell the requester there are 0 bytes
     rx_status = 0;
@@ -548,9 +417,6 @@ long long RadioUHDSdr::GetTimeNs() {
 
 void RadioUHDSdr::PrintSettings() const {
   std::stringstream print_message;
-
-  // std::cout<<"print settings"<<std::endl;
-
   SoapySDR::Kwargs out;
   // std::cout<<"tx num channels are " << dev_->get_tx_num_channels() <<std::endl;
   for (size_t i = 0; i < dev_->get_tx_num_channels(); i++) {
@@ -572,16 +438,12 @@ void RadioUHDSdr::PrintSettings() const {
     }
   }
 
-  // uhd::property_tree::sptr tree = _get_tree();
-  // if (tree->exists("/mboards/0/fw_version")) out["fw_version"] = tree->access<std::string>("/mboards/0/fw_version").get();
-  // if (tree->exists("/mboards/0/fpga_version")) out["fpga_version"] = tree->access<std::string>("/mboards/0/fpga_version").get();
-
   SoapySDR::Kwargs hw_info = out;
 
   print_message << SerialNumber() << " (" << Id() << ")" << std::endl;
 
   if (kPrintRadioSettings) {
-    for (int i = 0; i < EnabledChannels().size(); i++) {
+    for (size_t i = 0; i < EnabledChannels().size(); i++) {
       print_message << "channels enalbed are: " << EnabledChannels()[i]
                     << std::endl;
     }
@@ -733,9 +595,6 @@ void RadioUHDSdr::ConfigureTddModeUe() {
   const int cl_trig_offset = cfg_->BeaconLen() + 249;
   const int sf_start = cl_trig_offset / cfg_->SampsPerSymbol();
   const int sp_start = cl_trig_offset % cfg_->SampsPerSymbol();
-  // dev_->setHardwareTime(
-  //     SoapySDR::ticksToTimeNs((sf_start << 16) | sp_start, cfg_->Rate()),
-  //     "TRIGGER");
   long long timeinput =
       SoapySDR::ticksToTimeNs((sf_start << 16) | sp_start, cfg_->Rate());
   uhd::time_spec_t time = uhd::time_spec_t::from_ticks(timeinput, 1e9);
@@ -757,19 +616,6 @@ void RadioUHDSdr::ConfigureTddModeUe() {
   }
   // Correlator(true);
 }
-
-// void RadioUHDSdr::Correlator(bool enable) {
-//   if (enable) {
-//     if (correlator_enabled_ == false) {
-//       correlator_enabled_ = true;
-//       const std::string corr_conf =
-//           R"({"corr_enabled":true,"corr_threshold":)" + std::to_string(1) + "}";
-//     }
-//   } else if (correlator_enabled_ == true) {
-//     correlator_enabled_ = false;
-//     const std::string corr_conf = "{\"corr_enabled\":false}";
-//   }
-// }
 
 void RadioUHDSdr::Flush() {
   AGORA_LOG_INFO("Flushing radio %zu rx data plane\n", Id());
