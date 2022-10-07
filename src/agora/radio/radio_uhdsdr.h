@@ -60,8 +60,8 @@ class RadioUHDSdr : public Radio {
   //   //Sets both tx and rx, is this ok?
   //   void SetFreqBb(size_t channel, double freq);
   //   //End Calibration Routines
-  //   std::vector<std::complex<float>> SnoopSamples(size_t channel,
-  //                                                 size_t read_size);
+  //     std::vector<std::complex<float>> SnoopSamples(size_t channel,
+  //                                                   size_t read_size);
 
   inline uhd::usrp::multi_usrp::sptr UHDDevice() const {
     return dev_;
