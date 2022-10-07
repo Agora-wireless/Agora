@@ -41,7 +41,13 @@ static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
                        kRecorderWorkerHdf5};
 #else
 static constexpr bool kRecordUplinkFrame = false;
+
+static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
+    kRecorderTypes{Agora_recorder::RecorderWorker::RecorderWorkerTypes::
+                       kRecorderWorkerMultiFile};
 #endif
+
+// static std::unique_ptr<Agora_recorder::RecorderThread> recorder_;
 
 Agora::Agora(Config* const cfg)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
@@ -66,6 +72,7 @@ Agora::Agora(Config* const cfg)
   InitializeCounters();
   InitializeThreads();
 
+  // #if defined(ENABLE_HDF5)
   if (kRecordUplinkFrame) {
     auto& new_recorder = recorders_.emplace_back(
         std::make_unique<Agora_recorder::RecorderThread>(
@@ -74,11 +81,12 @@ Agora::Agora(Config* const cfg)
                 config_->SocketThreadNum(),
             kFrameWnd * config_->Frame().NumTotalSyms() * config_->BsAntNum() *
                 kDefaultQueueSize,
-            0, config_->BsAntNum(), kRecordFrameInterval, kRecorderTypes,
-            true));
+            0, config_->BsAntNum(), kRecordFrameInterval, Direction::kDownlink,
+            kRecorderTypes, true));
     new_recorder->Start();
   }
 }
+// #endif
 
 Agora::~Agora() {
   if (kEnableMac == true) {
@@ -86,11 +94,13 @@ Agora::~Agora() {
   }
   worker_set_.reset();
 
+  // #if defined(ENABLE_HDF5)
   for (size_t i = 0; i < recorders_.size(); i++) {
     AGORA_LOG_INFO("Waiting for Recording to complete %zu\n", i);
     recorders_.at(i)->Stop();
   }
   recorders_.clear();
+  // #endif
   stats_.reset();
   phy_stats_.reset();
   FreeQueues();
@@ -371,11 +381,15 @@ void Agora::Start() {
       switch (event.event_type_) {
         case EventType::kPacketRX: {
           RxPacket* rx = rx_tag_t(event.tags_[0u]).rx_packet_;
+          // Packet* pkt = rx_tag_t(event.tags_[0]).rx_packet_->RawPacket();
           Packet* pkt = rx->RawPacket();
+          // Packet* pkt1 = rx->RawPacket();
 
           if (recorders_.size() == 1) {
             rx->Use();
+            // std::cout<<"no problem here 22"<<std::endl;
             recorders_.at(0)->DispatchWork(event);
+            // std::cout<<"no problem here 33"<<std::endl;
           }
 
           if (pkt->frame_id_ >=
