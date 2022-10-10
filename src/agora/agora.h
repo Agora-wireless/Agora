@@ -22,7 +22,6 @@
 #include "packet_txrx.h"
 #include "phy_stats.h"
 #include "ran_config.h"
-#include "recorder_thread.h"
 #include "stats.h"
 #include "symbols.h"
 
@@ -180,7 +179,6 @@ class Agora {
 
   uint8_t schedule_process_flags_;
   std::queue<size_t> encode_deferral_;
-  std::vector<std::unique_ptr<Agora_recorder::RecorderThread>> recorders_;
 };
 
 #endif  // AGORA_H_

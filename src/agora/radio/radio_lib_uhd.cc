@@ -14,7 +14,7 @@ static constexpr bool kPrintCalibrationMats = false;
 static constexpr size_t kSoapyMakeMaxAttempts = 3;
 static constexpr size_t kHubMissingWaitMs = 100;
 
-// only one BS radio object, since, no embrack_back is needed, and the thread number for BS is also set to be 1
+// only one BS radio object, since, no emplace_back is needed, and the thread number for BS is also set to be 1
 RadioUHDConfig::RadioUHDConfig(Config* cfg, Radio::RadioType radio_type)
     : cfg_(cfg), num_radios_initialized_(0), num_radios_configured_(0) {
   std::map<std::string, std::string> args;
@@ -59,7 +59,7 @@ RadioUHDConfig::RadioUHDConfig(Config* cfg, Radio::RadioType radio_type)
 
   std::vector<std::thread> config_bs_threads;
   for (size_t i = 0; i < radio_num_; i++) {
-#if THREADED_INIT
+#if defined(THREADED_INIT)
     config_bs_threads.emplace_back(&RadioUHDConfig::ConfigureBsRadio, this, i);
 #else
     ConfigureBsRadio(i);
@@ -81,7 +81,6 @@ RadioUHDConfig::RadioUHDConfig(Config* cfg, Radio::RadioType radio_type)
     }
     num_radios_config = num_radios_configured_.load();
   }
-
   for (auto& join_thread : config_bs_threads) {
     join_thread.join();
   }

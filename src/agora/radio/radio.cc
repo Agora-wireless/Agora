@@ -22,6 +22,7 @@ std::unique_ptr<Radio> Radio::Create(Radio::RadioType type) {
     }
 #if defined(USE_PURE_UHD)
     case kUhdNative: {
+      AGORA_LOG_INFO("UHDSdr is created here\n");
       return std::make_unique<RadioUHDSdr>();
     }
 #endif

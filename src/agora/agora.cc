@@ -47,6 +47,8 @@ static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
                        kRecorderWorkerMultiFile};
 #endif
 
+static std::unique_ptr<Agora_recorder::RecorderThread> recorder_;
+
 Agora::Agora(Config* const cfg)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
       config_(cfg),
@@ -70,35 +72,30 @@ Agora::Agora(Config* const cfg)
   InitializeCounters();
   InitializeThreads();
 
-  // #if defined(ENABLE_HDF5)
   if (kRecordUplinkFrame) {
-    auto& new_recorder = recorders_.emplace_back(
-        std::make_unique<Agora_recorder::RecorderThread>(
-            config_, 0,
-            cfg->CoreOffset() + config_->WorkerThreadNum() +
-                config_->SocketThreadNum(),
-            kFrameWnd * config_->Frame().NumTotalSyms() * config_->BsAntNum() *
-                kDefaultQueueSize,
-            0, config_->BsAntNum(), kRecordFrameInterval, Direction::kUplink,
-            kRecorderTypes, true));
-    new_recorder->Start();
+    recorder_ = std::make_unique<Agora_recorder::RecorderThread>(
+        config_, 0,
+        cfg->CoreOffset() + config_->WorkerThreadNum() +
+            config_->SocketThreadNum() + 1,
+        kFrameWnd * config_->Frame().NumTotalSyms() * config_->BsAntNum() *
+            kDefaultQueueSize,
+        0, config_->BsAntNum(), kRecordFrameInterval, Direction::kUplink,
+        kRecorderTypes, true);
+    recorder_->Start();
   }
 }
-// #endif
 
 Agora::~Agora() {
   if (kEnableMac == true) {
     mac_std_thread_.join();
   }
-  worker_set_.reset();
 
-  // #if defined(ENABLE_HDF5)
-  for (size_t i = 0; i < recorders_.size(); i++) {
-    AGORA_LOG_INFO("Waiting for Recording to complete %zu\n", i);
-    recorders_.at(i)->Stop();
+  worker_set_.reset();
+  if (recorder_ != nullptr) {
+    AGORA_LOG_INFO("Waiting for Recording to complete\n");
+    recorder_->Stop();
   }
-  recorders_.clear();
-  // #endif
+  recorder_.reset();
   stats_.reset();
   phy_stats_.reset();
   FreeQueues();
@@ -379,15 +376,11 @@ void Agora::Start() {
       switch (event.event_type_) {
         case EventType::kPacketRX: {
           RxPacket* rx = rx_tag_t(event.tags_[0u]).rx_packet_;
-          // Packet* pkt = rx_tag_t(event.tags_[0]).rx_packet_->RawPacket();
           Packet* pkt = rx->RawPacket();
-          // Packet* pkt1 = rx->RawPacket();
 
-          if (recorders_.size() == 1) {
+          if (recorder_ != nullptr) {
             rx->Use();
-            // std::cout<<"no problem here 22"<<std::endl;
-            recorders_.at(0)->DispatchWork(event);
-            // std::cout<<"no problem here 33"<<std::endl;
+            recorder_->DispatchWork(event);
           }
 
           if (pkt->frame_id_ >=
@@ -477,6 +470,7 @@ void Agora::Start() {
               if (kPrintPhyStats) {
                 this->phy_stats_->PrintEvmStats(frame_id);
               }
+              this->phy_stats_->RecordCsiCond(frame_id);
               this->phy_stats_->RecordEvm(frame_id);
               this->phy_stats_->RecordEvmSnr(frame_id);
               if (kUplinkHardDemod) {
@@ -1160,35 +1154,57 @@ void Agora::SaveDecodeDataToFile(int frame_id) {
       cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
 
   AGORA_LOG_INFO("Saving decode data to %s\n", kDecodeDataFilename.c_str());
-  FILE* fp = std::fopen(kDecodeDataFilename.c_str(), "wb");
-
-  for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
-    for (size_t j = 0; j < cfg->UeAntNum(); j++) {
-      int8_t* ptr = agora_memory_->GetDecod()[(frame_id % kFrameWnd)][i][j];
-      std::fwrite(ptr, num_decoded_bytes, sizeof(uint8_t), fp);
+  auto* fp = std::fopen(kDecodeDataFilename.c_str(), "wb");
+  if (fp == nullptr) {
+    AGORA_LOG_ERROR("SaveDecodeDataToFile error creating file pointer\n")
+  } else {
+    for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
+      for (size_t j = 0; j < cfg->UeAntNum(); j++) {
+        const int8_t* ptr =
+            agora_memory_->GetDecod()[(frame_id % kFrameWnd)][i][j];
+        const auto write_status =
+            std::fwrite(ptr, sizeof(uint8_t), num_decoded_bytes, fp);
+        if (write_status != num_decoded_bytes) {
+          AGORA_LOG_ERROR("SaveDecodeDataToFile error while writting file\n")
+        }
+      }
+    }  // end for
+    const auto close_status = std::fclose(fp);
+    if (close_status != 0) {
+      AGORA_LOG_ERROR("SaveDecodeDataToFile error while closing file\n")
     }
-  }
-  std::fclose(fp);
+  }  // end else
 }
 
-void Agora::SaveTxDataToFile(UNUSED int frame_id) {
+void Agora::SaveTxDataToFile(int frame_id) {
   const auto& cfg = config_;
   AGORA_LOG_INFO("Saving Frame %d TX data to %s\n", frame_id,
                  kTxDataFilename.c_str());
-  FILE* fp = std::fopen(kTxDataFilename.c_str(), "wb");
+  auto* fp = std::fopen(kTxDataFilename.c_str(), "wb");
+  if (fp == nullptr) {
+    AGORA_LOG_ERROR("SaveTxDataToFile error creating file pointer\n")
+  } else {
+    for (size_t i = 0; i < cfg->Frame().NumDLSyms(); i++) {
+      const size_t total_data_symbol_id =
+          cfg->GetTotalDataSymbolIdxDl(frame_id, i);
 
-  for (size_t i = 0; i < cfg->Frame().NumDLSyms(); i++) {
-    size_t total_data_symbol_id = cfg->GetTotalDataSymbolIdxDl(frame_id, i);
-
-    for (size_t ant_id = 0; ant_id < cfg->BsAntNum(); ant_id++) {
-      size_t offset = total_data_symbol_id * cfg->BsAntNum() + ant_id;
-      auto* pkt = reinterpret_cast<Packet*>(
-          &agora_memory_->GetDlSocket()[offset * cfg->DlPacketLength()]);
-      short* socket_ptr = pkt->data_;
-      std::fwrite(socket_ptr, cfg->SampsPerSymbol() * 2, sizeof(short), fp);
+      for (size_t ant_id = 0; ant_id < cfg->BsAntNum(); ant_id++) {
+        const size_t offset = total_data_symbol_id * cfg->BsAntNum() + ant_id;
+        auto* pkt = reinterpret_cast<Packet*>(
+            &agora_memory_->GetDlSocket()[offset * cfg->DlPacketLength()]);
+        const short* socket_ptr = pkt->data_;
+        const auto write_status = std::fwrite(socket_ptr, sizeof(short),
+                                              cfg->SampsPerSymbol() * 2, fp);
+        if (write_status != cfg->SampsPerSymbol() * 2) {
+          AGORA_LOG_ERROR("SaveTxDataToFile error while writting file\n")
+        }
+      }
+    }
+    const auto close_status = std::fclose(fp);
+    if (close_status != 0) {
+      AGORA_LOG_ERROR("SaveTxDataToFile error while closing file\n")
     }
   }
-  std::fclose(fp);
 }
 
 void Agora::GetEqualData(float** ptr, int* size) {

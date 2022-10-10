@@ -8,7 +8,6 @@
 #include "recorder_worker_hdf5.h"
 #endif
 #include "recorder_worker_multifile.h"
-#include "symbols.h"
 
 namespace Agora_recorder {
 

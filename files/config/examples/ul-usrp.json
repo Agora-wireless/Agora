@@ -50,5 +50,4 @@
     "ue_socket_thread_num": 1,
     "socket_thread_num":4,
     "max_frame": 10000
-
 }

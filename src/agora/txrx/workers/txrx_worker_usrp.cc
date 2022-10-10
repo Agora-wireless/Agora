@@ -44,8 +44,8 @@ void TxRxWorkerUsrp::DoTxRx() {
   /// For multi-uhd    num_interfaces_ = 1. (all radios are handled with 1 rx call)
   /// Determine the number of channels (A + B) / radios
   /// cfg_->NumRadios() * cfg_->NumChannels()?
-  const size_t number_bs_radios = Configuration()->NumChannels();
-  // const size_t number_bs_radios = 1;
+  const size_t number_bs_radios =
+      Configuration()->NumRadios() * Configuration()->NumChannels();
 
   //Allocate a tx vector of zeros;
   //Overallocated by 1 (replaced by the beacon)
@@ -93,6 +93,10 @@ void TxRxWorkerUsrp::DoTxRx() {
   tx_time_bs_ = rx_time_bs_ + ((Configuration()->SampsPerSymbol() *
                                 Configuration()->Frame().NumTotalSyms()) *
                                kFirstBeaconFrameAdvance);
+  std::cout << "delay time is: "
+            << Configuration()->SampsPerSymbol() *
+                   Configuration()->Frame().NumTotalSyms() * kBeaconFrameAdvance
+            << std::endl;
   std::cout << "Tx Time BS: (tx_time_bs) " << tx_time_bs_ << std::endl;
   auto tx_status = radio_config_.RadioTx(
       radio_id, tx_locs.data(), Radio::TxFlags::kEndTransmit, tx_time_bs_);
@@ -151,6 +155,11 @@ void TxRxWorkerUsrp::DoTxRx() {
       tx_time_bs_ = rx_time_bs_ + Configuration()->SampsPerSymbol() *
                                       Configuration()->Frame().NumTotalSyms() *
                                       kBeaconFrameAdvance;
+      std::cout << "delay time is: "
+                << Configuration()->SampsPerSymbol() *
+                       Configuration()->Frame().NumTotalSyms() *
+                       kBeaconFrameAdvance
+                << std::endl;
       const int tx_ret = radio_config_.RadioTx(
           radio_id, tx_locs.data(), Radio::TxFlags::kEndTransmit, tx_time_bs_);
       std::cout << "TX BS time  (tx_time_bs): " << tx_time_bs_ << std::endl;
@@ -209,9 +218,11 @@ std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(
   const int rx_status = radio_config_.RadioRx(radio_id, rx_locs,
                                               Configuration()->SampsPerSymbol(),
                                               rx_flags, rx_time_bs_);
+
   // added to test
   count++;
-  if (Configuration()->IsUplink(frame_id, symbol_id) == true &&
+  if (rx_status == static_cast<int>(Configuration()->SampsPerSymbol()) &&
+      Configuration()->IsUplink(frame_id, symbol_id) == true &&
       count >= 1000000) {
     // added to test if recv is getting the correct samples:
 
@@ -235,6 +246,7 @@ std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(
   if (rx_status == static_cast<int>(Configuration()->SampsPerSymbol())) {
     //Process the rx data
     if (publish_symbol) {
+      std::cout << "this is a pilot or uplink symbol" << std::endl;
       const size_t ant_offset = radio_id * total_channels;
       for (size_t ch = 0; ch < total_channels; ++ch) {
         RxPacket& rx = *memory_tracking.at(ch);
