@@ -7,9 +7,9 @@
 #ifndef PACKETTXRX_RADIO_H_
 #define PACKETTXRX_RADIO_H_
 
-#include "bs_radio_set.h"
 #include "common_typedef_sdk.h"
 #include "packet_txrx.h"
+#include "radio_set_bs.h"
 
 #if defined(USE_PURE_UHD)
 #include "radio_lib_uhd.h"
@@ -43,9 +43,9 @@ class PacketTxRxRadio : public PacketTxRx {
                     std::byte* const tx_memory) final;
 
 #if defined(USE_PURE_UHD)
-  std::unique_ptr<RadioUHDConfig> radio_config_;
+  std::unique_ptr<RadioSetUhd> radio_config_;
 #else
-  std::unique_ptr<BsRadioSet> radio_config_;
+  std::unique_ptr<RadioSetBs> radio_config_;
 #endif
 };
 

@@ -3,11 +3,11 @@
  * @brief Implementation file for the digital (baseband) calibration 
  * functions such as sample offset and reciprocity calibration
  */
-#include "bs_radio_set.h"
 #include "comms-lib.h"
 #include "datatype_conversion.h"
 #include "logger.h"
 #include "matplotlibcpp.h"
+#include "radio_set_bs.h"
 
 namespace plt = matplotlibcpp;
 
@@ -17,7 +17,7 @@ static constexpr bool kPrintCalibrationMats = false;
 static constexpr bool kVerboseCalibration = false;
 static constexpr size_t kRefChannel = 0;
 
-auto BsRadioSet::TxArrayToRef(
+auto RadioSetBs::TxArrayToRef(
     const std::vector<std::complex<int16_t>>& tx_vec) {
   const size_t ref = cfg_->RefRadio(0);
   const size_t tx_antennas = cfg_->BfAntNum();
@@ -94,7 +94,7 @@ auto BsRadioSet::TxArrayToRef(
   return dl_buff;
 }
 
-auto BsRadioSet::TxRefToArray(
+auto RadioSetBs::TxRefToArray(
     const std::vector<std::complex<int16_t>>& tx_vec) {
   const size_t num_radios = cfg_->NumRadios();
   // minus ref. node (last in radio list assumed)
@@ -172,7 +172,7 @@ auto BsRadioSet::TxRefToArray(
   return ul_buff;
 }
 
-bool BsRadioSet::FindTimeOffset(
+bool RadioSetBs::FindTimeOffset(
     const std::vector<std::vector<std::complex<int16_t>>>& rx_mat,
     std::vector<int>& offset) {
   bool bad_data = false;
@@ -204,7 +204,7 @@ bool BsRadioSet::FindTimeOffset(
   return bad_data;
 }
 
-void BsRadioSet::AdjustDelays(std::vector<int> offset) {
+void RadioSetBs::AdjustDelays(std::vector<int> offset) {
   // adjust all trigger delay for all radios
   // with respect to the first non-ref radio
   size_t ref_offset = *std::max_element(offset.begin(), offset.end());
@@ -224,7 +224,7 @@ void BsRadioSet::AdjustDelays(std::vector<int> offset) {
   }
 }
 
-void BsRadioSet::CalibrateSampleOffset() {
+void RadioSetBs::CalibrateSampleOffset() {
   const size_t num_radios = cfg_->BfAntNum() / cfg_->NumChannels();
 
   size_t n = 0;
@@ -407,7 +407,7 @@ void BsRadioSet::CalibrateSampleOffset() {
   }
 }
 
-bool BsRadioSet::InitialCalib() {
+bool RadioSetBs::InitialCalib() {
   // excludes zero padding
   const size_t seq_len = cfg_->PilotCf32().size();
   const size_t read_len = cfg_->PilotCi16().size();

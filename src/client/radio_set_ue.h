@@ -1,9 +1,9 @@
 /**
- * @file ue_radio_set.h
+ * @file radio_set_ue.h
  * @brief Declaration file for the UeRadioSet class
  */
-#ifndef UE_RADIO_SET_H_
-#define UE_RADIO_SET_H_
+#ifndef RADIO_SET_UE_H_
+#define RADIO_SET_UE_H_
 
 #include <atomic>
 #include <cstdlib>
@@ -36,4 +36,4 @@ class UeRadioSet : public RadioSet {
 
   std::atomic<size_t> num_client_radios_initialized_;
 };
-#endif  // UE_RADIO_SET_H_
+#endif  // RADIO_SET_UE_H_

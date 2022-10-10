@@ -333,8 +333,7 @@ if(RADIO_TYPE STREQUAL PURE_UHD)
       src/agora/radio/radio_uhdsdr.cc
       )
   set(PUREUHD_SOURCES_AGORA
-      src/agora/radio/radio_lib_uhd.cc
-      src/agora/radio/radio_calibrate_digital_uhd.cc
+      src/agora/radio/radio_set/radio_set_uhd.cc
       src/agora/txrx/workers/txrx_worker_usrp.cc
       )
   message(STATUS "pure_uhd_lib library initialized")
@@ -367,6 +366,7 @@ include_directories(
   src/mac/
   src/agora/
   src/agora/radio
+  src/agora/radio/radio_set
   src/agora/txrx
   src/agora/txrx/workers
   src/client
@@ -410,7 +410,7 @@ set(COMMON_SOURCES
   src/agora/radio/radio_socket.cc
   src/agora/radio/radio_data_plane_soapy.cc
   src/agora/radio/radio_data_plane_socket.cc
-  src/agora/radio/radio_set.cc
+  src/agora/radio/radio_set/radio_set.cc
   src/common/ipc/udp_comm.cc
   src/common/ipc/network_utils.cc
   src/common/loggers/csv_logger.cc
@@ -444,9 +444,9 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/dodemul.cc
   src/agora/doprecode.cc
   src/agora/dodecode.cc
-  src/agora/radio/bs_radio_set.cc
-  src/agora/radio/radio_calibrate_digital.cc
-  src/agora/radio/radio_calibrate_analog.cc
+  src/agora/radio/radio_set/radio_set_bs.cc
+  src/agora/radio/radio_set/radio_calibrate_digital.cc
+  src/agora/radio/radio_set/radio_calibrate_analog.cc
   src/mac/mac_thread_basestation.cc
   src/agora/txrx/packet_txrx_sim.cc
   src/agora/txrx/packet_txrx_radio.cc
@@ -458,7 +458,7 @@ add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 set(CLIENT_SOURCES
   src/client/doifft_client.cc
   src/client/dodecode_client.cc
-  src/client/ue_radio_set.cc
+  src/client/radio_set_ue.cc
   src/client/ue_worker.cc
   src/client/phy-ue.cc
   src/client/txrx/packet_txrx_client_sim.cc

@@ -31,10 +31,10 @@ PacketTxRxRadio::PacketTxRxRadio(
                  frame_start, tx_buffer) {
 #if defined(USE_PURE_UHD)
   AGORA_LOG_INFO("Using UHD");
-  radio_config_ = std::make_unique<RadioUHDConfig>(cfg, kRadioType);
+  radio_config_ = std::make_unique<RadioSetUhd>(cfg, kRadioType);
 #else
   AGORA_LOG_INFO("Using SoapySDR");
-  radio_config_ = std::make_unique<BsRadioSet>(cfg, kRadioType);
+  radio_config_ = std::make_unique<RadioSetBs>(cfg, kRadioType);
 #endif
 }
 

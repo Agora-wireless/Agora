@@ -10,9 +10,9 @@
 #include <memory>
 #include <vector>
 
-#include "bs_radio_set.h"
 #include "message.h"
 #include "radio_lib_uhd.h"
+#include "radio_set_bs.h"
 #include "txrx_worker.h"
 
 class TxRxWorkerUsrp : public TxRxWorker {
@@ -25,7 +25,7 @@ class TxRxWorkerUsrp : public TxRxWorker {
                  moodycamel::ProducerToken& notify_producer,
                  std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
                  std::mutex& sync_mutex, std::condition_variable& sync_cond,
-                 std::atomic<bool>& can_proceed, RadioUHDConfig& radio_config);
+                 std::atomic<bool>& can_proceed, RadioSetUhd& radio_config);
   TxRxWorkerUsrp() = delete;
   ~TxRxWorkerUsrp() final;
 
@@ -42,6 +42,6 @@ class TxRxWorkerUsrp : public TxRxWorker {
   long long rx_time_bs_;
   long long tx_time_bs_;
   // This object is created / owned by the parent process
-  RadioUHDConfig& radio_config_;
+  RadioSetUhd& radio_config_;
 };
 #endif  // TXRX_WORKER_USRP_H_

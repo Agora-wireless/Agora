@@ -11,9 +11,9 @@
 #include <vector>
 
 #include "message.h"
+#include "radio_set_ue.h"
 #include "rx_status_tracker.h"
 #include "txrx_worker.h"
-#include "ue_radio_set.h"
 
 class TxRxWorkerClientHw : public TxRxWorker {
  public:
