@@ -1,13 +1,13 @@
 /**
  * @file ue_radio_set.cc
- * @brief Implementation file for the UeRadioSet class
+ * @brief Implementation file for the RadioSetUe class
  */
 
 #include "radio_set_ue.h"
 
 #include "logger.h"
 
-UeRadioSet::UeRadioSet(const Config* const cfg, Radio::RadioType radio_type)
+RadioSetUe::RadioSetUe(const Config* const cfg, Radio::RadioType radio_type)
     : RadioSet(cfg->SampsPerSymbol()), cfg_(cfg) {
   if (radio_type == Radio::RadioType::kUhdNative) {
     total_radios_ = 1;
@@ -26,7 +26,7 @@ UeRadioSet::UeRadioSet(const Config* const cfg, Radio::RadioType radio_type)
   num_client_radios_initialized_ = 0;
   for (size_t i = 0; i < total_radios_; i++) {
 #if defined(THREADED_INIT)
-    radio_threads.emplace_back(&UeRadioSet::InitRadio, this, i);
+    radio_threads.emplace_back(&RadioSetUe::InitRadio, this, i);
 #else
     InitRadio(i);
 #endif
@@ -39,7 +39,7 @@ UeRadioSet::UeRadioSet(const Config* const cfg, Radio::RadioType radio_type)
     num_checks++;
     if (num_checks > 1e9) {
       AGORA_LOG_INFO(
-          "UeRadioSet: Waiting for radio initialization, %zu of %zu "
+          "RadioSetUe: Waiting for radio initialization, %zu of %zu "
           "ready\n",
           num_client_radios_init, total_radios_);
       num_checks = 0;
@@ -55,10 +55,10 @@ UeRadioSet::UeRadioSet(const Config* const cfg, Radio::RadioType radio_type)
   for (const auto& radio : radios_) {
     radio->PrintSettings();
   }
-  AGORA_LOG_INFO("UeRadioSet: Radio init complete\n");
+  AGORA_LOG_INFO("RadioSetUe: Radio init complete\n");
 }
 
-void UeRadioSet::InitRadio(size_t radio_id) {
+void RadioSetUe::InitRadio(size_t radio_id) {
   radios_.at(radio_id)->Init(cfg_, radio_id, cfg_->UeRadioId().at(radio_id),
                              Utils::StrToChannels(cfg_->UeChannel()),
                              cfg_->UeHwFramer());
@@ -75,7 +75,7 @@ void UeRadioSet::InitRadio(size_t radio_id) {
   this->num_client_radios_initialized_.fetch_add(1);
 }
 
-bool UeRadioSet::RadioStart() {
+bool RadioSetUe::RadioStart() {
   // send through the first radio for now
   for (size_t i = 0; i < total_radios_; i++) {
     if (cfg_->UeHwFramer()) {
@@ -83,11 +83,11 @@ bool UeRadioSet::RadioStart() {
     }
   }
   RadioSet::RadioStart(Radio::kActivateWaitTrigger);
-  AGORA_LOG_INFO("UeRadioSet: Radio start complete!\n");
+  AGORA_LOG_INFO("RadioSetUe: Radio start complete!\n");
   return true;
 }
 
-void UeRadioSet::Go() {
+void RadioSetUe::Go() {
   if ((kUseUHD == false) || (kUsePureUHD == false)) {
     for (size_t i = 0; i < total_radios_; i++) {
       radios_.at(i)->Trigger();

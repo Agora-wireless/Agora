@@ -9,11 +9,7 @@
 
 #include "common_typedef_sdk.h"
 #include "packet_txrx.h"
-#include "radio_set_bs.h"
-
-#if defined(USE_PURE_UHD)
-#include "radio_lib_uhd.h"
-#endif
+#include "radio_set.h"
 
 /**
  * @brief Implementations of this class provide packet I/O for Agora.
@@ -42,11 +38,7 @@ class PacketTxRxRadio : public PacketTxRx {
                     size_t* rx_frame_start, std::vector<RxPacket>& rx_memory,
                     std::byte* const tx_memory) final;
 
-#if defined(USE_PURE_UHD)
-  std::unique_ptr<RadioSetUhd> radio_config_;
-#else
-  std::unique_ptr<RadioSetBs> radio_config_;
-#endif
+  std::unique_ptr<RadioSet> radio_config_;
 };
 
 #endif  // PACKETTXRX_RADIO_H_
