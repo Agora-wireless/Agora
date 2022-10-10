@@ -70,7 +70,7 @@ void RadioSet::ReadSensors() {
 }
 
 void RadioSet::RadioStop() {
-  //Could add a threaded deactivate if it speeds things up.
+  //Threaded deactivate to speed things up
   std::vector<std::thread> deactivate_radio_threads;
   for (auto& radio : radios_) {
     deactivate_radio_threads.emplace_back(&Radio::Deactivate, radio.get());

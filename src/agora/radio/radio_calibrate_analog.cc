@@ -6,9 +6,9 @@
 #include <chrono>
 #include <thread>
 
+#include "bs_radio_set.h"
 #include "comms-lib.h"
 #include "matplotlibcpp.h"
-#include "radio_lib.h"
 #include "radio_soapysdr.h"
 
 namespace plt = matplotlibcpp;

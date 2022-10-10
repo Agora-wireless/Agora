@@ -1,9 +1,9 @@
 /**
- * @file client_radio.cc
- * @brief Implementation file for the client radio config class
+ * @file ue_radio_set.cc
+ * @brief Implementation file for the UeRadioSet class
  */
 
-#include "client_radio.h"
+#include "ue_radio_set.h"
 
 #include "logger.h"
 

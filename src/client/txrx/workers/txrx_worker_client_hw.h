@@ -10,10 +10,10 @@
 #include <memory>
 #include <vector>
 
-#include "client_radio.h"
 #include "message.h"
 #include "rx_status_tracker.h"
 #include "txrx_worker.h"
+#include "ue_radio_set.h"
 
 class TxRxWorkerClientHw : public TxRxWorker {
  public:

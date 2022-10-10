@@ -1,8 +1,8 @@
 /**
- * @file radio_lib.cc
+ * @file bs_radio_set.cc
  * @brief Implementation file for the BsRadioSet class.
  */
-#include "radio_lib.h"
+#include "bs_radio_set.h"
 
 #include <thread>
 

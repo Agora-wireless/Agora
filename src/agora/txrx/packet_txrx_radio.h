@@ -7,9 +7,9 @@
 #ifndef PACKETTXRX_RADIO_H_
 #define PACKETTXRX_RADIO_H_
 
+#include "bs_radio_set.h"
 #include "common_typedef_sdk.h"
 #include "packet_txrx.h"
-#include "radio_lib.h"
 
 #if defined(USE_PURE_UHD)
 #include "radio_lib_uhd.h"

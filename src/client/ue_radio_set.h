@@ -1,9 +1,9 @@
 /**
- * @file client_radio.h
- * @brief Declaration file for the client radio config class
+ * @file ue_radio_set.h
+ * @brief Declaration file for the UeRadioSet class
  */
-#ifndef CLIENT_RADIO_LIB_H_
-#define CLIENT_RADIO_LIB_H_
+#ifndef UE_RADIO_SET_H_
+#define UE_RADIO_SET_H_
 
 #include <atomic>
 #include <cstdlib>
@@ -25,15 +25,15 @@ class UeRadioSet : public RadioSet {
   virtual arma::cx_float* GetCalibUl() final { return nullptr; }
   virtual arma::cx_float* GetCalibDl() final { return nullptr; }
 
-  // Thread functions
-  virtual void InitRadio(size_t radio_id) final;
-  virtual void ConfigureRadio(size_t radio_id) final {}
-
  private:
+  // Thread functions used in constructor
+  void InitRadio(size_t radio_id);
+  void ConfigureRadio(size_t radio_id);
+
   const Config* const cfg_;
   size_t total_radios_;
   size_t total_antennas_;
 
   std::atomic<size_t> num_client_radios_initialized_;
 };
-#endif  // CLIENT_RADIO_LIB_H_
+#endif  // UE_RADIO_SET_H_

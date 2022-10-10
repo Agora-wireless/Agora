@@ -10,8 +10,8 @@
 #include <memory>
 #include <vector>
 
+#include "bs_radio_set.h"
 #include "message.h"
-#include "radio_lib.h"
 #include "rx_status_tracker.h"
 #include "txrx_worker.h"
 
