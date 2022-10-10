@@ -14,9 +14,16 @@ RadioSet::RadioSet(size_t samples_per_symbol)
     : samples_per_symbol_(samples_per_symbol) {}
 
 RadioSet::~RadioSet() {
+  std::vector<std::thread> close_radio_threads;
   for (auto& radio : radios_) {
-    radio->Close();
+    close_radio_threads.emplace_back(&Radio::Close, radio.get());
   }
+
+  AGORA_LOG_INFO("~RadioSet waiting for close\n");
+  for (auto& join_thread : close_radio_threads) {
+    join_thread.join();
+  }
+  radios_.clear();
 }
 
 int RadioSet::RadioTx(size_t radio_id, const void* const* buffs,

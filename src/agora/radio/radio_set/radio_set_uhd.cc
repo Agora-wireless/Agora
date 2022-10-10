@@ -4,20 +4,12 @@
  */
 #include <thread>
 
-#include "SoapySDR/Formats.h"
-#include "SoapySDR/Logger.hpp"
 #include "logger.h"
 #include "radio_lib_uhd.h"
-
-static constexpr bool kPrintCalibrationMats = false;
-static constexpr size_t kSoapyMakeMaxAttempts = 3;
-static constexpr size_t kHubMissingWaitMs = 100;
 
 // only one BS radio object, since, no emplace_back is needed, and the thread number for BS is also set to be 1
 RadioSetUhd::RadioSetUhd(Config* cfg, Radio::RadioType radio_type)
     : cfg_(cfg), num_radios_initialized_(0), num_radios_configured_(0) {
-  std::map<std::string, std::string> args;
-  std::map<std::string, std::string> sargs;
   // load channels
   auto channels = Utils::StrToChannels(cfg_->Channel());
 
@@ -26,15 +18,16 @@ RadioSetUhd::RadioSetUhd(Config* cfg, Radio::RadioType radio_type)
   AGORA_LOG_INFO("BS Radio num is: %d, Antenna num: %d \n", radio_num_,
                  antenna_num_);
 
-  radios_ = Radio::Create(radio_type);
+  for (size_t i = 0; i < radio_num_; i++) {
+    radios_.emplace_back(Radio::Create(radio_type));
+  }
   AGORA_LOG_INFO("radio UHD created here \n");
   std::vector<std::thread> init_bs_threads;
-
   for (size_t i = 0; i < radio_num_; i++) {
 #if defined(THREADED_INIT)
-    init_bs_threads.emplace_back(&RadioSetUhd::InitBsRadio, this, i);
+    init_bs_threads.emplace_back(&RadioSetUhd::InitRadio, this, i);
 #else
-    InitBsRadio(i);
+    InitRadio(i);
 #endif
   }
 
@@ -60,9 +53,9 @@ RadioSetUhd::RadioSetUhd(Config* cfg, Radio::RadioType radio_type)
   std::vector<std::thread> config_bs_threads;
   for (size_t i = 0; i < radio_num_; i++) {
 #if defined(THREADED_INIT)
-    config_bs_threads.emplace_back(&RadioSetUhd::ConfigureBsRadio, this, i);
+    config_bs_threads.emplace_back(&RadioSetUhd::ConfigureRadio, this, i);
 #else
-    ConfigureBsRadio(i);
+    ConfigureRadio(i);
 #endif
   }
 
@@ -88,27 +81,13 @@ RadioSetUhd::RadioSetUhd(Config* cfg, Radio::RadioType radio_type)
   AGORA_LOG_INFO("RadioSetUhd init complete!\n");
 }
 
-RadioSetUhd::~RadioSetUhd() {
-  FreeBuffer1d(&init_calib_dl_processed_);
-  FreeBuffer1d(&init_calib_ul_processed_);
-
-  std::vector<std::thread> close_radio_threads;
-  close_radio_threads.emplace_back(&Radio::Close, radios_.get());
-
-  AGORA_LOG_INFO("~RadioSetUhd waiting for close\n");
-  for (auto& join_thread : close_radio_threads) {
-    join_thread.join();
-  }
-  AGORA_LOG_INFO("RadioStop destructed\n");
-}
-
-void RadioSetUhd::InitBsRadio(size_t radio_id) {
+void RadioSetUhd::InitRadio(size_t radio_id) {
   radios_->Init(cfg_, radio_id, cfg_->RadioId().at(radio_id),
                 Utils::StrToChannels(cfg_->Channel()), cfg_->HwFramer());
   num_radios_initialized_.fetch_add(1);
 }
 
-void RadioSetUhd::ConfigureBsRadio(size_t radio_id) {
+void RadioSetUhd::ConfigureRadio(size_t radio_id) {
   (void)radio_id;
   std::vector<double> tx_gains;
   tx_gains.emplace_back(cfg_->TxGainA());
@@ -123,98 +102,6 @@ void RadioSetUhd::ConfigureBsRadio(size_t radio_id) {
 }
 
 bool RadioSetUhd::RadioStart() {
-  bool good_calib = false;
-  AllocBuffer1d(&init_calib_dl_processed_,
-                cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
-                Agora_memory::Alignment_t::kAlign64, 1);
-  AllocBuffer1d(&init_calib_ul_processed_,
-                cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
-                Agora_memory::Alignment_t::kAlign64, 1);
-  // initialize init_calib to a matrix of zeros
-  for (size_t i = 0; i < (cfg_->OfdmDataNum() * cfg_->BfAntNum()); i++) {
-    init_calib_dl_processed_[i] = 0;
-    init_calib_ul_processed_[i] = 0;
-  }
-
-  calib_meas_num_ = cfg_->InitCalibRepeat();
-  if (calib_meas_num_ != 0u) {
-    init_calib_ul_.Calloc(calib_meas_num_,
-                          cfg_->OfdmDataNum() * cfg_->BfAntNum(),
-                          Agora_memory::Alignment_t::kAlign64);
-    init_calib_dl_.Calloc(calib_meas_num_,
-                          cfg_->OfdmDataNum() * cfg_->BfAntNum(),
-                          Agora_memory::Alignment_t::kAlign64);
-    if (cfg_->Frame().NumDLSyms() > 0) {
-      int iter = 0;
-      int max_iter = 1;
-      AGORA_LOG_INFO("Start initial reciprocity calibration...\n");
-      while (good_calib == false) {
-        good_calib = InitialCalib();
-        iter++;
-        if ((iter == max_iter) && (good_calib == false)) {
-          AGORA_LOG_INFO(
-              "attempted %d unsuccessful calibration, stopping ...\n");
-          break;
-        }
-      }
-      if (good_calib == false) {
-        return good_calib;
-      } else {
-        AGORA_LOG_INFO("initial calibration successful!\n");
-      }
-      // process initial measurements
-      arma::cx_fcube calib_dl_cube(cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                   calib_meas_num_, arma::fill::zeros);
-      arma::cx_fcube calib_ul_cube(cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                   calib_meas_num_, arma::fill::zeros);
-      for (size_t i = 0; i < calib_meas_num_; i++) {
-        arma::cx_fmat calib_dl_mat(init_calib_dl_[i], cfg_->OfdmDataNum(),
-                                   cfg_->BfAntNum(), false);
-        arma::cx_fmat calib_ul_mat(init_calib_ul_[i], cfg_->OfdmDataNum(),
-                                   cfg_->BfAntNum(), false);
-        calib_dl_cube.slice(i) = calib_dl_mat;
-        calib_ul_cube.slice(i) = calib_ul_mat;
-        if (kPrintCalibrationMats) {
-          Utils::PrintMat(calib_dl_mat, "calib_dl_mat" + std::to_string(i));
-          Utils::PrintMat(calib_ul_mat, "calib_ul_mat" + std::to_string(i));
-          Utils::PrintMat(calib_dl_mat / calib_ul_mat,
-                          "calib_mat" + std::to_string(i));
-        }
-        if (kRecordCalibrationMats == true) {
-          Utils::SaveMat(calib_dl_mat, "calib_dl_mat.m",
-                         "init_calib_dl_mat" + std::to_string(i),
-                         i > 0 /*append*/);
-          Utils::SaveMat(calib_ul_mat, "calib_ul_mat.m",
-                         "init_calib_ul_mat" + std::to_string(i),
-                         i > 0 /*append*/);
-        }
-      }
-      arma::cx_fmat calib_dl_mean_mat(init_calib_dl_processed_,
-                                      cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                      false);
-      arma::cx_fmat calib_ul_mean_mat(init_calib_ul_processed_,
-                                      cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                      false);
-      calib_dl_mean_mat = arma::mean(calib_dl_cube, 2);  // mean along dim 2
-      calib_ul_mean_mat = arma::mean(calib_ul_cube, 2);  // mean along dim 2
-      if (kPrintCalibrationMats) {
-        Utils::PrintMat(calib_dl_mean_mat, "calib_dl_mat");
-        Utils::PrintMat(calib_ul_mean_mat, "calib_ul_mat");
-        Utils::PrintMat(calib_dl_mean_mat / calib_ul_mean_mat, "calib_mat");
-      }
-      if (kRecordCalibrationMats == true) {
-        Utils::SaveMat(calib_dl_mean_mat, "calib_dl_mat.m",
-                       "init_calib_dl_mat_mean", true /*append*/);
-        Utils::SaveMat(calib_ul_mean_mat, "calib_ul_mat.m",
-                       "init_calib_ul_mat_mean", true /*append*/);
-      }
-    }
-    init_calib_dl_.Free();
-    init_calib_ul_.Free();
-  }
-
-  //Speed up the activations (could have a flush)
-  std::vector<std::thread> activate_radio_threads;
   for (size_t i = 0; i < radio_num_; i++) {
     if (cfg_->HwFramer()) {
       const size_t cell_id = cfg_->CellId().at(i);
@@ -222,49 +109,9 @@ bool RadioSetUhd::RadioStart() {
       radios_->ConfigureTddModeBs(is_ref_radio);
     }
     radios_->SetTimeAtTrigger(0);
-    activate_radio_threads.emplace_back(&Radio::Activate, radios_.get(),
-                                        Radio::ActivationTypes::kActivate, 0,
-                                        0);
+    RadioSet::RadioStart(Radio::kActivate);
   }
-
-  AGORA_LOG_INFO("RadioStart waiting for activation\n");
-  for (auto& join_thread : activate_radio_threads) {
-    join_thread.join();
-  }
-  AGORA_LOG_INFO("RadioSetUhd::RadioUHDStart complete!\n");
   return true;
 }
 
 void RadioSetUhd::Go() {}
-
-long long RadioSetUhd::SyncArrayTime() {
-  //1ms
-  constexpr long long kTimeSyncMaxLimit = 1000000;
-  //Use the trigger to sync the array
-  AGORA_LOG_TRACE("SyncArrayTime: Setting trigger time\n");
-  radios_->SetTimeAtTrigger();
-  AGORA_LOG_TRACE("SyncArrayTime: Triggering!\n");
-  Go();
-
-  ///Wait for enough time for the boards to update
-  auto wait_time = std::chrono::milliseconds(5000);
-  AGORA_LOG_TRACE("SyncArrayTime: Waiting for %ld ms\n", wait_time.count());
-  std::this_thread::sleep_for(wait_time);
-  AGORA_LOG_TRACE("SyncArrayTime: Time Check!\n");
-
-  //Get first time
-  auto radio_time = radios_->GetTimeNs();
-  //Verify all times are within 1ms (typical .35ms - .85 between calls) - since only one object in UHD setting, this is being deleted
-  auto time_now = radios_->GetTimeNs();
-  auto time_diff_ns = time_now - radio_time;
-  if (time_diff_ns > kTimeSyncMaxLimit) {
-    AGORA_LOG_WARN(
-        "SyncArrayTime: Radio UHD time out of bounds during alignment.  Radio "
-        "UHD "
-        "time %lld, reference %lld, difference %lld, tolerance %lld\n",
-        time_now, radio_time, time_diff_ns, kTimeSyncMaxLimit);
-  }
-  //Update the check time with the current time
-  radio_time = time_now;
-  return radio_time;
-}
