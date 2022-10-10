@@ -2,14 +2,18 @@
  * @file radio_lib_uhd.cc
  * @brief Implementation file for the RadioSetUhd class.
  */
+#include "radio_set_uhd.h"
+
 #include <thread>
 
 #include "logger.h"
-#include "radio_set_uhd.h"
 
 // only one BS radio object, since, no emplace_back is needed, and the thread number for BS is also set to be 1
 RadioSetUhd::RadioSetUhd(Config* cfg, Radio::RadioType radio_type)
-    : cfg_(cfg), num_radios_initialized_(0), num_radios_configured_(0) {
+    : RadioSet(cfg->SampsPerSymbol()),
+      cfg_(cfg),
+      num_radios_initialized_(0),
+      num_radios_configured_(0) {
   // load channels
   auto channels = Utils::StrToChannels(cfg_->Channel());
 
@@ -85,7 +89,8 @@ RadioSetUhd::RadioSetUhd(Config* cfg, Radio::RadioType radio_type)
 
 void RadioSetUhd::InitRadio(size_t radio_id) {
   radios_.at(radio_id)->Init(cfg_, radio_id, cfg_->RadioId().at(radio_id),
-                Utils::StrToChannels(cfg_->Channel()), cfg_->HwFramer());
+                             Utils::StrToChannels(cfg_->Channel()),
+                             cfg_->HwFramer());
   num_radios_initialized_.fetch_add(1);
 }
 
@@ -108,9 +113,9 @@ bool RadioSetUhd::RadioStart() {
     if (cfg_->HwFramer()) {
       const size_t cell_id = cfg_->CellId().at(i);
       const bool is_ref_radio = (i == cfg_->RefRadio(cell_id));
-      radios_.at(0)->ConfigureTddModeBs(is_ref_radio);
+      radios_.at(i)->ConfigureTddModeBs(is_ref_radio);
     }
-    radios_.at(0)->SetTimeAtTrigger(0);
+    radios_.at(i)->SetTimeAtTrigger(0);
     RadioSet::RadioStart(Radio::kActivate);
   }
   return true;

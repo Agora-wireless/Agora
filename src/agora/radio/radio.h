@@ -21,7 +21,7 @@ class Radio {
   static std::unique_ptr<Radio> Create(RadioType type);
 
   enum ActivationTypes { kActivate, kActivateWaitTrigger };
-  virtual ~Radio();
+  virtual ~Radio() = 0;
 
   //Accessors
   inline size_t Id() const { return id_; }

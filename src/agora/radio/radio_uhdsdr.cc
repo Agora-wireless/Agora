@@ -9,18 +9,13 @@
 #include <uhd/utils/log_add.hpp>
 #include <uhd/version.hpp>
 
-#include "SoapySDR/Formats.hpp"
-#include "SoapySDR/Logger.hpp"
-#include "SoapySDR/Time.hpp"
-#include "SoapySDR/Version.hpp"
 #include "comms-lib.h"
 #include "logger.h"
 #include "symbols.h"
 #include "uhd/usrp/multi_usrp.hpp"
 
-static constexpr size_t kSoapyMakeMaxAttempts = 3;
+static constexpr size_t kMakeMaxAttempts = 3;
 static constexpr bool kPrintRadioSettings = true;
-static constexpr double kAttnMax = -18.0f;
 
 // radio init time for UHD devices
 // increase the wait time for radio init to get rid of the late packet issue
@@ -61,7 +56,6 @@ void RadioUHDSdr::Init(const Config* cfg, size_t id, const std::string& serial,
     AGORA_LOG_TRACE("Init RadioUHDSdr %s(%zu)\n", serial.c_str(), id);
     Radio::Init(cfg, id, serial, enabled_channels, hw_framer);
 
-    // changed args from SoapySDR to two maps
     std::map<std::string, std::string> args;
     std::map<std::string, std::string> sargs;
 
@@ -69,7 +63,7 @@ void RadioUHDSdr::Init(const Config* cfg, size_t id, const std::string& serial,
     args["driver"] = "uhd";
     args["addr"] = SerialNumber();
 
-    for (size_t tries = 0; tries < kSoapyMakeMaxAttempts; tries++) {
+    for (size_t tries = 0; tries < kMakeMaxAttempts; tries++) {
       try {
         dev_ = uhd::usrp::multi_usrp::make(args);
         break;
@@ -81,7 +75,7 @@ void RadioUHDSdr::Init(const Config* cfg, size_t id, const std::string& serial,
     }
     if (dev_ == nullptr) {
       AGORA_LOG_ERROR("UHDSDR failed to locate the radio %s in %zu attempts\n",
-                      SerialNumber().c_str(), kSoapyMakeMaxAttempts);
+                      SerialNumber().c_str(), kMakeMaxAttempts);
       throw std::runtime_error("UHDSDR failed to locate the radio with id " +
                                SerialNumber());
     }
@@ -178,17 +172,14 @@ void RadioUHDSdr::Activate(Radio::ActivationTypes type, long long act_time_ns,
     dev_->set_time_source("external");
     uhd::time_spec_t time2 = uhd::time_spec_t::from_ticks(0, 1e9);
     dev_->set_time_next_pps(time2);
+    //dev_->set_time_unknown_pps(uhd::time_spec_t(0.0));
+    // Wait for pps sync pulse
+    //std::this_thread::sleep_for(std::chrono::seconds(1));
   }
   AGORA_LOG_INFO("in/external clock set \n");
 
   // Wait for pps sync pulse ??`
-  int uhd_flags = 0;
-
-  if (type == Radio::ActivationTypes::kActivateWaitTrigger) {
-    uhd_flags |= SOAPY_SDR_WAIT_TRIGGER;
-  } else if (act_time_ns != 0) {
-    uhd_flags |= SOAPY_SDR_HAS_TIME;
-  }
+  //FLAGS????  *** Is this enough time?
 
   uhd::stream_cmd_t::stream_mode_t mode;
   mode = uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
@@ -206,15 +197,10 @@ void RadioUHDSdr::Activate(Radio::ActivationTypes type, long long act_time_ns,
 void RadioUHDSdr::Deactivate() {
   AGORA_LOG_TRACE("Deactivate RadioUHDSdr %s(%zu)\n", SerialNumber().c_str(),
                   Id());
-  const std::string tdd_conf_str = "{\"tdd_enabled\":false}";
-
-  uhd::stream_cmd_t::stream_mode_t mode;
-  mode = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
-  uhd::stream_cmd_t cmd(mode);
-  const int flags = 0;
-  cmd.stream_now = (flags & SOAPY_SDR_HAS_TIME) == 0;
-  const long long timeNs = 0;
-  cmd.time_spec = uhd::time_spec_t::from_ticks(timeNs, 1e9);
+  uhd::stream_cmd_t cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+  //Stop now
+  cmd.stream_now = true;
+  cmd.time_spec = 0;
   rxs_->issue_stream_cmd(cmd);
 
   // there is not issue_stream_cmd in uhd::tx_streamer
@@ -223,24 +209,11 @@ void RadioUHDSdr::Deactivate() {
     AGORA_LOG_WARN("Deactivate UHD tx stream with status %d %s\n", status,
                    SoapySDR_errToStr(status));
   }
-  // Correlator(false);
 }
 
 int RadioUHDSdr::Tx(const void* const* tx_buffs, size_t tx_size,
                     Radio::TxFlags flags, long long& tx_time_ns) {
-  constexpr size_t kTxTimeoutUs = 1000000;
-
-  int soapy_flags;
-  if (flags == Radio::TxFlags::kTxFlagNone) {
-    soapy_flags = SOAPY_SDR_HAS_TIME;
-  } else if (flags == Radio::TxFlags::kEndTransmit) {
-    soapy_flags = (SOAPY_SDR_HAS_TIME | SOAPY_SDR_END_BURST);
-  } else if (flags == Radio::TxFlags::kTxWaitTrigger) {
-    soapy_flags = SOAPY_SDR_END_BURST | SOAPY_SDR_WAIT_TRIGGER;
-  } else {
-    AGORA_LOG_ERROR("Unsupported radio tx flag %d\n", static_cast<int>(flags));
-    soapy_flags = 0;
-  }
+  constexpr size_t kTxTimeoutSec = 1;
 
   if (HwFramer() == false) {
     // For UHD device xmit from host using frameTimeNs
@@ -249,23 +222,20 @@ int RadioUHDSdr::Tx(const void* const* tx_buffs, size_t tx_size,
 
   uhd::tx_streamer::sptr stream = txs_;
   uhd::tx_metadata_t md;
-  md.has_time_spec = (soapy_flags & SOAPY_SDR_HAS_TIME) != 0;
-  md.end_of_burst = (soapy_flags & SOAPY_SDR_END_BURST) != 0;
+  md.has_time_spec = true;
+  md.end_of_burst = (flags == kEndTransmit);
   md.time_spec = uhd::time_spec_t::from_ticks(tx_time_ns, 1e9);
 
   uhd::tx_streamer::buffs_type stream_buffs(tx_buffs,
                                             stream->get_num_channels());
-  int ret = stream->send(stream_buffs, tx_size, md, kTxTimeoutUs / 1e6);
-  soapy_flags = 0;
-
+  const int ret = stream->send(stream_buffs, tx_size, md, kTxTimeoutSec);
   const int write_status = ret;
 
   if (kDebugRadioTX) {
-    int status_flag = 0;
     uhd::async_metadata_t md_debug;
-    status_flag = 0;
-    if (md.has_time_spec) status_flag |= SOAPY_SDR_HAS_TIME;
-    tx_time_ns = md_debug.time_spec.to_ticks(1e9);
+    if (md.has_time_spec) {
+      tx_time_ns = md_debug.time_spec.to_ticks(1e9);
+    }
   }
   return write_status;
 }
@@ -301,49 +271,54 @@ int RadioUHDSdr::Rx(std::vector<void*>& rx_locs, size_t rx_size,
   rx_time_ns = 0;
   static constexpr long kRxTimeout = 1;  // 1uS
   out_flags = Radio::RxFlags::kRxFlagNone;
-  int soapy_rx_flags = (1 << 29);
 
-  int rx_status = 0;
   long long frame_time_ns(0);
 
   uhd::rx_metadata_t md;
   uhd::rx_streamer::buffs_type stream_buffs(rx_locs.data(),
                                             rxs_->get_num_channels());
   // double check with if/assert
-  rx_status = rxs_->recv(stream_buffs, rx_size, md, kRxTimeout / 1e6,
-                         (soapy_rx_flags & SOAPY_SDR_ONE_PACKET) != 0);
+  const size_t rx_status =
+      rxs_->recv(stream_buffs, rx_size, md, kRxTimeout / 1e6, false);
 
-  soapy_rx_flags = 0;
-  if (md.has_time_spec) soapy_rx_flags |= SOAPY_SDR_HAS_TIME;
-  if (md.end_of_burst) soapy_rx_flags |= SOAPY_SDR_END_BURST;
-  if (md.more_fragments) soapy_rx_flags |= SOAPY_SDR_MORE_FRAGMENTS;
+  const bool has_time = md.has_time_spec;
+  const bool end_burst = md.end_of_burst;
+  const bool more_frags = md.more_fragments;
+
   frame_time_ns = md.time_spec.to_ticks(1e9);
+  const size_t rx_samples = static_cast<size_t>(rx_status);
 
-  if (rx_status > 0) {
-    const size_t rx_samples = static_cast<size_t>(rx_status);
+  if (has_time == false) {
+    AGORA_LOG_WARN("RadioUHDSdr::Rx - does not have time");
+  }
 
-    if ((soapy_rx_flags & SOAPY_SDR_HAS_TIME) == 0) {
-      AGORA_LOG_WARN("RadioUHDSdr::Rx - does not have time");
+  //If status == 0 check why
+  if (rx_status == 0) {
+    /*
+    switch (md.error_code) {
+      case uhd::rx_metadata_t::ERROR_CODE_NONE:
+      case uhd::rx_metadata_t::ERROR_CODE_OVERFLOW:
+      case uhd::rx_metadata_t::ERROR_CODE_TIMEOUT:
+      case uhd::rx_metadata_t::ERROR_CODE_BAD_PACKET:
+      case uhd::rx_metadata_t::ERROR_CODE_ALIGNMENT:
+      case uhd::rx_metadata_t::ERROR_CODE_LATE_COMMAND:
+      case uhd::rx_metadata_t::ERROR_CODE_BROKEN_CHAIN:
+        break;
     }
+    */
+  } else {
     //if end burst flag is not set, then we have partial data (hw_framer mode only)
     if (HwFramer()) {
       if (rx_samples != rx_size) {
-        if ((soapy_rx_flags & SOAPY_SDR_END_BURST) == 0) {
+        if (end_burst == false) {
           AGORA_LOG_TRACE("RadioUHDSdr::Rx - short rx call");
           //Soapy could print a 'D' if this happens. But this would be acceptable
-        } else if ((soapy_rx_flags & SOAPY_SDR_END_BURST) ==
-                   SOAPY_SDR_END_BURST) {
-          AGORA_LOG_WARN("RadioDataPlane_UHD::Rx");
-          out_flags = Radio::RxFlags::kEndReceive;
-        } else if (((frame_time_ns & 0xFFFF) + rx_samples) >=
-                   cfg_->SampsPerSymbol()) {
-          //Hackish way to determine if we should proceed
-          //The first symbol bug appears to periodically cut off a few samples from the first symbol
+        } else {
           AGORA_LOG_WARN("RadioDataPlane_UHD::Rx");
           out_flags = Radio::RxFlags::kEndReceive;
         }
       } else {
-        if ((soapy_rx_flags & SOAPY_SDR_END_BURST) == 0) {
+        if (end_burst == false) {
           //This usually happens when the timeout is not long enough to wait for multiple packets for a given requested rx length
           AGORA_LOG_WARN(
               "RadioDataPlane_UHD::Rx - expected SOAPY_SDR_END_BURST but "
@@ -353,8 +328,7 @@ int RadioUHDSdr::Rx(std::vector<void*>& rx_locs, size_t rx_size,
         }
       }
 
-      if ((soapy_rx_flags & SOAPY_SDR_MORE_FRAGMENTS) ==
-          SOAPY_SDR_MORE_FRAGMENTS) {
+      if (more_frags) {
         AGORA_LOG_WARN(
             "RadioDataPlane_UHD::Rx - fragments remaining on rx call for "
             "sample count %zu requested %zu symbols with flags %d\n",
@@ -365,9 +339,6 @@ int RadioUHDSdr::Rx(std::vector<void*>& rx_locs, size_t rx_size,
       // for UHD device (or software framer) recv using ticks
       rx_time_ns = SoapySDR::timeNsToTicks(frame_time_ns, cfg_->Rate());
     }
-  } else if (rx_status == SOAPY_SDR_TIMEOUT) {
-    /// If a timeout occurs tell the requester there are 0 bytes
-    rx_status = 0;
   }
   return rx_status;
 }
@@ -375,24 +346,9 @@ int RadioUHDSdr::Rx(std::vector<void*>& rx_locs, size_t rx_size,
 void RadioUHDSdr::Trigger() {}
 
 void RadioUHDSdr::ReadSensor() const {
-  std::stringstream print_message;
-  print_message << "TEMPs on Iris " << SerialNumber() << "(" << Id() << ")"
-                << std::endl;
-  print_message << "ZYNQ_TEMP  : " << dev_->get_mboard_sensor("ZYNQ_TEMP").value
-                << std::endl;
-  print_message << "LMS7_TEMP  : " << dev_->get_mboard_sensor("LMS7_TEMP").value
-                << std::endl;
-  print_message << "FE_TEMP  : " << dev_->get_mboard_sensor("FE_TEMP").value
-                << std::endl;
-  print_message << "TX0 TEMP  : " << dev_->get_tx_sensor("TEMP", 0).value
-                << std::endl;
-  print_message << "TX1 TEMP  : " << dev_->get_tx_sensor("TEMP", 1).value
-                << std::endl;
-  print_message << "RX0 TEMP  : " << dev_->get_rx_sensor("TEMP", 0).value
-                << std::endl;
-  print_message << "RX1 TEMP  : " << dev_->get_rx_sensor("TEMP", 1).value
-                << std::endl;
-  AGORA_LOG_INFO("%s\n", print_message.str().c_str());
+  for (size_t i = 0; i < dev_->get_num_mboards(); i++) {
+    std::cout << dev_->get_mboard_sensor_names(i).at(0) << std::endl;
+  }
 }
 
 void RadioUHDSdr::SetTimeAtTrigger(long long time_ns) {
@@ -485,135 +441,8 @@ void RadioUHDSdr::PrintSettings() const {
 
 void RadioUHDSdr::ClearSyncDelay() {}
 
-void RadioUHDSdr::ConfigureTddModeBs(bool is_ref_radio) {
-  nlohmann::json conf;
-  conf["tdd_enabled"] = true;
-  conf["frame_mode"] = "free_running";
-  conf["max_frame"] = 0;
-  conf["symbol_size"] = cfg_->SampsPerSymbol();
-  conf["beacon_start"] = cfg_->OfdmTxZeroPrefix();
-  conf["beacon_stop"] = cfg_->OfdmTxZeroPrefix() + cfg_->BeaconLen();
-
-  // experimentally good value for dev front-end
-  std::vector<std::string> tdd_sched;
-
-  std::string sched = cfg_->Frame().FrameIdentifier();
-  size_t sched_size = sched.length();
-  for (size_t s = 0; s < sched_size; s++) {
-    char c = cfg_->Frame().FrameIdentifier().at(s);
-    if (c == 'C') {
-      sched.replace(s, 1, is_ref_radio ? "R" : "T");
-    } else if (c == 'L') {
-      sched.replace(s, 1, is_ref_radio ? "T" : "R");
-    } else if (c == 'P') {
-      sched.replace(s, 1, "R");
-    } else if (c == 'U') {
-      sched.replace(s, 1, "R");
-    } else if (c == 'D') {
-      sched.replace(s, 1, "T");
-    } else if (c != 'B') {
-      sched.replace(s, 1, "G");
-    }
-  }
-  AGORA_LOG_INFO("Radio %zu Frame 1: %s \n", Id(), sched.c_str());
-  tdd_sched.push_back(sched);
-
-  conf["frames"] = tdd_sched;
-  std::string conf_string = conf.dump();
-
-  std::vector<unsigned> beacon_weights(cfg_->NumRadios() * cfg_->NumChannels());
-  size_t ant_idx = 0;
-  for (const auto& channel : EnabledChannels()) {
-    if (cfg_->Beamsweep()) {
-      for (size_t j = 0; j < beacon_weights.size(); j++) {
-        beacon_weights.at(j) = CommsLib::Hadamard2(ant_idx, j);
-      }
-    } else {
-      const size_t ant_id = (Id() * cfg_->NumChannels()) + ant_idx;
-      if (ant_id == cfg_->BeaconAnt()) {
-        std::fill(beacon_weights.begin(), beacon_weights.end(), 1);
-      } else {
-        std::fill(beacon_weights.begin(), beacon_weights.end(), 0);
-      }
-    }
-
-    char channel_letter;
-    if (channel == 0) {
-      channel_letter = 'A';
-    } else if (channel == 1) {
-      channel_letter = 'B';
-    } else {
-      AGORA_LOG_ERROR("Unsupported channel %zu\n", channel);
-      throw std::runtime_error("Unsupported channel");
-    }
-    std::string prog_reg = "BEACON_RAM_WGT_";
-    prog_reg.push_back(channel_letter);
-    ant_idx++;
-  }
-}
-
-void RadioUHDSdr::ConfigureTddModeUe() {
-  nlohmann::json conf;
-  conf["tdd_enabled"] = true;
-  conf["frame_mode"] = "continuous_resync";
-  const int max_frame =
-      (int)(2.0f / ((cfg_->SampsPerSymbol() * cfg_->Frame().NumTotalSyms()) /
-                    cfg_->Rate()));
-  conf["max_frame"] = max_frame;
-  conf["dual_pilot"] = (cfg_->NumUeChannels() == 2);
-  auto tdd_sched = cfg_->Frame().FrameIdentifier();
-  for (size_t s = 0; s < cfg_->Frame().FrameIdentifier().length(); s++) {
-    char c = cfg_->Frame().FrameIdentifier().at(s);
-    if (c == 'B') {
-      tdd_sched.replace(s, 1, "R");  // Dummy RX used in PHY scheduler
-    } else if (c == 'P' and ((cfg_->NumUeChannels() == 1 and
-                              cfg_->Frame().GetPilotSymbol(Id()) != s) or
-                             (cfg_->NumUeChannels() == 2 and
-                              (cfg_->Frame().GetPilotSymbol(2 * Id()) != s and
-                               cfg_->Frame().GetPilotSymbol(Id() * 2 + 1) !=
-                                   s)))) {  // TODO: change this for
-      // orthogonal pilots
-      tdd_sched.replace(s, 1, "G");
-    } else if (c == 'U') {
-      tdd_sched.replace(s, 1, "T");
-    } else if (c == 'D') {
-      tdd_sched.replace(s, 1, "R");
-    } else if (c != 'P') {
-      tdd_sched.replace(s, 1, "G");
-    }
-  }
-  AGORA_LOG_INFO("UE %zu Frame 1: %s \n", Id(), tdd_sched.c_str());
-  std::vector<std::string> jframes;
-  jframes.push_back(tdd_sched);
-  conf["frames"] = jframes;
-  conf["symbol_size"] = cfg_->SampsPerSymbol();
-  std::string conf_string = conf.dump();
-  // beaconSize + 82 (BS FE delay) + 68 (path delay) + 17 (correlator delay) +
-  // 82 (Client FE Delay)
-  const int cl_trig_offset = cfg_->BeaconLen() + 249;
-  const int sf_start = cl_trig_offset / cfg_->SampsPerSymbol();
-  const int sp_start = cl_trig_offset % cfg_->SampsPerSymbol();
-  long long timeinput =
-      SoapySDR::ticksToTimeNs((sf_start << 16) | sp_start, cfg_->Rate());
-  uhd::time_spec_t time = uhd::time_spec_t::from_ticks(timeinput, 1e9);
-  dev_->set_time_now(time);
-
-  // experimentally good value for dev front-end
-  for (const auto& channel : EnabledChannels()) {
-    char channel_letter;
-    if (channel == 0) {
-      channel_letter = 'A';
-    } else if (channel == 1) {
-      channel_letter = 'B';
-    } else {
-      AGORA_LOG_ERROR("Unsupported channel %zu\n", channel);
-      throw std::runtime_error("Unsupported channel");
-    }
-    std::string prog_reg = "TX_RAM_";
-    prog_reg.push_back(channel_letter);
-  }
-  // Correlator(true);
-}
+void RadioUHDSdr::ConfigureTddModeBs(bool is_ref_radio) {}
+void RadioUHDSdr::ConfigureTddModeUe() {}
 
 void RadioUHDSdr::Flush() {
   AGORA_LOG_INFO("Flushing radio %zu rx data plane\n", Id());
