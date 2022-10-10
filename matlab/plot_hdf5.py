@@ -65,7 +65,8 @@ def verify_hdf5(hdf5, frame_i=100, cell_i=0, ofdm_sym_i=0, ant_i =0,
     nonzero_sc_size = fft_size
     if 'DATA_SUBCARRIER_NUM' in metadata:
         nonzero_sc_size = metadata['DATA_SUBCARRIER_NUM']
-    #ofdm_pilot = np.array(metadata['OFDM_PILOT'])
+    if "OFDM_PILOT" in metadata.keys():
+        ofdm_pilot = np.array(metadata['OFDM_PILOT'])
     if "OFDM_PILOT_F" in metadata.keys():
         ofdm_pilot_f = np.array(metadata['OFDM_PILOT_F'])
     else:

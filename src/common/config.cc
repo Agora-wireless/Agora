@@ -27,6 +27,7 @@ static constexpr size_t kMacAlignmentBytes = 64u;
 static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
+static constexpr bool KUseCyclicShift = !kOutputUlScData;
 
 static const std::string kLogFilepath =
     TOSTRING(PROJECT_DIRECTORY) "/files/log/";
@@ -157,7 +158,7 @@ Config::Config(std::string jsonfilename)
 
     //Add in serial numbers
     for (size_t radio = 0; radio < num_radios_; radio++) {
-      AGORA_LOG_INFO("Adding BS_SIM_RADIO_%d\n", radio);
+      AGORA_LOG_TRACE("Adding BS_SIM_RADIO_%d\n", radio);
       radio_id_.emplace_back("BS_SIM_RADIO_" + std::to_string(radio));
     }
   }
@@ -174,7 +175,7 @@ Config::Config(std::string jsonfilename)
   } else {
     ue_num_ = tdd_conf.value("ue_radio_num", 8);
     for (size_t ue_radio = 0; ue_radio < ue_num_; ue_radio++) {
-      AGORA_LOG_INFO("Adding UE_SIM_RADIO_%d\n", ue_radio);
+      AGORA_LOG_TRACE("Adding UE_SIM_RADIO_%d\n", ue_radio);
       const std::string ue_name = "UE_SIM_RADIO_" + std::to_string(ue_radio);
       ue_radio_id_.push_back(ue_name);
       ue_radio_name_.emplace_back(
@@ -303,8 +304,11 @@ Config::Config(std::string jsonfilename)
   RtAssert(ofdm_data_num_ % kTransposeBlockSize == 0,
            "Transpose block size must divide number of OFDM data subcarriers");
   ofdm_pilot_spacing_ = tdd_conf.value("ofdm_pilot_spacing", 16);
-  ofdm_data_start_ =
-      tdd_conf.value("ofdm_data_start", (ofdm_ca_num_ - ofdm_data_num_) / 2);
+  ofdm_data_start_ = tdd_conf.value("ofdm_data_start",
+                                    ((ofdm_ca_num_ - ofdm_data_num_) / 2) /
+                                        kSCsPerCacheline * kSCsPerCacheline);
+  RtAssert(ofdm_data_start_ % kSCsPerCacheline == 0,
+           "ofdm_data_start must be a multiple of subcarriers per cacheline");
   ofdm_data_stop_ = ofdm_data_start_ + ofdm_data_num_;
 
   // Build subcarrier map for data ofdm symbols
@@ -956,7 +960,9 @@ void Config::GenData() {
       CommsLib::GetSequence(this->ofdm_data_num_, CommsLib::kLteZadoffChu);
   auto zc_seq = Utils::DoubleToCfloat(zc_seq_double);
   this->common_pilot_ =
-      CommsLib::SeqCyclicShift(zc_seq, M_PI / 4);  // Used in LTE SRS
+      KUseCyclicShift
+          ? CommsLib::SeqCyclicShift(zc_seq, M_PI / 4)  // Used in LTE SRS
+          : zc_seq;
 
   this->pilots_ = static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64,
@@ -998,9 +1004,12 @@ void Config::GenData() {
       CommsLib::GetSequence(this->ofdm_data_num_, CommsLib::kLteZadoffChu);
   auto zc_ue_pilot = Utils::DoubleToCfloat(zc_ue_pilot_double);
   for (size_t i = 0; i < ue_ant_num_; i++) {
-    auto zc_ue_pilot_i = CommsLib::SeqCyclicShift(
-        zc_ue_pilot,
-        (i + this->ue_ant_offset_) * (float)M_PI / 6);  // LTE DMRS
+    auto zc_ue_pilot_i =
+        KUseCyclicShift
+            ? CommsLib::SeqCyclicShift(
+                  zc_ue_pilot,
+                  (i + this->ue_ant_offset_) * (float)M_PI / 6)  // LTE DMRS
+            : zc_ue_pilot;
     for (size_t j = 0; j < this->ofdm_data_num_; j++) {
       this->ue_specific_pilot_[i][j] = {zc_ue_pilot_i[j].real(),
                                         zc_ue_pilot_i[j].imag()};
@@ -1238,9 +1247,13 @@ void Config::GenData() {
 
       for (size_t j = 0; j < ofdm_data_num_; j++) {
         const size_t sc = j + ofdm_data_start_;
-        int8_t* mod_input_ptr =
-            GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, u, j);
-        ul_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, ul_mod_table_);
+        if (i >= this->frame_.ClientUlPilotSymbols()) {
+          int8_t* mod_input_ptr =
+              GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, u, j);
+          ul_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, ul_mod_table_);
+        } else {
+          ul_iq_f_[i][q + j] = ue_specific_pilot_[u][j];
+        }
         // FFT Shift
         const size_t k = sc >= ofdm_ca_num_ / 2 ? sc - ofdm_ca_num_ / 2
                                                 : sc + ofdm_ca_num_ / 2;
