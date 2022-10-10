@@ -60,8 +60,8 @@ class RadioUHDSdr : public Radio {
   //   //Sets both tx and rx, is this ok?
   //   void SetFreqBb(size_t channel, double freq);
   //   //End Calibration Routines
-  //   std::vector<std::complex<float>> SnoopSamples(size_t channel,
-  //                                                 size_t read_size);
+  //     std::vector<std::complex<float>> SnoopSamples(size_t channel,
+  //                                                   size_t read_size);
 
   inline uhd::usrp::multi_usrp::sptr UHDDevice() const {
     return dev_;
@@ -73,9 +73,6 @@ class RadioUHDSdr : public Radio {
 
   uhd::usrp::multi_usrp::sptr dev_;
   std::string ip_address_;
-
-  //   std::unique_ptr<RadioDataPlaneUHD> rxp_;
-
   uhd::rx_streamer::sptr rxs_;  // init in RadioUHDSdr::Init()
   uhd::tx_streamer::sptr txs_;
   //   bool correlator_enabled_;
