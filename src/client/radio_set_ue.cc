@@ -3,7 +3,7 @@
  * @brief Implementation file for the UeRadioSet class
  */
 
-#include "ue_radio_set.h"
+#include "radio_set_ue.h"
 
 #include "logger.h"
 

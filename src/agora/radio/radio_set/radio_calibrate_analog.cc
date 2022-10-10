@@ -6,9 +6,9 @@
 #include <chrono>
 #include <thread>
 
-#include "bs_radio_set.h"
 #include "comms-lib.h"
 #include "matplotlibcpp.h"
+#include "radio_set_bs.h"
 #include "radio_soapysdr.h"
 
 namespace plt = matplotlibcpp;
@@ -120,7 +120,7 @@ static void MeasureCorrection(RadioSoapySdr* ref, size_t channel,
             << " dB, tone level=" << desired_tone_level << "dB" << std::endl;
 }
 
-void BsRadioSet::AdjustCalibrationGains(std::vector<Radio*>& rx_devs,
+void RadioSetBs::AdjustCalibrationGains(std::vector<Radio*>& rx_devs,
                                         Radio* tx_dev, size_t channel,
                                         double fft_bin, bool plot) {
   const double target_level = -10.0f;
@@ -178,7 +178,7 @@ void BsRadioSet::AdjustCalibrationGains(std::vector<Radio*>& rx_devs,
             << std::endl;
 }
 
-void BsRadioSet::SetIqBalance(Radio* dev, int direction, size_t channel,
+void RadioSetBs::SetIqBalance(Radio* dev, int direction, size_t channel,
                               int gcorr, int iqcorr) {
   const auto gcorri = (gcorr < 0) ? 2047 - std::abs(gcorr) : 2047;
   const auto gcorrq = (gcorr > 0) ? 2047 - std::abs(gcorr) : 2047;
@@ -189,7 +189,7 @@ void BsRadioSet::SetIqBalance(Radio* dev, int direction, size_t channel,
   dynamic_cast<RadioSoapySdr*>(dev)->SetIQBalance(direction, channel, i_qcorr);
 }
 
-void BsRadioSet::DciqMinimize(Radio* target_dev, Radio* ref_dev, int direction,
+void RadioSetBs::DciqMinimize(Radio* target_dev, Radio* ref_dev, int direction,
                               size_t channel, double rx_center_tone,
                               double tx_center_tone) {
   const size_t n = 1024;
@@ -298,7 +298,7 @@ void BsRadioSet::DciqMinimize(Radio* target_dev, Radio* ref_dev, int direction,
     for (int i = start; i < stop; i += step) {
       const int gcorr = ((iter % 2) == 0) ? i : bestgcorr;
       const int iqcorr = ((iter % 2) == 1) ? i : bestiqcorr;
-      BsRadioSet::SetIqBalance(target_dev, direction, channel, gcorr, iqcorr);
+      RadioSetBs::SetIqBalance(target_dev, direction, channel, gcorr, iqcorr);
 
       // measure the efficacy
       std::this_thread::sleep_for(std::chrono::milliseconds(SETTLE_TIME_MS));
@@ -316,7 +316,7 @@ void BsRadioSet::DciqMinimize(Radio* target_dev, Radio* ref_dev, int direction,
   }
 
   // apply the ideal correction
-  BsRadioSet::SetIqBalance(target_dev, direction, channel, bestgcorr,
+  RadioSetBs::SetIqBalance(target_dev, direction, channel, bestgcorr,
                            bestiqcorr);
   auto gcorri = (bestgcorr < 0) ? 2047 - std::abs(bestgcorr) : 2047;
   auto gcorrq = (bestgcorr > 0) ? 2047 - std::abs(bestgcorr) : 2047;
@@ -327,7 +327,7 @@ void BsRadioSet::DciqMinimize(Radio* target_dev, Radio* ref_dev, int direction,
                     window_gain);
 }
 
-void BsRadioSet::DciqCalibrationProc(size_t channel) {
+void RadioSetBs::DciqCalibrationProc(size_t channel) {
   std::cout << "****************************************************\n";
   std::cout << "   DC Offset and IQ Imbalance Calibration: Ch " << channel
             << std::endl;
@@ -361,13 +361,13 @@ void BsRadioSet::DciqCalibrationProc(size_t channel) {
 
   // Tune rx gains for calibration on all radios except reference radio
   // Tune tx gain on reference radio
-  BsRadioSet::AdjustCalibrationGains(all_but_ref_devs, ref_dev, channel,
+  RadioSetBs::AdjustCalibrationGains(all_but_ref_devs, ref_dev, channel,
                                      tone_bb_freq / sample_rate, true);
 
   // Minimize Rx DC offset and IQ Imbalance on all receiving radios
   // TODO: Parallelize this loop
   for (size_t r = 0; r < total_radios - 1; r++) {
-    BsRadioSet::DciqMinimize(all_but_ref_devs.at(r), all_but_ref_devs.at(r),
+    RadioSetBs::DciqMinimize(all_but_ref_devs.at(r), all_but_ref_devs.at(r),
                              SOAPY_SDR_RX, channel, 0.0,
                              tone_bb_freq / sample_rate);
   }
@@ -391,9 +391,9 @@ void BsRadioSet::DciqCalibrationProc(size_t channel) {
 
   // Tune rx gain for calibraion on reference radio
   // Tune tx gain on neighboring radio to reference radio
-  BsRadioSet::AdjustCalibrationGains(ref_dev_container, ref_ref_dev, channel,
+  RadioSetBs::AdjustCalibrationGains(ref_dev_container, ref_ref_dev, channel,
                                      tone_bb_freq / sample_rate);
-  BsRadioSet::DciqMinimize(ref_dev, ref_dev, SOAPY_SDR_RX, channel, 0.0,
+  RadioSetBs::DciqMinimize(ref_dev, ref_dev, SOAPY_SDR_RX, channel, 0.0,
                            tone_bb_freq / sample_rate);
 
   ref_ref_dev->StopRefTx(channel);
@@ -418,10 +418,10 @@ void BsRadioSet::DciqCalibrationProc(size_t channel) {
 
   // Tune tx gain for calibraion on reference antenna
   // Tune rx gain on neighboring radio to reference radio
-  BsRadioSet::AdjustCalibrationGains(
+  RadioSetBs::AdjustCalibrationGains(
       ref_ref_dev_container, ref_dev, channel,
       (tone_bb_freq + tx_tone_bb_freq) / sample_rate);
-  BsRadioSet::DciqMinimize(ref_dev, ref_ref_dev, SOAPY_SDR_TX, channel,
+  RadioSetBs::DciqMinimize(ref_dev, ref_ref_dev, SOAPY_SDR_TX, channel,
                            tone_bb_freq / sample_rate,
                            tx_tone_bb_freq / sample_rate);
 
@@ -446,10 +446,10 @@ void BsRadioSet::DciqCalibrationProc(size_t channel) {
     radio->StartRefTx(channel);
     // Tune tx gain for calibraion of the current radio
     // Tune rx gain on the reference radio
-    BsRadioSet::AdjustCalibrationGains(
+    RadioSetBs::AdjustCalibrationGains(
         ref_dev_container, radio, channel,
         (tone_bb_freq + tx_tone_bb_freq) / sample_rate);
-    BsRadioSet::DciqMinimize(radio, ref_dev, SOAPY_SDR_TX, channel,
+    RadioSetBs::DciqMinimize(radio, ref_dev, SOAPY_SDR_TX, channel,
                              tone_bb_freq / sample_rate,
                              tx_tone_bb_freq / sample_rate);
     radio->StopRefTx(channel);

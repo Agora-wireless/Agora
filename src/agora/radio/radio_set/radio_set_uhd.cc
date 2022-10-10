@@ -1,87 +1,40 @@
 /**
- * @file bs_radio_set.cc
- * @brief Implementation file for the BsRadioSet class.
+ * @file radio_lib_uhd.cc
+ * @brief Implementation file for the RadioSetUhd class.
  */
-#include "bs_radio_set.h"
-
 #include <thread>
 
 #include "SoapySDR/Formats.h"
 #include "SoapySDR/Logger.hpp"
 #include "logger.h"
+#include "radio_lib_uhd.h"
 
 static constexpr bool kPrintCalibrationMats = false;
 static constexpr size_t kSoapyMakeMaxAttempts = 3;
 static constexpr size_t kHubMissingWaitMs = 100;
 
-BsRadioSet::BsRadioSet(Config* cfg, Radio::RadioType radio_type)
-    : RadioSet(cfg->SampsPerSymbol()),
-      cfg_(cfg),
-      num_radios_initialized_(0),
-      num_radios_configured_(0) {
-  SoapySDR::Kwargs args;
-  SoapySDR::Kwargs sargs;
+// only one BS radio object, since, no emplace_back is needed, and the thread number for BS is also set to be 1
+RadioSetUhd::RadioSetUhd(Config* cfg, Radio::RadioType radio_type)
+    : cfg_(cfg), num_radios_initialized_(0), num_radios_configured_(0) {
+  std::map<std::string, std::string> args;
+  std::map<std::string, std::string> sargs;
   // load channels
   auto channels = Utils::StrToChannels(cfg_->Channel());
 
   radio_num_ = cfg_->NumRadios();
   antenna_num_ = cfg_->BsAntNum();
-  std::cout << "BS Radio num is " << radio_num_
-            << ", Antenna num: " << antenna_num_ << std::endl;
-  if (kUseUHD == false) {
-    for (size_t i = 0; i < cfg_->NumCells(); i++) {
-      SoapySDR::Device* hub_device = nullptr;
-      if (cfg_->HubId().at(i).empty() == false) {
-        args["driver"] = "remote";
-        args["timeout"] = "100000";
-        args["serial"] = cfg_->HubId().at(i);
-        args["remote:type"] = "faros";
-        args["remote:driver"] = "faros";
-        args["remote:mtu"] = "1500";
-        args["remote:ipver"] = "6";
-        //remote: prot is also an option
+  AGORA_LOG_INFO("BS Radio num is: %d, Antenna num: %d \n", radio_num_,
+                 antenna_num_);
 
-        for (size_t tries = 0; tries < kSoapyMakeMaxAttempts; tries++) {
-          try {
-            hub_device = SoapySDR::Device::make(args);
-            break;
-          } catch (const std::runtime_error& e) {
-            const auto* message = e.what();
-            AGORA_LOG_WARN("BsRadioSet::Soapy error[%zu] -- %s\n", tries,
-                           message);
-            std::this_thread::sleep_for(
-                std::chrono::milliseconds(kHubMissingWaitMs));
-          }
-        }
-        if (hub_device == nullptr) {
-          AGORA_LOG_ERROR(
-              "SoapySDR failed to locate the hub device %s in %zu tries\n",
-              cfg_->HubId().at(i).c_str(), kSoapyMakeMaxAttempts);
-          throw std::runtime_error("SoapySDR failed to locate the hub device");
-        } else {
-          for (const auto& info : hub_device->getSettingInfo()) {
-            AGORA_LOG_TRACE("Hub[%s(%zu)] setting: %s\n",
-                            cfg_->HubId().at(i).c_str(), i, info.key.c_str());
-            (void)info;
-          }
-          hub_device->writeSetting("FEC_SNOOPER_CLEAR", "");
-        }
-      }
-      hubs_.push_back(hub_device);
-    }
-  }
-
-  for (size_t i = 0; i < radio_num_; i++) {
-    radios_.emplace_back(Radio::Create(radio_type));
-  }
-
+  radios_ = Radio::Create(radio_type);
+  AGORA_LOG_INFO("radio UHD created here \n");
   std::vector<std::thread> init_bs_threads;
 
   for (size_t i = 0; i < radio_num_; i++) {
-#ifdef THREADED_INIT
-    init_bs_threads.emplace_back(&BsRadioSet::InitRadio, this, i);
+#if defined(THREADED_INIT)
+    init_bs_threads.emplace_back(&RadioSetUhd::InitBsRadio, this, i);
 #else
-    InitRadio(i);
+    InitBsRadio(i);
 #endif
   }
 
@@ -92,7 +45,8 @@ BsRadioSet::BsRadioSet(Config* cfg, Radio::RadioType radio_type)
     num_checks++;
     if (num_checks > 1e9) {
       std::printf(
-          "BsRadioSet: Waiting for radio initialization, %zu of %zu ready\n",
+          "RadioSetUhd: Waiting for radio initialization, %zu of %zu "
+          "ready\n",
           num_radios_init, radio_num_);
       num_checks = 0;
     }
@@ -103,25 +57,16 @@ BsRadioSet::BsRadioSet(Config* cfg, Radio::RadioType radio_type)
     join_thread.join();
   }
 
-  // Perform DC Offset & IQ Imbalance Calibration
-  if (cfg_->ImbalanceCalEn()) {
-    if (cfg_->Channel().find('A') != std::string::npos) {
-      DciqCalibrationProc(0);
-    }
-    if (cfg_->Channel().find('B') != std::string::npos) {
-      DciqCalibrationProc(1);
-    }
-  }
-
   std::vector<std::thread> config_bs_threads;
   for (size_t i = 0; i < radio_num_; i++) {
-#ifdef THREADED_INIT
-    config_bs_threads.emplace_back(&BsRadioSet::ConfigureRadio, this, i);
+#if defined(THREADED_INIT)
+    config_bs_threads.emplace_back(&RadioSetUhd::ConfigureBsRadio, this, i);
 #else
-    ConfigureRadio(i);
+    ConfigureBsRadio(i);
 #endif
   }
 
+  AGORA_LOG_INFO("radio UHD configured here \n");
   num_checks = 0;
   // Block until all radios are configured
   size_t num_radios_config = num_radios_configured_.load();
@@ -129,63 +74,42 @@ BsRadioSet::BsRadioSet(Config* cfg, Radio::RadioType radio_type)
     num_checks++;
     if (num_checks > 1e9) {
       AGORA_LOG_WARN(
-          "BsRadioSet: Waiting for radio initialization, %zu of %zu ready\n",
+          "RadioSetUhd: Waiting for radio initialization, %zu of %zu "
+          "ready\n",
           num_radios_config, radio_num_);
       num_checks = 0;
     }
     num_radios_config = num_radios_configured_.load();
   }
-
   for (auto& join_thread : config_bs_threads) {
     join_thread.join();
   }
-
-  for (const auto& radio : radios_) {
-    radio->PrintSettings();
-  }
-
-  // TODO: For multi-cell, this procedure needs modification
-  if (kUseUHD == false) {
-    for (size_t i = 0; i < cfg_->NumCells(); i++) {
-      if (hubs_.at(i) == nullptr) {
-        radios_.at(i)->ClearSyncDelay();
-      } else {
-        hubs_.at(i)->writeSetting("SYNC_DELAYS", "");
-      }
-    }
-  }
-  AGORA_LOG_INFO("BsRadioSet init complete!\n");
+  radios_->PrintSettings();
+  AGORA_LOG_INFO("RadioSetUhd init complete!\n");
 }
 
-void BsRadioSet::InitRadio(size_t radio_id) {
-  radios_.at(radio_id)->Init(cfg_, radio_id, cfg_->RadioId().at(radio_id),
-                             Utils::StrToChannels(cfg_->Channel()),
-                             cfg_->HwFramer());
-  num_radios_initialized_.fetch_add(1);
-}
-
-BsRadioSet::~BsRadioSet() {
+RadioSetUhd::~RadioSetUhd() {
   FreeBuffer1d(&init_calib_dl_processed_);
   FreeBuffer1d(&init_calib_ul_processed_);
 
   std::vector<std::thread> close_radio_threads;
-  for (auto& radio : radios_) {
-    close_radio_threads.emplace_back(&Radio::Close, radio.get());
-  }
+  close_radio_threads.emplace_back(&Radio::Close, radios_.get());
 
-  AGORA_LOG_INFO("~BsRadioSet waiting for close\n");
+  AGORA_LOG_INFO("~RadioSetUhd waiting for close\n");
   for (auto& join_thread : close_radio_threads) {
     join_thread.join();
   }
-
-  for (auto* hub : hubs_) {
-    SoapySDR::Device::unmake(hub);
-  }
-  hubs_.clear();
   AGORA_LOG_INFO("RadioStop destructed\n");
 }
 
-void BsRadioSet::ConfigureRadio(size_t radio_id) {
+void RadioSetUhd::InitBsRadio(size_t radio_id) {
+  radios_->Init(cfg_, radio_id, cfg_->RadioId().at(radio_id),
+                Utils::StrToChannels(cfg_->Channel()), cfg_->HwFramer());
+  num_radios_initialized_.fetch_add(1);
+}
+
+void RadioSetUhd::ConfigureBsRadio(size_t radio_id) {
+  (void)radio_id;
   std::vector<double> tx_gains;
   tx_gains.emplace_back(cfg_->TxGainA());
   tx_gains.emplace_back(cfg_->TxGainB());
@@ -194,14 +118,11 @@ void BsRadioSet::ConfigureRadio(size_t radio_id) {
   rx_gains.emplace_back(cfg_->RxGainA());
   rx_gains.emplace_back(cfg_->RxGainB());
 
-  radios_.at(radio_id)->Setup(tx_gains, rx_gains);
+  radios_->Setup(tx_gains, rx_gains);
   num_radios_configured_.fetch_add(1);
 }
 
-bool BsRadioSet::RadioStart() {
-  if (cfg_->SampleCalEn()) {
-    CalibrateSampleOffset();
-  }
+bool RadioSetUhd::RadioStart() {
   bool good_calib = false;
   AllocBuffer1d(&init_calib_dl_processed_,
                 cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
@@ -226,20 +147,20 @@ bool BsRadioSet::RadioStart() {
     if (cfg_->Frame().NumDLSyms() > 0) {
       int iter = 0;
       int max_iter = 1;
-      std::cout << "Start initial reciprocity calibration..." << std::endl;
+      AGORA_LOG_INFO("Start initial reciprocity calibration...\n");
       while (good_calib == false) {
         good_calib = InitialCalib();
         iter++;
         if ((iter == max_iter) && (good_calib == false)) {
-          std::cout << "attempted " << max_iter
-                    << " unsucessful calibration, stopping ..." << std::endl;
+          AGORA_LOG_INFO(
+              "attempted %d unsuccessful calibration, stopping ...\n");
           break;
         }
       }
       if (good_calib == false) {
         return good_calib;
       } else {
-        std::cout << "initial calibration successful!" << std::endl;
+        AGORA_LOG_INFO("initial calibration successful!\n");
       }
       // process initial measurements
       arma::cx_fcube calib_dl_cube(cfg_->OfdmDataNum(), cfg_->BfAntNum(),
@@ -292,63 +213,58 @@ bool BsRadioSet::RadioStart() {
     init_calib_ul_.Free();
   }
 
+  //Speed up the activations (could have a flush)
+  std::vector<std::thread> activate_radio_threads;
   for (size_t i = 0; i < radio_num_; i++) {
     if (cfg_->HwFramer()) {
       const size_t cell_id = cfg_->CellId().at(i);
       const bool is_ref_radio = (i == cfg_->RefRadio(cell_id));
-      radios_.at(i)->ConfigureTddModeBs(is_ref_radio);
+      radios_->ConfigureTddModeBs(is_ref_radio);
     }
-    radios_.at(i)->SetTimeAtTrigger(0);
+    radios_->SetTimeAtTrigger(0);
+    activate_radio_threads.emplace_back(&Radio::Activate, radios_.get(),
+                                        Radio::ActivationTypes::kActivate, 0,
+                                        0);
   }
-  RadioSet::RadioStart(Radio::kActivate);
+
+  AGORA_LOG_INFO("RadioStart waiting for activation\n");
+  for (auto& join_thread : activate_radio_threads) {
+    join_thread.join();
+  }
+  AGORA_LOG_INFO("RadioSetUhd::RadioUHDStart complete!\n");
   return true;
 }
 
-void BsRadioSet::Go() {
-  // TODO: For multi-cell trigger process needs modification
-  if (kUseUHD == false) {
-    for (size_t i = 0; i < cfg_->NumCells(); i++) {
-      if (hubs_.at(i) == nullptr) {
-        radios_.at(i)->Trigger();
-      } else {
-        hubs_.at(i)->writeSetting("TRIGGER_GEN", "");
-      }
-    }
-  }
-}
+void RadioSetUhd::Go() {}
 
-long long BsRadioSet::SyncArrayTime() {
+long long RadioSetUhd::SyncArrayTime() {
   //1ms
   constexpr long long kTimeSyncMaxLimit = 1000000;
   //Use the trigger to sync the array
   AGORA_LOG_TRACE("SyncArrayTime: Setting trigger time\n");
-  for (auto& radio : radios_) {
-    radio->SetTimeAtTrigger();
-  }
-
+  radios_->SetTimeAtTrigger();
   AGORA_LOG_TRACE("SyncArrayTime: Triggering!\n");
   Go();
 
   ///Wait for enough time for the boards to update
-  auto wait_time = std::chrono::milliseconds(500);
+  auto wait_time = std::chrono::milliseconds(5000);
   AGORA_LOG_TRACE("SyncArrayTime: Waiting for %ld ms\n", wait_time.count());
   std::this_thread::sleep_for(wait_time);
   AGORA_LOG_TRACE("SyncArrayTime: Time Check!\n");
 
   //Get first time
-  auto radio_time = radios_.at(0)->GetTimeNs();
-  //Verify all times are within 1ms (typical .35ms - .85 between calls)
-  for (size_t i = 1; i < radios_.size(); i++) {
-    auto time_now = radios_.at(i)->GetTimeNs();
-    auto time_diff_ns = time_now - radio_time;
-    if (time_diff_ns > kTimeSyncMaxLimit) {
-      AGORA_LOG_WARN(
-          "SyncArrayTime: Radio time out of bounds during alignment.  Radio "
-          "%zu, time %lld, reference %lld, difference %lld, tolerance %lld\n",
-          i, time_now, radio_time, time_diff_ns, kTimeSyncMaxLimit);
-    }
-    //Update the check time with the current time
-    radio_time = time_now;
+  auto radio_time = radios_->GetTimeNs();
+  //Verify all times are within 1ms (typical .35ms - .85 between calls) - since only one object in UHD setting, this is being deleted
+  auto time_now = radios_->GetTimeNs();
+  auto time_diff_ns = time_now - radio_time;
+  if (time_diff_ns > kTimeSyncMaxLimit) {
+    AGORA_LOG_WARN(
+        "SyncArrayTime: Radio UHD time out of bounds during alignment.  Radio "
+        "UHD "
+        "time %lld, reference %lld, difference %lld, tolerance %lld\n",
+        time_now, radio_time, time_diff_ns, kTimeSyncMaxLimit);
   }
+  //Update the check time with the current time
+  radio_time = time_now;
   return radio_time;
 }

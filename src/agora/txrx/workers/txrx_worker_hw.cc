@@ -25,7 +25,7 @@ TxRxWorkerHw::TxRxWorkerHw(
     moodycamel::ProducerToken& notify_producer,
     std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
     std::mutex& sync_mutex, std::condition_variable& sync_cond,
-    std::atomic<bool>& can_proceed, BsRadioSet& radio_config)
+    std::atomic<bool>& can_proceed, RadioSetBs& radio_config)
     : TxRxWorker(core_offset, tid, interface_count, interface_offset,
                  config->NumChannels(), config, rx_frame_start, event_notify_q,
                  tx_pending_q, tx_producer, notify_producer, rx_memory,

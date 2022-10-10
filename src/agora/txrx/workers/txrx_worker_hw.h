@@ -10,8 +10,8 @@
 #include <memory>
 #include <vector>
 
-#include "bs_radio_set.h"
 #include "message.h"
+#include "radio_set_bs.h"
 #include "rx_status_tracker.h"
 #include "txrx_worker.h"
 
@@ -38,7 +38,7 @@ class TxRxWorkerHw : public TxRxWorker {
                moodycamel::ProducerToken& notify_producer,
                std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
                std::mutex& sync_mutex, std::condition_variable& sync_cond,
-               std::atomic<bool>& can_proceed, BsRadioSet& radio_config);
+               std::atomic<bool>& can_proceed, RadioSetBs& radio_config);
   TxRxWorkerHw() = delete;
   ~TxRxWorkerHw() final;
   void DoTxRx() final;
@@ -73,7 +73,7 @@ class TxRxWorkerHw : public TxRxWorker {
                            size_t next_symbol);
 
   // This object is created / owned by the parent process
-  BsRadioSet& radio_config_;
+  RadioSetBs& radio_config_;
   size_t program_start_ticks_;
   const double freq_ghz_;
 

@@ -2,14 +2,14 @@
  * @file main.cc
  * @brief Main file for the radio test program
  */
-#include "bs_radio_set.h"
 #include "comms-lib.h"
 #include "gflags/gflags.h"
 #include "logger.h"
 #include "network_utils.h"
+#include "radio_set_bs.h"
+#include "radio_set_ue.h"
 #include "rx_status_tracker.h"
 #include "signal_handler.h"
-#include "ue_radio_set.h"
 #include "version_config.h"
 
 DEFINE_string(

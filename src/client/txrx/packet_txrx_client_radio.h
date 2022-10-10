@@ -9,7 +9,7 @@
 
 #include "common_typedef_sdk.h"
 #include "packet_txrx.h"
-#include "ue_radio_set.h"
+#include "radio_set_ue.h"
 
 /**
  * @brief Implementations of this class provide packet I/O for Agora.
