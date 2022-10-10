@@ -12,7 +12,7 @@
 #include "logger.h"
 #include "message.h"
 
-static constexpr size_t kFirstBeaconFrameAdvance = 400;
+static constexpr size_t kFirstBeaconFrameAdvance = 40;
 static constexpr size_t kBeaconFrameAdvance = 0;
 
 TxRxWorkerUsrp::TxRxWorkerUsrp(
