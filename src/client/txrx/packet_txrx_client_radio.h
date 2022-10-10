@@ -38,7 +38,7 @@ class PacketTxRxClientRadio : public PacketTxRx {
                     size_t* rx_frame_start, std::vector<RxPacket>& rx_memory,
                     std::byte* const tx_memory) final;
 
-  std::unique_ptr<ClientRadioConfig> radio_config_;
+  std::unique_ptr<UeRadioSet> radio_config_;
 };
 
 #endif  // PACKETTXRX_CLIENT_RADIO_H_

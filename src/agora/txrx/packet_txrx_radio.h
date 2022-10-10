@@ -45,7 +45,7 @@ class PacketTxRxRadio : public PacketTxRx {
 #if defined(USE_PURE_UHD)
   std::unique_ptr<RadioUHDConfig> radio_config_;
 #else
-  std::unique_ptr<RadioConfig> radio_config_;
+  std::unique_ptr<BsRadioSet> radio_config_;
 #endif
 };
 

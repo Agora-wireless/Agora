@@ -7,9 +7,8 @@
 
 #include "logger.h"
 
-ClientRadioConfig::ClientRadioConfig(const Config* const cfg,
-                                     Radio::RadioType radio_type)
-    : cfg_(cfg) {
+UeRadioSet::UeRadioSet(const Config* const cfg, Radio::RadioType radio_type)
+    : RadioSet(cfg->SampsPerSymbol()), cfg_(cfg) {
   if (radio_type == Radio::RadioType::kUhdNative) {
     total_radios_ = 1;
   } else {
@@ -27,9 +26,9 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg,
   num_client_radios_initialized_ = 0;
   for (size_t i = 0; i < total_radios_; i++) {
 #if defined(THREADED_INIT)
-    radio_threads.emplace_back(&ClientRadioConfig::InitClientRadio, this, i);
+    radio_threads.emplace_back(&UeRadioSet::InitRadio, this, i);
 #else
-    InitClientRadio(i);
+    InitRadio(i);
 #endif
   }  // end for (size_t i = 0; i < total_radios_; i++)
 
@@ -40,7 +39,7 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg,
     num_checks++;
     if (num_checks > 1e9) {
       AGORA_LOG_INFO(
-          "ClientRadioConfig: Waiting for radio initialization, %zu of %zu "
+          "UeRadioSet: Waiting for radio initialization, %zu of %zu "
           "ready\n",
           num_client_radios_init, total_radios_);
       num_checks = 0;
@@ -56,10 +55,10 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg,
   for (const auto& radio : radios_) {
     radio->PrintSettings();
   }
-  AGORA_LOG_INFO("ClientRadioConfig: Radio init complete\n");
+  AGORA_LOG_INFO("UeRadioSet: Radio init complete\n");
 }
 
-void ClientRadioConfig::InitClientRadio(size_t radio_id) {
+void UeRadioSet::InitRadio(size_t radio_id) {
   radios_.at(radio_id)->Init(cfg_, radio_id, cfg_->UeRadioId().at(radio_id),
                              Utils::StrToChannels(cfg_->UeChannel()),
                              cfg_->UeHwFramer());
@@ -76,7 +75,7 @@ void ClientRadioConfig::InitClientRadio(size_t radio_id) {
   this->num_client_radios_initialized_.fetch_add(1);
 }
 
-bool ClientRadioConfig::RadioStart() {
+bool UeRadioSet::RadioStart() {
   // send through the first radio for now
   for (size_t i = 0; i < total_radios_; i++) {
     if (cfg_->UeHwFramer()) {
@@ -84,55 +83,14 @@ bool ClientRadioConfig::RadioStart() {
     }
     radios_.at(i)->Activate(Radio::ActivationTypes::kActivateWaitTrigger);
   }
-  AGORA_LOG_INFO("ClientRadioConfig: Radio start complete!\n");
+  AGORA_LOG_INFO("UeRadioSet: Radio start complete!\n");
   return true;
 }
 
-void ClientRadioConfig::Go() const {
+void UeRadioSet::Go() {
   if ((kUseUHD == false) || (kUsePureUHD == false)) {
     for (size_t i = 0; i < total_radios_; i++) {
       radios_.at(i)->Trigger();
     }
-  }
-}
-
-int ClientRadioConfig::RadioTx(size_t radio_id, void** buffs, size_t num_samps,
-                               Radio::TxFlags flags, long long& tx_time) {
-  return radios_.at(radio_id)->Tx(buffs, num_samps, flags, tx_time);
-}
-
-int ClientRadioConfig::RadioRx(
-    size_t radio_id, std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-    size_t rx_size, Radio::RxFlags& out_flags, long long& rx_time_ns) {
-  return radios_.at(radio_id)->Rx(rx_data, rx_size, out_flags, rx_time_ns);
-}
-
-int ClientRadioConfig::RadioRx(
-    size_t radio_id, std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
-    size_t rx_size, Radio::RxFlags& out_flags, long long& rx_time_ns) {
-  return radios_.at(radio_id)->Rx(rx_buffs, rx_size, out_flags, rx_time_ns);
-}
-
-int ClientRadioConfig::RadioRx(size_t radio_id, std::vector<void*>& rx_locs,
-                               size_t rx_size, Radio::RxFlags& out_flags,
-                               long long& rx_time_ns) {
-  return radios_.at(radio_id)->Rx(rx_locs, rx_size, out_flags, rx_time_ns);
-}
-
-void ClientRadioConfig::ReadSensors() {
-  for (const auto& radio : radios_) {
-    radio->ReadSensor();
-  }
-}
-
-void ClientRadioConfig::RadioStop() {
-  for (auto& radio : radios_) {
-    radio->Deactivate();
-  }
-}
-
-ClientRadioConfig::~ClientRadioConfig() {
-  for (auto& radio : radios_) {
-    radio->Close();
   }
 }

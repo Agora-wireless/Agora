@@ -1,6 +1,6 @@
 /**
  * @file radio_lib_uhd.h
- * @brief Declaration file for the RadioConfig class.
+ * @brief Declaration file for the BsRadioSet class.
  */
 #ifndef RADIO_LIB_UHD_H_
 #define RADIO_LIB_UHD_H_

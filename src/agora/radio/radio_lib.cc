@@ -1,6 +1,6 @@
 /**
  * @file radio_lib.cc
- * @brief Implementation file for the RadioConfig class.
+ * @brief Implementation file for the BsRadioSet class.
  */
 #include "radio_lib.h"
 
@@ -14,8 +14,11 @@ static constexpr bool kPrintCalibrationMats = false;
 static constexpr size_t kSoapyMakeMaxAttempts = 3;
 static constexpr size_t kHubMissingWaitMs = 100;
 
-RadioConfig::RadioConfig(Config* cfg, Radio::RadioType radio_type)
-    : cfg_(cfg), num_radios_initialized_(0), num_radios_configured_(0) {
+BsRadioSet::BsRadioSet(Config* cfg, Radio::RadioType radio_type)
+    : RadioSet(cfg->SampsPerSymbol()),
+      cfg_(cfg),
+      num_radios_initialized_(0),
+      num_radios_configured_(0) {
   SoapySDR::Kwargs args;
   SoapySDR::Kwargs sargs;
   // load channels
@@ -44,7 +47,7 @@ RadioConfig::RadioConfig(Config* cfg, Radio::RadioType radio_type)
             break;
           } catch (const std::runtime_error& e) {
             const auto* message = e.what();
-            AGORA_LOG_WARN("RadioConfig::Soapy error[%zu] -- %s\n", tries,
+            AGORA_LOG_WARN("BsRadioSet::Soapy error[%zu] -- %s\n", tries,
                            message);
             std::this_thread::sleep_for(
                 std::chrono::milliseconds(kHubMissingWaitMs));
@@ -76,9 +79,9 @@ RadioConfig::RadioConfig(Config* cfg, Radio::RadioType radio_type)
 
   for (size_t i = 0; i < radio_num_; i++) {
 #ifdef THREADED_INIT
-    init_bs_threads.emplace_back(&RadioConfig::InitBsRadio, this, i);
+    init_bs_threads.emplace_back(&BsRadioSet::InitRadio, this, i);
 #else
-    InitBsRadio(i);
+    InitRadio(i);
 #endif
   }
 
@@ -89,7 +92,7 @@ RadioConfig::RadioConfig(Config* cfg, Radio::RadioType radio_type)
     num_checks++;
     if (num_checks > 1e9) {
       std::printf(
-          "RadioConfig: Waiting for radio initialization, %zu of %zu ready\n",
+          "BsRadioSet: Waiting for radio initialization, %zu of %zu ready\n",
           num_radios_init, radio_num_);
       num_checks = 0;
     }
@@ -113,9 +116,9 @@ RadioConfig::RadioConfig(Config* cfg, Radio::RadioType radio_type)
   std::vector<std::thread> config_bs_threads;
   for (size_t i = 0; i < radio_num_; i++) {
 #ifdef THREADED_INIT
-    config_bs_threads.emplace_back(&RadioConfig::ConfigureBsRadio, this, i);
+    config_bs_threads.emplace_back(&BsRadioSet::ConfigureRadio, this, i);
 #else
-    ConfigureBsRadio(i);
+    ConfigureRadio(i);
 #endif
   }
 
@@ -126,7 +129,7 @@ RadioConfig::RadioConfig(Config* cfg, Radio::RadioType radio_type)
     num_checks++;
     if (num_checks > 1e9) {
       AGORA_LOG_WARN(
-          "RadioConfig: Waiting for radio initialization, %zu of %zu ready\n",
+          "BsRadioSet: Waiting for radio initialization, %zu of %zu ready\n",
           num_radios_config, radio_num_);
       num_checks = 0;
     }
@@ -151,17 +154,17 @@ RadioConfig::RadioConfig(Config* cfg, Radio::RadioType radio_type)
       }
     }
   }
-  AGORA_LOG_INFO("RadioConfig init complete!\n");
+  AGORA_LOG_INFO("BsRadioSet init complete!\n");
 }
 
-void RadioConfig::InitBsRadio(size_t radio_id) {
+void BsRadioSet::InitRadio(size_t radio_id) {
   radios_.at(radio_id)->Init(cfg_, radio_id, cfg_->RadioId().at(radio_id),
                              Utils::StrToChannels(cfg_->Channel()),
                              cfg_->HwFramer());
   num_radios_initialized_.fetch_add(1);
 }
 
-void RadioConfig::ConfigureBsRadio(size_t radio_id) {
+void BsRadioSet::ConfigureRadio(size_t radio_id) {
   std::vector<double> tx_gains;
   tx_gains.emplace_back(cfg_->TxGainA());
   tx_gains.emplace_back(cfg_->TxGainB());
@@ -174,7 +177,7 @@ void RadioConfig::ConfigureBsRadio(size_t radio_id) {
   num_radios_configured_.fetch_add(1);
 }
 
-bool RadioConfig::RadioStart() {
+bool BsRadioSet::RadioStart() {
   if (cfg_->SampleCalEn()) {
     CalibrateSampleOffset();
   }
@@ -286,11 +289,11 @@ bool RadioConfig::RadioStart() {
   for (auto& join_thread : activate_radio_threads) {
     join_thread.join();
   }
-  AGORA_LOG_INFO("RadioConfig::RadioStart complete!\n");
+  AGORA_LOG_INFO("BsRadioSet::RadioStart complete!\n");
   return true;
 }
 
-void RadioConfig::Go() {
+void BsRadioSet::Go() {
   // TODO: For multi-cell trigger process needs modification
   if (kUseUHD == false) {
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
@@ -303,65 +306,7 @@ void RadioConfig::Go() {
   }
 }
 
-int RadioConfig::RadioTx(size_t radio_id, const void* const* buffs,
-                         Radio::TxFlags flags, long long& tx_time) {
-  return radios_.at(radio_id)->Tx(buffs, cfg_->SampsPerSymbol(), flags,
-                                  tx_time);
-}
-
-int RadioConfig::RadioTx(
-    size_t radio_id,
-    const std::vector<std::vector<std::complex<int16_t>>>& tx_data,
-    Radio::TxFlags flags, long long& tx_time)
-
-{
-  std::vector<const void*> buffs(tx_data.size());
-  for (size_t i = 0; i < tx_data.size(); i++) {
-    buffs.at(i) = tx_data.at(i).data();
-  }
-  return radios_.at(radio_id)->Tx(buffs.data(), cfg_->SampsPerSymbol(), flags,
-                                  tx_time);
-}
-
-int RadioConfig::RadioRx(
-    size_t radio_id, std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-    size_t rx_size, Radio::RxFlags& out_flags, long long& rx_time_ns) {
-  return radios_.at(radio_id)->Rx(rx_data, rx_size, out_flags, rx_time_ns);
-}
-
-int RadioConfig::RadioRx(
-    size_t radio_id, std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
-    size_t rx_size, Radio::RxFlags& out_flags, long long& rx_time_ns) {
-  return radios_.at(radio_id)->Rx(rx_buffs, rx_size, out_flags, rx_time_ns);
-}
-
-int RadioConfig::RadioRx(size_t radio_id, std::vector<void*>& rx_locs,
-                         size_t rx_size, Radio::RxFlags& out_flags,
-                         long long& rx_time_ns) {
-  return radios_.at(radio_id)->Rx(rx_locs, rx_size, out_flags, rx_time_ns);
-}
-
-void RadioConfig::ReadSensors() {
-  for (const auto& radio : radios_) {
-    radio->ReadSensor();
-  }
-}
-
-void RadioConfig::RadioStop() {
-  //Could add a threaded deactivate if it speeds things up.
-  std::vector<std::thread> deactivate_radio_threads;
-  for (auto& radio : radios_) {
-    deactivate_radio_threads.emplace_back(&Radio::Deactivate, radio.get());
-  }
-
-  AGORA_LOG_INFO("RadioStop waiting for deactivation\n");
-  for (auto& join_thread : deactivate_radio_threads) {
-    join_thread.join();
-  }
-  AGORA_LOG_INFO("RadioStop deactivated\n");
-}
-
-long long RadioConfig::SyncArrayTime() {
+long long BsRadioSet::SyncArrayTime() {
   //1ms
   constexpr long long kTimeSyncMaxLimit = 1000000;
   //Use the trigger to sync the array
@@ -397,7 +342,7 @@ long long RadioConfig::SyncArrayTime() {
   return radio_time;
 }
 
-RadioConfig::~RadioConfig() {
+BsRadioSet::~BsRadioSet() {
   FreeBuffer1d(&init_calib_dl_processed_);
   FreeBuffer1d(&init_calib_ul_processed_);
 
@@ -406,7 +351,7 @@ RadioConfig::~RadioConfig() {
     close_radio_threads.emplace_back(&Radio::Close, radio.get());
   }
 
-  AGORA_LOG_INFO("~RadioConfig waiting for close\n");
+  AGORA_LOG_INFO("~BsRadioSet waiting for close\n");
   for (auto& join_thread : close_radio_threads) {
     join_thread.join();
   }
