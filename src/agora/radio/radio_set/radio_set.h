@@ -15,7 +15,7 @@
 
 class RadioSet {
  public:
-  RadioSet() = delete;
+  RadioSet() {};
   explicit RadioSet(size_t samples_per_symbol);
   virtual ~RadioSet() = 0;
 

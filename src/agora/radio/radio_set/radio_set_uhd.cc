@@ -5,7 +5,7 @@
 #include <thread>
 
 #include "logger.h"
-#include "radio_lib_uhd.h"
+#include "radio_set_uhd.h"
 
 // only one BS radio object, since, no emplace_back is needed, and the thread number for BS is also set to be 1
 RadioSetUhd::RadioSetUhd(Config* cfg, Radio::RadioType radio_type)
@@ -77,12 +77,14 @@ RadioSetUhd::RadioSetUhd(Config* cfg, Radio::RadioType radio_type)
   for (auto& join_thread : config_bs_threads) {
     join_thread.join();
   }
-  radios_->PrintSettings();
+  for (const auto& radio : radios_) {
+    radio->PrintSettings();
+  }
   AGORA_LOG_INFO("RadioSetUhd init complete!\n");
 }
 
 void RadioSetUhd::InitRadio(size_t radio_id) {
-  radios_->Init(cfg_, radio_id, cfg_->RadioId().at(radio_id),
+  radios_.at(radio_id)->Init(cfg_, radio_id, cfg_->RadioId().at(radio_id),
                 Utils::StrToChannels(cfg_->Channel()), cfg_->HwFramer());
   num_radios_initialized_.fetch_add(1);
 }
@@ -97,7 +99,7 @@ void RadioSetUhd::ConfigureRadio(size_t radio_id) {
   rx_gains.emplace_back(cfg_->RxGainA());
   rx_gains.emplace_back(cfg_->RxGainB());
 
-  radios_->Setup(tx_gains, rx_gains);
+  radios_.at(radio_id)->Setup(tx_gains, rx_gains);
   num_radios_configured_.fetch_add(1);
 }
 
@@ -106,9 +108,9 @@ bool RadioSetUhd::RadioStart() {
     if (cfg_->HwFramer()) {
       const size_t cell_id = cfg_->CellId().at(i);
       const bool is_ref_radio = (i == cfg_->RefRadio(cell_id));
-      radios_->ConfigureTddModeBs(is_ref_radio);
+      radios_.at(0)->ConfigureTddModeBs(is_ref_radio);
     }
-    radios_->SetTimeAtTrigger(0);
+    radios_.at(0)->SetTimeAtTrigger(0);
     RadioSet::RadioStart(Radio::kActivate);
   }
   return true;
