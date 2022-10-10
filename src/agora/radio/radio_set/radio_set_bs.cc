@@ -168,16 +168,6 @@ RadioSetBs::~RadioSetBs() {
   FreeBuffer1d(&init_calib_dl_processed_);
   FreeBuffer1d(&init_calib_ul_processed_);
 
-  std::vector<std::thread> close_radio_threads;
-  for (auto& radio : radios_) {
-    close_radio_threads.emplace_back(&Radio::Close, radio.get());
-  }
-
-  AGORA_LOG_INFO("~RadioSetBs waiting for close\n");
-  for (auto& join_thread : close_radio_threads) {
-    join_thread.join();
-  }
-
   for (auto* hub : hubs_) {
     SoapySDR::Device::unmake(hub);
   }
