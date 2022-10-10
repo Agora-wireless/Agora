@@ -174,18 +174,15 @@ void RadioUHDSdr::Activate(Radio::ActivationTypes type, long long act_time_ns,
     dev_->set_time_next_pps(time2);
     //dev_->set_time_unknown_pps(uhd::time_spec_t(0.0));
     // Wait for pps sync pulse
-    //std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
   }
   AGORA_LOG_INFO("in/external clock set \n");
-
-  // Wait for pps sync pulse ??`
-  //FLAGS????  *** Is this enough time?
 
   uhd::stream_cmd_t::stream_mode_t mode;
   mode = uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
   uhd::stream_cmd_t cmd(mode);
   cmd.stream_now = false;
-  cmd.time_spec = dev_->get_time_now() + uhd::time_spec_t(0.1);
+  cmd.time_spec = dev_->get_time_now() + uhd::time_spec_t(1.0);
   cmd.num_samps = samples;
 
   AGORA_LOG_INFO("RadioUHDSdr::xmit activate defaulted\n");
@@ -220,16 +217,13 @@ int RadioUHDSdr::Tx(const void* const* tx_buffs, size_t tx_size,
     tx_time_ns = SoapySDR::ticksToTimeNs(tx_time_ns, cfg_->Rate());
   }
 
-  uhd::tx_streamer::sptr stream = txs_;
   uhd::tx_metadata_t md;
   md.has_time_spec = true;
   md.end_of_burst = (flags == kEndTransmit);
   md.time_spec = uhd::time_spec_t::from_ticks(tx_time_ns, 1e9);
 
-  uhd::tx_streamer::buffs_type stream_buffs(tx_buffs,
-                                            stream->get_num_channels());
-  const int ret = stream->send(stream_buffs, tx_size, md, kTxTimeoutSec);
-  const int write_status = ret;
+  uhd::tx_streamer::buffs_type stream_buffs(tx_buffs, txs_->get_num_channels());
+  const int write_status = txs_->send(stream_buffs, tx_size, md, kTxTimeoutSec);
 
   if (kDebugRadioTX) {
     uhd::async_metadata_t md_debug;
