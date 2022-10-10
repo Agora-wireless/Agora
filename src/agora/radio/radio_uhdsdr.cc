@@ -9,6 +9,11 @@
 #include <uhd/utils/log_add.hpp>
 #include <uhd/version.hpp>
 
+#include "SoapySDR/Device.hpp"
+#include "SoapySDR/Time.hpp"
+#include "SoapySDR/Formats.hpp"
+#include "SoapySDR/Logger.hpp"
+
 #include "comms-lib.h"
 #include "logger.h"
 #include "symbols.h"
@@ -197,7 +202,7 @@ void RadioUHDSdr::Deactivate() {
   uhd::stream_cmd_t cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
   //Stop now
   cmd.stream_now = true;
-  cmd.time_spec = 0;
+  cmd.time_spec = uhd::time_spec_t::from_ticks(0, 1e9);;
   rxs_->issue_stream_cmd(cmd);
 
   // there is not issue_stream_cmd in uhd::tx_streamer
@@ -316,17 +321,17 @@ int RadioUHDSdr::Rx(std::vector<void*>& rx_locs, size_t rx_size,
           //This usually happens when the timeout is not long enough to wait for multiple packets for a given requested rx length
           AGORA_LOG_WARN(
               "RadioDataPlane_UHD::Rx - expected SOAPY_SDR_END_BURST but "
-              "didn't happen samples count %zu requested %zu symbols with "
-              "flags %d\n",
-              rx_samples, rx_size, soapy_rx_flags);
+              "didn't happen samples count %zu requested %zu symbols"
+              "\n",
+              rx_samples, rx_size);
         }
       }
 
       if (more_frags) {
         AGORA_LOG_WARN(
             "RadioDataPlane_UHD::Rx - fragments remaining on rx call for "
-            "sample count %zu requested %zu symbols with flags %d\n",
-            rx_samples, rx_size, soapy_rx_flags);
+            "sample count %zu requested %zu symbols \n",
+            rx_samples, rx_size);
       }
       rx_time_ns = frame_time_ns;
     } else {
