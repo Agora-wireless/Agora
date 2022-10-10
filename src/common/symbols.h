@@ -184,6 +184,7 @@ static constexpr bool kEnableMatLog = false;
 static constexpr bool kUse12BitIQ = false;
 static constexpr bool kDebug12BitIQ = false;
 static constexpr bool kDebugDownlink = false;
+static constexpr bool kDebugUplink = false;
 
 static constexpr bool kUsePartialTrans = true;
 

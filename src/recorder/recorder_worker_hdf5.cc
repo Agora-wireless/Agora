@@ -176,7 +176,7 @@ void RecorderWorkerHDF5::Init() {
   // ********************* //
 
   // *****Temp compatibility values
-  //hdf5_->WriteAttribute("DATA_SUBCARRIER_NUM", cfg_->OfdmDataNum());
+  hdf5_->WriteAttribute("DATA_SUBCARRIER_NUM", cfg_->OfdmDataNum());
   const size_t fft_size = cfg_->OfdmCaNum();
   const size_t sym_data_sc_num = cfg_->OfdmDataNum();
   hdf5_->WriteAttribute("FFT_SIZE", fft_size);
@@ -209,10 +209,13 @@ void RecorderWorkerHDF5::Init() {
   const size_t pilot_f_samples = pilot_sym_f.at(0).size();
   RtAssert(pilot_sym_f.at(0).size() == pilot_sym_f.at(1).size(),
            "pilot_sym_f must have equal dimensions");
-  std::vector<double> split_vec_pilot_f(2 * pilot_f_samples);
+  std::vector<double> split_vec_pilot_f(2 * fft_size, 0.0);
+  const auto ofdm_data_start = cfg_->OfdmDataStart();
   for (size_t i = 0; i < pilot_f_samples; i++) {
-    split_vec_pilot_f[(2 * i) + 0] = pilot_sym_f.at(0).at(i);
-    split_vec_pilot_f[(2 * i) + 1] = pilot_sym_f.at(1).at(i);
+    split_vec_pilot_f[(2 * (ofdm_data_start + i)) + 0] =
+        pilot_sym_f.at(0).at(i);
+    split_vec_pilot_f[(2 * (ofdm_data_start + i)) + 1] =
+        pilot_sym_f.at(1).at(i);
   }
   hdf5_->WriteAttribute("OFDM_PILOT_F", split_vec_pilot_f);
 

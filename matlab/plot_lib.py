@@ -154,9 +154,11 @@ def plot_constellation_stats(evm, evm_snr, ser, ul_data, txdata, frame_i, ul_slo
     for i in range(n_users):
         y_i = int(i // plt_x_len)
         x_i = i % plt_x_len
+        tx_max = np.max(np.real(txdata[frame_i, i, :]))
+        tx_color = (tx_max - np.real(txdata[frame_i, i, :])) * 2 * tx_max + (tx_max - np.imag(txdata[frame_i, i, :]))
         axes5[y_i, x_i].set_title('User %d'%(i))
-        axes5[y_i, x_i].scatter(np.real(ul_data[frame_i, i, :]), np.imag(ul_data[frame_i, i, :]))
-        axes5[y_i, x_i].scatter(np.real(txdata[frame_i, i, :]), np.imag(txdata[frame_i, i, :]))
+        axes5[y_i, x_i].scatter(np.real(ul_data[frame_i, i, :]), np.imag(ul_data[frame_i, i, :]), c=tx_color, cmap='rainbow')
+        axes5[y_i, x_i].scatter(np.real(txdata[frame_i, i, :]), np.imag(txdata[frame_i, i, :]), marker='*', s=300, c=tx_color, cmap='rainbow')
 
         axes6[0, 0].plot(range(evm.shape[0]), 100 * evm[:, i], label='User %d'%(i))
         axes6[1, 0].plot(range(evm.shape[0]), evm_snr[:, i], label='User %d'%(i))
