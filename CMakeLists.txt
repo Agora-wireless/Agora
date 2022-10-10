@@ -23,7 +23,7 @@ endif()
 # New versions of GCC enable position-independent executables by default. We
 # don't want to compile FlexRAN libraries with -fPIC because it reduces
 # performance by around 40%.  Don’t produce a dynamically linked position independent executable. 
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -no-pie -pthread")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -no-pie")
 
 set(CMAKE_CXX_STANDARD 17)
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
@@ -96,7 +96,7 @@ endif()
 #Settable values
 message(STATUS "\n-- ----- Configuration values -----")
 message(STATUS "DEBUG:            ${DEBUG}")
-set(RADIO_TYPE SIMULATION CACHE STRING "RADIO_TYPE defaulting to 'SIMULATION', valid types are SIMULATION / SOAPY_IRIS / SOAPY_UHD")
+set(RADIO_TYPE SIMULATION CACHE STRING "RADIO_TYPE defaulting to 'SIMULATION', valid types are SIMULATION / SOAPY_IRIS / SOAPY_UHD / PURE_UHD")
 message(STATUS "RADIO_TYPE:       ${RADIO_TYPE}")
 set(LOG_LEVEL "info" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 message(STATUS "LOG_LEVEL:        ${LOG_LEVEL}")
@@ -125,8 +125,6 @@ elseif(RADIO_TYPE STREQUAL SOAPY_UHD)
 elseif(RADIO_TYPE STREQUAL PURE_UHD)
   message(STATUS "Enabled Pure UHD radio type")
   add_definitions(-DUSE_PURE_UHD)
-  set(ENABLE_PURE_UHD True CACHE STRING "ENABLE_PURE_UHD setting to 'TRUE'")
-  message(STATUS "ENABLE_PURE_UHD Support Enabled: ${ENABLE_PURE_UHD}")
 else()
   message(STATUS "Enabled SIMULATION radio type")
 endif()
@@ -305,24 +303,38 @@ include_directories(third_party third_party/spdlog/include third_party/nlohmann/
 add_definitions(-DTHREADED_INIT)
 
 if(RADIO_TYPE STREQUAL PURE_UHD)
+  message(STATUS "Enabled PURE_UHD radio")
+  add_definitions(-DUSE_UHD)
+  # Adding dependency of UHD and boost external libraries
   find_package(UHD "3.15.0" REQUIRED)
   message(STATUS "Using UHD Version: ${UHD_VERSION}")
 
+  ########################################################################
+  # PURE UHD dependencies
+  ########################################################################
+  # Adding dependency of Boost to souder
   set(BOOST_REQUIRED_COMPONENTS
-  program_options
-  system
-  thread)
+      program_options
+      system
+      thread)
 
   if(MSVC)
-    set(BOOST_ALL_DYN_LINK "${BOOST_ALL_DYN_LINK}" CACHE BOOL "boost enable dynamic linking")
-    if(BOOST_ALL_DYN_LINK)
-      add_definitions(-DBOOST_ALL_DYN_LINK) #setup boost auto-linking in msvc
-    else(BOOST_ALL_DYN_LINK)
-      set(BOOST_REQUIRED_COMPONENTS) #empty components list for static link
-    endif(BOOST_ALL_DYN_LINK)
+      set(BOOST_ALL_DYN_LINK "${BOOST_ALL_DYN_LINK}" CACHE BOOL "boost enable dynamic linking")
+      if(BOOST_ALL_DYN_LINK)
+          add_definitions(-DBOOST_ALL_DYN_LINK) #setup boost auto-linking in msvc
+      else(BOOST_ALL_DYN_LINK)
+          set(BOOST_REQUIRED_COMPONENTS) #empty components list for static link
+      endif(BOOST_ALL_DYN_LINK)
   endif(MSVC)
   find_package(Boost "1.65" REQUIRED ${BOOST_REQUIRED_COMPONENTS})
   message(STATUS "Using Boost Version: ${Boost_VERSION}")
+
+  set(PUREUHD_SOURCES
+      src/agora/radio/radio_uhdsdr.cc
+      src/agora/radio/radio_lib_uhd.cc
+      src/agora/txrx/workers/txrx_worker_usrp.cc
+      )
+  message(STATUS "pure_uhd_lib library initialized")
 endif()
 
 # MAC
@@ -336,6 +348,7 @@ set(MAC_CLIENT_SOURCES
   src/mac/video_receiver.cc
   src/mac/file_receiver.cc
   src/mac/mac_client.cc)
+
 set(MAC_BS_SOURCES
   src/mac/mac_sender.cc
   src/mac/mac_receiver.cc
@@ -372,6 +385,7 @@ endif()
 add_library(recorder_sources_lib OBJECT ${RECORDER_SOURCES})
 
 set(COMMON_SOURCES
+  ${PUREUHD_SOURCES}
   src/agora/stats.cc
   src/common/phy_stats.cc
   src/common/framestats.cc
@@ -400,12 +414,6 @@ set(COMMON_SOURCES
   src/encoder/cyclic_shift.cc
   src/encoder/encoder.cc
   src/encoder/iobuffer.cc)
-
-  if(RADIO_TYPE STREQUAL PURE_UHD)
-    set(COMMON_SOURCES ${COMMON_SOURCES}
-      src/agora/radio/radio_uhdsdr.cc
-      )
-  endif()
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(SHARED_TXRX_SOURCES
@@ -438,16 +446,8 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/txrx/packet_txrx_sim.cc
   src/agora/txrx/packet_txrx_radio.cc
   src/agora/txrx/workers/txrx_worker_sim.cc
-  src/agora/txrx/workers/txrx_worker_hw.cc
-  )
+  src/agora/txrx/workers/txrx_worker_hw.cc)
 
-  if(RADIO_TYPE STREQUAL PURE_UHD)
-    set(AGORA_SOURCES ${AGORA_SOURCES}
-      src/agora/radio/radio_lib_uhd.cc  
-      src/agora/radio/radio_calibrate_digital_uhd.cc
-      src/agora/txrx/workers/txrx_worker_usrp.cc
-      )
-  endif()
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
 set(CLIENT_SOURCES
@@ -464,7 +464,7 @@ set(CLIENT_SOURCES
 add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
 
 set(COMMON_LIBS -Wl,--start-group ${MKL_LIBS} ${BLAS_LIBRARIES} -Wl,--end-group ${NUMA_LIBRARIES} ${FLEXRAN_LDPC_LIBS} ${HDF5_LIBRARIES} ${DPDK_LIBRARIES} ${ARMADILLO_LIBRARIES} ${SOAPY_LIB}
-    ${PYTHON_LIB} ${GFLAGS_LIBRARIES} ${COMMON_LIBS})
+    ${PYTHON_LIB} ${Boost_LIBRARIES} ${GFLAGS_LIBRARIES} ${UHD_LIBRARIES} ${COMMON_LIBS})
 message(VERBOSE "Common libs: ${COMMON_LIBS}")
 
 # TODO: The main agora executable is performance-critical, so we need to
@@ -472,24 +472,17 @@ message(VERBOSE "Common libs: ${COMMON_LIBS}")
 # against sources reduces performance.
 add_executable(agora
   src/agora/main.cc
+  $<TARGET_OBJECTS:recorder_sources_lib>
   $<TARGET_OBJECTS:agora_sources_lib>
   $<TARGET_OBJECTS:shared_txrx_sources_lib>
-  $<TARGET_OBJECTS:recorder_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(agora ${COMMON_LIBS})
-if(RADIO_TYPE STREQUAL PURE_UHD)
-  target_link_libraries(agora ${UHD_LIBRARIES})
-endif()
-
 
 add_executable(data_generator
   ${CMAKE_CURRENT_SOURCE_DIR}/src/data_generator/data_generator_main.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/data_generator/data_generator.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(data_generator ${COMMON_LIBS})
-if(RADIO_TYPE STREQUAL PURE_UHD)
-  target_link_libraries(data_generator ${UHD_LIBRARIES})
-endif()
 target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
 add_executable(user
@@ -497,12 +490,8 @@ add_executable(user
   $<TARGET_OBJECTS:recorder_sources_lib>
   $<TARGET_OBJECTS:client_sources_lib>
   $<TARGET_OBJECTS:shared_txrx_sources_lib>
-  $<TARGET_OBJECTS:common_sources_lib>
-  $<TARGET_OBJECTS:agora_sources_lib>)
+  $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(user ${COMMON_LIBS})
-if(RADIO_TYPE STREQUAL PURE_UHD)
-  target_link_libraries(user ${UHD_LIBRARIES})
-endif()
 
 add_executable(sender
   simulator/sender_cli.cc
@@ -510,9 +499,6 @@ add_executable(sender
   src/common/dpdk_transport.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sender ${COMMON_LIBS})
-if(RADIO_TYPE STREQUAL PURE_UHD)
-  target_link_libraries(sender ${UHD_LIBRARIES})
-endif()
 
 add_executable(sim
   simulator/main.cc
@@ -522,9 +508,6 @@ add_executable(sim
   src/common/dpdk_transport.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sim ${COMMON_LIBS})
-if(RADIO_TYPE STREQUAL PURE_UHD)
-  target_link_libraries(sim ${UHD_LIBRARIES})
-endif()
 
 add_executable(chsim
   simulator/chsim_main.cc
@@ -532,33 +515,22 @@ add_executable(chsim
   simulator/channel.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(chsim ${COMMON_LIBS})
-if(RADIO_TYPE STREQUAL PURE_UHD)
-  target_link_libraries(chsim ${UHD_LIBRARIES})
-endif()
 
 add_executable(macuser
      ${MAC_CLIENT_SOURCES}
-     ${COMMON_SOURCES}
-     ${PUREUHD_SOURCES})
+     ${COMMON_SOURCES})
 target_link_libraries(macuser ${COMMON_LIBS})
-if(RADIO_TYPE STREQUAL PURE_UHD)
-  target_link_libraries(macuser ${UHD_LIBRARIES})
-endif()
 
 add_executable(macbs
      ${MAC_BS_SOURCES}
-     ${COMMON_SOURCES}
-     ${PUREUHD_SOURCES})
+     ${COMMON_SOURCES})
 target_link_libraries(macbs ${COMMON_LIBS})
-if(RADIO_TYPE STREQUAL PURE_UHD)
-  target_link_libraries(macbs ${UHD_LIBRARIES})
-endif()
 
 if(RADIO_TYPE STREQUAL SOAPY_IRIS)
 add_executable(radio_test
     test/radio_test/main.cc
-    $<TARGET_OBJECTS:agora_sources_lib>
     $<TARGET_OBJECTS:recorder_sources_lib>
+    $<TARGET_OBJECTS:agora_sources_lib>
     $<TARGET_OBJECTS:client_sources_lib>
     $<TARGET_OBJECTS:shared_txrx_sources_lib>
     $<TARGET_OBJECTS:common_sources_lib>)
@@ -568,27 +540,20 @@ endif()
 # End-to-end test
 add_executable(test_agora
   test/test_agora/main.cc
-  $<TARGET_OBJECTS:agora_sources_lib>
   $<TARGET_OBJECTS:recorder_sources_lib>
+  $<TARGET_OBJECTS:agora_sources_lib>
   $<TARGET_OBJECTS:shared_txrx_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_agora ${COMMON_LIBS})
-if(RADIO_TYPE STREQUAL PURE_UHD)
-  target_link_libraries(test_agora ${UHD_LIBRARIES})
-endif()
 
 set(LDPC_TESTS test_ldpc test_ldpc_mod test_ldpc_baseband)
 foreach(test_name IN LISTS LDPC_TESTS)
   add_executable(${test_name}
     test/compute_kernels/ldpc/${test_name}.cc
     $<TARGET_OBJECTS:common_sources_lib>)
-
   # Unit tests should pass without memory errors
   set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")
   target_link_libraries(${test_name} ${COMMON_LIBS} ${GTEST_LIBRARIES})
-  if(RADIO_TYPE STREQUAL PURE_UHD)
-  target_link_libraries(${test_name} ${UHD_LIBRARIES})
-endif()
   add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
 
@@ -601,16 +566,13 @@ set(UNIT_TESTS test_armadillo test_datatype_conversion test_udp_client_server
 foreach(test_name IN LISTS UNIT_TESTS)
   add_executable(${test_name}
     test/unit_tests/${test_name}.cc
+    $<TARGET_OBJECTS:recorder_sources_lib>
     $<TARGET_OBJECTS:agora_sources_lib>
     $<TARGET_OBJECTS:shared_txrx_sources_lib>
-    $<TARGET_OBJECTS:common_sources_lib>
-    $<TARGET_OBJECTS:recorder_sources_lib>)
+    $<TARGET_OBJECTS:common_sources_lib>)
 
   # Unit tests should pass without memory errors
   set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")
   target_link_libraries(${test_name} ${COMMON_LIBS} ${GTEST_LIBRARIES})
-  if(RADIO_TYPE STREQUAL PURE_UHD)
-  target_link_libraries(${test_name} ${UHD_LIBRARIES})
-endif()
   add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()

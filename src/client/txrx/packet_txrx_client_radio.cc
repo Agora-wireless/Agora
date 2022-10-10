@@ -3,16 +3,15 @@
  * @brief Implementation of PacketTxRxClientRadio initialization functions, and datapath
  * functions for communicating with user hardware.
  */
-
 #include "packet_txrx_client_radio.h"
 
 #include "logger.h"
 #include "txrx_worker_client_hw.h"
 
 #if defined(USE_PURE_UHD)
-auto kRadioType = Radio::kUhdNative;
+static constexpr Radio::RadioType kRadioType = Radio::kUhdNative;
 #else
-auto kRadioType = Radio::kSoapySdrStream;
+static constexpr Radio::RadioType kRadioType = Radio::kSoapySdrStream;
 #endif
 
 static constexpr size_t kRadioTriggerWaitMs = 100;
