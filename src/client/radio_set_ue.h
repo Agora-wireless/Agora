@@ -1,6 +1,6 @@
 /**
  * @file radio_set_ue.h
- * @brief Declaration file for the UeRadioSet class
+ * @brief Declaration file for the RadioSetUe class
  */
 #ifndef RADIO_SET_UE_H_
 #define RADIO_SET_UE_H_
@@ -13,10 +13,10 @@
 #include "radio.h"
 #include "radio_set.h"
 
-class UeRadioSet : public RadioSet {
+class RadioSetUe : public RadioSet {
  public:
-  UeRadioSet(const Config* const cfg, Radio::RadioType radio_type);
-  virtual ~UeRadioSet() final = default;
+  RadioSetUe(const Config* const cfg, Radio::RadioType radio_type);
+  virtual ~RadioSetUe() final = default;
 
   virtual bool RadioStart() final;
   virtual void Go() final;

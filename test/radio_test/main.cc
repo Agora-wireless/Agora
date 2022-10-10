@@ -123,7 +123,7 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
 
   if (kUseArgos) {
     // Makes the soapy remote "HUB" / InitBsRadio / ConfigureBsRadio
-    auto radioconfig = std::make_unique<RadioConfig>(cfg, type);
+    auto radioconfig = std::make_unique<RadioSetBs>(cfg, type);
     radioconfig->RadioStart();
 
     //std::this_thread::sleep_for(std::chrono::seconds(2));
@@ -279,7 +279,7 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
 
   if (kUseArgos) {
     // Makes the soapy remote "HUB" / InitBsRadio / ConfigureBsRadio
-    auto radioconfig = std::make_unique<ClientRadioConfig>(cfg, type);
+    auto radioconfig = std::make_unique<RadioSetUe>(cfg, type);
     radioconfig->RadioStart();
 
     //std::this_thread::sleep_for(std::chrono::seconds(2));
