@@ -69,6 +69,22 @@ void RadioSet::ReadSensors() {
   }
 }
 
+bool RadioSet::RadioStart(Radio::ActivationTypes start_type) {
+  //Speed up the activations (could have a flush)
+  std::vector<std::thread> activate_radio_threads;
+  for (auto& radio : radios_) {
+    activate_radio_threads.emplace_back(&Radio::Activate, radio.get(),
+                                        start_type, 0, 0);
+  }
+
+  AGORA_LOG_INFO("RadioStart waiting for activation\n");
+  for (auto& join_thread : activate_radio_threads) {
+    join_thread.join();
+  }
+  AGORA_LOG_INFO("RadioStart complete!\n");
+  return true;
+}
+
 void RadioSet::RadioStop() {
   //Threaded deactivate to speed things up
   std::vector<std::thread> deactivate_radio_threads;

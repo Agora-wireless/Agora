@@ -20,8 +20,8 @@ class RadioSet {
   virtual ~RadioSet() = 0;
 
   virtual void Go() = 0;
-  virtual bool RadioStart() = 0;
 
+  virtual bool RadioStart() = 0;
   virtual void RadioStop();
   virtual void ReadSensors();
 
@@ -48,6 +48,8 @@ class RadioSet {
   virtual arma::cx_float* GetCalibDl() { return nullptr; }
 
  protected:
+  bool RadioStart(Radio::ActivationTypes start_type);
+
   std::vector<std::unique_ptr<Radio>> radios_;
   size_t samples_per_symbol_;
 };
