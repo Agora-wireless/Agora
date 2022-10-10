@@ -1,6 +1,6 @@
 /**
  * @file radio_lib.h
- * @brief Declaration file for the RadioConfig class.
+ * @brief Declaration file for the BsRadioSet class.
  */
 #ifndef RADIO_LIB_H_
 #define RADIO_LIB_H_
@@ -17,40 +17,28 @@
 #include "config.h"
 #include "memory_manage.h"
 #include "radio.h"
+#include "radio_set.h"
 
-class RadioConfig {
+class BsRadioSet : public RadioSet {
  public:
-  RadioConfig(Config* cfg, Radio::RadioType radio_type);
-  ~RadioConfig();
+  BsRadioSet(Config* cfg, Radio::RadioType radio_type);
+  virtual ~BsRadioSet() final;
 
-  bool RadioStart();
-  void RadioStop();
-  void ReadSensors();
-  int RadioTx(size_t radio_id, const void* const* buffs, Radio::TxFlags flags,
-              long long& tx_time);
-  int RadioTx(size_t radio_id,
-              const std::vector<std::vector<std::complex<int16_t>>>& tx_data,
-              Radio::TxFlags flags, long long& tx_time_ns);
+  virtual bool RadioStart() final;
+  virtual void Go() final;
 
-  int RadioRx(size_t radio_id,
-              std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-              size_t rx_size, Radio::RxFlags& out_flags, long long& rx_time_ns);
+  virtual bool DoCalib() const final { return calib_; }
 
-  int RadioRx(size_t radio_id,
-              std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
-              size_t rx_size, Radio::RxFlags& out_flags, long long& rx_time_ns);
-
-  int RadioRx(size_t radio_id, std::vector<void*>& rx_locs, size_t rx_size,
-              Radio::RxFlags& out_flags, long long& rx_time_ns);
-
-  bool DoCalib() const { return calib_; }
-  void Go();
-  arma::cx_float* GetCalibUl() { return init_calib_ul_processed_; }
-  arma::cx_float* GetCalibDl() { return init_calib_dl_processed_; }
+  virtual arma::cx_float* GetCalibUl() final {
+    return init_calib_ul_processed_;
+  }
+  virtual arma::cx_float* GetCalibDl() final {
+    return init_calib_dl_processed_;
+  }
 
   // Thread functions
-  void InitBsRadio(size_t radio_id);
-  void ConfigureBsRadio(size_t radio_id);
+  virtual void InitRadio(size_t radio_id) final;
+  virtual void ConfigureRadio(size_t radio_id) final;
 
  private:
   long long SyncArrayTime();
@@ -80,7 +68,6 @@ class RadioConfig {
   void DciqCalibrationProc(size_t channel);
   Config* cfg_;
   std::vector<SoapySDR::Device*> hubs_;
-  std::vector<std::unique_ptr<Radio>> radios_;
   arma::cx_float* init_calib_ul_processed_;
   arma::cx_float* init_calib_dl_processed_;
   Table<arma::cx_float> init_calib_ul_;

@@ -11,36 +11,26 @@
 
 #include "config.h"
 #include "radio.h"
+#include "radio_set.h"
 
-class ClientRadioConfig {
+class UeRadioSet : public RadioSet {
  public:
-  ClientRadioConfig(const Config* const cfg, Radio::RadioType radio_type);
-  ~ClientRadioConfig();
+  UeRadioSet(const Config* const cfg, Radio::RadioType radio_type);
+  virtual ~UeRadioSet() final = default;
 
-  bool RadioStart();
-  void RadioStop();
-  void ReadSensors();
-  int RadioTx(size_t radio_id, void** buffs, size_t num_samps,
-              Radio::TxFlags flags, long long& tx_time);
+  virtual bool RadioStart() final;
+  virtual void Go() final;
 
-  int RadioRx(size_t radio_id,
-              std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-              size_t rx_size, Radio::RxFlags& out_flags, long long& rx_time_ns);
+  virtual bool DoCalib() const final { return false; }
+  virtual arma::cx_float* GetCalibUl() final { return nullptr; }
+  virtual arma::cx_float* GetCalibDl() final { return nullptr; }
 
-  int RadioRx(size_t radio_id,
-              std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
-              size_t rx_size, Radio::RxFlags& out_flags, long long& rx_time_ns);
-
-  int RadioRx(size_t radio_id, std::vector<void*>& rx_locs, size_t rx_size,
-              Radio::RxFlags& out_flags, long long& rx_time_ns);
-
-  void Go() const;
+  // Thread functions
+  virtual void InitRadio(size_t radio_id) final;
+  virtual void ConfigureRadio(size_t radio_id) final {}
 
  private:
-  void InitClientRadio(size_t radio_id);
-
   const Config* const cfg_;
-  std::vector<std::unique_ptr<Radio>> radios_;
   size_t total_radios_;
   size_t total_antennas_;
 

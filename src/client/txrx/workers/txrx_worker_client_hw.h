@@ -27,8 +27,7 @@ class TxRxWorkerClientHw : public TxRxWorker {
                      std::vector<RxPacket>& rx_memory,
                      std::byte* const tx_memory, std::mutex& sync_mutex,
                      std::condition_variable& sync_cond,
-                     std::atomic<bool>& can_proceed,
-                     ClientRadioConfig& radio_config);
+                     std::atomic<bool>& can_proceed, UeRadioSet& radio_config);
   TxRxWorkerClientHw() = delete;
   ~TxRxWorkerClientHw() final;
   void DoTxRx() final;
@@ -52,7 +51,7 @@ class TxRxWorkerClientHw : public TxRxWorker {
   void ResetRxStatus(size_t interface, bool reuse_memory);
 
   // This object is created / owned by the parent process
-  ClientRadioConfig& radio_;
+  UeRadioSet& radio_;
   size_t program_start_ticks_;
 
   std::vector<std::vector<std::complex<int16_t>>> frame_zeros_;
