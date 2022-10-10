@@ -47,10 +47,6 @@ class RadioSet {
   virtual arma::cx_float* GetCalibUl() { return nullptr; }
   virtual arma::cx_float* GetCalibDl() { return nullptr; }
 
-  // Threaded functions
-  virtual void InitRadio(size_t radio_id) = 0;
-  virtual void ConfigureRadio(size_t radio_id) = 0;
-
  protected:
   std::vector<std::unique_ptr<Radio>> radios_;
   size_t samples_per_symbol_;

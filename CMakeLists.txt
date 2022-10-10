@@ -444,7 +444,7 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/dodemul.cc
   src/agora/doprecode.cc
   src/agora/dodecode.cc
-  src/agora/radio/radio_lib.cc
+  src/agora/radio/bs_radio_set.cc
   src/agora/radio/radio_calibrate_digital.cc
   src/agora/radio/radio_calibrate_analog.cc
   src/mac/mac_thread_basestation.cc
@@ -458,7 +458,7 @@ add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 set(CLIENT_SOURCES
   src/client/doifft_client.cc
   src/client/dodecode_client.cc
-  src/client/client_radio.cc
+  src/client/ue_radio_set.cc
   src/client/ue_worker.cc
   src/client/phy-ue.cc
   src/client/txrx/packet_txrx_client_sim.cc

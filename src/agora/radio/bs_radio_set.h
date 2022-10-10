@@ -1,9 +1,9 @@
 /**
- * @file radio_lib.h
+ * @file bs_radio_set.h
  * @brief Declaration file for the BsRadioSet class.
  */
-#ifndef RADIO_LIB_H_
-#define RADIO_LIB_H_
+#ifndef BS_RADIO_SET_H_
+#define BS_RADIO_SET_H_
 
 #include <atomic>
 #include <complex>
@@ -28,7 +28,6 @@ class BsRadioSet : public RadioSet {
   virtual void Go() final;
 
   virtual bool DoCalib() const final { return calib_; }
-
   virtual arma::cx_float* GetCalibUl() final {
     return init_calib_ul_processed_;
   }
@@ -36,11 +35,11 @@ class BsRadioSet : public RadioSet {
     return init_calib_dl_processed_;
   }
 
-  // Thread functions
-  virtual void InitRadio(size_t radio_id) final;
-  virtual void ConfigureRadio(size_t radio_id) final;
-
  private:
+  // Thread functions
+  void InitRadio(size_t radio_id);
+  void ConfigureRadio(size_t radio_id);
+
   long long SyncArrayTime();
 
   void CalibrateSampleOffset();
@@ -80,4 +79,4 @@ class BsRadioSet : public RadioSet {
   std::atomic<size_t> num_radios_initialized_;
   std::atomic<size_t> num_radios_configured_;
 };
-#endif  // RADIO_LIB_H_
+#endif  // BS_RADIO_SET_H_
