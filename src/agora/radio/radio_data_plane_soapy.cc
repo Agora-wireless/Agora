@@ -168,7 +168,7 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
           static_cast<size_t>((frame_time_ns >> 16) & 0xFFFF));
     }
 
-    if (kDebugPrintRx) {
+    if (kDebugRadioRX) {
       if (rx_status == static_cast<int>(rx_size)) {
         AGORA_LOG_INFO("Radio %s(%zu) received %d:%zu flags: %d MTU %zu\n",
                        radio_->SerialNumber().c_str(), radio_->Id(), rx_status,
