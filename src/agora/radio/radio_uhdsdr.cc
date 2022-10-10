@@ -418,7 +418,6 @@ long long RadioUHDSdr::GetTimeNs() {
 void RadioUHDSdr::PrintSettings() const {
   std::stringstream print_message;
   SoapySDR::Kwargs out;
-  // std::cout<<"tx num channels are " << dev_->get_tx_num_channels() <<std::endl;
   for (size_t i = 0; i < dev_->get_tx_num_channels(); i++) {
     const uhd::dict<std::string, std::string> info = dev_->get_usrp_tx_info(i);
     for (const std::string& key : info.keys()) {
@@ -516,7 +515,7 @@ void RadioUHDSdr::ConfigureTddModeBs(bool is_ref_radio) {
       sched.replace(s, 1, "G");
     }
   }
-  std::cout << "Radio " << Id() << " Frame 1: " << sched << std::endl;
+  AGORA_LOG_INFO("Radio %zu Frame 1: %s \n", Id(), sched.c_str());
   tdd_sched.push_back(sched);
 
   conf["frames"] = tdd_sched;
@@ -583,8 +582,7 @@ void RadioUHDSdr::ConfigureTddModeUe() {
       tdd_sched.replace(s, 1, "G");
     }
   }
-  std::cout << "UE " << SerialNumber() << "(" << Id()
-            << ") Frame: " << tdd_sched << std::endl;
+  AGORA_LOG_INFO("UE %zu Frame 1: %s \n", Id(), tdd_sched.c_str());
   std::vector<std::string> jframes;
   jframes.push_back(tdd_sched);
   conf["frames"] = jframes;

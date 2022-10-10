@@ -116,6 +116,7 @@ void TxRxWorkerClientHw::DoTxRx() {
 
   //Turns out detecting more than 1 beacon is helpful for the start
   size_t beacons_detected = 0;
+
   while ((beacons_detected < kBeaconsToStart) &&
          (Configuration()->Running() == true)) {
     const ssize_t sync_index =
@@ -142,6 +143,7 @@ void TxRxWorkerClientHw::DoTxRx() {
       throw std::runtime_error("rx sample offset is less than 0");
     }
   }
+
   long long time0 = 0;
   //Set initial frame and symbol to max value so we start at 0
   size_t rx_frame_id = SIZE_MAX;

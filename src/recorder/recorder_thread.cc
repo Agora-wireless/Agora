@@ -22,6 +22,7 @@ RecorderThread::RecorderThread(
     bool wait_signal)
     : event_queue_(queue_size),
       producer_token_(event_queue_),
+
       id_(thread_id),
       core_alloc_(core),
       wait_signal_(wait_signal) {
