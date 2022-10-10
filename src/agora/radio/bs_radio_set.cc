@@ -164,6 +164,27 @@ void BsRadioSet::InitRadio(size_t radio_id) {
   num_radios_initialized_.fetch_add(1);
 }
 
+BsRadioSet::~BsRadioSet() {
+  FreeBuffer1d(&init_calib_dl_processed_);
+  FreeBuffer1d(&init_calib_ul_processed_);
+
+  std::vector<std::thread> close_radio_threads;
+  for (auto& radio : radios_) {
+    close_radio_threads.emplace_back(&Radio::Close, radio.get());
+  }
+
+  AGORA_LOG_INFO("~BsRadioSet waiting for close\n");
+  for (auto& join_thread : close_radio_threads) {
+    join_thread.join();
+  }
+
+  for (auto* hub : hubs_) {
+    SoapySDR::Device::unmake(hub);
+  }
+  hubs_.clear();
+  AGORA_LOG_INFO("RadioStop destructed\n");
+}
+
 void BsRadioSet::ConfigureRadio(size_t radio_id) {
   std::vector<double> tx_gains;
   tx_gains.emplace_back(cfg_->TxGainA());
@@ -271,8 +292,6 @@ bool BsRadioSet::RadioStart() {
     init_calib_ul_.Free();
   }
 
-  //Speed up the activations (could have a flush)
-  std::vector<std::thread> activate_radio_threads;
   for (size_t i = 0; i < radio_num_; i++) {
     if (cfg_->HwFramer()) {
       const size_t cell_id = cfg_->CellId().at(i);
@@ -280,16 +299,8 @@ bool BsRadioSet::RadioStart() {
       radios_.at(i)->ConfigureTddModeBs(is_ref_radio);
     }
     radios_.at(i)->SetTimeAtTrigger(0);
-    activate_radio_threads.emplace_back(&Radio::Activate, radios_.at(i).get(),
-                                        Radio::ActivationTypes::kActivate, 0,
-                                        0);
   }
-
-  AGORA_LOG_INFO("RadioStart waiting for activation\n");
-  for (auto& join_thread : activate_radio_threads) {
-    join_thread.join();
-  }
-  AGORA_LOG_INFO("BsRadioSet::RadioStart complete!\n");
+  RadioSet::RadioStart(Radio::kActivate);
   return true;
 }
 
@@ -340,25 +351,4 @@ long long BsRadioSet::SyncArrayTime() {
     radio_time = time_now;
   }
   return radio_time;
-}
-
-BsRadioSet::~BsRadioSet() {
-  FreeBuffer1d(&init_calib_dl_processed_);
-  FreeBuffer1d(&init_calib_ul_processed_);
-
-  std::vector<std::thread> close_radio_threads;
-  for (auto& radio : radios_) {
-    close_radio_threads.emplace_back(&Radio::Close, radio.get());
-  }
-
-  AGORA_LOG_INFO("~BsRadioSet waiting for close\n");
-  for (auto& join_thread : close_radio_threads) {
-    join_thread.join();
-  }
-
-  for (auto* hub : hubs_) {
-    SoapySDR::Device::unmake(hub);
-  }
-  hubs_.clear();
-  AGORA_LOG_INFO("RadioStop destructed\n");
 }

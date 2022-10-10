@@ -81,8 +81,8 @@ bool UeRadioSet::RadioStart() {
     if (cfg_->UeHwFramer()) {
       radios_.at(i)->ConfigureTddModeUe();
     }
-    radios_.at(i)->Activate(Radio::ActivationTypes::kActivateWaitTrigger);
   }
+  RadioSet::RadioStart(Radio::kActivateWaitTrigger);
   AGORA_LOG_INFO("UeRadioSet: Radio start complete!\n");
   return true;
 }
