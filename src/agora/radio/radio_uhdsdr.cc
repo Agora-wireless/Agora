@@ -249,7 +249,48 @@ int RadioUHDSdr::Tx(const void* const* tx_buffs, size_t tx_size,
   uhd::tx_streamer::buffs_type stream_buffs(tx_buffs, txs_->get_num_channels());
   const int write_status = txs_->send(stream_buffs, tx_size, md, kTxTimeoutSec);
   if (kDebugRadioTX) {
-    //Should check the async status here
+    uhd::async_metadata_t async_md;
+    bool async_valid = tx_stream->recv_async_msg(async_md, kTxTimeoutSec);
+    if (async_valid) {
+      switch (async_md.event_code) {
+        case uhd::async_metadata_t::EVENT_CODE_BURST_ACK: {
+          AGORA_LOG_WARN("recv_async_msg:EVENT_CODE_BURST_ACK.\n");
+          break;
+        }
+        case uhd::async_metadata_t::EVENT_CODE_UNDERFLOW: {
+          AGORA_LOG_WARN("recv_async_msg:EVENT_CODE_UNDERFLOW.\n");
+          break;
+        }
+        case uhd::async_metadata_t::EVENT_CODE_SEQ_ERROR: {
+          AGORA_LOG_WARN("recv_async_msg:EVENT_CODE_SEQ_ERROR.\n");
+          break;
+        }
+        case uhd::async_metadata_t::EVENT_CODE_TIME_ERROR: {
+          AGORA_LOG_WARN("recv_async_msg:EVENT_CODE_TIME_ERROR.\n");
+          break;
+        }
+        case uhd::async_metadata_t::EVENT_CODE_UNDERFLOW_IN_PACKET: {
+          AGORA_LOG_WARN("recv_async_msg:EVENT_CODE_UNDERFLOW_IN_PACKET.\n");
+          break;
+        }
+        case uhd::async_metadata_t::EVENT_CODE_SEQ_ERROR_IN_BURST: {
+          AGORA_LOG_WARN("recv_async_msg:EVENT_CODE_SEQ_ERROR_IN_BURST.\n");
+          break;
+        }
+        case uhd::async_metadata_t::EVENT_CODE_USER_PAYLOAD: {
+          AGORA_LOG_WARN("recv_async_msg:EVENT_CODE_USER_PAYLOAD.\n");
+          break;
+        }
+
+        default: {
+          AGORA_LOG_WARN(
+              "recv_async_msg: received unexpected event code 0x%x.\n",
+              static_cast<int>(async_md.event_code));
+        }
+      }
+    } else {
+      AGORA_LOG_WARN("RadioUHDSdr::recv_async_msg recv failed\n");
+    }
   }
   return write_status;
 }
