@@ -103,6 +103,8 @@ void RadioUHDSdr::Init(const Config* cfg, size_t id, const std::string& serial,
     uhd::stream_args_t stream_args("sc16");
     stream_args.channels = enabled_channels;
     stream_args.args = sargs;
+    //Samples per packet
+    stream_args.args["spp"] = std::to_string(cfg->SampsPerSymbol());
 
     rxs_ = dev_->get_rx_stream(stream_args);
     txs_ = dev_->get_tx_stream(stream_args);

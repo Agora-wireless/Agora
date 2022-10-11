@@ -83,13 +83,12 @@ void TxRxWorkerUsrp::DoTxRx() {
   Radio::RxFlags rx_flags = Radio::RxFlags::kRxFlagNone;
   AGORA_LOG_INFO("Fetch to current Rx time to track sample count...\n");
   int rx_status = 0;
-  while (rx_status != Configuration()->SampsPerSymbol()){
+  while (rx_status != Configuration()->SampsPerSymbol()) {
     rx_status = radio_config_.RadioRx(radio_id, rx_locs,
-                                         Configuration()->SampsPerSymbol(),
-                                         rx_flags, rx_time_bs_);
+                                      Configuration()->SampsPerSymbol(),
+                                      rx_flags, rx_time_bs_);
     AGORA_LOG_INFO("Rx status: %d\n", rx_status);
-
-  }                                  
+  }
   AGORA_LOG_INFO("First Rx status: %d\n", rx_status);
   if (rx_status <= 0) {
     AGORA_LOG_WARN("DoTxRx: Rx status is unexpected %zu on first rx\n",
@@ -131,6 +130,8 @@ void TxRxWorkerUsrp::DoTxRx() {
     throw std::runtime_error("Rx time is not equal to the tx beacon time");
   }
 
+  //rx_time_bs_ == tx_time_bs_  is the start time of the first tx beacon
+
   //Schedule tx beacons advanced.
   for (size_t i = 0; i < kBeaconFrameAdvance; i++) {
     //Schedule kBeaconFrameAdvance -1 frames ahead
@@ -150,11 +151,9 @@ void TxRxWorkerUsrp::DoTxRx() {
   size_t global_symbol_id = 0;
   size_t local_interface = 0;
 
-  int count = 0;
   while (Configuration()->Running()) {
     // receive data
-    RecvEnqueue(local_interface, global_frame_id, global_symbol_id, rx_locs,
-                count);
+    RecvEnqueue(local_interface, global_frame_id, global_symbol_id, rx_locs);
 
     //if rx is successful than update the counter / times
     // Schedule the next beacon
@@ -194,7 +193,7 @@ void TxRxWorkerUsrp::DoTxRx() {
 //RX data and pass the samples to the scheduler
 std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(
     size_t radio_id, size_t frame_id, size_t symbol_id,
-    const std::vector<void*>& discard_locs, int& count) {
+    const std::vector<void*>& discard_locs) {
   std::vector<Packet*> rx_packets;
   std::vector<RxPacket*> memory_tracking;
 
@@ -219,30 +218,6 @@ std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(
   const int rx_status = radio_config_.RadioRx(radio_id, rx_locs,
                                               Configuration()->SampsPerSymbol(),
                                               rx_flags, rx_time_bs_);
-
-  // added to test
-  count++;
-  if (rx_status == static_cast<int>(Configuration()->SampsPerSymbol()) &&
-      Configuration()->IsUplink(frame_id, symbol_id) == true &&
-      count >= 1000000) {
-    // added to test if recv is getting the correct samples:
-
-    std::ofstream outfile;
-    const std::string& file = "ul_buff1.dat";
-    outfile.open(file.c_str(), std::ofstream::binary);
-    if (outfile.is_open()) {
-      std::cout << "opened" << std::endl;
-      outfile.write((const char*)rx_locs.front(),
-                    Configuration()->SampsPerSymbol() *
-                        sizeof(std::vector<std::complex<int16_t>>));
-    } else {
-      std::cout << "not opened";
-    }
-    if (outfile.is_open()) {
-      outfile.close();
-    }
-    exit(111);
-  }
 
   if (rx_status == static_cast<int>(Configuration()->SampsPerSymbol())) {
     //Process the rx data
