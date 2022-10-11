@@ -176,7 +176,7 @@ void RadioUHDSdr::Activate(Radio::ActivationTypes type, long long act_time_ns,
     dev_->set_time_next_pps(time2);
     //dev_->set_time_unknown_pps(uhd::time_spec_t(0.0));
     // Wait for pps sync pulse
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    // std::this_thread::sleep_for(std::chrono::seconds(1));
   }
   AGORA_LOG_INFO("in/external clock set \n");
 
@@ -184,7 +184,7 @@ void RadioUHDSdr::Activate(Radio::ActivationTypes type, long long act_time_ns,
   mode = uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
   uhd::stream_cmd_t cmd(mode);
   cmd.stream_now = false;
-  cmd.time_spec = dev_->get_time_now() + uhd::time_spec_t(1.0);
+  cmd.time_spec = dev_->get_time_now() + uhd::time_spec_t(0.1);
   cmd.num_samps = samples;
 
   AGORA_LOG_INFO("RadioUHDSdr::xmit activate defaulted\n");
