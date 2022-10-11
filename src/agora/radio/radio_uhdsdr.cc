@@ -63,7 +63,7 @@ void RadioUHDSdr::Init(const Config* cfg, size_t id, const std::string& serial,
     args["driver"] = "uhd";
     args["addr"] = SerialNumber();
     //Need to make sure MTU is acceptable of this (assume 32 bit/4 byte samples)
-    const size_t frame_size = cfg->SampsPerSymbol() * 4;
+    const std::string frame_size = std::to_string(cfg->SampsPerSymbol() * 4);
     args["send_frame_size"] = frame_size;
     args["recv_frame_size"] = frame_size;
 
@@ -297,7 +297,7 @@ int RadioUHDSdr::Rx(std::vector<void*>& rx_locs, size_t rx_size,
   const bool start_burst = md.start_of_burst;
   const bool end_burst = md.end_of_burst;
   const bool more_frags = md.more_fragments;
-  AGORA_LOG_INFO(
+  AGORA_LOG_TRACE(
       "Rx Debug | HAS TIME:%d | START BURST:%d | END BURST:%d | FRAGS :%d "
       "| FRAG OFFSET:%zu |\n",
       has_time, start_burst, end_burst, more_frags, md.fragment_offset);
@@ -305,7 +305,7 @@ int RadioUHDSdr::Rx(std::vector<void*>& rx_locs, size_t rx_size,
   if (has_time) {
     rx_time_ns = md.time_spec.to_ticks(cfg_->Rate());
   } else {
-    AGORA_LOG_WARN("RadioUHDSdr::Rx - does not have time");
+    AGORA_LOG_WARN("RadioUHDSdr::Rx - does not have time \n");
   }
 
   //If status == 0 check why

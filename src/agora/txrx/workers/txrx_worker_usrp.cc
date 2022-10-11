@@ -82,9 +82,14 @@ void TxRxWorkerUsrp::DoTxRx() {
   //Should this be end rx?
   Radio::RxFlags rx_flags = Radio::RxFlags::kRxFlagNone;
   AGORA_LOG_INFO("Fetch to current Rx time to track sample count...\n");
-  auto rx_status = radio_config_.RadioRx(radio_id, rx_locs,
+  int rx_status = 0;
+  while (rx_status != Configuration()->SampsPerSymbol()){
+    rx_status = radio_config_.RadioRx(radio_id, rx_locs,
                                          Configuration()->SampsPerSymbol(),
                                          rx_flags, rx_time_bs_);
+    AGORA_LOG_INFO("Rx status: %d\n", rx_status);
+
+  }                                  
   AGORA_LOG_INFO("First Rx status: %d\n", rx_status);
   if (rx_status <= 0) {
     AGORA_LOG_WARN("DoTxRx: Rx status is unexpected %zu on first rx\n",
