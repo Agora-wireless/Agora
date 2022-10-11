@@ -86,10 +86,14 @@ void RadioUHDSdr::Init(const Config* cfg, size_t id, const std::string& serial,
     device_info << "Hardware = " << dev_->get_mboard_name() << std::endl;
 
     if (kPrintRadioSettings) {
-      auto clock_sources = dev_->get_clock_source(0);
-      AGORA_LOG_INFO("Clock source %s\n", clock_sources);
-      auto time_sources = dev_->get_time_source(0);
-      AGORA_LOG_INFO("Time source %s\n", time_sources);
+      auto clock_sources = dev_->get_clock_sources(0);
+      for ([[maybe_unused]] const auto& source : clock_sources) {
+        AGORA_LOG_TRACE("Clock source %s\n", source.c_str());
+      }
+      auto time_sources = dev_->get_time_sources(0);
+      for ([[maybe_unused]] const auto& source : time_sources) {
+        AGORA_LOG_TRACE("Time source %s\n", source.c_str());
+      }
       AGORA_LOG_INFO("%s\n", device_info.str().c_str());
     }
 
