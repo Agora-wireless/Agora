@@ -89,15 +89,12 @@ RadioSetUhd::RadioSetUhd(Config* cfg, Radio::RadioType radio_type)
 }
 
 void RadioSetUhd::InitRadio(size_t radio_id) {
-  radio_id = 0;
   radios_.at(radio_id)->Init(cfg_, radio_id, cfg_->RadioId().at(radio_id),
-                             Utils::StrToChannels(cfg_->Channel()),
-                             cfg_->HwFramer());
+                             Utils::StrToChannels(cfg_->Channel()), false);
   num_radios_initialized_.fetch_add(1);
 }
 
 void RadioSetUhd::ConfigureRadio(size_t radio_id) {
-  radio_id = 0;
   std::vector<double> tx_gains;
   tx_gains.emplace_back(cfg_->TxGainA());
   tx_gains.emplace_back(cfg_->TxGainB());
@@ -112,15 +109,12 @@ void RadioSetUhd::ConfigureRadio(size_t radio_id) {
 
 bool RadioSetUhd::RadioStart() {
   for (size_t i = 0; i < radio_num_; i++) {
-    if (cfg_->HwFramer()) {
-      const size_t cell_id = cfg_->CellId().at(i);
-      const bool is_ref_radio = (i == cfg_->RefRadio(cell_id));
-      radios_.at(i)->ConfigureTddModeBs(is_ref_radio);
-    }
-    radios_.at(i)->SetTimeAtTrigger(0);
-    RadioSet::RadioStart(Radio::kActivate);
+    //radios_.at(i)->ConfigureTddModeBs(false);
+    //radios_.at(i)->SetTimeAtTrigger(0);
   }
+  RadioSet::RadioStart(Radio::kActivate);
   return true;
 }
 
+//Maybe we start the streaming on all radios at go....
 void RadioSetUhd::Go() {}
