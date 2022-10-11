@@ -77,15 +77,18 @@ void TxRxWorkerUsrp::DoTxRx() {
   running_ = true;
   WaitSync();
 
+  //Radio is streaming........  flush?
+
   //Should this be end rx?
   Radio::RxFlags rx_flags = Radio::RxFlags::kRxFlagNone;
-  std::cout << "Sync BS host and FGPA timestamp..." << std::endl;
+  AGORA_LOG_INFO("Fetch to current Rx time to track sample count...\n");
   auto rx_status = radio_config_.RadioRx(radio_id, rx_locs,
                                          Configuration()->SampsPerSymbol(),
                                          rx_flags, rx_time_bs_);
   AGORA_LOG_INFO("First Rx status: %d\n", rx_status);
   if (rx_status <= 0) {
-    AGORA_LOG_WARN("DoTxRx: Rx status is unexpected %zu\n", rx_status);
+    AGORA_LOG_WARN("DoTxRx: Rx status is unexpected %zu on first rx\n",
+                   rx_status);
   }
 
   // Schedule the first beacon in the future
@@ -93,9 +96,10 @@ void TxRxWorkerUsrp::DoTxRx() {
   tx_time_bs_ = rx_time_bs_ + ((Configuration()->SampsPerSymbol() *
                                 Configuration()->Frame().NumTotalSyms()) *
                                kFirstBeaconFrameAdvance);
-  auto tx_status = radio_config_.RadioTx(
+  //Need to make sure this doesn't block until after the TX time
+  const auto tx_status = radio_config_.RadioTx(
       radio_id, tx_locs.data(), Radio::TxFlags::kEndTransmit, tx_time_bs_);
-  if (rx_status <= 0) {
+  if (tx_status <= 0) {
     AGORA_LOG_WARN("DoTxRx: Tx status is unexpected %zu\n", tx_status);
   }
 
@@ -109,14 +113,17 @@ void TxRxWorkerUsrp::DoTxRx() {
                                       rx_flags, rx_time_bs_);
 
     if (rx_status <= 0) {
-      AGORA_LOG_WARN("DoTxRx:Rx status is unexpected %zu\n", rx_status);
+      AGORA_LOG_WARN(
+          "DoTxRx:Rx status is unexpected %zu while reading frame advanced\n",
+          rx_status);
     }
   }
 
   // rx_time_bs_ should be 1 symbol / slot time before the tx beacon time;
-  if (rx_time_bs_ >= tx_time_bs_) {
-    AGORA_LOG_ERROR("Rx time is greater than the tx beacon time");
-    throw std::runtime_error("Rx time is greater than the tx beacon time");
+  if (rx_time_bs_ != tx_time_bs_) {
+    AGORA_LOG_ERROR("Rx time is unexpected %lld:%lld\n", rx_time_bs_,
+                    tx_time_bs_);
+    throw std::runtime_error("Rx time is not equal to the tx beacon time");
   }
 
   //Schedule tx beacons advanced.
