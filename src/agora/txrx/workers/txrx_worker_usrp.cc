@@ -83,7 +83,7 @@ void TxRxWorkerUsrp::DoTxRx() {
   auto rx_status = radio_config_.RadioRx(radio_id, rx_locs,
                                          Configuration()->SampsPerSymbol(),
                                          rx_flags, rx_time_bs_);
-  std::cout << "First Rx Status " << rx_status << std::endl;
+  AGORA_LOG_INFO("First Rx status: %d\n", rx_status);
   if (rx_status <= 0) {
     AGORA_LOG_WARN("DoTxRx: Rx status is unexpected %zu\n", rx_status);
   }
@@ -93,11 +93,6 @@ void TxRxWorkerUsrp::DoTxRx() {
   tx_time_bs_ = rx_time_bs_ + ((Configuration()->SampsPerSymbol() *
                                 Configuration()->Frame().NumTotalSyms()) *
                                kFirstBeaconFrameAdvance);
-  std::cout << "delay time is: "
-            << Configuration()->SampsPerSymbol() *
-                   Configuration()->Frame().NumTotalSyms() * kBeaconFrameAdvance
-            << std::endl;
-  std::cout << "Tx Time BS: (tx_time_bs) " << tx_time_bs_ << std::endl;
   auto tx_status = radio_config_.RadioTx(
       radio_id, tx_locs.data(), Radio::TxFlags::kEndTransmit, tx_time_bs_);
   if (rx_status <= 0) {
@@ -155,14 +150,8 @@ void TxRxWorkerUsrp::DoTxRx() {
       tx_time_bs_ = rx_time_bs_ + Configuration()->SampsPerSymbol() *
                                       Configuration()->Frame().NumTotalSyms() *
                                       kBeaconFrameAdvance;
-      std::cout << "delay time is: "
-                << Configuration()->SampsPerSymbol() *
-                       Configuration()->Frame().NumTotalSyms() *
-                       kBeaconFrameAdvance
-                << std::endl;
       const int tx_ret = radio_config_.RadioTx(
           radio_id, tx_locs.data(), Radio::TxFlags::kEndTransmit, tx_time_bs_);
-      std::cout << "TX BS time  (tx_time_bs): " << tx_time_bs_ << std::endl;
       if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
         AGORA_LOG_ERROR(
             "BAD Transmit(%d:%zu) at Time %lld and frame count %zu\n", tx_ret,
@@ -246,7 +235,6 @@ std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(
   if (rx_status == static_cast<int>(Configuration()->SampsPerSymbol())) {
     //Process the rx data
     if (publish_symbol) {
-      std::cout << "this is a pilot or uplink symbol" << std::endl;
       const size_t ant_offset = radio_id * total_channels;
       for (size_t ch = 0; ch < total_channels; ++ch) {
         RxPacket& rx = *memory_tracking.at(ch);
