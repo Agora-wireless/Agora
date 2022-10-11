@@ -44,11 +44,8 @@ int main(int argc, char* argv[]) {
 
     // Register signal handler to handle kill signal
     signal_handler.SetupSignalHandlers();
-    std::cout << "error rise in init part" << std::endl;
     std::unique_ptr<Agora> agora_cli = std::make_unique<Agora>(cfg.get());
-    std::cout << "safely gets here " << std::endl;
     agora_cli->Start();
-    std::cout << "error here " << std::endl;
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {
     std::cerr << "SignalException: " << e.what() << std::endl;

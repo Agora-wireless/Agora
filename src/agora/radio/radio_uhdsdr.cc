@@ -116,14 +116,12 @@ void RadioUHDSdr::Init(const Config* cfg, size_t id, const std::string& serial,
 void RadioUHDSdr::Setup(const std::vector<double>& tx_gains,
                         const std::vector<double>& rx_gains) {
   AGORA_LOG_TRACE("Setup RadioUHD Sdr %s(%zu)\n", SerialNumber().c_str(), Id());
-  // for (auto ch : EnabledChannels()) {
   dev_->set_rx_rate(cfg_->Rate());
   dev_->set_tx_rate(cfg_->Rate());
-  // }
 
   // use the TRX antenna port for both tx and rx
   for (auto ch : EnabledChannels()) {
-    dev_->set_rx_antenna("RX2", ch);
+    dev_->set_rx_antenna("TX/RX", ch);
     dev_->set_tx_antenna("TX/RX", ch);
   }
 
@@ -164,19 +162,36 @@ void RadioUHDSdr::Activate(Radio::ActivationTypes type, long long act_time_ns,
   const bool is_ue = false;
   if (is_ue) {
     AGORA_LOG_INFO("setting sources to internal \n");
-    dev_->set_time_source("internal");
     dev_->set_clock_source("internal");
+    dev_->set_time_source("internal");
     uhd::time_spec_t time1 = uhd::time_spec_t::from_ticks(0, 1e9);
     dev_->set_time_unknown_pps(time1);
   } else {
     AGORA_LOG_INFO("setting sources to external \n");
-    dev_->set_clock_source("external");
+    std::cout << boost::format("Setting device timestamp to 0...") << std::endl;
     dev_->set_time_source("external");
+    dev_->set_time_unknown_pps(uhd::time_spec_t(0.0));
+    // Wait for pps sync pulse
+    // std::this_thread::sleep_for(std::chrono::seconds(0.1));
+
+    std::vector<std::string> sensor_names;
+    sensor_names = dev_->get_tx_sensor_names(0);
+    if (std::find(sensor_names.begin(), sensor_names.end(), "lo_locked")
+        != sensor_names.end()) {
+        uhd::sensor_value_t lo_locked = dev_->get_tx_sensor("lo_locked", 0);
+        std::cout << boost::format("Checking TXRX: %s ...") % lo_locked.to_pp_string()
+                  << std::endl;
+        UHD_ASSERT_THROW(lo_locked.to_bool());
+    }
+    dev_->set_clock_source("external");
+    const size_t mboard_sensor_idx = 0;
+    sensor_names = dev_->get_mboard_sensor_names(mboard_sensor_idx);
+    uhd::sensor_value_t ref_locked = dev_->get_mboard_sensor("ref_locked", mboard_sensor_idx);
+    std::cout << boost::format("Checking TXRX: %s ...") % ref_locked.to_pp_string()
+              << std::endl;
+    UHD_ASSERT_THROW(ref_locked.to_bool());
     uhd::time_spec_t time2 = uhd::time_spec_t::from_ticks(0, 1e9);
     dev_->set_time_next_pps(time2);
-    //dev_->set_time_unknown_pps(uhd::time_spec_t(0.0));
-    // Wait for pps sync pulse
-    // std::this_thread::sleep_for(std::chrono::seconds(1));
   }
   AGORA_LOG_INFO("in/external clock set \n");
 
