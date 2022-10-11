@@ -211,7 +211,7 @@ static constexpr bool kRecordCalibrationMats = false;
 /// Print the I/Q samples in the pilots
 static constexpr bool kDebugPrintPilot = false;
 
-static constexpr bool kDebugRadioTX = false;
+static constexpr bool kDebugRadioTX = true;
 static constexpr bool kDebugRadioRX = false;
 
 static constexpr bool kLogMacPackets = false;
