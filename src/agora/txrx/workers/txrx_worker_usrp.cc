@@ -13,7 +13,7 @@
 #include "message.h"
 
 static constexpr size_t kFirstBeaconFrameAdvance = 200;
-static constexpr size_t kBeaconFrameAdvance = 0;
+static constexpr size_t kBeaconFrameAdvance = 1;
 
 TxRxWorkerUsrp::TxRxWorkerUsrp(
     size_t core_offset, size_t tid, size_t radio_hi, size_t radio_lo,

@@ -19,7 +19,7 @@ static constexpr bool kPrintRadioSettings = true;
 
 // radio init time for UHD devices
 // increase the wait time for radio init to get rid of the late packet issue
-static constexpr double kUhdInitTimeSec = 6.0;
+static constexpr double kUhdInitTimeSec = 1.0;
 
 RadioUHDSdr::RadioUHDSdr() : dev_(nullptr), rxs_(nullptr), txs_(nullptr) {
   AGORA_LOG_INFO("calling pure uhd version of radio constructor.\n");
@@ -62,6 +62,10 @@ void RadioUHDSdr::Init(const Config* cfg, size_t id, const std::string& serial,
     args["timeout"] = "1000000";
     args["driver"] = "uhd";
     args["addr"] = SerialNumber();
+    //Need to make sure MTU is acceptable of this (assume 32 bit/4 byte samples)
+    const size_t frame_size = cfg->SampsPerSymbol() * 4;
+    args["send_frame_size"] = frame_size;
+    args["recv_frame_size"] = frame_size;
 
     for (size_t tries = 0; tries < kMakeMaxAttempts; tries++) {
       try {
@@ -320,19 +324,24 @@ int RadioUHDSdr::Rx(std::vector<void*>& rx_locs, size_t rx_size,
         break;
     }
     */
-  } else {
-    if (end_burst == false) {
+  } else if (rx_status == rx_size) {
+    if (end_burst) {
       //This usually happens when the timeout is not long enough to wait for multiple packets for a given requested rx length
-      AGORA_LOG_WARN(
-          "RadioUHDSdr::Rx - expected end burst but didn't happen samples "
-          "requested %zu\n",rx_size);
+      AGORA_LOG_WARN("RadioUHDSdr::Rx - unexpected end burst %zu:%zu\n",
+                     rx_size, rx_status);
     }
 
     if (more_frags) {
       AGORA_LOG_WARN(
-          "RadioDataPlane_UHD::Rx - fragments remaining on rx call for sample "
-          "requested %zu symbols \n", rx_size);
+          "RadioUHDSdr::Rx - fragments remaining on rx call requested %zu "
+          "received %zu\n",
+          rx_size, rx_status);
     }
+    out_flags = Radio::RxFlags::kEndReceive;
+  } else {
+    AGORA_LOG_WARN(
+        "RadioUHDSdr::Rx - returned less than requested samples %zu:%zu\n",
+        rx_size, rx_status);
   }
   return rx_status;
 }
