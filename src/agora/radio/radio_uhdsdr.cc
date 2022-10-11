@@ -19,7 +19,7 @@ static constexpr bool kPrintRadioSettings = true;
 
 // radio init time for UHD devices
 // increase the wait time for radio init to get rid of the late packet issue
-static constexpr size_t kUhdInitTimeSec = 1;
+static constexpr double kUhdInitTimeSec = 6.0;
 
 RadioUHDSdr::RadioUHDSdr() : dev_(nullptr), rxs_(nullptr), txs_(nullptr) {
   AGORA_LOG_INFO("calling pure uhd version of radio constructor.\n");
@@ -166,13 +166,13 @@ void RadioUHDSdr::Activate(Radio::ActivationTypes type, long long act_time_ns,
     AGORA_LOG_INFO("setting sources to internal \n");
     dev_->set_clock_source("internal");
     dev_->set_time_source("internal");
-    uhd::time_spec_t time_zero = uhd::time_spec_t(0);
+    uhd::time_spec_t time_zero = uhd::time_spec_t(0.0);
     dev_->set_time_unknown_pps(time_zero);
   } else {
     AGORA_LOG_INFO("setting sources to external \n");
     std::cout << boost::format("Setting device timestamp to 0...") << std::endl;
     dev_->set_time_source("external");
-    uhd::time_spec_t time_zero = uhd::time_spec_t(0);
+    uhd::time_spec_t time_zero = uhd::time_spec_t(0.0);
     dev_->set_time_unknown_pps(time_zero);
     // Wait for pps sync pulse
     // std::this_thread::sleep_for(std::chrono::seconds(0.1));
@@ -325,15 +325,13 @@ int RadioUHDSdr::Rx(std::vector<void*>& rx_locs, size_t rx_size,
       //This usually happens when the timeout is not long enough to wait for multiple packets for a given requested rx length
       AGORA_LOG_WARN(
           "RadioUHDSdr::Rx - expected end burst but didn't happen samples "
-          "count %zu requested %zu\n",
-          rx_samples, rx_size);
+          "requested %zu\n",rx_size);
     }
 
     if (more_frags) {
       AGORA_LOG_WARN(
           "RadioDataPlane_UHD::Rx - fragments remaining on rx call for sample "
-          "count %zu requested %zu symbols \n",
-          rx_samples, rx_size);
+          "requested %zu symbols \n", rx_size);
     }
   }
   return rx_status;
@@ -350,8 +348,9 @@ void RadioUHDSdr::ReadSensor() const {
 void RadioUHDSdr::SetTimeAtTrigger(long long time_ns) {
   uhd::time_spec_t time_new =
       uhd::time_spec_t::from_ticks(time_ns, cfg_->Rate());
-  //dev_->set_time_now(time_new);
-  dev_->set_time_last_pps(time_new);
+  dev_->set_time_now(time_new);
+  // there is no time setting function as set time last pps
+  // dev_->set_time_last_pps(time_new);
   //dev_->set_time_next_pps(time_new);
   //Wait a second?
 
