@@ -252,7 +252,7 @@ int RadioUHDSdr::Tx(const void* const* tx_buffs, size_t tx_size,
   const int write_status = txs_->send(stream_buffs, tx_size, md, kTxTimeoutSec);
   if (kDebugRadioTX) {
     uhd::async_metadata_t async_md;
-    bool async_valid = tx_stream->recv_async_msg(async_md, kTxTimeoutSec);
+    bool async_valid = txs_->recv_async_msg(async_md, kTxTimeoutSec);
     if (async_valid) {
       switch (async_md.event_code) {
         case uhd::async_metadata_t::EVENT_CODE_BURST_ACK: {
