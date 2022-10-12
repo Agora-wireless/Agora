@@ -7,11 +7,9 @@
 
 #include "logger.h"
 #include "radio_set_ue.h"
-#include "txrx_worker_client_hw.h"
-
-#if defined(USE_PURE_UHD)
 #include "radio_set_uhd.h"
-#endif
+#include "txrx_worker_client_hw.h"
+#include "txrx_worker_client_uhd.h"
 
 static constexpr Radio::RadioType kRadioType = Radio::kSoapySdrStream;
 static constexpr size_t kRadioTriggerWaitMs = 100;
@@ -76,8 +74,14 @@ bool PacketTxRxClientRadio::CreateWorker(size_t tid, size_t interface_count,
        1));
 
   //This is the spot to choose what type of TxRxWorker you want....
-  if (kUseArgos || kUsePureUHD) {
+  if (kUseArgos) {
     worker_threads_.emplace_back(std::make_unique<TxRxWorkerClientHw>(
+        core_offset_, tid, interface_count, interface_offset, cfg_,
+        rx_frame_start, event_notify_q_, tx_pending_q_,
+        *tx_producer_tokens_[tid], *notify_producer_tokens_[tid], rx_memory,
+        tx_memory, mutex_, cond_, proceed_, *radio_config_.get()));
+  } else if (kUsePureUHD) {
+    worker_threads_.emplace_back(std::make_unique<TxRxWorkerClientUhd>(
         core_offset_, tid, interface_count, interface_offset, cfg_,
         rx_frame_start, event_notify_q_, tx_pending_q_,
         *tx_producer_tokens_[tid], *notify_producer_tokens_[tid], rx_memory,

@@ -1,11 +1,11 @@
 /**
- * @file txrx_worker_client_hw.h
+ * @file txrx_worker_client_uhd.h
  * @brief Implementation of PacketTxRxRadio datapath functions for communicating
- * with real iris / faros hardware
+ * with real usrp hardware
  */
 
-#ifndef TXRX_WORKER_CLIENT_HW_H_
-#define TXRX_WORKER_CLIENT_HW_H_
+#ifndef TXRX_WORKER_CLIENT_UHD_H_
+#define TXRX_WORKER_CLIENT_UHD_H_
 
 #include <memory>
 #include <vector>
@@ -15,21 +15,21 @@
 #include "rx_status_tracker.h"
 #include "txrx_worker.h"
 
-class TxRxWorkerClientHw : public TxRxWorker {
+class TxRxWorkerClientUhd : public TxRxWorker {
  public:
-  TxRxWorkerClientHw(size_t core_offset, size_t tid, size_t interface_count,
-                     size_t interface_offset, Config* const config,
-                     size_t* rx_frame_start,
-                     moodycamel::ConcurrentQueue<EventData>* event_notify_q,
-                     moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
-                     moodycamel::ProducerToken& tx_producer,
-                     moodycamel::ProducerToken& notify_producer,
-                     std::vector<RxPacket>& rx_memory,
-                     std::byte* const tx_memory, std::mutex& sync_mutex,
-                     std::condition_variable& sync_cond,
-                     std::atomic<bool>& can_proceed, RadioSet& radio_config);
-  TxRxWorkerClientHw() = delete;
-  ~TxRxWorkerClientHw() final;
+  TxRxWorkerClientUhd(size_t core_offset, size_t tid, size_t interface_count,
+                      size_t interface_offset, Config* const config,
+                      size_t* rx_frame_start,
+                      moodycamel::ConcurrentQueue<EventData>* event_notify_q,
+                      moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
+                      moodycamel::ProducerToken& tx_producer,
+                      moodycamel::ProducerToken& notify_producer,
+                      std::vector<RxPacket>& rx_memory,
+                      std::byte* const tx_memory, std::mutex& sync_mutex,
+                      std::condition_variable& sync_cond,
+                      std::atomic<bool>& can_proceed, RadioSet& radio_config);
+  TxRxWorkerClientUhd() = delete;
+  ~TxRxWorkerClientUhd() final;
   void DoTxRx() final;
 
  private:
@@ -62,4 +62,4 @@ class TxRxWorkerClientHw : public TxRxWorker {
   //For each interface.
   std::vector<TxRxWorkerRx::RxStatusTracker> rx_status_;
 };
-#endif  // TXRX_WORKER_CLIENT_HW_H_
+#endif  // TXRX_WORKER_CLIENT_UHD_H_

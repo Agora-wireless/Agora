@@ -336,6 +336,10 @@ if(RADIO_TYPE STREQUAL PURE_UHD)
   set(PUREUHD_SOURCES_AGORA
       src/agora/txrx/workers/txrx_worker_usrp.cc
       )
+
+  set(PUREUHD_SOURCES_CLIENT
+      src/client/txrx/workers/txrx_worker_client_uhd.cc
+      )
   message(STATUS "pure_uhd_lib library initialized")
 endif()
 
@@ -456,6 +460,7 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
 set(CLIENT_SOURCES
+  ${PUREUHD_SOURCES_CLIENT}
   src/client/doifft_client.cc
   src/client/dodecode_client.cc
   src/client/radio_set_ue.cc
