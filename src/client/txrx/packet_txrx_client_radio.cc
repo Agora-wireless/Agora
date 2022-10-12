@@ -7,9 +7,12 @@
 
 #include "logger.h"
 #include "radio_set_ue.h"
-#include "radio_set_uhd.h"
 #include "txrx_worker_client_hw.h"
 #include "txrx_worker_client_uhd.h"
+
+#if defined(USE_PURE_UHD)
+#include "radio_set_uhd.h"
+#endif
 
 static constexpr Radio::RadioType kRadioType = Radio::kSoapySdrStream;
 static constexpr size_t kRadioTriggerWaitMs = 100;
