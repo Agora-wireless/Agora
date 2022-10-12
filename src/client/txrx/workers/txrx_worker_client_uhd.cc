@@ -1,10 +1,10 @@
 /**
- * @file txrx_worker_client_hw.cc
+ * @file txrx_worker_client_uhd.cc
  * @brief Implementation of PacketTxRx datapath functions for communicating
- * with real iris / faros hardware
+ * with real usrp hardware
  */
 
-#include "txrx_worker_client_hw.h"
+#include "txrx_worker_client_uhd.h"
 
 #include <cassert>
 #include <complex>
@@ -24,7 +24,7 @@ static constexpr size_t kBeaconsToStart = 2;
 static constexpr bool kPrintClientBeaconSNR = true;
 static constexpr ssize_t kMaxBeaconAdjust = 5;
 
-TxRxWorkerClientHw::TxRxWorkerClientHw(
+TxRxWorkerClientUhd::TxRxWorkerClientUhd(
     size_t core_offset, size_t tid, size_t interface_count,
     size_t interface_offset, Config* const config, size_t* rx_frame_start,
     moodycamel::ConcurrentQueue<EventData>* event_notify_q,
@@ -61,7 +61,7 @@ TxRxWorkerClientHw::TxRxWorkerClientHw(
     rx_pkts_ptrs_.at(ch) = &scratch_rx_memory;
 
     AGORA_LOG_TRACE(
-        "TxRxWorkerClientHw - rx pkt memory %ld:%ld data location %ld\n",
+        "TxRxWorkerClientUhd - rx pkt memory %ld:%ld data location %ld\n",
         reinterpret_cast<intptr_t>(pkt_memory),
         reinterpret_cast<intptr_t>(scratch_rx_memory.RawPacket()),
         reinterpret_cast<intptr_t>(scratch_rx_memory.RawPacket()->data_));
@@ -74,15 +74,15 @@ TxRxWorkerClientHw::TxRxWorkerClientHw(
   InitRxStatus();
 }
 
-TxRxWorkerClientHw::~TxRxWorkerClientHw() = default;
+TxRxWorkerClientUhd::~TxRxWorkerClientUhd() = default;
 
 //Main Thread Execution loop
-void TxRxWorkerClientHw::DoTxRx() {
+void TxRxWorkerClientUhd::DoTxRx() {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid_);
 
-  AGORA_LOG_INFO("TxRxWorkerClientHw[%zu] has %zu:%zu total radios %zu\n", tid_,
-                 interface_offset_, (interface_offset_ + num_interfaces_) - 1,
-                 num_interfaces_);
+  AGORA_LOG_INFO("TxRxWorkerClientUhd[%zu] has %zu:%zu total radios %zu\n",
+                 tid_, interface_offset_,
+                 (interface_offset_ + num_interfaces_) - 1, num_interfaces_);
 
   running_ = true;
 
@@ -95,13 +95,13 @@ void TxRxWorkerClientHw::DoTxRx() {
   program_start_ticks_ = GetTime::Rdtsc();
 
   if (num_interfaces_ == 0) {
-    AGORA_LOG_WARN("TxRxWorkerClientHw[%zu] has no interfaces, exiting\n",
+    AGORA_LOG_WARN("TxRxWorkerClientUhd[%zu] has no interfaces, exiting\n",
                    tid_);
     running_ = false;
     return;
   } else if (num_interfaces_ > 1) {
     throw std::runtime_error(
-        "TxRxWorkerClientHw does not support multiple interfaces per thread");
+        "TxRxWorkerClientUhd does not support multiple interfaces per thread");
   }
   const size_t local_interface = 0;
   long long rx_time = 0;
@@ -124,7 +124,7 @@ void TxRxWorkerClientHw::DoTxRx() {
       rx_adjust_samples = sync_index - Configuration()->BeaconLen() -
                           Configuration()->OfdmTxZeroPrefix();
       AGORA_LOG_INFO(
-          "TxRxWorkerClientHw [%zu]: Beacon detected for radio %zu, "
+          "TxRxWorkerClientUhd [%zu]: Beacon detected for radio %zu, "
           "sync_index: %ld, rx sample offset: %ld, window %zu, samples in "
           "frame %zu, alignment removal %zu\n",
           tid_, local_interface + interface_offset_, sync_index,
@@ -136,7 +136,8 @@ void TxRxWorkerClientHw::DoTxRx() {
       beacons_detected++;
     } else if (Configuration()->Running()) {
       AGORA_LOG_WARN(
-          "TxRxWorkerClientHw [%zu]: Beacon could not be detected on interface "
+          "TxRxWorkerClientUhd [%zu]: Beacon could not be detected on "
+          "interface "
           "%zu - sync_index: %ld\n",
           tid_, local_interface, sync_index);
       throw std::runtime_error("rx sample offset is less than 0");
@@ -178,7 +179,7 @@ void TxRxWorkerClientHw::DoTxRx() {
             rx_adjust_samples = sync_index - Configuration()->BeaconLen() -
                                 Configuration()->OfdmTxZeroPrefix();
             AGORA_LOG_INFO(
-                "TxRxWorkerClientHw [%zu]: Initial Sync - radio %zu, frame "
+                "TxRxWorkerClientUhd [%zu]: Initial Sync - radio %zu, frame "
                 "%zu, symbol %zu sync_index: %ld, rx sample offset: %ld time0 "
                 "%lld\n",
                 tid_, (local_interface + interface_offset_) + ch, rx_frame_id,
@@ -236,14 +237,14 @@ void TxRxWorkerClientHw::DoTxRx() {
                                    Configuration()->OfdmTxZeroPrefix();
             if (std::abs(adjust) > kMaxBeaconAdjust) {
               AGORA_LOG_WARN(
-                  "TxRxWorkerClientHw [%zu]: Re-syncing ignored due to excess "
+                  "TxRxWorkerClientUhd [%zu]: Re-syncing ignored due to excess "
                   "offset %ld - channel %zu, sync_index: %ld, tries %zu\n ",
                   tid_, adjust, kSyncDetectChannel, sync_index,
                   resync_retry_cnt);
             } else {
               rx_adjust_samples = adjust;
               AGORA_LOG_INFO(
-                  "TxRxWorkerClientHw [%zu]: Re-syncing channel %zu, "
+                  "TxRxWorkerClientUhd [%zu]: Re-syncing channel %zu, "
                   "sync_index: %ld, rx sample offset: %ld tries %zu\n ",
                   tid_, kSyncDetectChannel, sync_index, rx_adjust_samples,
                   resync_retry_cnt);
@@ -259,7 +260,7 @@ void TxRxWorkerClientHw::DoTxRx() {
                                        samples_per_symbol,
                                        Configuration()->ClCorrScale().at(tid_));
                     AGORA_LOG_INFO(
-                        "TxRxWorkerClientHw [%zu]: beacon status channel %zu, "
+                        "TxRxWorkerClientUhd [%zu]: beacon status channel %zu, "
                         "sync_index: %ld, rx sample offset: %ld\n",
                         tid_, ch, aux_channel_sync,
                         aux_channel_sync -
@@ -276,7 +277,8 @@ void TxRxWorkerClientHw::DoTxRx() {
             resync_retry_cnt++;
             if (resync_retry_cnt > kReSyncRetryCount) {
               AGORA_LOG_ERROR(
-                  "TxRxWorkerClientHw [%zu]: Exceeded resync retry limit (%zu) "
+                  "TxRxWorkerClientUhd [%zu]: Exceeded resync retry limit "
+                  "(%zu) "
                   "for client %zu reached after %zu resync successes at frame: "
                   "%zu.  Stopping!\n",
                   tid_, kReSyncRetryCount, local_interface + interface_offset_,
@@ -301,11 +303,11 @@ void TxRxWorkerClientHw::DoTxRx() {
 // global_symbol_id in - symbol id of the last rx packet
 //                 out - symbol id of the current rx packet
 //
-std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
-                                              size_t& global_frame_id,
-                                              size_t& global_symbol_id,
-                                              long long& receive_time,
-                                              ssize_t& sample_offset) {
+std::vector<Packet*> TxRxWorkerClientUhd::DoRx(size_t interface_id,
+                                               size_t& global_frame_id,
+                                               size_t& global_symbol_id,
+                                               long long& receive_time,
+                                               ssize_t& sample_offset) {
   const size_t radio_id = interface_id + interface_offset_;
   const size_t first_ant_id = radio_id * channels_per_interface_;
   std::vector<Packet*> result_packets;
@@ -354,7 +356,7 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
 
     if (rx_status < 0) {
       AGORA_LOG_ERROR(
-          "TxRxWorkerClientHw[%zu]: Interface %zu | Radio %zu - Rx failure RX "
+          "TxRxWorkerClientUhd[%zu]: Interface %zu | Radio %zu - Rx failure RX "
           "status = %d is less than 0\n",
           tid_, interface_id, interface_id + interface_offset_, rx_status);
     } else if (rx_status > 0) {
@@ -363,7 +365,7 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
       if (new_samples < num_rx_samps) {
         //Didn't receive everything we requested, try again next time (status saved in rx_info)
         AGORA_LOG_TRACE(
-            "TxRxWorkerClientHw[%zu]: Interface %zu | Radio %zu - Rx failure "
+            "TxRxWorkerClientUhd[%zu]: Interface %zu | Radio %zu - Rx failure "
             "RX status = %d is less than num samples %zu\n",
             tid_, interface_id, interface_id + interface_offset_, rx_status,
             num_rx_samps);
@@ -388,7 +390,7 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
 
           if (kDebugPrintInTask) {
             AGORA_LOG_INFO(
-                "TxRxWorkerClientHw [%zu]: Rx (Frame %zu, Symbol %zu, Radio "
+                "TxRxWorkerClientUhd [%zu]: Rx (Frame %zu, Symbol %zu, Radio "
                 "%zu) - at time %lld\n",
                 tid_, global_frame_id, global_symbol_id, radio_id,
                 receive_time);
@@ -405,7 +407,7 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
               result_packets.push_back(raw_pkt);
 
               AGORA_LOG_FRAME(
-                  "TxRxWorkerClientHw [%zu]: Rx Downlink (Frame %zu, Symbol "
+                  "TxRxWorkerClientUhd [%zu]: Rx Downlink (Frame %zu, Symbol "
                   "%zu, Ant %zu) from Radio %zu at time %lld\n",
                   tid_, global_frame_id, global_symbol_id, first_ant_id + ch,
                   radio_id, receive_time);
@@ -421,7 +423,7 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
         ResetRxStatus(interface_id, ignore);
       } else {
         AGORA_LOG_ERROR(
-            "TxRxWorkerClientHw[%zu]: Interface %zu | Radio %zu - Rx failure "
+            "TxRxWorkerClientUhd[%zu]: Interface %zu | Radio %zu - Rx failure "
             "new samples %zu requested samples %zu samples rx'd exceed "
             "request\n",
             tid_, interface_id, interface_id + interface_offset_, new_samples,
@@ -433,7 +435,7 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
 }
 
 //Tx data
-size_t TxRxWorkerClientHw::DoTx(const long long time0) {
+size_t TxRxWorkerClientUhd::DoTx(const long long time0) {
   auto tx_events = GetPendingTxEvents();
 
   for (const EventData& current_event : tx_events) {
@@ -448,7 +450,7 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
     const size_t ant_offset = ue_ant % channels_per_interface_;
 
     AGORA_LOG_FRAME(
-        "TxRxWorkerClientHw::DoTx[%zu]: Request to Transmit (Frame %zu, "
+        "TxRxWorkerClientUhd::DoTx[%zu]: Request to Transmit (Frame %zu, "
         "User %zu, Ant %zu) time0 %lld\n",
         tid_, frame_id, interface_id, ue_ant, time0);
 
@@ -456,7 +458,7 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
                  (interface_id <= (num_interfaces_ + interface_offset_)),
              "Invalid Tx interface Id");
     RtAssert(interface_id == tid_,
-             "TxRxWorkerClientHw::DoTx - Ue id was not the expected values");
+             "TxRxWorkerClientUhd::DoTx - Ue id was not the expected values");
 
     //For Tx we need all channels_per_interface_ antennas before we can transmit
     //we will assume that if you get the last antenna, you have already received all
@@ -493,7 +495,7 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
           NotifyComplete(complete_event);
         }
         AGORA_LOG_TRACE(
-            "TxRxWorkerClientHw::DoTx[%zu]: Frame %zu Transmit Complete for "
+            "TxRxWorkerClientUhd::DoTx[%zu]: Frame %zu Transmit Complete for "
             "Ue "
             "%zu\n",
             tid_, frame_id, interface_id);
@@ -505,8 +507,8 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
 
 ///\todo for the multi radio case should let this return if not enough data is found
 /// This function blocks untill all the discard_samples are received for a given local_interface
-void TxRxWorkerClientHw::AdjustRx(size_t local_interface,
-                                  size_t discard_samples) {
+void TxRxWorkerClientUhd::AdjustRx(size_t local_interface,
+                                   size_t discard_samples) {
   const size_t radio_id = local_interface + interface_offset_;
   long long rx_time = 0;
 
@@ -539,8 +541,8 @@ void TxRxWorkerClientHw::AdjustRx(size_t local_interface,
 }
 
 ///\todo for the multi radio case should let this return if not enough data is found
-ssize_t TxRxWorkerClientHw::SyncBeacon(size_t local_interface,
-                                       size_t sample_window) {
+ssize_t TxRxWorkerClientUhd::SyncBeacon(size_t local_interface,
+                                        size_t sample_window) {
   const size_t radio_id = local_interface + interface_offset_;
   ssize_t sync_index = -1;
   long long rx_time = 0;
@@ -603,7 +605,7 @@ ssize_t TxRxWorkerClientHw::SyncBeacon(size_t local_interface,
   return sync_index;
 }
 
-ssize_t TxRxWorkerClientHw::FindSyncBeacon(
+ssize_t TxRxWorkerClientUhd::FindSyncBeacon(
     const std::complex<int16_t>* check_data, size_t sample_window,
     float corr_scale) {
   ssize_t sync_index = -1;
@@ -634,13 +636,13 @@ ssize_t TxRxWorkerClientHw::FindSyncBeacon(
       sig_power += std::pow(std::abs(power_value), 2);
       noise_power += std::pow(std::abs(noise_value), 2);
     }
-    AGORA_LOG_INFO("TxRxWorkerClientHw: Sync Beacon - SNR %2.1f dB\n",
+    AGORA_LOG_INFO("TxRxWorkerClientUhd: Sync Beacon - SNR %2.1f dB\n",
                    +10 * std::log10(sig_power / noise_power));
   }
   return sync_index;
 }
 
-bool TxRxWorkerClientHw::IsRxSymbol(size_t symbol_id) {
+bool TxRxWorkerClientUhd::IsRxSymbol(size_t symbol_id) {
   auto symbol_type = Configuration()->GetSymbolType(symbol_id);
   bool is_rx;
 
@@ -654,8 +656,8 @@ bool TxRxWorkerClientHw::IsRxSymbol(size_t symbol_id) {
 }
 
 // All UL symbols
-void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
-                                         long long time0) {
+void TxRxWorkerClientUhd::TxUplinkSymbols(size_t radio_id, size_t frame_id,
+                                          long long time0) {
   const size_t tx_frame_id = frame_id + TX_FRAME_DELTA;
   const size_t samples_per_symbol = Configuration()->SampsPerSymbol();
   const size_t samples_per_frame =
@@ -701,7 +703,7 @@ void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
     }
     if (kDebugPrintInTask) {
       AGORA_LOG_INFO(
-          "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Symbol (Frame "
+          "TxRxWorkerClientUhd::DoTx[%zu]: Transmitted Symbol (Frame "
           "%zu:%zu, Symbol %zu, Ue %zu) at time %lld flags %d\n",
           tid_, frame_id, tx_frame_id, tx_symbol_id, radio_id, tx_time,
           static_cast<int>(flags_tx));
@@ -709,8 +711,8 @@ void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
   }
 }
 
-void TxRxWorkerClientHw::TxPilot(size_t pilot_ant, size_t frame_id,
-                                 long long time0) {
+void TxRxWorkerClientUhd::TxPilot(size_t pilot_ant, size_t frame_id,
+                                  long long time0) {
   const size_t tx_frame_id = frame_id + TX_FRAME_DELTA;
   const size_t pilot_channel = (pilot_ant % channels_per_interface_);
   const size_t radio = pilot_ant / channels_per_interface_;
@@ -766,7 +768,7 @@ void TxRxWorkerClientHw::TxPilot(size_t pilot_ant, size_t frame_id,
 
   if (kDebugPrintInTask) {
     AGORA_LOG_INFO(
-        "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Pilot  (Frame "
+        "TxRxWorkerClientUhd::DoTx[%zu]: Transmitted Pilot  (Frame "
         "%zu:%zu, Symbol %zu, Ue %zu, Ant %zu:%zu) at time %lld flags "
         "%d\n",
         tid_, frame_id, tx_frame_id, pilot_symbol_id, radio, pilot_channel,
@@ -774,7 +776,7 @@ void TxRxWorkerClientHw::TxPilot(size_t pilot_ant, size_t frame_id,
   }
 }
 
-void TxRxWorkerClientHw::InitRxStatus() {
+void TxRxWorkerClientUhd::InitRxStatus() {
   rx_status_.resize(num_interfaces_,
                     TxRxWorkerRx::RxStatusTracker(channels_per_interface_));
   std::vector<RxPacket*> rx_packets(channels_per_interface_);
@@ -792,7 +794,7 @@ void TxRxWorkerClientHw::InitRxStatus() {
   }
 }
 
-void TxRxWorkerClientHw::ResetRxStatus(size_t interface, bool reuse_memory) {
+void TxRxWorkerClientUhd::ResetRxStatus(size_t interface, bool reuse_memory) {
   auto& prev_status = rx_status_.at(interface);
 
   std::vector<RxPacket*> rx_packets;
