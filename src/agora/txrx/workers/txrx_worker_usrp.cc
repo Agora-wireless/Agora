@@ -13,7 +13,8 @@
 #include "message.h"
 
 static constexpr size_t kFirstBeaconFrameAdvance = 200;
-static constexpr size_t kTxFrameAdvance = 1;
+static constexpr size_t kTxFrameAdvance = 2;
+static constexpr bool kDebugRxTimes = true;
 
 TxRxWorkerUsrp::TxRxWorkerUsrp(
     size_t core_offset, size_t tid, size_t radio_hi, size_t radio_lo,
@@ -129,6 +130,7 @@ void TxRxWorkerUsrp::DoTxRx() {
 std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(
     size_t radio_id, size_t frame_id, size_t symbol_id,
     const std::vector<void*>& discard_locs) {
+  long long rx_time;
   std::vector<Packet*> rx_packets;
   std::vector<RxPacket*> memory_tracking;
 
@@ -150,9 +152,8 @@ std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(
   }
 
   Radio::RxFlags rx_flags;
-  const int rx_status = radio_config_.RadioRx(radio_id, rx_locs,
-                                              Configuration()->SampsPerSymbol(),
-                                              rx_flags, rx_time_bs_);
+  const int rx_status = radio_config_.RadioRx(
+      radio_id, rx_locs, Configuration()->SampsPerSymbol(), rx_flags, rx_time);
 
   if (rx_status == static_cast<int>(Configuration()->SampsPerSymbol())) {
     //Process the rx data
@@ -166,6 +167,17 @@ std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(
         NotifyComplete(rx_message);
       }
     }
+
+    if (kDebugRxTimes) {
+      if ((rx_time_bs_ + static_cast<long long>(
+                             Configuration()->SampsPerSymbol())) != rx_time) {
+        AGORA_LOG_WARN("RecvEnqueue: Unexpected Rx time %lld:%lld(%lld)\n",
+                       rx_time,
+                       static_cast<long long>(
+                           rx_time_bs_ + Configuration()->SampsPerSymbol()),
+                       rx_time_bs_);
+      }
+    }
   } else {
     AGORA_LOG_ERROR(
         "TxRxWorkerUsrp::RecvEnqueue: Unexpected Rx return status %dn\n",
@@ -173,6 +185,7 @@ std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(
     throw std::runtime_error(
         "TxRxWorkerUsrp::RecvEnqueue:Unexpected Rx return status");
   }
+  rx_time_bs_ = rx_time;
   return rx_packets;
 }
 
@@ -365,7 +378,8 @@ long long TxRxWorkerUsrp::DiscardRxFrames(size_t radio_id,
     } else if ((old_rx_time != 0) &&
                ((old_rx_time + Configuration()->SampsPerSymbol()) != rx_time)) {
       AGORA_LOG_WARN("Unexpected Rx Time %lld:%lld\n", rx_time,
-                     old_rx_time + Configuration()->SampsPerSymbol());
+                     old_rx_time + static_cast<long long>(
+                                       Configuration()->SampsPerSymbol()));
     }
   }
   rx_time_bs_ = rx_time;

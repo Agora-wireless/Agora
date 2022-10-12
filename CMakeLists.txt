@@ -330,10 +330,10 @@ if(RADIO_TYPE STREQUAL PURE_UHD)
   message(STATUS "Using Boost Version: ${Boost_VERSION}")
 
   set(PUREUHD_SOURCES
+      src/agora/radio/radio_set/radio_set_uhd.cc
       src/agora/radio/radio_uhdsdr.cc
       )
   set(PUREUHD_SOURCES_AGORA
-      src/agora/radio/radio_set/radio_set_uhd.cc
       src/agora/txrx/workers/txrx_worker_usrp.cc
       )
   message(STATUS "pure_uhd_lib library initialized")
