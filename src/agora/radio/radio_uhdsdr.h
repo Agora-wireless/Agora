@@ -11,6 +11,27 @@
 #include "config.h"
 #include "radio.h"
 #include "uhd/usrp/multi_usrp.hpp"
+/*!
+ * Indicate end of burst for transmit or receive.
+ * For write, end of burst if set by the caller.
+ * For read, end of burst is set by the driver.
+ */
+#define UHD_SDR_END_BURST (1 << 1)
+
+/*!
+ * Indicates that the time stamp is valid.
+ * For write, the caller must set has time when timeNs is provided.
+ * For read, the driver sets has time when timeNs is provided.
+ */
+#define UHD_SDR_HAS_TIME (1 << 2)
+
+/*!
+ * Indicate that the stream should wait for an external trigger event.
+ * This flag might be used with the flags argument in any of the
+ * stream API calls. The trigger implementation is hardware-specific.
+ */
+#define UHD_SDR_WAIT_TRIGGER (1 << 6)
+
 
 class RadioUHDSdr : public Radio {
  public:
