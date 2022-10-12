@@ -236,17 +236,44 @@ void RadioUHDSdr::Deactivate() {
 
 int RadioUHDSdr::Tx(const void* const* tx_buffs, size_t tx_size,
                     Radio::TxFlags flags, long long& tx_time_ns) {
-  constexpr double kTxTimeoutSec = 1.0f;
+  constexpr double kTxTimeoutSec = 1.0;
   //tx_time_ns is a sample counter / tick value
+
+  int uhd_flags;
+  if (flags == Radio::TxFlags::kTxFlagNone) {
+    uhd_flags = UHD_SDR_HAS_TIME;; 
+  } else if (flags == Radio::TxFlags::kEndTransmit) {
+    uhd_flags = (UHD_SDR_HAS_TIME | UHD_SDR_END_BURST);
+  } else if (flags == Radio::TxFlags::kTxWaitTrigger) {
+    uhd_flags = UHD_SDR_END_BURST | UHD_SDR_WAIT_TRIGGER;
+  } else {
+    AGORA_LOG_ERROR("Unsupported radio tx flag %d\n", static_cast<int>(flags));
+    uhd_flags = 0;
+  }
+
+// left here for now for debugging purposes, might not needd
+  // const long long ratell = (long long)(cfg_->Rate());
+  // const long long full = (long long)(tx_time_ns/ratell);
+  // const long long err = tx_time_ns - (full*ratell);
+  // const double part = full*(cfg_->Rate() - ratell);
+  // const double frac = ((err - part)*1000000000)/cfg_->Rate();
+  // // added to adjust the time spec
+  // tx_time_ns = (full*1000000000) + llround(frac);
 
   uhd::tx_metadata_t md;
   //Should handle the start of burst flag...
   //md.start_of_burst = true;
   //md.end_of_burst = (flags == kEndTransmit);
-  md.start_of_burst = true;
-  md.end_of_burst = true;
-  md.has_time_spec = true;
+
+  // md.start_of_burst = true;
+  // md.end_of_burst = true;
+  // md.has_time_spec = true;
+  // md.time_spec = uhd::time_spec_t::from_ticks(tx_time_ns, cfg_->Rate());
+
+  md.has_time_spec = (flags & UHD_SDR_HAS_TIME) != 0;
+  md.end_of_burst = (flags & UHD_SDR_END_BURST) != 0;
   md.time_spec = uhd::time_spec_t::from_ticks(tx_time_ns, cfg_->Rate());
+
 
   uhd::tx_streamer::buffs_type stream_buffs(tx_buffs, txs_->get_num_channels());
   const int write_status = txs_->send(stream_buffs, tx_size, md, kTxTimeoutSec);
