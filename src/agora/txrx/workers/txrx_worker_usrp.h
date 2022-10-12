@@ -37,6 +37,12 @@ class TxRxWorkerUsrp : public TxRxWorker {
                                    size_t symbol_id,
                                    const std::vector<void*>& discard_locs);
 
+  long long GetRxTime(size_t radio_id, std::vector<void*>& rx_locs);
+  long long DiscardRxFrames(size_t radio_id, size_t frames_to_ignore,
+                            std::vector<void*>& rx_locs);
+  void TxBeacon(size_t radio_id, size_t tx_frame_number,
+                const std::vector<void*>& tx_locs, long long time0);
+
   long long rx_time_bs_;
   long long tx_time_bs_;
   // This object is created / owned by the parent process

@@ -13,7 +13,7 @@
 #include "message.h"
 
 static constexpr size_t kFirstBeaconFrameAdvance = 200;
-static constexpr size_t kBeaconFrameAdvance = 1;
+static constexpr size_t kTxFrameAdvance = 1;
 
 TxRxWorkerUsrp::TxRxWorkerUsrp(
     size_t core_offset, size_t tid, size_t radio_hi, size_t radio_lo,
@@ -29,6 +29,8 @@ TxRxWorkerUsrp::TxRxWorkerUsrp(
                  config, rx_frame_start, event_notify_q, tx_pending_q,
                  tx_producer, notify_producer, rx_memory, tx_memory, sync_mutex,
                  sync_cond, can_proceed),
+      rx_time_bs_(0),
+      tx_time_bs_(0),
       radio_config_(radio_config) {}
 
 TxRxWorkerUsrp::~TxRxWorkerUsrp() = default;
@@ -70,120 +72,53 @@ void TxRxWorkerUsrp::DoTxRx() {
     rx_locs.emplace_back(rx_ignore_memory.at(i).data());
   }
 
-  rx_time_bs_ = 0;
-  tx_time_bs_ = 0;
   const size_t radio_id = 0;
+  size_t tx_frame_number = 0;
 
   running_ = true;
   WaitSync();
 
   //Radio is streaming........  flush?
-
-  //Should this be end rx?
-  Radio::RxFlags rx_flags = Radio::RxFlags::kRxFlagNone;
-  AGORA_LOG_INFO("Fetch to current Rx time to track sample count...\n");
-  int rx_status = 0;
-  while (rx_status != Configuration()->SampsPerSymbol()) {
-    rx_status = radio_config_.RadioRx(radio_id, rx_locs,
-                                      Configuration()->SampsPerSymbol(),
-                                      rx_flags, rx_time_bs_);
-    AGORA_LOG_INFO("Rx status: %d\n", rx_status);
-  }
-  AGORA_LOG_INFO("First Rx status: %d\n", rx_status);
-  if (rx_status <= 0) {
-    AGORA_LOG_WARN("DoTxRx: Rx status is unexpected %zu on first rx\n",
-                   rx_status);
-  }
-
-  // Schedule the first beacon in the future
-  //Assumes there is only 1 beacon and it is the first symbol... fix this when time allows
-  tx_time_bs_ = rx_time_bs_ + ((Configuration()->SampsPerSymbol() *
-                                Configuration()->Frame().NumTotalSyms()) *
-                               kFirstBeaconFrameAdvance);
-  //Need to make sure this doesn't block until after the TX time
-  const auto tx_status = radio_config_.RadioTx(
-      radio_id, tx_locs.data(), Radio::TxFlags::kEndTransmit, tx_time_bs_);
-  if (tx_status <= 0) {
-    AGORA_LOG_WARN("DoTxRx: Tx status is unexpected %zu\n", tx_status);
-  }
-
-  //Wait until the radio is about to tx the beacon
-  //todo -- Verify there shouldn't be a minus 1 here................
-  const size_t read_symbols =
-      Configuration()->Frame().NumTotalSyms() * kFirstBeaconFrameAdvance;
-  for (size_t i = 0; i < read_symbols; i++) {
-    rx_status = radio_config_.RadioRx(radio_id, rx_locs,
-                                      Configuration()->SampsPerSymbol(),
-                                      rx_flags, rx_time_bs_);
-
-    if (rx_status <= 0) {
-      AGORA_LOG_WARN(
-          "DoTxRx:Rx status is unexpected %zu while reading frame advanced\n",
-          rx_status);
-    }
-  }
-
-  // rx_time_bs_ should be 1 symbol / slot time before the tx beacon time;
-  if (rx_time_bs_ != tx_time_bs_) {
-    AGORA_LOG_ERROR("Rx time is unexpected %lld:%lld\n", rx_time_bs_,
-                    tx_time_bs_);
-    throw std::runtime_error("Rx time is not equal to the tx beacon time");
-  }
-
-  //rx_time_bs_ == tx_time_bs_  is the start time of the first tx beacon
-
-  //Schedule tx beacons advanced.
-  for (size_t i = 0; i < kBeaconFrameAdvance; i++) {
-    //Schedule kBeaconFrameAdvance -1 frames ahead
-    tx_time_bs_ += (Configuration()->SampsPerSymbol() *
-                    Configuration()->Frame().NumTotalSyms());
-    const int tx_ret = radio_config_.RadioTx(
-        radio_id, tx_locs.data(), Radio::TxFlags::kEndTransmit, tx_time_bs_);
-    if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
-      AGORA_LOG_ERROR("BAD Transmit(%d:%zu) at Time %lld and frame count %zu\n",
-                      tx_ret, Configuration()->SampsPerSymbol(), tx_time_bs_,
-                      i);
-    }
+  //Keep working through any buffered samples
+  const auto last_rx_time =
+      DiscardRxFrames(radio_id, kFirstBeaconFrameAdvance, rx_locs);
+  //Increament the last rx time by 1 symbol to create frame start time
+  long long time0 = last_rx_time + Configuration()->SampsPerSymbol();
+  //sending the beacon at time0 should produce a 'L' because we received data up until this time so we need to advance tx frame to give additional time
+  for (size_t i = 0; i < kTxFrameAdvance; i++) {
+    TxBeacon(radio_id, tx_frame_number + i, tx_locs, time0);
   }
   AGORA_LOG_INFO("Start BS main recv loop...\n");
 
-  size_t global_frame_id = 0;
-  size_t global_symbol_id = 0;
+  size_t rx_frame_id = 0;
+  size_t rx_symbol_id = 0;
   size_t local_interface = 0;
 
   while (Configuration()->Running()) {
-    // receive data
-    RecvEnqueue(local_interface, global_frame_id, global_symbol_id, rx_locs);
+    // receive data (assumes we rx samples_per_symbol)
+    RecvEnqueue(local_interface, rx_frame_id, rx_symbol_id, rx_locs);
 
     //if rx is successful than update the counter / times
-    // Schedule the next beacon
-    if (global_symbol_id == Configuration()->Frame().GetBeaconSymbol(0)) {
-      tx_time_bs_ = rx_time_bs_ + Configuration()->SampsPerSymbol() *
-                                      Configuration()->Frame().NumTotalSyms() *
-                                      kBeaconFrameAdvance;
-      const int tx_ret = radio_config_.RadioTx(
-          radio_id, tx_locs.data(), Radio::TxFlags::kEndTransmit, tx_time_bs_);
-      if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
-        AGORA_LOG_ERROR(
-            "BAD Transmit(%d:%zu) at Time %lld and frame count %zu\n", tx_ret,
-            Configuration()->SampsPerSymbol(), tx_time_bs_, global_frame_id);
-      }
+    // Schedule the next beacon (only on interface 0)
+    if (local_interface == 0 &&
+        (rx_symbol_id == Configuration()->Frame().GetBeaconSymbol(0))) {
+      TxBeacon(local_interface, rx_frame_id + kTxFrameAdvance, tx_locs, time0);
     }
 
     // If we received the first symbol from the first interface
     if (kIsWorkerTimingEnabled && (local_interface == 0) &&
-        (global_symbol_id == 0)) {
-      rx_frame_start_[global_frame_id % kNumStatsFrames] = GetTime::Rdtsc();
+        (rx_symbol_id == 0)) {
+      rx_frame_start_[rx_frame_id % kNumStatsFrames] = GetTime::Rdtsc();
     }
 
     local_interface++;
     if (local_interface == num_interfaces_) {
       local_interface = 0;
       // Update global frame_id and symbol_id
-      global_symbol_id++;
-      if (global_symbol_id == Configuration()->Frame().NumTotalSyms()) {
-        global_symbol_id = 0;
-        global_frame_id++;
+      rx_symbol_id++;
+      if (rx_symbol_id == Configuration()->Frame().NumTotalSyms()) {
+        rx_symbol_id = 0;
+        rx_frame_id++;
       }
     }  // interface rollover
   }
@@ -382,4 +317,73 @@ int TxRxWorkerUsrp::DequeueSend(int frame_id, int symbol_id) {
   auto complete_event = EventData(EventType::kPacketTX, event.tags_[0]);
   NotifyComplete(complete_event);
   return event.tags_[0];
+}
+
+///add - All radio id support?
+long long TxRxWorkerUsrp::GetRxTime(size_t radio_id,
+                                    std::vector<void*>& rx_locs) {
+  int rx_status = 0;
+  long long rx_time;
+  Radio::RxFlags rx_flags = Radio::RxFlags::kRxFlagNone;
+
+  //Loop until we get the correct amount of samples
+  while (rx_status != static_cast<int>(Configuration()->SampsPerSymbol())) {
+    rx_status = radio_config_.RadioRx(radio_id, rx_locs,
+                                      Configuration()->SampsPerSymbol(),
+                                      rx_flags, rx_time);
+    AGORA_LOG_INFO("GetRxTime: status %d at time %lld\n", rx_status, rx_time);
+  }
+  AGORA_LOG_INFO("GetRxTime: status %d at time %lld\n", rx_status, rx_time);
+  if (rx_status <= 0) {
+    AGORA_LOG_WARN("GetRxTime: Rx status is unexpected %zu\n", rx_status);
+  }
+  return rx_time;
+}
+
+///add - All radio id support?
+//Ignores frames from the rx'ing radio
+//Returns the start time of the last slot / symbol in the frame
+long long TxRxWorkerUsrp::DiscardRxFrames(size_t radio_id,
+                                          size_t frames_to_ignore,
+                                          std::vector<void*>& rx_locs) {
+  Radio::RxFlags rx_flags = Radio::RxFlags::kRxFlagNone;
+  long long rx_time(0);
+  long long old_rx_time;
+  const size_t read_symbols =
+      Configuration()->Frame().NumTotalSyms() * frames_to_ignore;
+
+  for (size_t i = 0; i < read_symbols; i++) {
+    old_rx_time = rx_time;
+    const auto rx_status = radio_config_.RadioRx(
+        radio_id, rx_locs, Configuration()->SampsPerSymbol(), rx_flags,
+        rx_time);
+
+    if (rx_status <= 0) {
+      AGORA_LOG_WARN("DiscardRxFrames:Rx status is unexpected %zu\n",
+                     rx_status);
+      i--;
+    } else if ((old_rx_time != 0) &&
+               ((old_rx_time + Configuration()->SampsPerSymbol()) != rx_time)) {
+      AGORA_LOG_WARN("Unexpected Rx Time %lld:%lld\n", rx_time,
+                     old_rx_time + Configuration()->SampsPerSymbol());
+    }
+  }
+  rx_time_bs_ = rx_time;
+  return rx_time;
+}
+
+void TxRxWorkerUsrp::TxBeacon(size_t radio_id, size_t tx_frame_number,
+                              const std::vector<void*>& tx_locs,
+                              long long time0) {
+  long long tx_time =
+      time0 + (Configuration()->SampsPerSymbol() *
+               Configuration()->Frame().NumTotalSyms() * tx_frame_number);
+  const int tx_ret = radio_config_.RadioTx(
+      radio_id, tx_locs.data(), Radio::TxFlags::kEndTransmit, tx_time);
+  if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
+    AGORA_LOG_ERROR(
+        "TxBeacon: BAD Transmit(%d:%zu) at Time %lld for frame %zu\n", tx_ret,
+        Configuration()->SampsPerSymbol(), tx_time, tx_frame_number);
+  }
+  tx_time_bs_ = tx_time;
 }
