@@ -236,22 +236,10 @@ void RadioUHDSdr::Deactivate() {
 
 int RadioUHDSdr::Tx(const void* const* tx_buffs, size_t tx_size,
                     Radio::TxFlags flags, long long& tx_time_ns) {
-  constexpr double kTxTimeoutSec = 1.0;
+  static constexpr double kTxTimeoutSec = 0.2f;
   //tx_time_ns is a sample counter / tick value
 
-  int uhd_flags;
-  if (flags == Radio::TxFlags::kTxFlagNone) {
-    uhd_flags = UHD_SDR_HAS_TIME;; 
-  } else if (flags == Radio::TxFlags::kEndTransmit) {
-    uhd_flags = (UHD_SDR_HAS_TIME | UHD_SDR_END_BURST);
-  } else if (flags == Radio::TxFlags::kTxWaitTrigger) {
-    uhd_flags = UHD_SDR_END_BURST | UHD_SDR_WAIT_TRIGGER;
-  } else {
-    AGORA_LOG_ERROR("Unsupported radio tx flag %d\n", static_cast<int>(flags));
-    uhd_flags = 0;
-  }
-
-// left here for now for debugging purposes, might not needd
+  // left here for now for debugging purposes, might not needd
   // const long long ratell = (long long)(cfg_->Rate());
   // const long long full = (long long)(tx_time_ns/ratell);
   // const long long err = tx_time_ns - (full*ratell);
@@ -261,19 +249,13 @@ int RadioUHDSdr::Tx(const void* const* tx_buffs, size_t tx_size,
   // tx_time_ns = (full*1000000000) + llround(frac);
 
   uhd::tx_metadata_t md;
-  //Should handle the start of burst flag...
-  //md.start_of_burst = true;
-  //md.end_of_burst = (flags == kEndTransmit);
-
-  // md.start_of_burst = true;
-  // md.end_of_burst = true;
-  // md.has_time_spec = true;
-  // md.time_spec = uhd::time_spec_t::from_ticks(tx_time_ns, cfg_->Rate());
-
-  md.has_time_spec = (flags & UHD_SDR_HAS_TIME) != 0;
-  md.end_of_burst = (flags & UHD_SDR_END_BURST) != 0;
+  //Always has time
+  md.has_time_spec = true;
   md.time_spec = uhd::time_spec_t::from_ticks(tx_time_ns, cfg_->Rate());
-
+  //Current the input flags don't have a START burst handling
+  md.start_of_burst = true;
+  md.end_of_burst = true;
+  //md.end_of_burst = (flags == Radio::TxFlags::kEndTransmit);
 
   uhd::tx_streamer::buffs_type stream_buffs(tx_buffs, txs_->get_num_channels());
   const int write_status = txs_->send(stream_buffs, tx_size, md, kTxTimeoutSec);
@@ -352,7 +334,7 @@ int RadioUHDSdr::Rx(std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
 
 int RadioUHDSdr::Rx(std::vector<void*>& rx_locs, size_t rx_size,
                     Radio::RxFlags& out_flags, long long& rx_time_ns) {
-  constexpr double kRxTimeoutSec = 1.0f;
+  static constexpr double kRxTimeoutSec = 0.2f;
   //Init the output values
   out_flags = Radio::RxFlags::kRxFlagNone;
   rx_time_ns = 0;

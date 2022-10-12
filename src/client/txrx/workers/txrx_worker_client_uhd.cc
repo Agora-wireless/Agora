@@ -137,8 +137,7 @@ void TxRxWorkerClientUhd::DoTxRx() {
     } else if (Configuration()->Running()) {
       AGORA_LOG_WARN(
           "TxRxWorkerClientUhd [%zu]: Beacon could not be detected on "
-          "interface "
-          "%zu - sync_index: %ld\n",
+          "interface %zu - sync_index: %ld\n",
           tid_, local_interface, sync_index);
       throw std::runtime_error("rx sample offset is less than 0");
     }
@@ -354,17 +353,17 @@ std::vector<Packet*> TxRxWorkerClientUhd::DoRx(size_t interface_id,
     const int rx_status = radio_.RadioRx(radio_id, rx_locations, num_rx_samps,
                                          out_flags, current_rx_time);
 
-    if (rx_status < 0) {
+    if (rx_status <= 0) {
       AGORA_LOG_ERROR(
           "TxRxWorkerClientUhd[%zu]: Interface %zu | Radio %zu - Rx failure RX "
-          "status = %d is less than 0\n",
+          "status = %d is less than or equal to 0\n",
           tid_, interface_id, interface_id + interface_offset_, rx_status);
     } else if (rx_status > 0) {
       const size_t new_samples = static_cast<size_t>(rx_status);
       rx_info.Update(new_samples, current_rx_time);
       if (new_samples < num_rx_samps) {
         //Didn't receive everything we requested, try again next time (status saved in rx_info)
-        AGORA_LOG_TRACE(
+        AGORA_LOG_INFO(
             "TxRxWorkerClientUhd[%zu]: Interface %zu | Radio %zu - Rx failure "
             "RX status = %d is less than num samples %zu\n",
             tid_, interface_id, interface_id + interface_offset_, rx_status,
