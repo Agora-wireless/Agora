@@ -153,8 +153,10 @@ void TxRxWorkerClientUhd::DoTxRx() {
   }
   long long time0 = 0;
   //Set initial frame and symbol to max value so we start at 0
-  size_t rx_frame_id = SIZE_MAX;
-  size_t rx_symbol_id = Configuration()->Frame().NumTotalSyms() - 1;
+  //size_t rx_frame_id = SIZE_MAX;
+  //size_t rx_symbol_id = Configuration()->Frame().NumTotalSyms() - 1;
+  size_t rx_frame_id = 0;
+  size_t rx_symbol_id = 0;
 
   bool resync = false;
   size_t resync_retry_cnt = 0;
@@ -292,7 +294,18 @@ void TxRxWorkerClientUhd::DoTxRx() {
             }
           }
         }  // end resync
-      } else if (!rx_pkts.empty()) {
+
+        local_interface++;
+        if (local_interface == num_interfaces_) {
+          local_interface = 0;
+          // Update global frame_id and symbol_id
+          rx_symbol_id++;
+          if (rx_symbol_id == Configuration()->Frame().NumTotalSyms()) {
+            rx_symbol_id = 0;
+            rx_frame_id++;
+          }
+        }  // interface rollover
+      } else if (rx_pkts.empty() == false) {
         throw std::runtime_error(
             "Received data but it was not the correct dimension");
       }
@@ -350,11 +363,12 @@ std::vector<Packet*> TxRxWorkerClientUhd::DoRx(
     if (kDebugRxTimes) {
       if ((rx_time_ue_ + static_cast<long long>(
                              Configuration()->SampsPerSymbol())) != rx_time) {
-        AGORA_LOG_WARN("TxRxWorkerUSRP: RecvEnqueue: Unexpected Rx time %lld:%lld(%lld)\n",
-                       rx_time,
-                       static_cast<long long>(
-                           rx_time_ue_ + Configuration()->SampsPerSymbol()),
-                       rx_time_ue_);
+        AGORA_LOG_WARN(
+            "TxRxWorkerUSRP: RecvEnqueue: Unexpected Rx time %lld:%lld(%lld)\n",
+            rx_time,
+            static_cast<long long>(rx_time_ue_ +
+                                   Configuration()->SampsPerSymbol()),
+            rx_time_ue_);
       }
     }
   } else {
