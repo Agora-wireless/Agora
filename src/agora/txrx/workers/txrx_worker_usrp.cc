@@ -12,8 +12,8 @@
 #include "logger.h"
 #include "message.h"
 
-static constexpr size_t kFirstBeaconFrameAdvance = 200;
-static constexpr size_t kTxFrameAdvance = 2;
+static constexpr size_t kFirstBeaconFrameAdvance = 100;
+static constexpr size_t kTxFrameAdvance = 1;
 static constexpr bool kDebugRxTimes = true;
 
 TxRxWorkerUsrp::TxRxWorkerUsrp(
@@ -79,13 +79,14 @@ void TxRxWorkerUsrp::DoTxRx() {
   running_ = true;
   WaitSync();
 
-  //Radio is streaming........  flush?
   //Keep working through any buffered samples
   const auto last_rx_time =
       DiscardRxFrames(radio_id, kFirstBeaconFrameAdvance, rx_locs);
-  //Increament the last rx time by 1 symbol to create frame start time
-  long long time0 = last_rx_time + Configuration()->SampsPerSymbol();
-  //sending the beacon at time0 should produce a 'L' because we received data up until this time so we need to advance tx frame to give additional time
+  //Time0 is the current time (start of last rx) + total number of frame samples
+  long long time0 = last_rx_time + static_cast<long long>(
+                                       Configuration()->SampsPerSymbol() *
+                                       Configuration()->Frame().NumTotalSyms());
+  AGORA_LOG_INFO("Time0 captured %lld...\n", time0);
   for (size_t i = 0; i < kTxFrameAdvance; i++) {
     TxBeacon(radio_id, tx_frame_number + i, tx_locs, time0);
   }
@@ -372,8 +373,8 @@ long long TxRxWorkerUsrp::DiscardRxFrames(size_t radio_id,
         rx_time);
 
     if (rx_status <= 0) {
-      AGORA_LOG_WARN("DiscardRxFrames:Rx status is unexpected %zu\n",
-                     rx_status);
+      AGORA_LOG_TRACE("DiscardRxFrames:Rx status is unexpected %zu\n",
+                      rx_status);
       i--;
     } else if ((old_rx_time != 0) &&
                ((old_rx_time + Configuration()->SampsPerSymbol()) != rx_time)) {
@@ -390,8 +391,9 @@ void TxRxWorkerUsrp::TxBeacon(size_t radio_id, size_t tx_frame_number,
                               const std::vector<void*>& tx_locs,
                               long long time0) {
   long long tx_time =
-      time0 + (Configuration()->SampsPerSymbol() *
-               Configuration()->Frame().NumTotalSyms() * tx_frame_number);
+      time0 + static_cast<long long>(Configuration()->SampsPerSymbol() *
+                                     Configuration()->Frame().NumTotalSyms() *
+                                     tx_frame_number);
   const int tx_ret = radio_config_.RadioTx(
       radio_id, tx_locs.data(), Radio::TxFlags::kEndTransmit, tx_time);
   if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
