@@ -79,7 +79,7 @@ EventData DoEncode::Launch(size_t tag) {
   }
 
   int8_t* tx_data_ptr = nullptr;
-  ///\todo Remove the IsUe condition and make GetMacBits and GetInfoBits
+  ///\todo Make GetMacBits and GetInfoBits
   /// universal with raw_buffer_rollover_ the parameter.
   if (kEnableMac) {
     // All cb's per symbol are included in 1 mac packet

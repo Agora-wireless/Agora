@@ -278,6 +278,7 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
           "RadioSoapySdr::Init[%zu] - Radio rx control plane could not be "
           "configured\n",
           id);
+    }
     rxp_->Init(this, cfg_, hw_framer);
     rxp_->Setup();
     txs_ = dev_->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CS16, enabled_channels,
