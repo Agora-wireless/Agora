@@ -34,9 +34,8 @@ class TxRxWorkerClientUhd : public TxRxWorker {
 
  private:
   size_t DoTx(const long long time0);
-  std::vector<Packet*> DoRx(size_t interface_id, size_t& global_frame_id,
-                            size_t& global_symbol_id, long long& receive_time,
-                            ssize_t& sample_offset);
+  std::vector<Packet*> DoRx(size_t radio_id, size_t frame_id, size_t symbol_id,
+                            const std::vector<void*>& discard_locs);
 
   ssize_t SyncBeacon(size_t local_interface, size_t sample_window);
   ssize_t FindSyncBeacon(const std::complex<int16_t>* check_data,
@@ -53,6 +52,7 @@ class TxRxWorkerClientUhd : public TxRxWorker {
   // This object is created / owned by the parent process
   RadioSet& radio_;
   size_t program_start_ticks_;
+  long long rx_time_ue_;
 
   std::vector<std::vector<std::complex<int16_t>>> frame_zeros_;
   std::vector<std::vector<std::complex<int16_t>>> frame_storage_;
