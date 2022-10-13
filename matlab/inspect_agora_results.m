@@ -93,10 +93,10 @@ function inspect_agora_results(dataset_filename, verbose)
         h5disp(dataset_filename,strcat(group_id,dataset_id));
     end 
     start = [1 1 1 1 1];
-    count = [total_samples total_users 1 1 1];
+    count = [total_samples total_users dl_pilot_symbols 1 1];
     tx_pilot_hdf5 = double(h5read(dataset_filename, strcat(group_id,dataset_id), start, count));
     %Convert to complex
-    tx_pilot_cxdouble = complex(tx_pilot_hdf5(1:2:end,:), tx_pilot_hdf5(2:2:end,:));
+    tx_pilot_cxdouble = complex(tx_pilot_hdf5(1:2:end,:,:), tx_pilot_hdf5(2:2:end,:,:));
     clear tx_pilot_hdf5 dataset_id start count;
 
     dataset_id = '/TxData';

@@ -38,8 +38,6 @@ class AgoraWorker {
   MessageInfo* message_;
   AgoraBuffer* buffer_;
   FrameInfo* frame_;
-
-  std::array<std::shared_ptr<CsvLog::MatLogger>, CsvLog::kMatLogs> mat_loggers_;
 };
 
 #endif  // AGORA_WORKER_H_

@@ -25,9 +25,7 @@ DoBeamWeights::DoBeamWeights(
     Table<complex_float>& calib_ul_msum_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices,
-    PhyStats* in_phy_stats, Stats* stats_manager,
-    std::shared_ptr<CsvLog::MatLogger> dl_csi_logger,
-    std::shared_ptr<CsvLog::MatLogger> dl_beam_logger)
+    PhyStats* in_phy_stats, Stats* stats_manager)
     : Doer(config, tid),
       csi_buffers_(csi_buffers),
       calib_dl_buffer_(calib_dl_buffer),
@@ -36,9 +34,7 @@ DoBeamWeights::DoBeamWeights(
       calib_ul_msum_buffer_(calib_ul_msum_buffer),
       ul_beam_matrices_(ul_beam_matrices),
       dl_beam_matrices_(dl_beam_matrices),
-      phy_stats_(in_phy_stats),
-      dl_csi_logger_(std::move(dl_csi_logger)),
-      dl_beam_logger_(std::move(dl_beam_logger)) {
+      phy_stats_(in_phy_stats) {
   duration_stat_ = stats_manager->GetDurationStat(DoerType::kBeam, tid);
   pred_csi_buffer_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
@@ -103,6 +99,9 @@ float DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
                                      const float noise,
                                      complex_float* ul_beam_mem,
                                      complex_float* dl_beam_mem) {
+  if (kEnableMatLog) {
+    phy_stats_->UpdateUlCsi(frame_id, cur_sc_id, mat_csi);
+  }
   arma::cx_fmat mat_ul_beam(reinterpret_cast<arma::cx_float*>(ul_beam_mem),
                             cfg_->UeAntNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_beam_tmp;
@@ -147,8 +146,8 @@ float DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
       mat_dl_beam_tmp = mat_ul_beam_tmp * inv_calib_mat;
     } else {
       arma::cx_fmat mat_dl_csi = inv(arma::diagmat(calib_sc_vec)) * mat_csi;
-      if (kEnableMatLog && dl_csi_logger_) {
-        dl_csi_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_csi);
+      if (kEnableMatLog) {
+        phy_stats_->UpdateDlCsi(frame_id, cur_sc_id, mat_dl_csi);
       }
       switch (cfg_->BeamformingAlgo()) {
         case CommsLib::BeamformingAlgorithm::kZF:
@@ -197,8 +196,8 @@ float DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     arma::cx_fmat mat_dl_beam(reinterpret_cast<arma::cx_float*>(dl_beam_mem),
                               cfg_->BsAntNum(), cfg_->UeAntNum(), false);
     mat_dl_beam = mat_dl_beam_tmp.st();
-    if (kEnableMatLog && dl_beam_logger_) {
-      dl_beam_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_beam);
+    if (kEnableMatLog) {
+      phy_stats_->UpdateDlBeam(frame_id, cur_sc_id, mat_dl_beam);
     }
   }
   for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {
@@ -434,18 +433,6 @@ void DoBeamWeights::ComputeFullCsiBeams(size_t tag) {
                         dl_beam_matrices_[frame_slot][cur_sc_id]);
     if (kPrintBeamStats) {
       phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
-    }
-    if (kEnableMatLog) {
-      if (dl_csi_logger_) {
-        dl_csi_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_csi);
-      }
-
-      if (dl_beam_logger_) {
-        arma::cx_fmat mat_dl_beam(reinterpret_cast<arma::cx_float*>(
-                                      dl_beam_matrices_[frame_slot][cur_sc_id]),
-                                  cfg_->BsAntNum(), cfg_->UeAntNum(), false);
-        dl_beam_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_beam);
-      }
     }
 
     duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
