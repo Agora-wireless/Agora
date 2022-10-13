@@ -73,7 +73,7 @@ TxRxWorkerClientUhd::TxRxWorkerClientUhd(
            "Interface count must be set to 1 for use with this class");
 
   RtAssert(config->UeHwFramer() == false, "Must have ue hw framer disabled");
-  InitRxStatus();
+  //InitRxStatus();
 }
 
 TxRxWorkerClientUhd::~TxRxWorkerClientUhd() = default;
