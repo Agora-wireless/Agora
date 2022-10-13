@@ -9,11 +9,7 @@
 
 RadioSetUe::RadioSetUe(const Config* const cfg, Radio::RadioType radio_type)
     : RadioSet(cfg->SampsPerSymbol()), cfg_(cfg) {
-  if (radio_type == Radio::RadioType::kUhdNative) {
-    total_radios_ = 1;
-  } else {
-    total_radios_ = cfg_->UeNum();
-  }
+  total_radios_ = cfg_->UeNum();
   total_antennas_ = cfg_->UeAntNum();
   std::cout << "Total Number of Client Radios " << total_radios_ << " with "
             << total_antennas_ << " antennas" << std::endl;
@@ -88,9 +84,7 @@ bool RadioSetUe::RadioStart() {
 }
 
 void RadioSetUe::Go() {
-  if ((kUseUHD == false) || (kUsePureUHD == false)) {
-    for (size_t i = 0; i < total_radios_; i++) {
-      radios_.at(i)->Trigger();
-    }
+  for (size_t i = 0; i < total_radios_; i++) {
+    radios_.at(i)->Trigger();
   }
 }
