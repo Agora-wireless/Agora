@@ -3,11 +3,14 @@
  * @brief Implementation file for the digital (baseband) calibration 
  * functions such as sample offset and reciprocity calibration
  */
+#include <chrono>
+
 #include "comms-lib.h"
 #include "datatype_conversion.h"
 #include "logger.h"
 #include "matplotlibcpp.h"
 #include "radio_lib.h"
+#include "simd_types.h"
 
 namespace plt = matplotlibcpp;
 
@@ -16,6 +19,7 @@ static constexpr bool kReciprocalCalibPlot = false;
 static constexpr bool kPrintCalibrationMats = false;
 static constexpr bool kVerboseCalibration = false;
 static constexpr size_t kRefChannel = 0;
+static constexpr float kMaxSampleRxTimeSec = 1.0f;
 
 auto RadioConfig::TxArrayToRef(
     const std::vector<std::complex<int16_t>>& tx_vec) {
@@ -43,6 +47,9 @@ auto RadioConfig::TxArrayToRef(
 
   // Send a separate pilot from each antenna (each loop)
   for (size_t ant_i = 0; ant_i < tx_antennas; ant_i++) {
+    auto start_time = std::chrono::steady_clock::now();
+    std::chrono::duration<float> elapsed_seconds{0.0};
+
     const size_t radio_i = ant_i / cfg_->NumChannels();
     const size_t current_channel = ant_i % cfg_->NumChannels();
     // set up tx/rx buffers
@@ -67,24 +74,38 @@ auto RadioConfig::TxArrayToRef(
     Go();
 
     auto rx_flags = Radio::RxFlags::kRxFlagNone;
-    int rx_status;
-    do {
+    int rx_status = 0;
+    while ((rx_status == 0) &&
+           (elapsed_seconds.count() < kMaxSampleRxTimeSec)) {
       rx_status =
           radios_.at(ref)->Rx(rx_buffs, read_samples, rx_flags, rx_time);
+      elapsed_seconds = std::chrono::duration_cast<std::chrono::seconds>(
+          std::chrono::steady_clock::now() - start_time);
+    }
 
-      if (rx_status > 0) {
-        auto rx_samples = static_cast<size_t>(rx_status);
-        if (rx_samples < read_samples) {
-          AGORA_LOG_WARN("Radio %zu Rx less than requested samples %zu:%zu\n",
-                         radio_i, rx_samples, read_samples);
-        }
-      } else if (rx_status < 0) {
-        AGORA_LOG_ERROR(
-            "Radio %zu Rx Failure with status %d:%zu from ref node %zu\n",
-            radio_i, rx_status, read_samples, ref);
+    if (rx_status > 0) {
+      auto rx_samples = static_cast<size_t>(rx_status);
+      if (rx_samples == read_samples) {
+        //Success
+        AGORA_LOG_SYMBOL(
+            "Ref Radio %zu Rx Success with %d:%zu from node %zu at time %lld\n",
+            ref, rx_status, read_samples, radio_i, rx_time);
+
+      } else {
+        //Short samples
+        AGORA_LOG_WARN("Radio %zu Rx less than requested samples %zu:%zu\n",
+                       ref, rx_samples, read_samples);
       }
-    } while (rx_status == 0);
-
+    } else if (rx_status < 0) {
+      //Rx failure
+      AGORA_LOG_ERROR("Radio %zu Rx Failure with status %d:%zu from node %zu\n",
+                      ref, rx_status, read_samples, radio_i);
+    } else {
+      //Timeout
+      AGORA_LOG_WARN(
+          "Radio %zu Rx Timeout Failure after %f sec from node %zu\n", ref,
+          elapsed_seconds.count(), radio_i);
+    }
     radios_.at(radio_i)->Deactivate();
     radios_.at(ref)->Deactivate();
     //Reset rx / tx buffers to zeros / dummies
@@ -139,34 +160,48 @@ auto RadioConfig::TxRefToArray(
 
   auto rx_flags = Radio::RxFlags::kRxFlagNone;
   for (size_t radio_i = 0; radio_i < rx_radios; radio_i++) {
+    auto start_time = std::chrono::steady_clock::now();
+    std::chrono::duration<float> elapsed_seconds{0.0};
+
     const size_t base_ant = radio_i * num_channels;
     for (size_t ch = 0; ch < num_channels; ch++) {
       rx_buffs.at(ch) = &ul_buff.at(base_ant + ch);
     }
 
-    int rx_status;
-    do {
+    int rx_status = 0;
+    while ((rx_status == 0) &&
+           (elapsed_seconds.count() < kMaxSampleRxTimeSec)) {
       rx_status =
           radios_.at(radio_i)->Rx(rx_buffs, read_samples, rx_flags, rx_time);
+      elapsed_seconds = std::chrono::duration_cast<std::chrono::seconds>(
+          std::chrono::steady_clock::now() - start_time);
+    }
 
-      if (rx_status > 0) {
-        auto rx_samples = static_cast<size_t>(rx_status);
-        if (rx_samples < read_samples) {
-          AGORA_LOG_WARN("Radio %zu Rx less than requested samples %zu:%zu\n",
-                         radio_i, rx_samples, read_samples);
-        }
-      } else if (rx_status < 0) {
-        AGORA_LOG_ERROR(
-            "Radio %zu Rx Failure with status %d:%zu from ref node %zu\n",
-            radio_i, rx_status, read_samples, ref);
+    if (rx_status > 0) {
+      auto rx_samples = static_cast<size_t>(rx_status);
+      if (rx_samples == read_samples) {
+        //Success
+        AGORA_LOG_SYMBOL(
+            "Radio %zu Rx Success with %d:%zu from ref node %zu at time %lld\n",
+            radio_i, rx_status, read_samples, ref, rx_time);
+      } else {
+        //Short Samples
+        AGORA_LOG_WARN("Radio %zu Rx less than requested samples %zu:%zu\n",
+                       radio_i, rx_samples, read_samples);
       }
-    } while (rx_status == 0);
-    AGORA_LOG_WARN(
-        "Radio %zu Rx Success with %d:%zu from ref node %zu at time %lld\n",
-        radio_i, rx_status, read_samples, ref, rx_time);
+    } else if (rx_status < 0) {
+      //Rx error
+      AGORA_LOG_ERROR(
+          "Radio %zu Rx Failure with status %d:%zu from ref node %zu\n",
+          radio_i, rx_status, read_samples, ref);
+    } else {
+      //Timeout
+      AGORA_LOG_WARN(
+          "Radio %zu Rx Timeout Failure after %f sec from ref node %zu\n",
+          radio_i, elapsed_seconds.count(), ref);
+    }
     radios_.at(radio_i)->Deactivate();
   }
-
   //All rx done, deactivate the tx
   radios_.at(ref)->Deactivate();
   return ul_buff;
@@ -184,35 +219,43 @@ bool RadioConfig::FindTimeOffset(
     size_t peak = CommsLib::FindPilotSeq(samps, cfg_->PilotCf32(), seq_len);
     offset[i] = peak < seq_len ? 0 : peak - seq_len;
     if (offset.at(i) == 0) {
-      AGORA_LOG_WARN("Invalid uplink pilot offsets\n");
+      AGORA_LOG_WARN("Invalid pilot offsets\n");
       bad_data = true;
       break;
     }
     if (i >= cfg_->NumChannels() &&
         std::abs((int)offset.at(i) - (int)offset.at(i - cfg_->NumChannels())) >
-            static_cast<int>(kMaxArraySampleOffset))
-
-    {  // make sure offsets are not too
-      // different from each other
+            static_cast<int>(kMaxArraySampleOffset)) {
+      // make sure offsets are not too different from each other
       AGORA_LOG_WARN(
-          "Difference in uplink pilot offsets exceeds threshold (%zu)\n",
-          kMaxArraySampleOffset);
+          "Difference in pilot offsets exceeds threshold %zu:%zu between "
+          "channel %zu:%zu\n",
+          std::abs(offset.at(i) - offset.at(i - cfg_->NumChannels())),
+          kMaxArraySampleOffset, i, i - cfg_->NumChannels());
       bad_data = true;
-      break;
     }
+  }
+
+  if (bad_data) {
+    std::stringstream print_offsets;
+    char separator = ' ';
+    for (const auto& offset_value : offset) {
+      print_offsets << separator << offset_value;
+      separator = ',';
+    }
+    AGORA_LOG_WARN("All offsets:%s\n", print_offsets.str().c_str());
   }
   return bad_data;
 }
 
-void RadioConfig::AdjustDelays(std::vector<int> offset) {
-  // adjust all trigger delay for all radios
-  // with respect to the first non-ref radio
-  size_t ref_offset = *std::max_element(offset.begin(), offset.end());
-  for (size_t i = 0; i < offset.size(); i++) {
-    // int delta = cfg_->OfdmTxZeroPrefix() - offset[i];
-    const int delta = ref_offset - offset[i];
-    AGORA_LOG_INFO("Sample_adjusting delay of node %zu (offset %d) by %d\n", i,
-                   offset[i], delta);
+void RadioConfig::AdjustDelays(const std::vector<int>& ch0_offsets) {
+  // adjust all trigger delay fwith respect to the max offset
+  const size_t ref_offset =
+      *std::max_element(ch0_offsets.begin(), ch0_offsets.end());
+  for (size_t i = 0; i < ch0_offsets.size(); i++) {
+    const int delta = ref_offset - ch0_offsets.at(i);
+    AGORA_LOG_INFO("Sample adjusting delay of node %zu (offset %d) by %d\n", i,
+                   ch0_offsets.at(i), delta);
     const int iter = delta < 0 ? -delta : delta;
     for (int j = 0; j < iter; j++) {
       if (delta < 0) {
@@ -224,187 +267,172 @@ void RadioConfig::AdjustDelays(std::vector<int> offset) {
   }
 }
 
-void RadioConfig::CalibrateSampleOffset() {
-  const size_t num_radios = cfg_->BfAntNum() / cfg_->NumChannels();
+//Returns the min and max offset values for channel 0 accross all radios
+static std::vector<int> GetRadioOffsets(size_t num_channels, size_t num_radios,
+                                        size_t offset_check_channel,
+                                        const std::vector<int>& offsets) {
+  std::vector<int> channel_offset(num_radios);
+  std::vector<int> radio_offset(num_channels);
 
-  size_t n = 0;
+  for (size_t radio = 0; radio < num_radios; radio++) {
+    for (size_t ch = 0; ch < num_channels; ch++) {
+      const size_t ant = (radio * num_channels) + ch;
+      const auto& insert_value = offsets.at(ant);
+      //can ignore all none offset_check_channels
+      if (offset_check_channel == ch) {
+        channel_offset.at(radio) = insert_value;
+      }
+      radio_offset.at(ch) = insert_value;
+    }
+    const auto min_max_value =
+        std::minmax_element(radio_offset.begin(), radio_offset.end());
+    AGORA_LOG_INFO("Radio %zu channel offsets [min=%zu,max=%zu] diff=%zu\n",
+                   radio, *min_max_value.first, *min_max_value.second,
+                   *min_max_value.second - *min_max_value.first);
+  }
+  return channel_offset;
+}
+
+//check_buff first dimension is the radio number, then rx sample vector
+static void CheckSnr(
+    size_t offset,
+    const std::vector<std::vector<std::complex<int16_t>>>& check_buff,
+    const Config* cfg) {
+  const size_t data_start = offset + cfg->CpLen();
+  const size_t samples = cfg->OfdmCaNum();
+  const size_t data_stop = data_start + samples;
+  AGORA_LOG_TRACE("Data %zu:%zu radios %zu samples %zu:%zu\n", data_start,
+                  data_stop, check_buff.size(), check_buff.at(0).size(),
+                  samples);
+
+  std::vector<float> snr;
+  snr.reserve(check_buff.size());
+  //Temp vector to store samples can align to use Simd
+  std::vector<std::complex<float>> ofdm_data(samples);
+
+  std::stringstream snr_printout;
+  snr_printout << "\n*************************************************"
+               << std::endl;
+  snr_printout << "Received SNR" << std::endl;
+  RtAssert(data_stop < check_buff.at(0).size(),
+           "Data samples go beyond received symbol boundary. Consider changing "
+           "the ofdm_tx_zero_postfix parameter!");
+  for (auto& i : check_buff) {
+    //*2 for complex
+    ConvertShortToFloat(reinterpret_cast<const short*>(i.data()),
+                        reinterpret_cast<float*>(ofdm_data.data()),
+                        ofdm_data.size() * 2);
+    const float& snr_val = snr.emplace_back(CommsLib::ComputeOfdmSnr(
+        ofdm_data, cfg->OfdmDataStart(), cfg->OfdmDataStop()));
+    snr_printout << snr_val << " ";
+  }
+  snr_printout << std::endl;
+
+  const auto min_max_snr_it = std::minmax_element(snr.begin(), snr.end());
+  snr_printout << "Min SNR at antenna " << min_max_snr_it.first - snr.begin()
+               << ": " << *min_max_snr_it.first << std::endl
+               << "Max SNR at antenna " << min_max_snr_it.second - snr.begin()
+               << ": " << *min_max_snr_it.second << std::endl
+               << "*************************************************"
+               << std::endl;
+  AGORA_LOG_INFO("%s", snr_printout.str().c_str())
+}
+
+void RadioConfig::CalibrateSampleOffset() {
   const size_t max_retries = 10;
+  const bool uplink_success = CalibrateSampleOffsetUplink(max_retries);
+  if (uplink_success) {
+    CalibrateSampleOffsetDownlink(max_retries);
+  }
+}
+
+bool RadioConfig::CalibrateSampleOffsetUplink(size_t max_attempts) {
+  bool uplink_cal_success = false;
   AGORA_LOG_INFO("Calibrating with uplink\n");
-  // Transmit from Ref to Array and Adjust Delays Until Synced
-  while (n < max_retries) {
+  const size_t num_channels = cfg_->NumChannels();
+  const size_t num_radios = cfg_->BfAntNum() / num_channels;
+
+  for (size_t attempt = 0;
+       (attempt < max_attempts) && (uplink_cal_success == false); attempt++) {
     auto ul_buff = TxRefToArray(cfg_->PilotCi16());
     std::vector<int> ul_offset(cfg_->BfAntNum(), 0);
-    const bool bad_data = this->FindTimeOffset(ul_buff, ul_offset);
+    const bool bad_data = FindTimeOffset(ul_buff, ul_offset);
     if (bad_data) {
-      n++;
-      std::cout << "Time offset returned bad data = " << bad_data << " count "
-                << n << std::endl;
-      continue;
-    }
-
-    std::vector<int> ul_offset_a;
-    std::vector<int> ul_offset_b;
-    int max_ab_diff = 0;
-    int min_ab_diff = INT_MAX;
-    if (cfg_->NumChannels() > 1) {
-      for (size_t i = 0; i < num_radios; i += cfg_->NumChannels()) {
-        ul_offset_a.push_back(ul_offset.at(i));
-        ul_offset_b.push_back(ul_offset.at(i + 1));
-        int ul_offset_diff = std::abs(ul_offset_b.back() - ul_offset_a.back());
-        if (ul_offset_diff > max_ab_diff) {
-          max_ab_diff = ul_offset_diff;
-        }
-        if (ul_offset_diff < min_ab_diff) {
-          min_ab_diff = ul_offset_diff;
-        }
-      }
-      std::cout << "Rx max chan A & B offset diff: " << max_ab_diff
-                << ", Rx min chan A & B offset diff: " << min_ab_diff
-                << std::endl;
+      AGORA_LOG_WARN(
+          "Uplink Time offset count not be found during attempt: %d\n",
+          attempt);
     } else {
-      ul_offset_a = ul_offset;
-    }
-    const int ul_max_offset =
-        *std::max_element(ul_offset_a.begin(), ul_offset_a.end());
-    const int ul_min_offset =
-        *std::min_element(ul_offset_a.begin(), ul_offset_a.end());
-    std::cout << "Max ul_offset: " << ul_max_offset
-              << ", Min ul_offset: " << ul_min_offset << std::endl;
-    if (ul_max_offset - ul_min_offset > 0) {
-      std::cout
-          << "Uplink pilot offsets not synced. Adjusting trigger offset..."
-          << std::endl;
-      AdjustDelays(ul_offset_a);
-    } else {
-      // measure uplink SNR here
-      std::vector<float> snr;
-      std::cout << "*************************************************"
-                << std::endl;
-      std::cout << "Received SNR from the Reference Node At the Array"
-                << std::endl;
-      size_t pilot_start = ul_min_offset + cfg_->CpLen();
-      size_t pilot_stop = ul_min_offset + cfg_->CpLen() + cfg_->OfdmCaNum();
-      RtAssert(pilot_stop < cfg_->SampsPerSymbol(),
-               "Pilot samples go beyond received symbol boundary."
-               " Consider extending ofdm_tx_zero_postfix parameter!");
-      for (auto& i : ul_buff) {
-        std::vector<std::complex<int16_t>> ofdm_samps(i.begin() + pilot_start,
-                                                      i.begin() + pilot_stop);
-        auto ofdm_data = Utils::Cint16ToCfloat32(ofdm_samps);
-        float snr_val = CommsLib::ComputeOfdmSnr(
-            ofdm_data, cfg_->OfdmDataStart(), cfg_->OfdmDataStop());
-        snr.push_back(snr_val);
-        std::cout << snr_val << " ";
+      //Data looks ok, eval offsets
+      const auto ch0_offsets =
+          GetRadioOffsets(num_channels, num_radios, 0, ul_offset);
+      const auto min_max_offset =
+          std::minmax_element(ch0_offsets.begin(), ch0_offsets.end());
+      const int min_offset = *min_max_offset.first;
+      const int max_offset = *min_max_offset.second;
+      const int diff_offset = max_offset - min_offset;
+      AGORA_LOG_INFO("Uplink Offsets detected [min=%zu, max=%zu] diff=%zu\n",
+                     min_offset, max_offset, diff_offset);
+      if (diff_offset > 0) {
+        AGORA_LOG_INFO(
+            "Uplink pilot offsets not synced. Adjusting trigger offset...\n")
+        AdjustDelays(ch0_offsets);
+      } else {
+        CheckSnr(min_offset, ul_buff, cfg_);
+        cfg_->OfdmRxZeroPrefixCalUl(min_offset - (min_offset % 4));
+        uplink_cal_success = true;
       }
-      std::cout << std::endl;
-      auto ul_max_snr_it = std::max_element(snr.begin(), snr.end());
-      auto ul_min_snr_it = std::min_element(snr.begin(), snr.end());
-      std::cout << "Min UL SNR at antenna " << ul_min_snr_it - snr.begin()
-                << ": " << *ul_min_snr_it << std::endl;
-      std::cout << "Max UL SNR at antenna " << ul_max_snr_it - snr.begin()
-                << ": " << *ul_max_snr_it << std::endl;
-      std::cout << "*************************************************"
-                << std::endl;
-      cfg_->OfdmRxZeroPrefixCalUl(ul_min_offset - (ul_min_offset % 4));
-      break;
     }
-    n++;
   }
 
-  if (n >= max_retries) {
-    std::cout << "Reached max retries for sample offset calibration (uplink)"
-              << std::endl;
-    return;
+  if (uplink_cal_success == false) {
+    AGORA_LOG_ERROR(
+        "Reached max retries for sample offset calibration (uplink)\n");
   }
+  return uplink_cal_success;
+}
 
-  // Transmit from Array to Ref and ensure they are all synced
-  n = 0;
+static constexpr size_t kDownlinkMaxDiffOffset = 4;
+bool RadioConfig::CalibrateSampleOffsetDownlink(size_t max_attempts) {
+  bool downlink_cal_success = false;
+  const size_t num_channels = cfg_->NumChannels();
+  const size_t num_radios = cfg_->BfAntNum() / num_channels;
+
   AGORA_LOG_INFO("Calibrating with downlink\n");
-  while (n < max_retries) {
+  for (size_t attempt = 0;
+       (attempt < max_attempts) && (downlink_cal_success == false); attempt++) {
     auto dl_buff = TxArrayToRef(cfg_->PilotCi16());
     std::vector<int> dl_offset(cfg_->BfAntNum(), 0);
-    const bool bad_data = this->FindTimeOffset(dl_buff, dl_offset);
+    const bool bad_data = FindTimeOffset(dl_buff, dl_offset);
     if (bad_data) {
-      n++;
-      continue;
-    }
-
-    std::vector<int> dl_offset_a;
-    std::vector<int> dl_offset_b;
-    int max_ab_diff = 0;
-    int min_ab_diff = INT_MAX;
-    if (cfg_->NumChannels() > 1) {
-      for (size_t i = 0; i < num_radios; i += cfg_->NumChannels()) {
-        dl_offset_a.push_back(dl_offset.at(i));
-        dl_offset_b.push_back(dl_offset.at(i + 1));
-        int dl_offset_diff = std::abs(dl_offset_b.back() - dl_offset_a.back());
-        if (dl_offset_diff > max_ab_diff) {
-          max_ab_diff = dl_offset_diff;
-        }
-        if (dl_offset_diff < min_ab_diff) {
-          min_ab_diff = dl_offset_diff;
-        }
-      }
-      std::cout << "Tx max chan A & B offset diff: " << max_ab_diff
-                << ", Tx min chan A & B offset diff: " << min_ab_diff
-                << std::endl;
+      AGORA_LOG_WARN(
+          "Downlink Time offset count not be found during attempt: %d\n",
+          bad_data, attempt);
     } else {
-      dl_offset_a = dl_offset;
-    }
+      const auto ch0_offsets =
+          GetRadioOffsets(num_channels, num_radios, 0, dl_offset);
+      const auto min_max_offset =
+          std::minmax_element(ch0_offsets.begin(), ch0_offsets.end());
+      const int min_offset = *min_max_offset.first;
+      const int max_offset = *min_max_offset.second;
+      const size_t diff_offset = max_offset - min_offset;
+      AGORA_LOG_INFO("Downlink Offsets detected [min=%zu, max=%zu] diff=%zu\n",
+                     min_offset, max_offset, diff_offset);
 
-    const int max_offset =
-        *std::max_element(dl_offset_a.begin(), dl_offset_a.end());
-    const int min_offset =
-        *std::min_element(dl_offset_a.begin(), dl_offset_a.end());
-    std::cout << "Max dl_offset: " << max_offset
-              << ", Min dl_offset: " << min_offset << std::endl;
-    if (max_offset - min_offset > 4) {
-      if (n + 1 < max_retries) {
-        std::cout << "Downlink offsets mismatch: Try " << n + 1 << std::endl;
+      if (diff_offset > kDownlinkMaxDiffOffset) {
+        AGORA_LOG_WARN("Downlink offsets mismatch: Attempt %zu\n", attempt);
       } else {
-        std::cout << "Downlink pilot offsets not synced!" << std::endl;
-        return;
+        CheckSnr(min_offset, dl_buff, cfg_);
+        cfg_->OfdmRxZeroPrefixCalDl(min_offset - (min_offset % 4));
+        downlink_cal_success = true;
       }
-    } else {
-      // measure downlink SNR here
-      std::vector<float> snr;
-      std::cout << "*************************************************"
-                << std::endl;
-      std::cout << "Received SNR from the Reference Node At the Array"
-                << std::endl;
-      const size_t pilot_start = min_offset + cfg_->CpLen();
-      const size_t pilot_stop = min_offset + cfg_->CpLen() + cfg_->OfdmCaNum();
-      RtAssert(pilot_stop < cfg_->SampsPerSymbol(),
-               "Received pilot exceeds symbol boundary. Consider extending "
-               "ofdm_tx_zero_postfix parameter!");
-      for (auto& i : dl_buff) {
-        std::vector<std::complex<int16_t>> ofdm_samps(i.begin() + pilot_start,
-                                                      i.begin() + pilot_stop);
-        auto ofdm_data = Utils::Cint16ToCfloat32(ofdm_samps);
-        float snr_val = CommsLib::ComputeOfdmSnr(
-            ofdm_data, cfg_->OfdmDataStart(), cfg_->OfdmDataStop());
-        snr.push_back(snr_val);
-        std::cout << snr_val << " ";
-      }
-      std::cout << std::endl;
-      auto dl_max_snr_it = std::max_element(snr.begin(), snr.end());
-      auto dl_min_snr_it = std::min_element(snr.begin(), snr.end());
-      std::cout << "Min DL SNR at antenna " << dl_min_snr_it - snr.begin()
-                << ": " << *dl_min_snr_it << std::endl;
-      std::cout << "Max DL SNR at antenna " << dl_max_snr_it - snr.begin()
-                << ": " << *dl_max_snr_it << std::endl;
-      std::cout << "*************************************************"
-                << std::endl;
-      cfg_->OfdmRxZeroPrefixCalDl(min_offset - (min_offset % 4));
-      break;
     }
-    n++;
   }
-  if (n >= max_retries) {
-    std::cout << "Reached max retries for sample offset calibration (downlink)"
-              << std::endl;
-    return;
+
+  if (downlink_cal_success == false) {
+    AGORA_LOG_ERROR(
+        "Reached max retries for sample offset calibration (downlink)\n");
   }
+  return downlink_cal_success;
 }
 
 bool RadioConfig::InitialCalib() {

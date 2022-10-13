@@ -64,11 +64,9 @@ TEST(TestArmadillo, CorrectnessStackMemoryState0) {
 TEST(TestArmadillo, CorrectnessStackMemoryState1) {
   CheckArmaMemoryState(1, false);
 }
-
-//Fails?
-//TEST(TestArmadillo, CorrectnessStackMemoryState2) {
-//  CheckArmaMemoryState(2, false);
-//}
+TEST(TestArmadillo, CorrectnessStackMemoryState2) {
+  CheckArmaMemoryState(2, false);
+}
 TEST(TestArmadillo, CorrectnessHeapMemoryState0) {
   CheckArmaMemoryState(0, true);
 }
