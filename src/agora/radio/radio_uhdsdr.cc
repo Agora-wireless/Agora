@@ -19,7 +19,7 @@ static constexpr bool kPrintRadioSettings = true;
 
 // radio init time for UHD devices
 // increase the wait time for radio init to get rid of the late packet issue
-static constexpr double kUhdInitTimeSec = 10.0f;
+static constexpr double kUhdInitTimeSec = 0.5f;
 
 RadioUHDSdr::RadioUHDSdr() : dev_(nullptr), rxs_(nullptr), txs_(nullptr) {
   AGORA_LOG_INFO("calling pure uhd version of radio constructor.\n");

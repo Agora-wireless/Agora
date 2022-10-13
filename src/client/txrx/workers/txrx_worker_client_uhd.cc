@@ -350,7 +350,7 @@ std::vector<Packet*> TxRxWorkerClientUhd::DoRx(
     if (kDebugRxTimes) {
       if ((rx_time_ue_ + static_cast<long long>(
                              Configuration()->SampsPerSymbol())) != rx_time) {
-        AGORA_LOG_WARN("RecvEnqueue: Unexpected Rx time %lld:%lld(%lld)\n",
+        AGORA_LOG_WARN("TxRxWorkerUSRP: RecvEnqueue: Unexpected Rx time %lld:%lld(%lld)\n",
                        rx_time,
                        static_cast<long long>(
                            rx_time_ue_ + Configuration()->SampsPerSymbol()),
