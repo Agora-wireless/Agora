@@ -123,6 +123,7 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
       // remote::type = faros for hub controlled radios
       args["remote:mtu"] = "1500";
       args["remote:ipver"] = "6";
+      sargs["SYNC_ACTIVATE"] = "false";
     } else {
       args["driver"] = "uhd";
       args["addr"] = SerialNumber();
@@ -250,7 +251,16 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
     // resets the DATA_clk domain logic.
     SoapySDR::Kwargs hw_info = dev_->getHardwareInfo();
     if (hw_info["revision"].find("Iris") != std::string::npos) {
+      const std::string tdd_conf_str = "{\"tdd_enabled\":false}";
+      dev_->writeSetting("TDD_MODE", "false");
+      dev_->writeSetting("TDD_CONFIG", tdd_conf_str);
       dev_->writeSetting("RESET_DATA_LOGIC", "");
+
+      auto clk_status = dev_->readSensor("CLKBUFF_LOCKED");
+      if (clk_status.compare("false") == 0) {
+        AGORA_LOG_WARN("RadioSoapySdr::Init[%zu] clk_status %s\n", id,
+                       clk_status.c_str());
+      }
     } else {
       AGORA_LOG_ERROR(
           "RadioSoapySdr::Init[%zu] - Not resetting the data logic\n", id);
@@ -261,12 +271,6 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
           "RadioSoapySdr::Init[%zu] - Radio rx control plane could not be "
           "configured\n",
           id);
-    }
-
-    auto clk_status = dev_->readSensor("CLKBUFF_LOCKED");
-    if (clk_status.compare("false") == 0) {
-      AGORA_LOG_WARN("RadioSoapySdr::Init[%zu] clk_status %s\n", id,
-                     clk_status.c_str());
     }
     rxp_->Init(this, cfg_, hw_framer);
     rxp_->Setup();
@@ -421,7 +425,6 @@ void RadioSoapySdr::Activate(Radio::ActivationTypes type, long long act_time_ns,
       "%d\n",
       SerialNumber().c_str(), Id(), act_time_ns, samples,
       static_cast<int>(type));
-  const bool is_ue = false;
   if (kUseUHD == false) {
     rxp_->Activate(type, act_time_ns, samples);
     int soapy_flags = 0;
@@ -442,6 +445,7 @@ void RadioSoapySdr::Activate(Radio::ActivationTypes type, long long act_time_ns,
                      SoapySDR_errToStr(status));
     }
   } else {
+    const bool is_ue = false;
     if (is_ue) {
       dev_->setTimeSource("internal");
       dev_->setClockSource("internal");
@@ -467,22 +471,17 @@ void RadioSoapySdr::Activate(Radio::ActivationTypes type, long long act_time_ns,
 void RadioSoapySdr::Deactivate() {
   AGORA_LOG_TRACE("Deactivate RadioSoapySdr %s(%zu)\n", SerialNumber().c_str(),
                   Id());
-  const std::string tdd_conf_str = "{\"tdd_enabled\":false}";
   rxp_->Deactivate();
   const auto status = dev_->deactivateStream(txs_);
   if (status < 0) {
     AGORA_LOG_WARN("Deactivate soapy tx stream with status %d %s\n", status,
                    SoapySDR_errToStr(status));
   }
-
-  //This stops the data flow to the socket
-  //dev_->writeSetting("RESET_DATA_LOGIC", "");
+  //Iris only... is this necessary?
+  dev_->writeSetting("RESET_DATA_LOGIC", "");
   //If this flush is not here before setting TDD_MODE to false.  This will sometimes
   //cause errors with the next rx sequence
   rxp_->Flush();
-  //The following is probably not necessary
-  //dev_->writeSetting("TDD_MODE", "false");
-  //dev_->writeSetting("TDD_CONFIG", tdd_conf_str);
   Correlator(false);
 }
 

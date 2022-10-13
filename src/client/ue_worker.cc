@@ -494,7 +494,7 @@ void UeWorker::DoDecodeUe(DoDecodeClient* decoder, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ant_id = gen_tag_t(tag).ant_id_;
-  LDPCconfig ldpc_config = config_.LdpcConfig(Direction::kDownlink);
+  const LDPCconfig& ldpc_config = config_.LdpcConfig(Direction::kDownlink);
 
   for (size_t cb_id = 0; cb_id < ldpc_config.NumBlocksInSymbol(); cb_id++) {
     // For now, call for each cb
@@ -525,7 +525,7 @@ void UeWorker::DoEncodeUe(DoEncode* encoder, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ant_id = gen_tag_t(tag).ue_id_;
-  LDPCconfig ldpc_config = config_.LdpcConfig(Direction::kUplink);
+  const LDPCconfig& ldpc_config = config_.LdpcConfig(Direction::kUplink);
 
   // For now, call for each cb
   for (size_t cb_id = 0; cb_id < ldpc_config.NumBlocksInSymbol(); cb_id++) {
@@ -536,7 +536,8 @@ void UeWorker::DoEncodeUe(DoEncode* encoder, size_t tag) {
             .tag_);
   }
   // Post the completion event (symbol)
-  size_t completion_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, ant_id).tag_;
+  const size_t completion_tag =
+      gen_tag_t::FrmSymUe(frame_id, symbol_id, ant_id).tag_;
   RtAssert(notify_queue_.enqueue(*ptok_.get(),
                                  EventData(EventType::kEncode, completion_tag)),
            "Encoded Symbol message enqueue failed");
