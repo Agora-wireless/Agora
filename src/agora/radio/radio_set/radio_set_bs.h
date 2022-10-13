@@ -42,6 +42,9 @@ class RadioSetBs : public RadioSet {
   long long SyncArrayTime();
 
   void CalibrateSampleOffset();
+  bool CalibrateSampleOffsetUplink(size_t max_attempts);
+  bool CalibrateSampleOffsetDownlink(size_t max_attempts);
+
   /* Transmit from each array antenna to ref antenna,
    * return the received signal vector at the ref antenna
   */
@@ -54,7 +57,7 @@ class RadioSetBs : public RadioSet {
       const std::vector<std::vector<std::complex<int16_t>>>& rx_mat,
       std::vector<int>& offset);
   bool InitialCalib();
-  void AdjustDelays(std::vector<int> offset);
+  void AdjustDelays(const std::vector<int>& ch0_offsets);
   static void DciqMinimize(Radio* target_dev, Radio* ref_dev, int direction,
                            size_t channel, double rx_center_tone,
                            double tx_center_tone);
