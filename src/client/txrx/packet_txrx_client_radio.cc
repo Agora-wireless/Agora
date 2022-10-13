@@ -12,9 +12,11 @@
 
 #if defined(USE_PURE_UHD)
 #include "radio_set_uhd.h"
+static constexpr Radio::RadioType kRadioType = Radio::kUhdNative;
+#else
+static constexpr Radio::RadioType kRadioType = Radio::kSoapySdrStream;
 #endif
 
-static constexpr Radio::RadioType kRadioType = Radio::kSoapySdrStream;
 static constexpr size_t kRadioTriggerWaitMs = 100;
 
 PacketTxRxClientRadio::PacketTxRxClientRadio(
@@ -28,11 +30,7 @@ PacketTxRxClientRadio::PacketTxRxClientRadio(
                  event_notify_q, tx_pending_q, notify_producer_tokens,
                  tx_producer_tokens, rx_buffer, packet_num_in_buffer,
                  frame_start, tx_buffer) {
-#if defined(USE_PURE_UHD)
-  radio_config_ = std::make_unique<RadioSetUhd>(cfg, Radio::kUhdNative);
-#else
   radio_config_ = std::make_unique<RadioSetUe>(cfg, kRadioType);
-#endif
 }
 
 PacketTxRxClientRadio::~PacketTxRxClientRadio() {
