@@ -570,7 +570,8 @@ float CommsLib::ComputeOfdmSnr(const std::vector<std::complex<float>>& data_t,
   //Copy the const input to an output vector and do an inplace transform
   auto fft_data(data_t);
   CommsLib::FFT(fft_data, fft_data.size());
-  const auto fft_mag = CommsLib::Abs2Avx(fft_data);
+  auto fft_data_shift = CommsLib::FFTShift(fft_data);
+  const auto fft_mag = CommsLib::Abs2Avx(fft_data_shift);
   float rssi = 0;
   float noise = 0;
   for (size_t i = 0; i < fft_mag.size(); i++) {
@@ -580,7 +581,7 @@ float CommsLib::ComputeOfdmSnr(const std::vector<std::complex<float>>& data_t,
     }
   }
   const size_t noise_sc_size =
-      fft_data.size() - (data_stop_index - data_start_index);
+      fft_data_shift.size() - (data_stop_index - data_start_index);
   noise *= (fft_mag.size() / noise_sc_size);
   return (10.0f * std::log10((rssi - noise) / noise));
 }
