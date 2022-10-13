@@ -114,7 +114,7 @@ void TxRxWorkerClientUhd::DoTxRx() {
     throw std::runtime_error(
         "TxRxWorkerClientUhd does not support multiple interfaces per thread");
   }
-  const size_t local_interface = 0;
+  size_t local_interface = 0;
   long long rx_time = 0;
 
   //Probably most efficient to make this a multiple of 64
