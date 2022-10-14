@@ -10,6 +10,7 @@
 #include "encoder.h"
 #include "phy_ldpc_decoder_5gnr.h"
 
+static constexpr bool kInPlaceScramble = false;
 static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintRawMacData = false;
 
@@ -34,10 +35,12 @@ DoEncode::DoEncode(Config* in_config, int in_tid, Direction dir,
                                  cfg_->LdpcConfig(dir).ExpansionFactor())));
   assert(encoded_buffer_temp_ != nullptr);
 
+  const size_t scrambler_buffer_bytes =
+      Roundup<64>(cfg_->NumBytesPerCb(dir)) +
+      kLdpcHelperFunctionInputBufferSizePaddingBytes;
   scrambler_buffer_ = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::kAlign64,
-      cfg_->NumBytesPerCb(dir) +
-          kLdpcHelperFunctionInputBufferSizePaddingBytes));
+      Agora_memory::Alignment_t::kAlign64, scrambler_buffer_bytes));
+  std::memset(scrambler_buffer_, 0u, scrambler_buffer_bytes);
 
   assert(scrambler_buffer_ != nullptr);
 }
@@ -106,14 +109,19 @@ EventData DoEncode::Launch(size_t tag) {
         cfg_->GetInfoBits(raw_data_buffer_, dir_, symbol_idx, ue_id, cur_cb_id);
   }
 
-  int8_t* ldpc_input = nullptr;
+  int8_t* ldpc_input = tx_data_ptr;
 
   if (this->cfg_->ScrambleEnabled()) {
-    std::memcpy(scrambler_buffer_, tx_data_ptr, cfg_->NumBytesPerCb(dir_));
-    scrambler_->Scramble(scrambler_buffer_, cfg_->NumBytesPerCb(dir_));
+    if (kInPlaceScramble) {
+      std::memcpy(scrambler_buffer_, ldpc_input, cfg_->NumBytesPerCb(dir_));
+      scrambler_->Scramble(scrambler_buffer_, cfg_->NumBytesPerCb(dir_));
+    } else {
+      scrambler_->Scramble(scrambler_buffer_, ldpc_input,
+                           cfg_->NumBytesPerCb(dir_));
+    }
+    std::memset(&scrambler_buffer_[cfg_->NumBytesPerCb(dir_)], 0u,
+                kLdpcHelperFunctionInputBufferSizePaddingBytes);
     ldpc_input = scrambler_buffer_;
-  } else {
-    ldpc_input = tx_data_ptr;
   }
 
   LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
