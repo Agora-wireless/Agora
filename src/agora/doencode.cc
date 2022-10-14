@@ -123,10 +123,30 @@ EventData DoEncode::Launch(size_t tag) {
                 kLdpcHelperFunctionInputBufferSizePaddingBytes);
     ldpc_input = scrambler_buffer_;
   }
+  if (kDebugTxData) {
+    char* str_bytes = reinterpret_cast<char*>(std::calloc(cfg_->NumBytesPerCb(dir_) + 1, 3));
+    char str_byte[4];
+    for (size_t i = 0; i < cfg_->NumBytesPerCb(dir_); i++) {
+      std::sprintf(str_byte, " %02x", reinterpret_cast<uint8_t*>(ldpc_input)[i]);
+      std::strcat(str_bytes, str_byte);
+    }
+    std::printf("ldpc input (%zu %zu %zu): %s\n", frame_id, symbol_idx, ue_id, str_bytes);
+    std::free(str_bytes);
+  }
 
   LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
                    ldpc_config.NumRows(), encoded_buffer_temp_, parity_buffer_,
                    ldpc_input);
+  if (kDebugTxData) {
+    char* str_bytes = reinterpret_cast<char*>(std::calloc(BitsToBytes(ldpc_config.NumCbCodewLen()) + 1, 3));
+    char str_byte[4];
+    for (size_t i = 0; i < BitsToBytes(ldpc_config.NumCbCodewLen()); i++) {
+      std::sprintf(str_byte, " %02x", reinterpret_cast<uint8_t*>(encoded_buffer_temp_)[i]);
+      std::strcat(str_bytes, str_byte);
+    }
+    std::printf("ldpc output (%zu %zu %zu): %s\n", frame_id, symbol_idx, ue_id, str_bytes);
+    std::free(str_bytes);
+  }
   int8_t* mod_buffer_ptr = cfg_->GetModBitsBuf(mod_bits_buffer_, dir_, frame_id,
                                                symbol_idx, ue_id, cur_cb_id);
 

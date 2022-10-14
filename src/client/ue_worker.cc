@@ -657,6 +657,29 @@ void UeWorker::DoIfft(size_t tag) {
         &modul_buffer_[total_ul_symbol_id][ant_id * config_.OfdmDataNum()];
     std::memcpy(ifft_buff + config_.OfdmDataStart(), modul_buff,
                 config_.OfdmDataNum() * sizeof(complex_float));
+    if (kDebugTxData) {
+      const complex_float* data_truth =
+          &config_.UlIqF()[ul_symbol_idx][ant_id * config_.OfdmDataNum()];
+      if (memcmp(data_truth, modul_buff,
+                 config_.OfdmDataNum() * sizeof(complex_float)) == 0) {
+        AGORA_LOG_INFO(
+            "Uplink iFFT: (frame %zu, symbol %zu, user %zu) Data SC values "
+            "matched UlIqF all %zu sc\n",
+            frame_id, symbol_id, ant_id, config_.OfdmDataNum());
+      } else {
+        size_t cnt_sc_mismatch = 0;
+        for (size_t i = 0; i < config_.OfdmDataNum(); i++) {
+          if (data_truth[i].re != modul_buff[i].re ||
+              data_truth[i].im != modul_buff[i].im) {
+            cnt_sc_mismatch++;
+          }
+        }
+        AGORA_LOG_INFO(
+            "Uplink iFFT: (frame %zu, symbol %zu, user %zu) Data SC values "
+            "mismatched UlIqF %zu of %zu sc\n",
+            frame_id, symbol_id, ant_id, cnt_sc_mismatch, config_.OfdmDataNum());
+      }
+    }
   }
   std::memset(ifft_buff + config_.OfdmDataStop(), 0,
               sizeof(complex_float) * config_.OfdmDataStart());
