@@ -83,10 +83,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kUplink));
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(
-                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kUplink)) &
-            0xFFFF));
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
+                                pkt->Data(),
+                                cfg_->MacPayloadMaxLength(Direction::kUplink)) &
+                            0xFFFF));
       }
     }
 
@@ -163,6 +163,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       if (this->cfg_->ScrambleEnabled()) {
         scrambler->Scramble(ul_scrambler_buffer, ul_cb_bytes);
       }
+      std::memset(&ul_scrambler_buffer[ul_cb_bytes], 0u,
+                  kLdpcHelperFunctionInputBufferSizePaddingBytes);
       this->GenCodeblock(Direction::kUplink, ul_scrambler_buffer,
                          ul_encoded_codewords.at(cb));
     }
@@ -483,10 +485,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kDownlink));
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(
-                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kDownlink)) &
-            0xFFFF));
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(pkt->Data(),
+                                                    cfg_->MacPayloadMaxLength(
+                                                        Direction::kDownlink)) &
+                            0xFFFF));
       }
     }
 
@@ -558,6 +560,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       if (this->cfg_->ScrambleEnabled()) {
         scrambler->Scramble(dl_scrambler_buffer, dl_cb_bytes);
       }
+      std::memset(&dl_scrambler_buffer[dl_cb_bytes], 0u,
+                  kLdpcHelperFunctionInputBufferSizePaddingBytes);
       this->GenCodeblock(Direction::kDownlink, dl_scrambler_buffer,
                          dl_encoded_codewords.at(cb));
     }
