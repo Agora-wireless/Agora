@@ -16,6 +16,7 @@
 
 static constexpr size_t kMakeMaxAttempts = 3;
 static constexpr bool kPrintRadioSettings = true;
+static constexpr bool kRadioTxTimeCheck = false;
 
 // radio init time for UHD devices
 // increase the wait time for radio init to get rid of the late packet issue
@@ -256,6 +257,18 @@ int RadioUHDSdr::Tx(const void* const* tx_buffs, size_t tx_size,
   md.start_of_burst = true;
   md.end_of_burst = true;
   //md.end_of_burst = (flags == Radio::TxFlags::kEndTransmit);
+
+  if (kRadioTxTimeCheck) {
+    const auto current_time = dev_->get_time_now().to_ticks(cfg_->Rate());
+    AGORA_LOG_INFO("Current Time %lld, Tx Time %lld, TimeDiff %lld\n",
+                   current_time, tx_time_ns, tx_time_ns - current_time);
+    if (current_time > tx_time_ns) {
+      AGORA_LOG_ERROR(
+          "Requested tx time %lld is in the past.  Current time %lld. "
+          "Transmission will not be correct\n",
+          tx_time_ns, current_time);
+    }
+  }
 
   uhd::tx_streamer::buffs_type stream_buffs(tx_buffs, txs_->get_num_channels());
   const int write_status = txs_->send(stream_buffs, tx_size, md, kTxTimeoutSec);
