@@ -22,7 +22,7 @@
     "beamsweep": false,
     "beacon_antenna": 0,
     "frame_schedule": [
-        "BGGGGGGGGGGGGGGPGGGGGGGGGGGGGUUUUGGGGGGGGGG"
+        "BGGGGGGGPGGGGGGGGGGUGUGUGUGGGGGGG"
     ],
     "client_ul_pilot_syms": 2,
     
@@ -31,23 +31,20 @@
     "ue_hw_framer": false,
     "demul_block_size": 48,
     "ue_demul_block_size": 48,
-    "core_offset": 10,
-    "ue_core_offset": 10,
-    "worker_thread_num": 4,
+    "core_offset": 4,
+    "ue_core_offset": 14,
+    "worker_thread_num": 8,
     "socket_thread_num": 1,
     "hw_framer": false,
     "tx_advance": [
-        78
+        140
     ],
     "exclude_cores": [0],
     "ue_rx_gain_a": 20,
     "ue_rx_gain_b": 20,
     "ue_tx_gain_a": 20,
     "ue_tx_gain_b": 20,
-    "ue_core_offset": 4,
-    "worker_thread_num": 10,
-    "ue_worker_thread_num": 2,
+    "ue_worker_thread_num": 4,
     "ue_socket_thread_num": 1,
-    "socket_thread_num":4,
-    "max_frame": 10000
+    "max_frame": 2000
 }

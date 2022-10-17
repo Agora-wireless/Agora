@@ -399,7 +399,7 @@ std::vector<Packet*> TxRxWorkerClientUhd::DoRx(size_t interface_id,
 }
 
 size_t TxRxWorkerClientUhd::DoTxThread(const long long time0) {
-  PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid_);
+  PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid_ + 6);
 
   AGORA_LOG_INFO(
       "TxRxWorkerClientUhd[%zu] Tx Thread -- has %zu:%zu total radios %zu\n",
