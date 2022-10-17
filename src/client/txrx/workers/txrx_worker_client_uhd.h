@@ -34,8 +34,8 @@ class TxRxWorkerClientUhd : public TxRxWorker {
 
  private:
   size_t DoTx(const long long time0);
-  std::vector<Packet*> DoRx(size_t radio_id, size_t frame_id, size_t symbol_id,
-                            const std::vector<void*>& discard_locs);
+  std::vector<Packet*> DoRx(size_t interface_id, size_t frame_id,
+                            size_t symbol_id, long long& receive_time);
 
   ssize_t SyncBeacon(size_t local_interface, size_t sample_window);
   ssize_t FindSyncBeacon(const std::complex<int16_t>* check_data,
