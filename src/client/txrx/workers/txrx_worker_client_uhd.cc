@@ -96,6 +96,7 @@ void TxRxWorkerClientUhd::DoTxRx() {
   }
 
   running_ = true;
+  std::thread tx_thread;
 
   const size_t samples_per_symbol = Configuration()->SampsPerSymbol();
   const size_t samples_per_frame =
@@ -219,18 +220,46 @@ void TxRxWorkerClientUhd::DoTxRx() {
       break;
     }
 
-    //Attempt Tx
-    const size_t tx_status = DoTx(time0);
-    if (tx_status == 0) {
-      const auto rx_pkts =
-          DoRx(local_interface, rx_frame_id, rx_symbol_id, rx_time_ue_);
-      if (kDebugPrintInTask) {
-        AGORA_LOG_INFO(
-            "DoTxRx[%zu]: radio %zu received frame id %zu, symbol id %zu at "
-            "time %lld\n",
-            tid_, local_interface + interface_offset_, rx_frame_id,
-            rx_symbol_id, rx_time);
+    const auto rx_pkts =
+        DoRx(local_interface, rx_frame_id, rx_symbol_id, rx_time);
+    if (kDebugPrintInTask) {
+      AGORA_LOG_INFO(
+          "DoTxRx[%zu]: radio %zu received frame id %zu, symbol id %zu at "
+          "time %lld\n",
+          tid_, local_interface + interface_offset_, rx_frame_id, rx_symbol_id,
+          rx_time);
+    }
+    //Rx Success
+    if (rx_pkts.size() > 0) {
+      rx_time_ue_ = rx_time;
+      if ((rx_frame_id == 0) && (rx_frame_id == 0) && (local_interface == 0)) {
+        //Launch TX attempt
+        tx_thread =
+            std::thread(&TxRxWorkerClientUhd::DoTxThread, this, rx_time_ue_);
+
+        if (kVerifyFirstSync) {
+          for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+            const ssize_t sync_index = FindSyncBeacon(
+                reinterpret_cast<std::complex<int16_t>*>(rx_pkts.at(ch)->data_),
+                samples_per_symbol, Configuration()->ClCorrScale().at(tid_));
+            if (sync_index >= 0) {
+              AGORA_LOG_INFO(
+                  "TxRxWorkerClientUhd [%zu]: Initial Sync - radio %zu, frame "
+                  "%zu, symbol %zu sync_index: %ld, rx sample offset: %ld "
+                  "time0 %lld\n",
+                  tid_, (local_interface + interface_offset_) + ch, rx_frame_id,
+                  rx_symbol_id, sync_index,
+                  sync_index - Configuration()->BeaconLen() -
+                      Configuration()->OfdmTxZeroPrefix(),
+                  time0);
+            } else {
+              throw std::runtime_error(
+                  "No Beacon Detected at Frame 0 / Symbol 0");
+            }
+          }
+        }  // end verify first sync
       }
+
       // resync every frame_sync_period frames:
       // Only sync on beacon symbols
       if ((rx_symbol_id == Configuration()->Frame().GetBeaconSymbolLast()) &&
@@ -307,9 +336,14 @@ void TxRxWorkerClientUhd::DoTxRx() {
           rx_frame_id++;
         }
       }  // interface rollover
-    }
+    }    //    if (rx_pkts.size() > 0) {
+    //Necessary?
+    std::this_thread::yield();
   }  // end main while loop
   running_ = false;
+  if (tx_thread.joinable()) {
+    tx_thread.join();
+  }
 }
 
 //RX data, should return channel number of packets || 0
@@ -399,6 +433,25 @@ std::vector<Packet*> TxRxWorkerClientUhd::DoRx(size_t interface_id,
   return result_packets;
 }
 
+size_t TxRxWorkerClientUhd::DoTxThread(const long long time0) {
+  PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid_);
+
+  AGORA_LOG_INFO(
+      "TxRxWorkerClientUhd[%zu] Tx Thread -- has %zu:%zu total radios %zu\n",
+      tid_, interface_offset_, (interface_offset_ + num_interfaces_) - 1,
+      num_interfaces_);
+
+  //Making GetPendingTxEvents / DoTx event based / sleep wakeup would be preferrable here
+  while (Configuration()->Running()) {
+    const auto tx_status = DoTx(time0);
+    if (tx_status == 0) {
+      //Sleep or yield here.
+      std::this_thread::yield();
+    }
+  }
+  return 0;
+}
+
 //Tx data
 size_t TxRxWorkerClientUhd::DoTx(const long long time0) {
   auto tx_events = GetPendingTxEvents();
@@ -430,22 +483,19 @@ size_t TxRxWorkerClientUhd::DoTx(const long long time0) {
     //other antennas (enforced in the passing utility)
     if ((ant_offset + 1) == channels_per_interface_) {
       // Transmit pilot(s)
-      if (Configuration()->UeHwFramer() == false) {
-        for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-          const size_t pilot_ant =
-              (interface_id * channels_per_interface_) + ch;
-          //Each pilot will be in a different tx slot (called for each pilot)
-          TxPilot(pilot_ant, frame_id, time0);
+      for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+        const size_t pilot_ant = (interface_id * channels_per_interface_) + ch;
+        //Each pilot will be in a different tx slot (called for each pilot)
+        TxPilot(pilot_ant, frame_id, time0);
 
-          //Pilot transmit complete for pilot ue
-          if (current_event.event_type_ == EventType::kPacketPilotTX) {
-            auto complete_event =
-                EventData(EventType::kPacketPilotTX,
-                          gen_tag_t::FrmSymUe(frame_id, 0, pilot_ant).tag_);
-            NotifyComplete(complete_event);
-          }
-        }  //For each channel
-      }
+        //Pilot transmit complete for pilot ue
+        if (current_event.event_type_ == EventType::kPacketPilotTX) {
+          auto complete_event =
+              EventData(EventType::kPacketPilotTX,
+                        gen_tag_t::FrmSymUe(frame_id, 0, pilot_ant).tag_);
+          NotifyComplete(complete_event);
+        }
+      }  //For each channel
 
       if (current_event.event_type_ == EventType::kPacketTX) {
         // Transmit data for all symbols (each cannel transmits for each symbol)
