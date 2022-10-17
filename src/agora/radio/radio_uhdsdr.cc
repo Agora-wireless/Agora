@@ -16,7 +16,7 @@
 
 static constexpr size_t kMakeMaxAttempts = 3;
 static constexpr bool kPrintRadioSettings = true;
-static constexpr bool kRadioTxTimeCheck = false;
+static constexpr bool kRadioTxTimeCheck = true;
 
 // radio init time for UHD devices
 // increase the wait time for radio init to get rid of the late packet issue
@@ -267,6 +267,7 @@ int RadioUHDSdr::Tx(const void* const* tx_buffs, size_t tx_size,
           "Requested tx time %lld is in the past.  Current time %lld. "
           "Transmission will not be correct\n",
           tx_time_ns, current_time);
+      throw std::runtime_error("Requested tx time is in the past");
     }
   }
 
