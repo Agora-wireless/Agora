@@ -73,7 +73,7 @@ TxRxWorkerClientUhd::TxRxWorkerClientUhd(
            "Interface count must be set to 1 for use with this class");
 
   RtAssert(config->UeHwFramer() == false, "Must have ue hw framer disabled");
-  //InitRxStatus();
+  InitRxStatus();
 }
 
 TxRxWorkerClientUhd::~TxRxWorkerClientUhd() = default;
@@ -174,7 +174,7 @@ void TxRxWorkerClientUhd::DoTxRx() {
   //Establish time0 from symbol = 0 (beacon), frame 0
   while (Configuration()->Running() && (time0 == 0)) {
     const auto rx_pkts =
-        DoRx(local_interface, rx_frame_id, rx_symbol_id, rx_locs);
+        DoRx(local_interface, rx_frame_id, rx_symbol_id, rx_time_ue_);
     time0 = rx_time_ue_;
 
     if (kVerifyFirstSync) {
@@ -223,7 +223,7 @@ void TxRxWorkerClientUhd::DoTxRx() {
     const size_t tx_status = DoTx(time0);
     if (tx_status == 0) {
       const auto rx_pkts =
-          DoRx(local_interface, rx_frame_id, rx_symbol_id, rx_locs);
+          DoRx(local_interface, rx_frame_id, rx_symbol_id, rx_time_ue_);
       if (kDebugPrintInTask) {
         AGORA_LOG_INFO(
             "DoTxRx[%zu]: radio %zu received frame id %zu, symbol id %zu at "
@@ -286,8 +286,7 @@ void TxRxWorkerClientUhd::DoTxRx() {
           resync_retry_cnt++;
           if (resync_retry_cnt > kReSyncRetryCount) {
             AGORA_LOG_ERROR(
-                "TxRxWorkerClientUhd [%zu]: Exceeded resync retry limit "
-                "(%zu) "
+                "TxRxWorkerClientUhd [%zu]: Exceeded resync retry limit (%zu) "
                 "for client %zu reached after %zu resync successes at frame: "
                 "%zu.  Stopping!\n",
                 tid_, kReSyncRetryCount, local_interface + interface_offset_,
@@ -314,71 +313,90 @@ void TxRxWorkerClientUhd::DoTxRx() {
 }
 
 //RX data, should return channel number of packets || 0
-// global_frame_id  in - frame id of the last rx packet
-//                 out - frame id of the current rx packet
-// global_symbol_id in - symbol id of the last rx packet
-//                 out - symbol id of the current rx packet
-//
-std::vector<Packet*> TxRxWorkerClientUhd::DoRx(
-    size_t radio_id, size_t frame_id, size_t symbol_id,
-    const std::vector<void*>& discard_locs) {
+// frame_id  in - frame id of the current rx packet
+// symbol_id in - symbol id of the current rx packet
+std::vector<Packet*> TxRxWorkerClientUhd::DoRx(size_t interface_id,
+                                               size_t frame_id,
+                                               size_t symbol_id,
+                                               long long& receive_time) {
+  const size_t radio_id = interface_id + interface_offset_;
+  const size_t first_ant_id = radio_id * channels_per_interface_;
+
   long long rx_time;
-  std::vector<Packet*> rx_packets;
-  std::vector<RxPacket*> memory_tracking;
+  Radio::RxFlags rx_flags;
+  std::vector<Packet*> result_packets;
+  auto& rx_info = rx_status_.at(interface_id);
+  const size_t num_rx_samps = Configuration()->SampsPerSymbol();
 
-  const size_t total_channels = discard_locs.size();
-  const bool publish_symbol = IsRxSymbol(symbol_id);
-
-  std::vector<void*> rx_locs(total_channels);
-  // std::cout<<"in txrx worker usrp recv enqueue, total number of channel is: " << total_channels << std::endl;
-  for (size_t ch = 0; ch < total_channels; ch++) {
-    if (publish_symbol) {
-      //Allocate memory if we care about the results
-      RxPacket& rx = GetRxPacket();
-      memory_tracking.push_back(&rx);
-      rx_locs.at(ch) = rx.RawPacket()->data_;
-    } else {
-      rx_locs.at(ch) = discard_locs.at(ch);
-    }
+  //Check for completion
+  if (rx_info.SamplesAvailable() > 0) {
+    AGORA_LOG_WARN("DoRx - Unexpected samples availble %zu exiting...\n",
+                   rx_info.SamplesAvailable());
+    throw std::runtime_error("Need to implement this!!!");
+    ResetRxStatus(interface_id, true);
   }
 
-  Radio::RxFlags rx_flags;
-  const int rx_status = radio_.RadioRx(
-      radio_id, rx_locs, Configuration()->SampsPerSymbol(), rx_flags, rx_time);
+  AGORA_LOG_TRACE(
+      "TxRxWorkerClientUhd[%zu]: DoRx - Calling RadioRx[%zu], available %zu, "
+      "offset %ld, requesting samples %zu:%zu\n",
+      tid_, radio_id, rx_info.SamplesAvailable(), 0, num_rx_samps,
+      Configuration()->SampsPerSymbol());
+
+  auto rx_locations = rx_info.GetRxPtrs();
+  const int rx_status =
+      radio_.RadioRx(radio_id, rx_locations, num_rx_samps, rx_flags, rx_time);
 
   if (rx_status == static_cast<int>(Configuration()->SampsPerSymbol())) {
-    //Process the rx data
-    if (publish_symbol) {
-      const size_t ant_offset = radio_id * total_channels;
-      for (size_t ch = 0; ch < total_channels; ++ch) {
-        RxPacket& rx = *memory_tracking.at(ch);
-        new (rx.RawPacket()) Packet(frame_id, symbol_id, 0, ant_offset + ch);
-        rx_packets.push_back(rx.RawPacket());
-        EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
-        NotifyComplete(rx_message);
-      }
-    }
+    const size_t new_samples = static_cast<size_t>(rx_status);
+    rx_info.Update(new_samples, rx_time);
 
     if (kDebugRxTimes) {
-      if ((rx_time_ue_ + static_cast<long long>(
-                             Configuration()->SampsPerSymbol())) != rx_time) {
+      if ((rx_time_ue_ + rx_status) != rx_time) {
         AGORA_LOG_WARN(
-            "TxRxWorkerUSRP: RecvEnqueue: Unexpected Rx time %lld:%lld(%lld)\n",
-            rx_time,
-            static_cast<long long>(rx_time_ue_ +
-                                   Configuration()->SampsPerSymbol()),
+            "TxRxWorkerClientUhd[%zu]: DoRx Unexpected Rx time "
+            "%lld:%lld(%lld)\n",
+            tid_, rx_time, static_cast<long long>(rx_time_ue_ + rx_status),
             rx_time_ue_);
       }
     }
+    receive_time = rx_info.StartTime();
+
+    if (kDebugPrintInTask) {
+      AGORA_LOG_INFO(
+          "TxRxWorkerClientUhd[%zu]: DoRx (Frame %zu, Symbol %zu, Radio "
+          "%zu) - at time %lld\n",
+          tid_, frame_id, symbol_id, radio_id, receive_time);
+    }
+
+    const bool publish_symbol = IsRxSymbol(symbol_id);
+    if (publish_symbol) {
+      auto packets = rx_info.GetRxPackets();
+      for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+        auto* rx_packet = packets.at(ch);
+        auto* raw_pkt = rx_packet->RawPacket();
+        new (raw_pkt) Packet(frame_id, symbol_id, 0, first_ant_id + ch);
+        result_packets.push_back(raw_pkt);
+
+        AGORA_LOG_FRAME(
+            "TxRxWorkerClientUhd[%zu]: DoRx Downlink (Frame %zu, Symbol "
+            "%zu, Ant %zu) from Radio %zu at time %lld\n",
+            tid_, frame_id, symbol_id, first_ant_id + ch, radio_id,
+            receive_time);
+
+        // Push kPacketRX event into the queue.
+        EventData rx_message(EventType::kPacketRX, rx_tag_t(*rx_packet).tag_);
+        NotifyComplete(rx_message);
+      }
+    }  // end is RxSymbol
+    ResetRxStatus(interface_id, (publish_symbol == false));
   } else {
     AGORA_LOG_ERROR(
-        "TxRxWorkerUsrp::RecvEnqueue: Unexpected Rx return status %dn\n",
-        rx_status);
+        "TxRxWorkerClientUhd[%zu]::DoRx: Unexpected Rx return status %dn\n",
+        tid_, rx_status);
     throw std::runtime_error(
-        "TxRxWorkerUsrp::RecvEnqueue:Unexpected Rx return status");
+        "TxRxWorkerClientUhd::DoRx:Unexpected Rx return status");
   }
-  rx_time_ue_ = rx_time;
-  return rx_packets;
+  return result_packets;
 }
 
 //Tx data
