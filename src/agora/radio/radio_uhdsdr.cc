@@ -238,25 +238,23 @@ void RadioUHDSdr::Deactivate() {
 int RadioUHDSdr::Tx(const void* const* tx_buffs, size_t tx_size,
                     Radio::TxFlags flags, long long& tx_time_ns) {
   static constexpr double kTxTimeoutSec = 0.2f;
-  //tx_time_ns is a sample counter / tick value
-
-  // left here for now for debugging purposes, might not needd
-  // const long long ratell = (long long)(cfg_->Rate());
-  // const long long full = (long long)(tx_time_ns/ratell);
-  // const long long err = tx_time_ns - (full*ratell);
-  // const double part = full*(cfg_->Rate() - ratell);
-  // const double frac = ((err - part)*1000000000)/cfg_->Rate();
-  // // added to adjust the time spec
-  // tx_time_ns = (full*1000000000) + llround(frac);
 
   uhd::tx_metadata_t md;
-  //Always has time
-  md.has_time_spec = true;
-  md.time_spec = uhd::time_spec_t::from_ticks(tx_time_ns, cfg_->Rate());
   //Current the input flags don't have a START burst handling
-  md.start_of_burst = true;
-  md.end_of_burst = true;
-  //md.end_of_burst = (flags == Radio::TxFlags::kEndTransmit);
+  md.start_of_burst = (flags == Radio::TxFlags::kStartEndTransmit) ||
+                      (flags == Radio::TxFlags::kStartTransmit);
+
+  md.end_of_burst = (flags == Radio::TxFlags::kStartEndTransmit) ||
+                    (flags == Radio::TxFlags::kEndTransmit);
+
+  if (md.start_of_burst) {
+    md.has_time_spec = true;
+    md.time_spec = uhd::time_spec_t::from_ticks(tx_time_ns, cfg_->Rate());
+  } else {
+    //Set to false?
+    md.has_time_spec = true;
+    md.time_spec = uhd::time_spec_t::from_ticks(tx_time_ns, cfg_->Rate());
+  }
 
   if (kRadioTxTimeCheck) {
     const auto current_time = dev_->get_time_now().to_ticks(cfg_->Rate());
