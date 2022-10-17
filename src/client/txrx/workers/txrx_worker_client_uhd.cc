@@ -172,46 +172,8 @@ void TxRxWorkerClientUhd::DoTxRx() {
                 std::floor(1e9 / (max_cfo * Configuration()->SampsPerFrame())));
 
   std::stringstream sout;
-  //Establish time0 from symbol = 0 (beacon), frame 0
-  while (Configuration()->Running() && (time0 == 0)) {
-    const auto rx_pkts =
-        DoRx(local_interface, rx_frame_id, rx_symbol_id, rx_time_ue_);
-    time0 = rx_time_ue_;
-
-    if (kVerifyFirstSync) {
-      for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-        const ssize_t sync_index = FindSyncBeacon(
-            reinterpret_cast<std::complex<int16_t>*>(rx_pkts.at(ch)->data_),
-            samples_per_symbol, Configuration()->ClCorrScale().at(tid_));
-        if (sync_index >= 0) {
-          AGORA_LOG_INFO(
-              "TxRxWorkerClientUhd [%zu]: Initial Sync - radio %zu, frame "
-              "%zu, symbol %zu sync_index: %ld, rx sample offset: %ld time0 "
-              "%lld\n",
-              tid_, (local_interface + interface_offset_) + ch, rx_frame_id,
-              rx_symbol_id, sync_index,
-              sync_index - Configuration()->BeaconLen() -
-                  Configuration()->OfdmTxZeroPrefix(),
-              time0);
-        } else {
-          throw std::runtime_error("No Beacon Detected at Frame 0 / Symbol 0");
-        }
-      }  // end verify first sync
-      local_interface++;
-      if (local_interface == num_interfaces_) {
-        local_interface = 0;
-        // Update global frame_id and symbol_id
-        rx_symbol_id++;
-        if (rx_symbol_id == Configuration()->Frame().NumTotalSyms()) {
-          rx_symbol_id = 0;
-          rx_frame_id++;
-        }
-      }  // interface rollover
-    }    // received Frame 0 Symbol 0
-  }      // end - establish time0 for a given interface
 
   //No Need to preschedule the TX_FRAME_DELTA init in software framer mode
-
   //Beacon sync detected run main rx routines
   while (Configuration()->Running()) {
     if ((Configuration()->FramesToTest() > 0) &&
