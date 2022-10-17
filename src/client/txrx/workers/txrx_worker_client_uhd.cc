@@ -303,7 +303,7 @@ void TxRxWorkerClientUhd::DoTxRx() {
     }  // interface rollover
 
     //Necessary?
-    std::this_thread::yield();
+    //std::this_thread::yield();
   }  // end main while loop
   running_ = false;
   if (tx_thread.joinable()) {
@@ -411,7 +411,7 @@ size_t TxRxWorkerClientUhd::DoTxThread(const long long time0) {
     const auto tx_status = DoTx(time0);
     if (tx_status == 0) {
       //Sleep or yield here.
-      std::this_thread::yield();
+      //std::this_thread::yield();
     }
   }
   return 0;
