@@ -193,7 +193,6 @@ void TxRxWorkerClientUhd::DoTxRx() {
     }
     //Rx Success
     if (rx_pkts.size() > 0) {
-      rx_time_ue_ = rx_time;
       if ((rx_frame_id == 0) && (rx_frame_id == 0) && (local_interface == 0)) {
         //Launch TX attempt
         tx_thread =
@@ -288,17 +287,21 @@ void TxRxWorkerClientUhd::DoTxRx() {
         }
       }  // end resync
 
-      local_interface++;
-      if (local_interface == num_interfaces_) {
-        local_interface = 0;
-        // Update global frame_id and symbol_id
-        rx_symbol_id++;
-        if (rx_symbol_id == Configuration()->Frame().NumTotalSyms()) {
-          rx_symbol_id = 0;
-          rx_frame_id++;
-        }
-      }  // interface rollover
-    }    //    if (rx_pkts.size() > 0) {
+    }  //    if (rx_pkts.size() > 0) {
+
+    rx_time_ue_ = rx_time;
+    //Asummes each Rx returns symbols
+    local_interface++;
+    if (local_interface == num_interfaces_) {
+      local_interface = 0;
+      // Update global frame_id and symbol_id
+      rx_symbol_id++;
+      if (rx_symbol_id == Configuration()->Frame().NumTotalSyms()) {
+        rx_symbol_id = 0;
+        rx_frame_id++;
+      }
+    }  // interface rollover
+
     //Necessary?
     std::this_thread::yield();
   }  // end main while loop
