@@ -395,7 +395,7 @@ void TxRxWorkerUsrp::TxBeacon(size_t radio_id, size_t tx_frame_number,
                                      Configuration()->Frame().NumTotalSyms() *
                                      tx_frame_number);
   const int tx_ret = radio_config_.RadioTx(
-      radio_id, tx_locs.data(), Radio::TxFlags::kEndTransmit, tx_time);
+      radio_id, tx_locs.data(), Radio::TxFlags::kStartEndTransmit, tx_time);
   if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
     AGORA_LOG_ERROR(
         "TxBeacon: BAD Transmit(%d:%zu) at Time %lld for frame %zu\n", tx_ret,

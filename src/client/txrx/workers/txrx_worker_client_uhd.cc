@@ -360,7 +360,7 @@ std::vector<Packet*> TxRxWorkerClientUhd::DoRx(size_t interface_id,
     }
     receive_time = rx_info.StartTime();
 
-    if (kDebugPrintInTask) {
+    if (true) {
       AGORA_LOG_INFO(
           "TxRxWorkerClientUhd[%zu]: DoRx (Frame %zu, Symbol %zu, Radio "
           "%zu) - at time %lld\n",
@@ -651,6 +651,37 @@ void TxRxWorkerClientUhd::TxUplinkSymbols(size_t radio_id, size_t frame_id,
     const size_t tx_symbol_id =
         Configuration()->Frame().GetULSymbol(ul_symbol_idx);
 
+    bool start_tx = false;
+    bool end_tx = false;
+    size_t prev_symbol = tx_symbol_id;
+    size_t next_symbol = tx_symbol_id;
+
+    if (ul_symbol_idx != 0) {
+      prev_symbol = Configuration()->Frame().GetULSymbol(ul_symbol_idx - 1);
+    }
+    if ((ul_symbol_idx + 1) != Configuration()->Frame().NumULSyms()) {
+      next_symbol = Configuration()->Frame().GetULSymbol(ul_symbol_idx + 1);
+    }
+
+    //If no tx symbol before, then start
+    if ((prev_symbol + 1) != tx_symbol_id) {
+      start_tx = true;
+    }
+    //If no tx symbol after, then end
+    if ((tx_symbol_id + 1) != next_symbol) {
+      end_tx = true;
+    }
+
+    if (start_tx == true && end_tx == true) {
+      flags_tx = Radio::TxFlags::kStartEndTransmit;
+    } else if (start_tx == true) {
+      flags_tx = Radio::TxFlags::kStartTransmit;
+    } else if (end_tx == true) {
+      flags_tx = Radio::TxFlags::kEndTransmit;
+    } else {
+      flags_tx = Radio::TxFlags::kTxFlagNone;
+    }
+
     for (size_t ch = 0; ch < channels_per_interface_; ch++) {
       const size_t tx_ant = (radio_id * channels_per_interface_) + ch;
       if (kDebugUplink) {
@@ -664,24 +695,16 @@ void TxRxWorkerClientUhd::TxUplinkSymbols(size_t radio_id, size_t frame_id,
       }
     }
 
-    if (Configuration()->UeHwFramer()) {
-      tx_time = ((long long)tx_frame_id << 32) | (tx_symbol_id << 16);
-    } else {
-      tx_time = time0 + (tx_frame_id * samples_per_frame) +
-                (tx_symbol_id * samples_per_symbol) -
-                Configuration()->ClTxAdvance().at(radio_id);
-    }
-
-    if (tx_symbol_id == Configuration()->Frame().GetULSymbolLast()) {
-      flags_tx = Radio::TxFlags::kEndTransmit;
-    }
+    tx_time = time0 + (tx_frame_id * samples_per_frame) +
+              (tx_symbol_id * samples_per_symbol) -
+              Configuration()->ClTxAdvance().at(radio_id);
     const int tx_status = radio_.RadioTx(radio_id, tx_data.data(),
                                          samples_per_symbol, flags_tx, tx_time);
     if (tx_status < static_cast<int>(samples_per_symbol)) {
       std::cout << "BAD Write (UL): For Ue " << radio_id << " " << tx_status
                 << "/" << samples_per_symbol << std::endl;
     }
-    if (kDebugPrintInTask) {
+    if (true) {
       AGORA_LOG_INFO(
           "TxRxWorkerClientUhd::DoTx[%zu]: Transmitted Symbol (Frame "
           "%zu:%zu, Symbol %zu, Ue %zu) at time %lld flags %d\n",
@@ -713,27 +736,25 @@ void TxRxWorkerClientUhd::TxPilot(size_t pilot_ant, size_t frame_id,
   const size_t pilot_symbol_id =
       Configuration()->Frame().GetPilotSymbol(pilot_ant);
 
-  Radio::TxFlags flags_tx = Radio::TxFlags::kEndTransmit;
+  //Assume nothing is before the pilot...
+  Radio::TxFlags flags_tx = Radio::TxFlags::kStartEndTransmit;
+
   //See if we need to set end burst for the last channel
   // (see if the next symbol is an uplink symbol)
   if ((pilot_channel + 1) == channels_per_interface_) {
     if (Configuration()->Frame().NumULSyms() > 0) {
       const size_t first_ul_symbol = Configuration()->Frame().GetULSymbol(0);
       if ((pilot_symbol_id + 1) == (first_ul_symbol)) {
-        flags_tx = Radio::TxFlags::kTxFlagNone;
+        flags_tx = Radio::TxFlags::kStartTransmit;
       }
     }
   } else {
-    flags_tx = Radio::TxFlags::kTxFlagNone;
+    flags_tx = Radio::TxFlags::kStartTransmit;
   }
 
-  if (Configuration()->UeHwFramer()) {
-    tx_time = ((long long)tx_frame_id << 32) | (pilot_symbol_id << 16);
-  } else {
-    tx_time = time0 + (tx_frame_id * samples_per_frame) +
-              (pilot_symbol_id * samples_per_symbol) -
-              Configuration()->ClTxAdvance().at(radio);
-  }
+  tx_time = time0 + (tx_frame_id * samples_per_frame) +
+            (pilot_symbol_id * samples_per_symbol) -
+            Configuration()->ClTxAdvance().at(radio);
 
   const int tx_status = radio_.RadioTx(radio, tx_data.data(),
                                        samples_per_symbol, flags_tx, tx_time);
