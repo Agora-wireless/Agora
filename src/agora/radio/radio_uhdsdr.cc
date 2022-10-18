@@ -16,7 +16,7 @@
 
 static constexpr size_t kMakeMaxAttempts = 3;
 static constexpr bool kPrintRadioSettings = true;
-static constexpr bool kRadioTxTimeCheck = true;
+static constexpr bool kRadioTxTimeCheck = false;
 
 // radio init time for UHD devices
 // increase the wait time for radio init to get rid of the late packet issue
@@ -237,7 +237,7 @@ void RadioUHDSdr::Deactivate() {
 
 int RadioUHDSdr::Tx(const void* const* tx_buffs, size_t tx_size,
                     Radio::TxFlags flags, long long& tx_time_ns) {
-  static constexpr double kTxTimeoutSec = 0.2f;
+  static constexpr double kTxTimeoutSec = 0.01f;
 
   uhd::tx_metadata_t md;
   //Current the input flags don't have a START burst handling
@@ -252,8 +252,8 @@ int RadioUHDSdr::Tx(const void* const* tx_buffs, size_t tx_size,
     md.time_spec = uhd::time_spec_t::from_ticks(tx_time_ns, cfg_->Rate());
   } else {
     //Set to false?
-    md.has_time_spec = true;
-    md.time_spec = uhd::time_spec_t::from_ticks(tx_time_ns, cfg_->Rate());
+    md.has_time_spec = false;
+    //md.time_spec = uhd::time_spec_t::from_ticks(tx_time_ns, cfg_->Rate());
   }
 
   if (kRadioTxTimeCheck) {
@@ -358,7 +358,7 @@ int RadioUHDSdr::Rx(std::vector<void*>& rx_locs, size_t rx_size,
       rxs_->recv(stream_buffs, rx_size, md, kRxTimeoutSec, false);
 
   const bool has_time = md.has_time_spec;
-  const bool start_burst = md.start_of_burst;
+  [[maybe_unused]] const bool start_burst = md.start_of_burst;
   const bool end_burst = md.end_of_burst;
   const bool more_frags = md.more_fragments;
   AGORA_LOG_TRACE(
