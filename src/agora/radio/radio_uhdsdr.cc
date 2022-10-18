@@ -24,6 +24,7 @@ static constexpr double kUhdInitTimeSec = 0.5f;
 
 RadioUHDSdr::RadioUHDSdr() : dev_(nullptr), rxs_(nullptr), txs_(nullptr) {
   AGORA_LOG_INFO("calling pure uhd version of radio constructor.\n");
+  uhd::log::set_log_level(uhd::log::severity_level::debug);
 }
 
 RadioUHDSdr::~RadioUHDSdr() {
