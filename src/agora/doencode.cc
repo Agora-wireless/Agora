@@ -129,8 +129,8 @@ EventData DoEncode::Launch(size_t tag) {
     std::stringstream dataprint;
     dataprint << std::setfill('0') << std::hex;
     for (size_t i = 0; i < cfg_->NumBytesPerCb(dir_); i++) {
-      dataprint << " 0x" << std::setw(2)
-                << reinterpret_cast<uint8_t*>(ldpc_input)[i];
+      dataprint << " " << std::setw(2)
+                << std::to_integer<int>(reinterpret_cast<std::byte*>(ldpc_input)[i]);
     }
     AGORA_LOG_INFO("ldpc input (%zu %zu %zu): %s\n", frame_id, symbol_idx,
                    ue_id, dataprint.str().c_str());
@@ -143,8 +143,8 @@ EventData DoEncode::Launch(size_t tag) {
     std::stringstream dataprint;
     dataprint << std::setfill('0') << std::hex;
     for (size_t i = 0; i < BitsToBytes(ldpc_config.NumCbCodewLen()); i++) {
-      dataprint << " 0x" << std::setw(2)
-                << reinterpret_cast<uint8_t*>(encoded_buffer_temp_)[i];
+      dataprint << " " << std::setw(2)
+                << std::to_integer<int>(reinterpret_cast<std::byte*>(encoded_buffer_temp_)[i]);
     }
     AGORA_LOG_INFO("ldpc output (%zu %zu %zu): %s\n", frame_id, symbol_idx,
                    ue_id, dataprint.str().c_str());
@@ -155,7 +155,7 @@ EventData DoEncode::Launch(size_t tag) {
   if (kPrintRawMacData && dir_ == Direction::kUplink) {
     std::printf("Encoded data - placed at location (%zu %zu %zu) %zu\n",
                 frame_id, symbol_idx, ue_id,
-                static_cast<intptr_t>(mod_buffer_ptr));
+                reinterpret_cast<intptr_t>(mod_buffer_ptr));
   }
   AdaptBitsForMod(reinterpret_cast<uint8_t*>(encoded_buffer_temp_),
                   reinterpret_cast<uint8_t*>(mod_buffer_ptr),
