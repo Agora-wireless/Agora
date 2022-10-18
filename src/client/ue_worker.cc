@@ -677,7 +677,8 @@ void UeWorker::DoIfft(size_t tag) {
         AGORA_LOG_INFO(
             "Uplink iFFT: (frame %zu, symbol %zu, user %zu) Data SC values "
             "mismatched UlIqF %zu of %zu sc\n",
-            frame_id, symbol_id, ant_id, cnt_sc_mismatch, config_.OfdmDataNum());
+            frame_id, symbol_id, ant_id, cnt_sc_mismatch,
+            config_.OfdmDataNum());
       }
     }
   }

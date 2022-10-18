@@ -75,7 +75,6 @@ class Scrambler {
                                  size_t byte_buffer_size,
                                  std::byte* out_byte_buffer);
 
-  //std::vector<std::byte> scram_buffer_;
   std::bitset<kScramblerlength> scram_buffer_;
   std::vector<std::byte> bit_buffer_;
 };  // class Scrambler

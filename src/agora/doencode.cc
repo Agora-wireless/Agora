@@ -130,7 +130,8 @@ EventData DoEncode::Launch(size_t tag) {
     dataprint << std::setfill('0') << std::hex;
     for (size_t i = 0; i < cfg_->NumBytesPerCb(dir_); i++) {
       dataprint << " " << std::setw(2)
-                << std::to_integer<int>(reinterpret_cast<std::byte*>(ldpc_input)[i]);
+                << std::to_integer<int>(
+                       reinterpret_cast<std::byte*>(ldpc_input)[i]);
     }
     AGORA_LOG_INFO("ldpc input (%zu %zu %zu): %s\n", frame_id, symbol_idx,
                    ue_id, dataprint.str().c_str());
@@ -144,7 +145,8 @@ EventData DoEncode::Launch(size_t tag) {
     dataprint << std::setfill('0') << std::hex;
     for (size_t i = 0; i < BitsToBytes(ldpc_config.NumCbCodewLen()); i++) {
       dataprint << " " << std::setw(2)
-                << std::to_integer<int>(reinterpret_cast<std::byte*>(encoded_buffer_temp_)[i]);
+                << std::to_integer<int>(
+                       reinterpret_cast<std::byte*>(encoded_buffer_temp_)[i]);
     }
     AGORA_LOG_INFO("ldpc output (%zu %zu %zu): %s\n", frame_id, symbol_idx,
                    ue_id, dataprint.str().c_str());
