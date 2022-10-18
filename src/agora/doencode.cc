@@ -34,10 +34,12 @@ DoEncode::DoEncode(Config* in_config, int in_tid, Direction dir,
                                  cfg_->LdpcConfig(dir).ExpansionFactor())));
   assert(encoded_buffer_temp_ != nullptr);
 
+  const size_t scrambler_buffer_bytes =
+      Roundup<64>(cfg_->NumBytesPerCb(dir)) +
+      kLdpcHelperFunctionInputBufferSizePaddingBytes;
   scrambler_buffer_ = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::kAlign64,
-      cfg_->NumBytesPerCb(dir) +
-          kLdpcHelperFunctionInputBufferSizePaddingBytes));
+      Agora_memory::Alignment_t::kAlign64, scrambler_buffer_bytes));
+  std::memset(scrambler_buffer_, 0u, scrambler_buffer_bytes);
 
   assert(scrambler_buffer_ != nullptr);
 }
@@ -111,6 +113,8 @@ EventData DoEncode::Launch(size_t tag) {
   if (this->cfg_->ScrambleEnabled()) {
     std::memcpy(scrambler_buffer_, tx_data_ptr, cfg_->NumBytesPerCb(dir_));
     scrambler_->Scramble(scrambler_buffer_, cfg_->NumBytesPerCb(dir_));
+    std::memset(&scrambler_buffer_[cfg_->NumBytesPerCb(dir_)], 0u,
+                kLdpcHelperFunctionInputBufferSizePaddingBytes);
     ldpc_input = scrambler_buffer_;
   } else {
     ldpc_input = tx_data_ptr;
