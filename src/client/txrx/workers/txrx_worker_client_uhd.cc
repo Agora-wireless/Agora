@@ -23,6 +23,7 @@ static constexpr float kBeaconDetectWindow = 2.33f;
 static constexpr size_t kBeaconsToStart = 2;
 static constexpr bool kPrintClientBeaconSNR = true;
 static constexpr ssize_t kMaxBeaconAdjust = 5;
+static constexpr bool kThreadedTx = true;
 
 static constexpr bool kDebugRxTimes = true;
 
@@ -182,129 +183,150 @@ void TxRxWorkerClientUhd::DoTxRx() {
       break;
     }
 
-    const auto rx_pkts =
-        DoRx(local_interface, rx_frame_id, rx_symbol_id, rx_time);
-    if (kDebugPrintInTask) {
-      AGORA_LOG_INFO(
-          "DoTxRx[%zu]: radio %zu received frame id %zu, symbol id %zu at "
-          "time %lld\n",
-          tid_, local_interface + interface_offset_, rx_frame_id, rx_symbol_id,
-          rx_time);
+    size_t tx_status = 0;
+    if (kThreadedTx == false) {
+      if (time0 != 0) {
+        tx_status = DoTx(time0);
+      }
     }
-    //Rx Success
-    if (rx_pkts.size() > 0) {
-      if ((rx_frame_id == 0) && (rx_frame_id == 0) && (local_interface == 0)) {
-        //Launch TX attempt
-        tx_thread =
-            std::thread(&TxRxWorkerClientUhd::DoTxThread, this, rx_time_ue_);
-
-        if (kVerifyFirstSync) {
-          for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-            const ssize_t sync_index = FindSyncBeacon(
-                reinterpret_cast<std::complex<int16_t>*>(rx_pkts.at(ch)->data_),
-                samples_per_symbol, Configuration()->ClCorrScale().at(tid_));
-            if (sync_index >= 0) {
-              AGORA_LOG_INFO(
-                  "TxRxWorkerClientUhd [%zu]: Initial Sync - radio %zu, frame "
-                  "%zu, symbol %zu sync_index: %ld, rx sample offset: %ld "
-                  "time0 %lld\n",
-                  tid_, (local_interface + interface_offset_) + ch, rx_frame_id,
-                  rx_symbol_id, sync_index,
-                  sync_index - Configuration()->BeaconLen() -
-                      Configuration()->OfdmTxZeroPrefix(),
-                  time0);
-            } else {
-              throw std::runtime_error(
-                  "No Beacon Detected at Frame 0 / Symbol 0");
-            }
+    if (tx_status == 0) {
+      const auto rx_pkts =
+          DoRx(local_interface, rx_frame_id, rx_symbol_id, rx_time);
+      if (kDebugPrintInTask) {
+        AGORA_LOG_INFO(
+            "DoTxRx[%zu]: radio %zu received frame id %zu, symbol id %zu at "
+            "time %lld\n",
+            tid_, local_interface + interface_offset_, rx_frame_id,
+            rx_symbol_id, rx_time);
+      }
+      //Rx Success
+      if (rx_pkts.size() > 0) {
+        if ((rx_frame_id == 0) && (rx_frame_id == 0) &&
+            (local_interface == 0)) {
+          time0 = rx_time;
+          //Launch TX attempt
+          if (kThreadedTx) {
+            tx_thread =
+                std::thread(&TxRxWorkerClientUhd::DoTxThread, this, time0);
           }
-        }  // end verify first sync
-      }
 
-      // resync every frame_sync_period frames:
-      // Only sync on beacon symbols
-      if ((rx_symbol_id == Configuration()->Frame().GetBeaconSymbolLast()) &&
-          ((rx_frame_id / frame_sync_period) > 0) &&
-          ((rx_frame_id % frame_sync_period) == 0)) {
-        resync = true;
-      }
-
-      //If we have a beacon and we would like to resync
-      if (resync &&
-          (rx_symbol_id == Configuration()->Frame().GetBeaconSymbolLast())) {
-        //This is adding a race condition on this data, it is ok for now but we should fix this
-        const ssize_t sync_index = FindSyncBeacon(
-            reinterpret_cast<std::complex<int16_t>*>(
-                rx_pkts.at(kSyncDetectChannel)->data_),
-            samples_per_symbol, Configuration()->ClCorrScale().at(tid_));
-        if (sync_index >= 0) {
-          const ssize_t adjust = sync_index - Configuration()->BeaconLen() -
-                                 Configuration()->OfdmTxZeroPrefix();
-          if (std::abs(adjust) > kMaxBeaconAdjust) {
-            AGORA_LOG_WARN(
-                "TxRxWorkerClientUhd [%zu]: Re-syncing ignored due to excess "
-                "offset %ld - channel %zu, sync_index: %ld, tries %zu\n ",
-                tid_, adjust, kSyncDetectChannel, sync_index, resync_retry_cnt);
-          } else {
-            AGORA_LOG_INFO(
-                "TxRxWorkerClientUhd [%zu]: Re-syncing channel %zu, "
-                "sync_index: %ld, rx sample offset: %ld tries %zu\n ",
-                tid_, kSyncDetectChannel, sync_index, adjust, resync_retry_cnt);
-            resync_success++;
-            resync = false;
-            //Display all the other channels
-            if (kDebugBeaconChannels) {
-              for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-                if (ch != kSyncDetectChannel) {
-                  const ssize_t aux_channel_sync =
-                      FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
-                                         rx_pkts.at(ch)->data_),
-                                     samples_per_symbol,
-                                     Configuration()->ClCorrScale().at(tid_));
-                  AGORA_LOG_INFO(
-                      "TxRxWorkerClientUhd [%zu]: beacon status channel %zu, "
-                      "sync_index: %ld, rx sample offset: %ld\n",
-                      tid_, ch, aux_channel_sync,
-                      aux_channel_sync - (Configuration()->BeaconLen() +
-                                          Configuration()->OfdmTxZeroPrefix()));
-                }
+          if (kVerifyFirstSync) {
+            for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+              const ssize_t sync_index = FindSyncBeacon(
+                  reinterpret_cast<std::complex<int16_t>*>(
+                      rx_pkts.at(ch)->data_),
+                  samples_per_symbol, Configuration()->ClCorrScale().at(tid_));
+              if (sync_index >= 0) {
+                AGORA_LOG_INFO(
+                    "TxRxWorkerClientUhd [%zu]: Initial Sync - radio %zu, "
+                    "frame "
+                    "%zu, symbol %zu sync_index: %ld, rx sample offset: %ld "
+                    "time0 %lld\n",
+                    tid_, (local_interface + interface_offset_) + ch,
+                    rx_frame_id, rx_symbol_id, sync_index,
+                    sync_index - Configuration()->BeaconLen() -
+                        Configuration()->OfdmTxZeroPrefix(),
+                    time0);
+              } else {
+                throw std::runtime_error(
+                    "No Beacon Detected at Frame 0 / Symbol 0");
               }
             }
-            resync_retry_cnt = 0;
-          }
-        } else {
-          resync_retry_cnt++;
-          if (resync_retry_cnt > kReSyncRetryCount) {
-            AGORA_LOG_ERROR(
-                "TxRxWorkerClientUhd [%zu]: Exceeded resync retry limit (%zu) "
-                "for client %zu reached after %zu resync successes at frame: "
-                "%zu.  Stopping!\n",
-                tid_, kReSyncRetryCount, local_interface + interface_offset_,
-                resync_success, rx_frame_id);
-            Configuration()->Running(false);
-            break;
-          }
+          }  // end verify first sync
         }
-      }  // end resync
 
-    }  //    if (rx_pkts.size() > 0) {
+        // resync every frame_sync_period frames:
+        // Only sync on beacon symbols
+        if ((rx_symbol_id == Configuration()->Frame().GetBeaconSymbolLast()) &&
+            ((rx_frame_id / frame_sync_period) > 0) &&
+            ((rx_frame_id % frame_sync_period) == 0)) {
+          resync = true;
+        }
 
-    rx_time_ue_ = rx_time;
-    //Asummes each Rx returns symbols
-    local_interface++;
-    if (local_interface == num_interfaces_) {
-      local_interface = 0;
-      // Update global frame_id and symbol_id
-      rx_symbol_id++;
-      if (rx_symbol_id == Configuration()->Frame().NumTotalSyms()) {
-        rx_symbol_id = 0;
-        rx_frame_id++;
-      }
-    }  // interface rollover
+        //If we have a beacon and we would like to resync
+        if (resync &&
+            (rx_symbol_id == Configuration()->Frame().GetBeaconSymbolLast())) {
+          //This is adding a race condition on this data, it is ok for now but we should fix this
+          const ssize_t sync_index = FindSyncBeacon(
+              reinterpret_cast<std::complex<int16_t>*>(
+                  rx_pkts.at(kSyncDetectChannel)->data_),
+              samples_per_symbol, Configuration()->ClCorrScale().at(tid_));
+          if (sync_index >= 0) {
+            const ssize_t adjust = sync_index - Configuration()->BeaconLen() -
+                                   Configuration()->OfdmTxZeroPrefix();
+            if (std::abs(adjust) > kMaxBeaconAdjust) {
+              AGORA_LOG_WARN(
+                  "TxRxWorkerClientUhd [%zu]: Re-syncing ignored due to "
+                  "excess "
+                  "offset %ld - channel %zu, sync_index: %ld, tries %zu\n ",
+                  tid_, adjust, kSyncDetectChannel, sync_index,
+                  resync_retry_cnt);
+            } else {
+              AGORA_LOG_INFO(
+                  "TxRxWorkerClientUhd [%zu]: Re-syncing channel %zu, "
+                  "sync_index: %ld, rx sample offset: %ld tries %zu\n ",
+                  tid_, kSyncDetectChannel, sync_index, adjust,
+                  resync_retry_cnt);
+              resync_success++;
+              resync = false;
+              //Display all the other channels
+              if (kDebugBeaconChannels) {
+                for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+                  if (ch != kSyncDetectChannel) {
+                    const ssize_t aux_channel_sync =
+                        FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
+                                           rx_pkts.at(ch)->data_),
+                                       samples_per_symbol,
+                                       Configuration()->ClCorrScale().at(tid_));
+                    AGORA_LOG_INFO(
+                        "TxRxWorkerClientUhd [%zu]: beacon status channel "
+                        "%zu, "
+                        "sync_index: %ld, rx sample offset: %ld\n",
+                        tid_, ch, aux_channel_sync,
+                        aux_channel_sync -
+                            (Configuration()->BeaconLen() +
+                             Configuration()->OfdmTxZeroPrefix()));
+                  }
+                }
+              }
+              resync_retry_cnt = 0;
+            }
+          } else {
+            resync_retry_cnt++;
+            if (resync_retry_cnt > kReSyncRetryCount) {
+              AGORA_LOG_ERROR(
+                  "TxRxWorkerClientUhd [%zu]: Exceeded resync retry limit "
+                  "(%zu) "
+                  "for client %zu reached after %zu resync successes at "
+                  "frame: "
+                  "%zu.  Stopping!\n",
+                  tid_, kReSyncRetryCount, local_interface + interface_offset_,
+                  resync_success, rx_frame_id);
+              Configuration()->Running(false);
+              break;
+            }
+          }
+        }  // end resync
 
-    //Necessary?
-    //std::this_thread::yield();
-  }  // end main while loop
+      }  //    if (rx_pkts.size() > 0) {
+
+      rx_time_ue_ = rx_time;
+      //Asummes each Rx returns symbols
+      local_interface++;
+      if (local_interface == num_interfaces_) {
+        local_interface = 0;
+        // Update global frame_id and symbol_id
+        rx_symbol_id++;
+        if (rx_symbol_id == Configuration()->Frame().NumTotalSyms()) {
+          rx_symbol_id = 0;
+          rx_frame_id++;
+        }
+      }  // interface rollover
+
+      //Necessary?
+      //std::this_thread::yield();
+    }  // end tx_success
+  }    // end main while loop
   running_ = false;
   if (tx_thread.joinable()) {
     tx_thread.join();
