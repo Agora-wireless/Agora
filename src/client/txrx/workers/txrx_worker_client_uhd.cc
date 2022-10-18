@@ -382,7 +382,7 @@ std::vector<Packet*> TxRxWorkerClientUhd::DoRx(size_t interface_id,
     }
     receive_time = rx_info.StartTime();
 
-    if (true) {
+    if (kDebugPrintInTask) {
       AGORA_LOG_INFO(
           "TxRxWorkerClientUhd[%zu]: DoRx (Frame %zu, Symbol %zu, Radio "
           "%zu) - at time %lld\n",
@@ -664,7 +664,6 @@ void TxRxWorkerClientUhd::TxUplinkSymbols(size_t radio_id, size_t frame_id,
   const size_t samples_per_symbol = Configuration()->SampsPerSymbol();
   const size_t samples_per_frame =
       samples_per_symbol * Configuration()->Frame().NumTotalSyms();
-  long long tx_time;
   Radio::TxFlags flags_tx = Radio::TxFlags::kTxFlagNone;
 
   std::vector<void*> tx_data(channels_per_interface_);
@@ -717,9 +716,16 @@ void TxRxWorkerClientUhd::TxUplinkSymbols(size_t radio_id, size_t frame_id,
       }
     }
 
-    tx_time = time0 + (tx_frame_id * samples_per_frame) +
-              (tx_symbol_id * samples_per_symbol) -
-              Configuration()->ClTxAdvance().at(radio_id);
+    long long tx_time = time0 + (tx_frame_id * samples_per_frame) +
+                        (tx_symbol_id * samples_per_symbol) -
+                        Configuration()->ClTxAdvance().at(radio_id);
+
+    if (tx_time < rx_time_ue_) {
+      AGORA_LOG_ERROR(
+          "Requested tx time %lld is in the past.  Last Rx Time %lld. "
+          "Transmission will not be correct - diff %lld\n",
+          tx_time, rx_time_ue_, rx_time_ue_ - tx_time);
+    }
     const int tx_status = radio_.RadioTx(radio_id, tx_data.data(),
                                          samples_per_symbol, flags_tx, tx_time);
     if (tx_status < static_cast<int>(samples_per_symbol)) {
@@ -729,9 +735,9 @@ void TxRxWorkerClientUhd::TxUplinkSymbols(size_t radio_id, size_t frame_id,
     if (true) {
       AGORA_LOG_INFO(
           "TxRxWorkerClientUhd::DoTx[%zu]: Transmitted Symbol (Frame "
-          "%zu:%zu, Symbol %zu, Ue %zu) at time %lld flags %d\n",
+          "%zu:%zu, Symbol %zu, Ue %zu) at time %lld:%lld:%lld flags %d\n",
           tid_, frame_id, tx_frame_id, tx_symbol_id, radio_id, tx_time,
-          static_cast<int>(flags_tx));
+          rx_time_ue_, tx_time - rx_time_ue_, static_cast<int>(flags_tx));
     }
   }
 }

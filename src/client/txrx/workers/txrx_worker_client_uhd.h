@@ -7,6 +7,7 @@
 #ifndef TXRX_WORKER_CLIENT_UHD_H_
 #define TXRX_WORKER_CLIENT_UHD_H_
 
+#include <atomic>
 #include <memory>
 #include <vector>
 
@@ -53,7 +54,7 @@ class TxRxWorkerClientUhd : public TxRxWorker {
   // This object is created / owned by the parent process
   RadioSet& radio_;
   size_t program_start_ticks_;
-  long long rx_time_ue_;
+  std::atomic<long long> rx_time_ue_;
 
   std::vector<std::vector<std::complex<int16_t>>> frame_zeros_;
   std::vector<std::vector<std::complex<int16_t>>> frame_storage_;
