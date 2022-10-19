@@ -1200,6 +1200,8 @@ void Config::GenData() {
                       GetInfoBits(ul_bits_, Direction::kUplink, i, j, k),
                       ul_num_bytes_per_cb_);
           scrambler->Scramble(ul_scramble_buffer, ul_num_bytes_per_cb_);
+          std::memset(&ul_scramble_buffer[ul_num_bytes_per_cb_], 0u,
+                      kLdpcHelperFunctionInputBufferSizePaddingBytes);
           ldpc_input = ul_scramble_buffer;
         } else {
           ldpc_input = GetInfoBits(ul_bits_, Direction::kUplink, i, j, k);
@@ -1315,6 +1317,8 @@ void Config::GenData() {
                       GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k),
                       dl_num_bytes_per_cb_);
           scrambler->Scramble(dl_scramble_buffer, dl_num_bytes_per_cb_);
+          std::memset(&dl_scramble_buffer[dl_num_bytes_per_cb_], 0u,
+                      kLdpcHelperFunctionInputBufferSizePaddingBytes);
           ldpc_input = dl_scramble_buffer;
         } else {
           ldpc_input = GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k);

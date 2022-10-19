@@ -163,6 +163,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       if (this->cfg_->ScrambleEnabled()) {
         scrambler->Scramble(ul_scrambler_buffer, ul_cb_bytes);
       }
+      std::memset(&ul_scrambler_buffer[ul_cb_bytes], 0u,
+                  kLdpcHelperFunctionInputBufferSizePaddingBytes);
       this->GenCodeblock(Direction::kUplink, ul_scrambler_buffer,
                          ul_encoded_codewords.at(cb));
     }
@@ -558,6 +560,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       if (this->cfg_->ScrambleEnabled()) {
         scrambler->Scramble(dl_scrambler_buffer, dl_cb_bytes);
       }
+      std::memset(&dl_scrambler_buffer[dl_cb_bytes], 0u,
+                  kLdpcHelperFunctionInputBufferSizePaddingBytes);
       this->GenCodeblock(Direction::kDownlink, dl_scrambler_buffer,
                          dl_encoded_codewords.at(cb));
     }
