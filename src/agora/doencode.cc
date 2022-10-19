@@ -8,8 +8,10 @@
 
 #include "concurrent_queue_wrapper.h"
 #include "encoder.h"
+#include "logger.h"
 #include "phy_ldpc_decoder_5gnr.h"
 
+static constexpr bool kInPlaceScramble = false;
 static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintRawMacData = false;
 
@@ -108,43 +110,70 @@ EventData DoEncode::Launch(size_t tag) {
         cfg_->GetInfoBits(raw_data_buffer_, dir_, symbol_idx, ue_id, cur_cb_id);
   }
 
-  int8_t* ldpc_input = nullptr;
+  int8_t* ldpc_input = tx_data_ptr;
 
   if (this->cfg_->ScrambleEnabled()) {
-    std::memcpy(scrambler_buffer_, tx_data_ptr, cfg_->NumBytesPerCb(dir_));
-    scrambler_->Scramble(scrambler_buffer_, cfg_->NumBytesPerCb(dir_));
+    if (kInPlaceScramble) {
+      std::memcpy(scrambler_buffer_, ldpc_input, cfg_->NumBytesPerCb(dir_));
+      scrambler_->Scramble(scrambler_buffer_, cfg_->NumBytesPerCb(dir_));
+    } else {
+      scrambler_->Scramble(scrambler_buffer_, ldpc_input,
+                           cfg_->NumBytesPerCb(dir_));
+    }
     std::memset(&scrambler_buffer_[cfg_->NumBytesPerCb(dir_)], 0u,
                 kLdpcHelperFunctionInputBufferSizePaddingBytes);
     ldpc_input = scrambler_buffer_;
-  } else {
-    ldpc_input = tx_data_ptr;
+  }
+
+  if (kDebugTxData) {
+    std::stringstream dataprint;
+    dataprint << std::setfill('0') << std::hex;
+    for (size_t i = 0; i < cfg_->NumBytesPerCb(dir_); i++) {
+      dataprint << " " << std::setw(2)
+                << std::to_integer<int>(
+                       reinterpret_cast<std::byte*>(ldpc_input)[i]);
+    }
+    AGORA_LOG_INFO("ldpc input (%zu %zu %zu): %s\n", frame_id, symbol_idx,
+                   ue_id, dataprint.str().c_str());
   }
 
   LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
                    ldpc_config.NumRows(), encoded_buffer_temp_, parity_buffer_,
                    ldpc_input);
+  if (kDebugTxData) {
+    std::stringstream dataprint;
+    dataprint << std::setfill('0') << std::hex;
+    for (size_t i = 0; i < BitsToBytes(ldpc_config.NumCbCodewLen()); i++) {
+      dataprint << " " << std::setw(2)
+                << std::to_integer<int>(
+                       reinterpret_cast<std::byte*>(encoded_buffer_temp_)[i]);
+    }
+    AGORA_LOG_INFO("ldpc output (%zu %zu %zu): %s\n", frame_id, symbol_idx,
+                   ue_id, dataprint.str().c_str());
+  }
   int8_t* mod_buffer_ptr = cfg_->GetModBitsBuf(mod_bits_buffer_, dir_, frame_id,
                                                symbol_idx, ue_id, cur_cb_id);
 
   if (kPrintRawMacData && dir_ == Direction::kUplink) {
     std::printf("Encoded data - placed at location (%zu %zu %zu) %zu\n",
-                frame_id, symbol_idx, ue_id, (size_t)mod_buffer_ptr);
+                frame_id, symbol_idx, ue_id,
+                reinterpret_cast<intptr_t>(mod_buffer_ptr));
   }
   AdaptBitsForMod(reinterpret_cast<uint8_t*>(encoded_buffer_temp_),
                   reinterpret_cast<uint8_t*>(mod_buffer_ptr),
                   BitsToBytes(ldpc_config.NumCbCodewLen()),
                   cfg_->ModOrderBits(dir_));
 
-  if (kPrintEncodedData == true) {
+  if (kPrintEncodedData) {
     std::printf("Encoded data\n");
-    size_t num_mod = cfg_->SubcarrierPerCodeBlock(dir_);
+    const size_t num_mod = cfg_->SubcarrierPerCodeBlock(dir_);
     for (size_t i = 0; i < num_mod; i++) {
       std::printf("%u ", *(mod_buffer_ptr + i));
     }
     std::printf("\n");
   }
 
-  size_t duration = GetTime::WorkerRdtsc() - start_tsc;
+  const size_t duration = GetTime::WorkerRdtsc() - start_tsc;
   duration_stat_->task_duration_[0] += duration;
   duration_stat_->task_count_++;
   if (GetTime::CyclesToUs(duration, cfg_->FreqGhz()) > 500) {

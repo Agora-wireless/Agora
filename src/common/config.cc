@@ -286,6 +286,9 @@ Config::Config(std::string jsonfilename)
   bs_mac_tx_port_ = tdd_conf.value("bs_mac_tx_port", kMacBaseRemotePort);
   bs_mac_rx_port_ = tdd_conf.value("bs_mac_rx_port", kMacBaseLocalPort);
 
+  log_listener_addr_ = tdd_conf.value("log_listener_addr", "");
+  log_listener_port_ = tdd_conf.value("log_listener_port", 33300);
+
   /* frame configurations */
   cp_len_ = tdd_conf.value("cp_size", 0);
   ofdm_ca_num_ = tdd_conf.value("fft_size", 2048);
@@ -1197,6 +1200,8 @@ void Config::GenData() {
                       GetInfoBits(ul_bits_, Direction::kUplink, i, j, k),
                       ul_num_bytes_per_cb_);
           scrambler->Scramble(ul_scramble_buffer, ul_num_bytes_per_cb_);
+          std::memset(&ul_scramble_buffer[ul_num_bytes_per_cb_], 0u,
+                      kLdpcHelperFunctionInputBufferSizePaddingBytes);
           ldpc_input = ul_scramble_buffer;
         } else {
           ldpc_input = GetInfoBits(ul_bits_, Direction::kUplink, i, j, k);
@@ -1312,6 +1317,8 @@ void Config::GenData() {
                       GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k),
                       dl_num_bytes_per_cb_);
           scrambler->Scramble(dl_scramble_buffer, dl_num_bytes_per_cb_);
+          std::memset(&dl_scramble_buffer[dl_num_bytes_per_cb_], 0u,
+                      kLdpcHelperFunctionInputBufferSizePaddingBytes);
           ldpc_input = dl_scramble_buffer;
         } else {
           ldpc_input = GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k);
