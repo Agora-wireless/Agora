@@ -377,6 +377,7 @@ class Config {
   inline Table<int8_t>& UlModBits() { return this->ul_mod_bits_; }
   inline Table<complex_float>& UlIqF() { return this->ul_iq_f_; }
   inline Table<complex_float>& DlIqF() { return this->dl_iq_f_; }
+  inline Table<std::complex<int16_t>>& UlIqT() { return this->ul_iq_t_; }
   inline Table<std::complex<int16_t>>& DlIqT() { return this->dl_iq_t_; }
 
   // Public functions
