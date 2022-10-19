@@ -362,4 +362,6 @@ static constexpr bool kDebugSenderReceiver = false;
 static constexpr bool kOutputUlScData = true;
 static constexpr size_t kOfdmSymbolPerSlot = 1;
 static constexpr size_t kOutputFrameNum = 1;
+
+static constexpr bool kDebugTxData = false;
 #endif  // SYMBOLS_H_

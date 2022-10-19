@@ -4,126 +4,139 @@
  */
 #include "scrambler.h"
 
+#include <array>
+#include <bitset>
+
+#include "logger.h"
+
 namespace AgoraScrambler {
 
-static const size_t kBitsInitArraySize = 7u;
-static const size_t kStartingVectorSize = (100 * 8);
+static constexpr size_t kBitsInByte = 8u;
+static constexpr size_t kBitsInitArraySize = 7u;
+static constexpr size_t kStartingVectorSize = (64 * 125);
 
 Scrambler::Scrambler()
     : scram_buffer_(kScramblerlength), bit_buffer_(kStartingVectorSize) {}
 
-void Scrambler::ConvertBytesToBits(const int8_t* in_byte_buffer,
+// in byte 0xA5
+// out_bits[7] = msb
+void Scrambler::ConvertBytesToBits(const std::byte* in_byte_buffer,
                                    size_t byte_buffer_size,
-                                   int8_t* out_bit_buffer) {
-  for (size_t i = 0; i < byte_buffer_size; i++) {
-    for (size_t j = 0; j < 8; j++) {
-      out_bit_buffer[i * 8 + j] =
-          (in_byte_buffer[i] & (1 << (7 - j))) >> (7 - j);
+                                   std::byte* out_bit_buffer) {
+  for (size_t byte_num = 0; byte_num < byte_buffer_size; byte_num++) {
+    const size_t out_byte_offset = (byte_num * kBitsInByte);
+    std::byte convert_byte = in_byte_buffer[byte_num];
+    AGORA_LOG_TRACE("byte to convert %0x", static_cast<uint8_t>(convert_byte));
+    for (size_t bit_num = 1; bit_num <= kBitsInByte; bit_num++) {
+      const size_t bit_out_loc = out_byte_offset + (kBitsInByte - bit_num);
+      out_bit_buffer[bit_out_loc] = convert_byte & std::byte(0x01);
+      AGORA_LOG_TRACE("Convert %0x bit %zu value %d at loc %zu",
+                      static_cast<uint8_t>(convert_byte), bit_num,
+                      static_cast<uint8_t>(out_bit_buffer[bit_out_loc]),
+                      bit_out_loc);
+      convert_byte = convert_byte >> 1;
     }
   }
 }
 
-void Scrambler::ConvertBitsToBytes(const int8_t* in_bit_buffer,
+void Scrambler::ConvertBitsToBytes(const std::byte* in_bit_buffer,
                                    size_t byte_buffer_size,
-                                   int8_t* out_byte_buffer) {
-  for (size_t i = 0; i < byte_buffer_size; i++) {
-    out_byte_buffer[i] = 0;
-    for (size_t j = 0; j < 8; j++) {
-      out_byte_buffer[i] <<= 1;
-      out_byte_buffer[i] += in_bit_buffer[i * 8 + j];
+                                   std::byte* out_byte_buffer) {
+  for (size_t byte_num = 0; byte_num < byte_buffer_size; byte_num++) {
+    const size_t byte_offset = (byte_num * kBitsInByte);
+    out_byte_buffer[byte_num] = std::byte(0x0);
+    for (size_t bit_num = 0; bit_num < kBitsInByte; bit_num++) {
+      const size_t bit_in_loc = byte_offset + bit_num;
+      out_byte_buffer[byte_num] =
+          (in_bit_buffer[bit_in_loc] | (out_byte_buffer[byte_num] << 1));
+      AGORA_LOG_TRACE("Convert %0x bit %zu value %d at loc %zu",
+                      static_cast<uint8_t>(out_byte_buffer[byte_num]), bit_num,
+                      static_cast<uint8_t>(in_bit_buffer[bit_in_loc]),
+                      bit_in_loc);
     }
   }
 }
 
-void Scrambler::WlanScrambler(void* byte_buffer, size_t byte_buffer_size,
-                              std::vector<int8_t>& scram_buffer,
-                              std::vector<int8_t>& bit_buffer) {
-  auto* byte_buffer_ptr = reinterpret_cast<int8_t*>(byte_buffer);
-  std::array<int8_t, kBitsInitArraySize> b_scrambler_init_bits;
-  std::array<int8_t, kBitsInitArraySize> scrambler_init_bits;
-  int8_t tmp;
-  size_t j;
+void Scrambler::WlanScrambler(void* output_buffer, const void* input_buffer,
+                              size_t num_bytes,
+                              std::bitset<kScramblerlength>& scram_buffer,
+                              std::vector<std::byte>& bit_buffer) {
+  auto* input_buffer_ptr = reinterpret_cast<const std::byte*>(input_buffer);
+  auto* output_buffer_ptr = reinterpret_cast<std::byte*>(output_buffer);
+
+  std::bitset<kBitsInitArraySize> scrambler_init_bits{kScramblerInitState};
+
   size_t buff_size;
-  int8_t res_xor;
+  std::bitset<1> res_xor;
+
+  //scram_buffer.reset();
 
   // Make sure there is enough room in each of the vectors
   // reserve will save the size of the largest call to prevent
   // memory reallocation (high water mark) 0 init vectors
-  scram_buffer.reserve(kScramblerlength);
-  scram_buffer.resize(kScramblerlength);
-  std::fill(scram_buffer.begin(), scram_buffer.end(), 0);
-
-  size_t bit_bufffer_size = byte_buffer_size * 8;
+  const size_t bit_bufffer_size = num_bytes * kBitsInByte;
   bit_buffer.reserve(bit_bufffer_size);
   bit_buffer.resize(bit_bufffer_size);
-  std::fill(bit_buffer.begin(), bit_buffer.end(), 0);
 
-  ConvertBytesToBits(&byte_buffer_ptr[0], byte_buffer_size, bit_buffer.data());
+  ConvertBytesToBits(input_buffer_ptr, num_bytes, bit_buffer.data());
 
   // Do scrambling
-  if (byte_buffer_size != 0) {
+  if (num_bytes != 0) {
     // Generate scrambler initial state array
-    for (int8_t& scrambler_init_bit : scrambler_init_bits) {
-      scrambler_init_bit = 0;
-    }
-    j = 1;
-    tmp = kScramblerInitState;
-    while ((j <= 7) && (tmp > 0)) {
-      scrambler_init_bits[j - 1] = tmp % 2;
-      tmp /= 2;
-      j++;
-    }
-
-    // Inverse the initial state array
-    for (size_t i = 0; i < 7; i++) {
-      b_scrambler_init_bits.at(i) = scrambler_init_bits.at(6 - i);
-    }
-    for (size_t i = 0; i < 7; i++) {
-      scrambler_init_bits.at(i) = b_scrambler_init_bits.at(i);
-    }
+    // Inverse the initial state array?  Skip?
+    //scrambler_init_bits;
 
     // Generate the scrambling sequence using the generator polynomial
-    buff_size = byte_buffer_size * 8;
-    if (buff_size > 127) {
-      buff_size = 127;
+    buff_size = num_bytes * kBitsInByte;
+    if (buff_size > scram_buffer.size()) {
+      buff_size = scram_buffer.size();
     }
-    for (j = 0; j < buff_size; j++) {
+    for (size_t i = 0; i < buff_size; i++) {
       //  x7 xor x4
-      res_xor = static_cast<int8_t>((scrambler_init_bits.at(0) != 0) !=
-                                    (scrambler_init_bits.at(3) != 0));
-      scram_buffer.at(j) = res_xor;
+      res_xor[0] = scrambler_init_bits[0] ^ scrambler_init_bits[3];
+      scram_buffer[i] = res_xor[0];
       //  Left-shift
       for (size_t i = 0; i < 6; i++) {
-        scrambler_init_bits.at(i) = scrambler_init_bits.at(i + 1);
+        scrambler_init_bits[i] = scrambler_init_bits[i + 1];
       }
       //  Update x1
-      scrambler_init_bits.at(6) = res_xor;
+      scrambler_init_bits[6] = res_xor[0];
     }
 
     // Generate scrambled sequence by xor-ing input to the scrambling sequence
-    j = 0;
-    for (size_t i = 0; i < byte_buffer_size * 8; i++) {
+    size_t j = 0;
+    for (size_t i = 0; i < bit_bufffer_size; i++) {
       if (j == buff_size) {
         j = 1;
       } else {
         j++;
       }
-
-      bit_buffer.at(i) = static_cast<signed char>(
-          (bit_buffer.at(i) != 0) != (scram_buffer.at(j - 1) != 0));
+      bit_buffer.at(i) =
+          bit_buffer.at(i) ^ std::byte(0x01 & scram_buffer[j - 1]);
     }
   }
-  ConvertBitsToBytes(bit_buffer.data(), byte_buffer_size, &byte_buffer_ptr[0]);
+  ConvertBitsToBytes(bit_buffer.data(), num_bytes, output_buffer_ptr);
 }
 
-void Scrambler::Scramble(void* byte_buffer, size_t byte_buffer_size) {
-  WlanScrambler(byte_buffer, byte_buffer_size, this->scram_buffer_,
-                this->bit_buffer_);
+void Scrambler::Scramble(void* scrambled, const void* to_scramble,
+                         size_t bytes_to_scramble) {
+  WlanScrambler(scrambled, to_scramble, bytes_to_scramble, scram_buffer_,
+                bit_buffer_);
 }
 
-void Scrambler::Descramble(void* byte_buffer, size_t byte_buffer_size) {
-  WlanScrambler(byte_buffer, byte_buffer_size, this->scram_buffer_,
-                this->bit_buffer_);
+void Scrambler::Scramble(void* inout_bytes, size_t bytes_to_scramble) {
+  WlanScrambler(inout_bytes, inout_bytes, bytes_to_scramble, scram_buffer_,
+                bit_buffer_);
+}
+
+void Scrambler::Descramble(void* descrambled, const void* scrambled,
+                           size_t bytes_to_descramble) {
+  WlanScrambler(descrambled, scrambled, bytes_to_descramble, scram_buffer_,
+                bit_buffer_);
+}
+void Scrambler::Descramble(void* inout_bytes, size_t bytes_to_descramble) {
+  WlanScrambler(inout_bytes, inout_bytes, bytes_to_descramble, scram_buffer_,
+                bit_buffer_);
 }
 
 };  // namespace AgoraScrambler

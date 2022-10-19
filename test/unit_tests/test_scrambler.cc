@@ -95,7 +95,7 @@ TEST(WLAN_Scrambler, fixed_input_scramble_uint8_t) {
  * The expected output is the same as the test data, which is scrambled and
  * then descrambled.
  */
-TEST(WLAN_Scrambler, random_input_scramble_descramble) {
+TEST(WLAN_Scrambler, random_input_scramble_descramble_inplace) {
   int8_t* byte_buffer;
   int8_t* byte_buffer_orig;
   byte_buffer = (int8_t*)std::calloc(kNumInputBytes, sizeof(int8_t));
@@ -113,6 +113,42 @@ TEST(WLAN_Scrambler, random_input_scramble_descramble) {
   scrambler->Scramble(byte_buffer, kNumInputBytes);
 
   // Descramble
+  scrambler->Descramble(byte_buffer, kNumInputBytes);
+
+  for (size_t i = 0; i < kNumInputBytes; i++) {
+    ASSERT_EQ(byte_buffer[i], byte_buffer_orig[i]);
+  }
+
+  std::free(byte_buffer);
+  std::free(byte_buffer_orig);
+}
+
+/**
+ * @brief  random_input_scramble_descramble
+ *
+ * The test data is generated inside the test as random integers of 1 byte.
+ *
+ * The expected output is the same as the test data, which is scrambled and
+ * then descrambled.
+ */
+TEST(WLAN_Scrambler, random_input_scramble_descramble) {
+  int8_t* byte_buffer;
+  int8_t* byte_buffer_orig;
+  byte_buffer = (int8_t*)std::calloc(kNumInputBytes, sizeof(int8_t));
+  byte_buffer_orig = (int8_t*)std::calloc(kNumInputBytes, sizeof(int8_t));
+
+  auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
+
+  srand(time(nullptr));
+  for (size_t i = 0; i < kNumInputBytes; i++) {
+    byte_buffer_orig[i] = rand() % 128 - 127;
+  }
+
+  // Scramble (don't modify the input)
+  scrambler->Scramble(byte_buffer, (const int8_t*)byte_buffer_orig,
+                      kNumInputBytes);
+
+  // Descramble (inplace)
   scrambler->Descramble(byte_buffer, kNumInputBytes);
 
   for (size_t i = 0; i < kNumInputBytes; i++) {
