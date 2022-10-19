@@ -286,6 +286,9 @@ Config::Config(std::string jsonfilename)
   bs_mac_tx_port_ = tdd_conf.value("bs_mac_tx_port", kMacBaseRemotePort);
   bs_mac_rx_port_ = tdd_conf.value("bs_mac_rx_port", kMacBaseLocalPort);
 
+  log_listener_addr_ = tdd_conf.value("log_listener_addr", "");
+  log_listener_port_ = tdd_conf.value("log_listener_port", 33300);
+
   /* frame configurations */
   cp_len_ = tdd_conf.value("cp_size", 0);
   ofdm_ca_num_ = tdd_conf.value("fft_size", 2048);
