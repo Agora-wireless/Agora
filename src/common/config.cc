@@ -1178,6 +1178,8 @@ void Config::GenData() {
                       GetInfoBits(ul_bits_, Direction::kUplink, i, j, k),
                       ul_num_bytes_per_cb_);
           scrambler->Scramble(ul_scramble_buffer, ul_num_bytes_per_cb_);
+          std::memset(&ul_scramble_buffer[ul_num_bytes_per_cb_], 0u,
+                      kLdpcHelperFunctionInputBufferSizePaddingBytes);
           ldpc_input = ul_scramble_buffer;
         } else {
           ldpc_input = GetInfoBits(ul_bits_, Direction::kUplink, i, j, k);
@@ -1226,9 +1228,13 @@ void Config::GenData() {
 
       for (size_t j = 0; j < ofdm_data_num_; j++) {
         const size_t sc = j + ofdm_data_start_;
-        int8_t* mod_input_ptr =
-            GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, u, j);
-        ul_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, ul_mod_table_);
+        if (i >= this->frame_.ClientUlPilotSymbols()) {
+          int8_t* mod_input_ptr =
+              GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, u, j);
+          ul_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, ul_mod_table_);
+        } else {
+          ul_iq_f_[i][q + j] = ue_specific_pilot_[u][j];
+        }
         // FFT Shift
         const size_t k = sc >= ofdm_ca_num_ / 2 ? sc - ofdm_ca_num_ / 2
                                                 : sc + ofdm_ca_num_ / 2;
@@ -1287,6 +1293,8 @@ void Config::GenData() {
                       GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k),
                       dl_num_bytes_per_cb_);
           scrambler->Scramble(dl_scramble_buffer, dl_num_bytes_per_cb_);
+          std::memset(&dl_scramble_buffer[dl_num_bytes_per_cb_], 0u,
+                      kLdpcHelperFunctionInputBufferSizePaddingBytes);
           ldpc_input = dl_scramble_buffer;
         } else {
           ldpc_input = GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k);
