@@ -274,7 +274,6 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
     }
     rxp_->Init(this, cfg_, hw_framer);
     rxp_->Setup();
-
     txs_ = dev_->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CS16, enabled_channels,
                              sargs);
 
@@ -487,7 +486,7 @@ void RadioSoapySdr::Deactivate() {
 
 int RadioSoapySdr::Tx(const void* const* tx_buffs, size_t tx_size,
                       Radio::TxFlags flags, long long& tx_time_ns) {
-  constexpr size_t kTxTimeoutUs = 1000000;
+  constexpr size_t kTxTimeoutUs = 10000;  // 10ms
 
   int soapy_flags;
   if (flags == Radio::TxFlags::kTxFlagNone) {

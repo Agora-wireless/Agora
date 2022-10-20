@@ -115,6 +115,8 @@ void TxRxWorkerClientHw::DoTxRx() {
   //Beacon has been detected...
   long long time0 = EstablishTime0(local_interface);
   ///\todo make sure we are "real time"
+  AGORA_LOG_INFO("DoTxRx[%zu]: radio %zu established time0 %lld\n", tid_,
+                 local_interface + interface_offset_, time0);
 
   size_t rx_frame_id = 0;
   size_t rx_symbol_id = 0;
@@ -550,8 +552,11 @@ void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
     const int tx_status = radio_.RadioTx(radio_id, tx_data.data(),
                                          samples_per_symbol, flags_tx, tx_time);
     if (tx_status < static_cast<int>(samples_per_symbol)) {
-      std::cout << "BAD Write (UL): For Ue " << radio_id << " " << tx_status
-                << "/" << samples_per_symbol << std::endl;
+      AGORA_LOG_ERROR(
+          "TxRxWorkerClientHw[%zu]: RadioTx status failed with code: %d For Ue "
+          "radio %zu for %zu bytes and flags %d\n",
+          tid_, tx_status, radio_id, samples_per_symbol,
+          static_cast<int>(flags_tx));
     }
     if (kDebugPrintInTask) {
       AGORA_LOG_INFO(
@@ -598,12 +603,12 @@ void TxRxWorkerClientHw::TxPilot(size_t pilot_ant, size_t frame_id,
   const int tx_status = radio_.RadioTx(pilot_radio, tx_data.data(),
                                        samples_per_symbol, flags_tx, tx_time);
 
-  if (tx_status < 0) {
-    std::cout << "BAD Radio Tx: (PILOT)" << tx_status << "For Ue Radio "
-              << pilot_radio << "/" << samples_per_symbol << std::endl;
-  } else if (tx_status != static_cast<int>(samples_per_symbol)) {
-    std::cout << "BAD Radio Tx: (PILOT)" << tx_status << "For Ue Radio "
-              << pilot_radio << "/" << samples_per_symbol << std::endl;
+  if (tx_status < static_cast<int>(samples_per_symbol)) {
+    AGORA_LOG_ERROR(
+        "TxRxWorkerClientHw[%zu]: RadioTx (Pilot) status failed with code: %d "
+        "For Ue radio %zu for %zu bytes and flags %d\n",
+        tid_, tx_status, pilot_radio, samples_per_symbol,
+        static_cast<int>(flags_tx));
   }
 
   if (kDebugPrintInTask) {
@@ -695,6 +700,9 @@ void TxRxWorkerClientHw::WaitDetectBeacon(size_t local_interface) {
   RtAssert(beacon_detect_window < samples_per_frame,
            "Frame must be greater than the beacon detect window");
 
+  AGORA_LOG_INFO("TxRxWorkerClientHw [%zu]: Waiting for beacon on radio %zu\n",
+                 tid_, local_interface + interface_offset_);
+
   //Turns out detecting more than 1 beacon is helpful for the start
   size_t beacons_detected = 0;
   while ((beacons_detected < kBeaconsToStart) && Configuration()->Running()) {
@@ -747,7 +755,7 @@ long long TxRxWorkerClientHw::EstablishTime0(size_t local_interface) {
             adjust_samples = sync_index - Configuration()->BeaconLen() -
                              Configuration()->OfdmTxZeroPrefix();
             AGORA_LOG_INFO(
-                "TxRxWorkerClientHw [%zu]: Initial Sync - radio %zu, frame "
+                "TxRxWorkerClientHw [%zu]: Initial Sync - ant %zu, frame "
                 "%zu, symbol %zu sync_index: %ld, rx sample offset: %ld time0 "
                 "%lld\n",
                 tid_, (local_interface + interface_offset_) + ch, frame_id,
@@ -781,13 +789,13 @@ bool TxRxWorkerClientHw::DoResync(const std::vector<Packet*>& check_pkts,
       adjust_samples = 0;
       AGORA_LOG_WARN(
           "TxRxWorkerClientHw [%zu]: Re-syncing ignored due to excess "
-          "offset %ld - channel %zu, sync_index: %ld\n ",
+          "offset %ld - channel %zu, sync_index: %ld\n",
           tid_, adjust, kSyncDetectChannel, sync_index);
     } else {
       adjust_samples = adjust;
       AGORA_LOG_INFO(
           "TxRxWorkerClientHw [%zu]: Re-syncing channel %zu, "
-          "sync_index: %ld, rx sample offset: %ld\n ",
+          "sync_index: %ld, rx sample offset: %ld\n",
           tid_, kSyncDetectChannel, sync_index, adjust_samples);
       //Display all the other channels
       if (kDebugBeaconChannels) {
@@ -834,8 +842,7 @@ bool TxRxWorkerClientHw::ResyncOnBeacon(size_t frame_id,
       if (resync_retry_cnt_ > kReSyncRetryCount) {
         AGORA_LOG_ERROR(
             "TxRxWorkerClientHw [%zu]: Exceeded resync retry limit (%zu) "
-            "for reached after %zu resync successes at frame: %zu.  "
-            "Stopping!\n",
+            "reached after %zu resync successes at frame: %zu. Stopping!\n",
             tid_, kReSyncRetryCount, resync_success_cnt_, frame_id);
         Configuration()->Running(false);
       }
