@@ -1190,7 +1190,7 @@ void Config::GenData() {
         LdpcEncodeHelper(ul_ldpc_config_.BaseGraph(),
                          ul_ldpc_config_.ExpansionFactor(),
                          ul_ldpc_config_.NumRows(), coded_bits_ptr,
-                         ul_temp_parity_buffer, ul_scramble_buffer);
+                         ul_temp_parity_buffer, ldpc_input);
         int8_t* mod_input_ptr =
             GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, j, k);
         AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
@@ -1303,7 +1303,7 @@ void Config::GenData() {
         LdpcEncodeHelper(dl_ldpc_config_.BaseGraph(),
                          dl_ldpc_config_.ExpansionFactor(),
                          dl_ldpc_config_.NumRows(), coded_bits_ptr,
-                         dl_temp_parity_buffer, dl_scramble_buffer);
+                         dl_temp_parity_buffer, ldpc_input);
         int8_t* mod_input_ptr =
             GetModBitsBuf(dl_mod_bits_, Direction::kDownlink, 0, i, j, k);
         AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
