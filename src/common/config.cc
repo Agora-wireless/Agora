@@ -19,6 +19,7 @@
 #include "message.h"
 #include "modulation.h"
 #include "scrambler.h"
+#include "simd_types.h"
 #include "utils_ldpc.h"
 
 using json = nlohmann::json;
@@ -1152,8 +1153,9 @@ void Config::GenData() {
   const size_t ul_num_blocks_per_symbol =
       this->ul_ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
 
-  // Used as an input ptr to
-  auto* ul_scramble_buffer = new int8_t[Roundup<64>(ul_num_bytes_per_cb_)]();
+  SimdAlignByteVector ul_scramble_buffer(
+      ul_num_bytes_per_cb_ + ul_num_padding_bytes_per_cb_, std::byte(0));
+
   int8_t* ldpc_input = nullptr;
 
   // Encode uplink bits
@@ -1176,14 +1178,15 @@ void Config::GenData() {
                             j * ul_ldpc_config_.NumBlocksInSymbol() + k];
 
         if (scramble_enabled_) {
-          std::memcpy(ul_scramble_buffer,
-                      GetInfoBits(ul_bits_, Direction::kUplink, i, j, k),
-                      ul_num_bytes_per_cb_);
-          scrambler->Scramble(ul_scramble_buffer, ul_num_bytes_per_cb_);
-          ldpc_input = ul_scramble_buffer;
+          scrambler->Scramble(
+              ul_scramble_buffer.data(),
+              GetInfoBits(ul_bits_, Direction::kUplink, i, j, k),
+              ul_num_bytes_per_cb_);
+          ldpc_input = ul_scramble_buffer.data();
         } else {
           ldpc_input = GetInfoBits(ul_bits_, Direction::kUplink, i, j, k);
         }
+        //Clean padding
         std::memset(&ldpc_input[ul_num_bytes_per_cb_], 0u,
                     ul_num_padding_bytes_per_cb_);
 
@@ -1268,7 +1271,8 @@ void Config::GenData() {
   const size_t dl_num_blocks_per_symbol =
       this->dl_ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
 
-  auto* dl_scramble_buffer = new int8_t[Roundup<64>(dl_num_bytes_per_cb_)]();
+  SimdAlignByteVector dl_scramble_buffer(
+      dl_num_bytes_per_cb_ + dl_num_padding_bytes_per_cb_, std::byte(0));
 
   Table<int8_t> dl_encoded_bits;
   dl_encoded_bits.Malloc(this->frame_.NumDLSyms() * dl_num_blocks_per_symbol,
@@ -1289,11 +1293,11 @@ void Config::GenData() {
                             j * dl_ldpc_config_.NumBlocksInSymbol() + k];
 
         if (scramble_enabled_) {
-          std::memcpy(dl_scramble_buffer,
-                      GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k),
-                      dl_num_bytes_per_cb_);
-          scrambler->Scramble(dl_scramble_buffer, dl_num_bytes_per_cb_);
-          ldpc_input = dl_scramble_buffer;
+          scrambler->Scramble(
+              dl_scramble_buffer.data(),
+              GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k),
+              dl_num_bytes_per_cb_);
+          ldpc_input = dl_scramble_buffer.data();
         } else {
           ldpc_input = GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k);
         }
@@ -1448,7 +1452,6 @@ void Config::GenData() {
   dl_encoded_bits.Free();
   ul_encoded_bits.Free();
   FreeBuffer1d(&pilot_ifft);
-  delete[] ul_scramble_buffer;
   delete[] dl_scramble_buffer;
 }
 
