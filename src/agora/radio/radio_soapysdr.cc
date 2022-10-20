@@ -123,7 +123,6 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
       // remote::type = faros for hub controlled radios
       args["remote:mtu"] = "1500";
       args["remote:ipver"] = "6";
-      sargs["SYNC_ACTIVATE"] = "false";
     } else {
       args["driver"] = "uhd";
       args["addr"] = SerialNumber();
