@@ -111,13 +111,13 @@ EventData DoEncode::Launch(size_t tag) {
 
   int8_t* ldpc_input = tx_data_ptr;
   const size_t num_bytes_per_cb = cfg_->NumBytesPerCb(dir_);
+  const size_t num_padding_bytes_per_cb = cfg_->NumPaddingBytesPerCb(dir_);
 
   if (this->cfg_->ScrambleEnabled()) {
     scrambler_->Scramble(scrambler_buffer_, ldpc_input, num_bytes_per_cb);
     ldpc_input = scrambler_buffer_;
   }
-  std::memset(&ldpc_input[num_bytes_per_cb], 0u,
-              cfg_->NumPaddingBytesPerCb(Direction::kUplink));
+  std::memset(&ldpc_input[num_bytes_per_cb], 0u, num_padding_bytes_per_cb);
 
   if (kDebugTxData) {
     std::stringstream dataprint;
