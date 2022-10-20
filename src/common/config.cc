@@ -1182,7 +1182,7 @@ void Config::GenData() {
               ul_scramble_buffer.data(),
               GetInfoBits(ul_bits_, Direction::kUplink, i, j, k),
               ul_num_bytes_per_cb_);
-          ldpc_input = ul_scramble_buffer.data();
+          ldpc_input = reinterpret_cast<int8_t*>(ul_scramble_buffer.data());
         } else {
           ldpc_input = GetInfoBits(ul_bits_, Direction::kUplink, i, j, k);
         }
@@ -1297,7 +1297,7 @@ void Config::GenData() {
               dl_scramble_buffer.data(),
               GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k),
               dl_num_bytes_per_cb_);
-          ldpc_input = dl_scramble_buffer.data();
+          ldpc_input = reinterpret_cast<int8_t*>(dl_scramble_buffer.data());
         } else {
           ldpc_input = GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k);
         }
@@ -1452,7 +1452,6 @@ void Config::GenData() {
   dl_encoded_bits.Free();
   ul_encoded_bits.Free();
   FreeBuffer1d(&pilot_ifft);
-  delete[] dl_scramble_buffer;
 }
 
 Config::~Config() {

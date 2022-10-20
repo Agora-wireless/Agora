@@ -163,7 +163,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         scrambler->Scramble(ul_scrambler_buffer.data(), ul_cb_bytes);
       }
       std::memset(&ul_scrambler_buffer.at(ul_cb_bytes), 0u, ul_cb_padding);
-      this->GenCodeblock(Direction::kUplink, ul_scrambler_buffer.data(),
+      this->GenCodeblock(Direction::kUplink,
+                         reinterpret_cast<int8_t*>(ul_scrambler_buffer.data()),
                          ul_encoded_codewords.at(cb));
     }
 
@@ -461,7 +462,6 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   /* ------------------------------------------------
    * Generate data for downlink test
    * ------------------------------------------------ */
-  const size_t dl_cb_bytes = cfg_->NumBytesPerCb(Direction::kDownlink);
   const LDPCconfig dl_ldpc_config =
       this->cfg_->LdpcConfig(Direction::kDownlink);
   const size_t dl_cb_bytes = cfg_->NumBytesPerCb(Direction::kDownlink);
@@ -563,9 +563,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       if (this->cfg_->ScrambleEnabled()) {
         scrambler->Scramble(dl_scrambler_buffer.data(), dl_cb_bytes);
       }
-      std::memset(&dl_scrambler_buffer.at(dl_cb_byte)], 0u,
-                  dl_cb_padding);
-      this->GenCodeblock(Direction::kDownlink, dl_scrambler_buffer.data(),
+      std::memset(&dl_scrambler_buffer.at(dl_cb_bytes), 0u, dl_cb_padding);
+      this->GenCodeblock(Direction::kDownlink,
+                         reinterpret_cast<int8_t*>(dl_scrambler_buffer.data()),
                          dl_encoded_codewords.at(cb));
     }
 
