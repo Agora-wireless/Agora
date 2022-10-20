@@ -36,9 +36,7 @@ DoEncode::DoEncode(Config* in_config, int in_tid, Direction dir,
                                  cfg_->LdpcConfig(dir).ExpansionFactor())));
   assert(encoded_buffer_temp_ != nullptr);
 
-  const size_t scrambler_buffer_bytes =
-      Roundup<64>(cfg_->NumBytesPerCb(dir)) +
-      kLdpcHelperFunctionInputBufferSizePaddingBytes;
+  const size_t scrambler_buffer_bytes = Roundup<64>(cfg_->NumBytesPerCb(dir));
   scrambler_buffer_ = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64, scrambler_buffer_bytes));
   std::memset(scrambler_buffer_, 0u, scrambler_buffer_bytes);
@@ -110,19 +108,20 @@ EventData DoEncode::Launch(size_t tag) {
         cfg_->GetInfoBits(raw_data_buffer_, dir_, symbol_idx, ue_id, cur_cb_id);
   }
 
-  if (kInPlaceScramble || this->cfg_->ScrambleEnabled() == false) {
-    std::memcpy(scrambler_buffer_, tx_data_ptr, cfg_->NumBytesPerCb(dir_));
-  }
+  int8_t* ldpc_input = tx_data_ptr;
+
   if (this->cfg_->ScrambleEnabled()) {
     if (kInPlaceScramble) {
+      std::memcpy(scrambler_buffer_, ldpc_input, cfg_->NumBytesPerCb(dir_));
       scrambler_->Scramble(scrambler_buffer_, cfg_->NumBytesPerCb(dir_));
     } else {
-      scrambler_->Scramble(scrambler_buffer_, tx_data_ptr,
+      scrambler_->Scramble(scrambler_buffer_, ldpc_input,
                            cfg_->NumBytesPerCb(dir_));
     }
+    ldpc_input = scrambler_buffer_;
   }
-  std::memset(&scrambler_buffer_[cfg_->NumBytesPerCb(dir_)], 0u,
-              kLdpcHelperFunctionInputBufferSizePaddingBytes);
+  std::memset(&ldpc_input[cfg_->NumBytesPerCb(dir_)], 0u,
+              cfg_->NumPaddingBytesPerCb(Direction::kUplink));
 
   if (kDebugTxData) {
     std::stringstream dataprint;

@@ -61,8 +61,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   //    LdpcEncodingInputBufSize(this->cfg_->LdpcConfig().BaseGraph(),
   //                             this->cfg_->LdpcConfig().ExpansionFactor());
 
-  auto* ul_scrambler_buffer =
-      new int8_t[ul_cb_bytes + kLdpcHelperFunctionInputBufferSizePaddingBytes];
+  auto* ul_scrambler_buffer = new int8_t[Roundup<64>(ul_cb_bytes)];
 
   // Step 1: Generate the information buffers (MAC Packets) and LDPC-encoded
   // buffers for uplink
@@ -164,7 +163,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         scrambler->Scramble(ul_scrambler_buffer, ul_cb_bytes);
       }
       std::memset(&ul_scrambler_buffer[ul_cb_bytes], 0u,
-                  kLdpcHelperFunctionInputBufferSizePaddingBytes);
+                  this->cfg_->NumPaddingBytesPerCb(Direction::kUplink));
       this->GenCodeblock(Direction::kUplink, ul_scrambler_buffer,
                          ul_encoded_codewords.at(cb));
     }
@@ -465,8 +464,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
    * ------------------------------------------------ */
   size_t dl_cb_bytes = cfg_->NumBytesPerCb(Direction::kDownlink);
   LDPCconfig dl_ldpc_config = this->cfg_->LdpcConfig(Direction::kDownlink);
-  auto* dl_scrambler_buffer =
-      new int8_t[dl_cb_bytes + kLdpcHelperFunctionInputBufferSizePaddingBytes];
+  auto* dl_scrambler_buffer = new int8_t[Roundup<64>(dl_cb_bytes)];
   if (this->cfg_->Frame().NumDLSyms() > 0) {
     const size_t num_dl_mac_bytes =
         this->cfg_->MacBytesNumPerframe(Direction::kDownlink);
@@ -561,7 +559,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         scrambler->Scramble(dl_scrambler_buffer, dl_cb_bytes);
       }
       std::memset(&dl_scrambler_buffer[dl_cb_bytes], 0u,
-                  kLdpcHelperFunctionInputBufferSizePaddingBytes);
+                  this->cfg_->NumPaddingBytesPerCb(Direction::kDownlink));
       this->GenCodeblock(Direction::kDownlink, dl_scrambler_buffer,
                          dl_encoded_codewords.at(cb));
     }
