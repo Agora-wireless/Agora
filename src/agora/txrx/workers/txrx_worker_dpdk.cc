@@ -211,7 +211,7 @@ std::vector<Packet*> TxRxWorkerDpdk::RecvEnqueue(uint16_t port_id,
           queue_id);
 
       // Push kPacketRX event into the queue.
-      EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
+      const EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
       NotifyComplete(rx_message);
       rx_packets.push_back(pkt);
     }
@@ -274,7 +274,7 @@ size_t TxRxWorkerDpdk::DequeueSend() {
       AGORA_LOG_ERROR("TxRxWorkerDpdk[%zu]: rte_eth_tx_burst() failed\n", tid_);
       throw std::runtime_error("TxRxWorkerDpdk: rte_eth_tx_burst() failed");
     }
-    auto complete_event =
+    const auto complete_event =
         EventData(EventType::kPacketTX, current_event.tags_[0]);
     NotifyComplete(complete_event);
   }
