@@ -110,20 +110,19 @@ EventData DoEncode::Launch(size_t tag) {
         cfg_->GetInfoBits(raw_data_buffer_, dir_, symbol_idx, ue_id, cur_cb_id);
   }
 
-  int8_t* ldpc_input = tx_data_ptr;
-
+  if (kInPlaceScramble || this->cfg_->ScrambleEnabled() == false) {
+    std::memcpy(scrambler_buffer_, tx_data_ptr, cfg_->NumBytesPerCb(dir_));
+  }
   if (this->cfg_->ScrambleEnabled()) {
     if (kInPlaceScramble) {
-      std::memcpy(scrambler_buffer_, ldpc_input, cfg_->NumBytesPerCb(dir_));
       scrambler_->Scramble(scrambler_buffer_, cfg_->NumBytesPerCb(dir_));
     } else {
-      scrambler_->Scramble(scrambler_buffer_, ldpc_input,
+      scrambler_->Scramble(scrambler_buffer_, tx_data_ptr,
                            cfg_->NumBytesPerCb(dir_));
     }
-    std::memset(&scrambler_buffer_[cfg_->NumBytesPerCb(dir_)], 0u,
-                kLdpcHelperFunctionInputBufferSizePaddingBytes);
-    ldpc_input = scrambler_buffer_;
   }
+  std::memset(&scrambler_buffer_[cfg_->NumBytesPerCb(dir_)], 0u,
+              kLdpcHelperFunctionInputBufferSizePaddingBytes);
 
   if (kDebugTxData) {
     std::stringstream dataprint;
@@ -131,7 +130,7 @@ EventData DoEncode::Launch(size_t tag) {
     for (size_t i = 0; i < cfg_->NumBytesPerCb(dir_); i++) {
       dataprint << " " << std::setw(2)
                 << std::to_integer<int>(
-                       reinterpret_cast<std::byte*>(ldpc_input)[i]);
+                       reinterpret_cast<std::byte*>(scrambler_buffer_)[i]);
     }
     AGORA_LOG_INFO("ldpc input (%zu %zu %zu): %s\n", frame_id, symbol_idx,
                    ue_id, dataprint.str().c_str());
@@ -139,7 +138,7 @@ EventData DoEncode::Launch(size_t tag) {
 
   LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
                    ldpc_config.NumRows(), encoded_buffer_temp_, parity_buffer_,
-                   ldpc_input);
+                   scrambler_buffer_);
   if (kDebugTxData) {
     std::stringstream dataprint;
     dataprint << std::setfill('0') << std::hex;

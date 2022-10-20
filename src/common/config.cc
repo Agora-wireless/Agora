@@ -1152,7 +1152,6 @@ void Config::GenData() {
   auto* ul_scramble_buffer =
       new int8_t[ul_num_bytes_per_cb_ +
                  kLdpcHelperFunctionInputBufferSizePaddingBytes]();
-  int8_t* ldpc_input = nullptr;
 
   // Encode uplink bits
   Table<int8_t> ul_encoded_bits;
@@ -1173,22 +1172,19 @@ void Config::GenData() {
             ul_encoded_bits[i * ul_num_blocks_per_symbol +
                             j * ul_ldpc_config_.NumBlocksInSymbol() + k];
 
+        std::memcpy(ul_scramble_buffer,
+                    GetInfoBits(ul_bits_, Direction::kUplink, i, j, k),
+                    ul_num_bytes_per_cb_);
         if (scramble_enabled_) {
-          std::memcpy(ul_scramble_buffer,
-                      GetInfoBits(ul_bits_, Direction::kUplink, i, j, k),
-                      ul_num_bytes_per_cb_);
           scrambler->Scramble(ul_scramble_buffer, ul_num_bytes_per_cb_);
-          std::memset(&ul_scramble_buffer[ul_num_bytes_per_cb_], 0u,
-                      kLdpcHelperFunctionInputBufferSizePaddingBytes);
-          ldpc_input = ul_scramble_buffer;
-        } else {
-          ldpc_input = GetInfoBits(ul_bits_, Direction::kUplink, i, j, k);
         }
+        std::memset(&ul_scramble_buffer[ul_num_bytes_per_cb_], 0u,
+                    kLdpcHelperFunctionInputBufferSizePaddingBytes);
 
         LdpcEncodeHelper(ul_ldpc_config_.BaseGraph(),
                          ul_ldpc_config_.ExpansionFactor(),
                          ul_ldpc_config_.NumRows(), coded_bits_ptr,
-                         ul_temp_parity_buffer, ldpc_input);
+                         ul_temp_parity_buffer, ul_scramble_buffer);
         int8_t* mod_input_ptr =
             GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, j, k);
         AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
@@ -1288,22 +1284,19 @@ void Config::GenData() {
             dl_encoded_bits[i * dl_num_blocks_per_symbol +
                             j * dl_ldpc_config_.NumBlocksInSymbol() + k];
 
+        std::memcpy(dl_scramble_buffer,
+                    GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k),
+                    dl_num_bytes_per_cb_);
         if (scramble_enabled_) {
-          std::memcpy(dl_scramble_buffer,
-                      GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k),
-                      dl_num_bytes_per_cb_);
           scrambler->Scramble(dl_scramble_buffer, dl_num_bytes_per_cb_);
-          std::memset(&dl_scramble_buffer[dl_num_bytes_per_cb_], 0u,
-                      kLdpcHelperFunctionInputBufferSizePaddingBytes);
-          ldpc_input = dl_scramble_buffer;
-        } else {
-          ldpc_input = GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k);
         }
+        std::memset(&dl_scramble_buffer[dl_num_bytes_per_cb_], 0u,
+                    kLdpcHelperFunctionInputBufferSizePaddingBytes);
 
         LdpcEncodeHelper(dl_ldpc_config_.BaseGraph(),
                          dl_ldpc_config_.ExpansionFactor(),
                          dl_ldpc_config_.NumRows(), coded_bits_ptr,
-                         dl_temp_parity_buffer, ldpc_input);
+                         dl_temp_parity_buffer, dl_scramble_buffer);
         int8_t* mod_input_ptr =
             GetModBitsBuf(dl_mod_bits_, Direction::kDownlink, 0, i, j, k);
         AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
