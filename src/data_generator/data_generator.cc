@@ -162,7 +162,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       if (this->cfg_->ScrambleEnabled()) {
         scrambler->Scramble(ul_scrambler_buffer.data(), ul_cb_bytes);
       }
-      std::memset(&ul_scrambler_buffer.at(ul_cb_bytes), 0u, ul_cb_padding);
+
+      if (ul_cb_bytes > 0) {
+        std::memset(&ul_scrambler_buffer.at(ul_cb_bytes), 0u, ul_cb_padding);
+      }
       this->GenCodeblock(Direction::kUplink,
                          reinterpret_cast<int8_t*>(ul_scrambler_buffer.data()),
                          ul_encoded_codewords.at(cb));
@@ -465,7 +468,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   const LDPCconfig dl_ldpc_config =
       this->cfg_->LdpcConfig(Direction::kDownlink);
   const size_t dl_cb_bytes = cfg_->NumBytesPerCb(Direction::kDownlink);
-  const size_t dl_cb_padding = kLdpcHelperFunctionInputBufferSizePaddingBytes;
+  const size_t dl_cb_padding = cfg_->NumPaddingBytesPerCb(Direction::kDownlink);
 
   SimdAlignByteVector dl_scrambler_buffer(dl_cb_bytes + dl_cb_padding,
                                           std::byte(0));
@@ -546,12 +549,12 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     std::vector<std::vector<int8_t>> dl_encoded_codewords(num_dl_codeblocks);
     for (size_t cb = 0; cb < num_dl_codeblocks; cb++) {
       // i : symbol -> ue -> cb (repeat)
-      size_t sym_id = cb / (symbol_blocks);
+      const size_t sym_id = cb / (symbol_blocks);
       // ue antenna for code block
-      size_t sym_offset = cb % (symbol_blocks);
-      size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
-      size_t ue_cb_id = sym_offset % dl_ldpc_config.NumBlocksInSymbol();
-      size_t ue_cb_cnt =
+      const size_t sym_offset = cb % (symbol_blocks);
+      const size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
+      const size_t ue_cb_id = sym_offset % dl_ldpc_config.NumBlocksInSymbol();
+      const size_t ue_cb_cnt =
           (sym_id * dl_ldpc_config.NumBlocksInSymbol()) + ue_cb_id;
       int8_t* cb_start = &dl_mac_info.at(ue_id).at(ue_cb_cnt * dl_cb_bytes);
       dl_information.at(cb) =
@@ -563,7 +566,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       if (this->cfg_->ScrambleEnabled()) {
         scrambler->Scramble(dl_scrambler_buffer.data(), dl_cb_bytes);
       }
-      std::memset(&dl_scrambler_buffer.at(dl_cb_bytes), 0u, dl_cb_padding);
+
+      if (dl_cb_padding) {
+        std::memset(&dl_scrambler_buffer.at(dl_cb_bytes), 0u, dl_cb_padding);
+      }
       this->GenCodeblock(Direction::kDownlink,
                          reinterpret_cast<int8_t*>(dl_scrambler_buffer.data()),
                          dl_encoded_codewords.at(cb));
@@ -573,8 +579,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     std::vector<std::vector<complex_float>> dl_modulated_codewords(
         num_dl_codeblocks);
     for (size_t i = 0; i < num_dl_codeblocks; i++) {
-      size_t sym_offset = i % (symbol_blocks);
-      size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
+      const size_t sym_offset = i % (symbol_blocks);
+      const size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
       dl_modulated_codewords.at(i) = this->GetDLModulation(
           dl_encoded_codewords.at(i), ue_specific_pilot[ue_id]);
     }

@@ -117,7 +117,9 @@ EventData DoEncode::Launch(size_t tag) {
     scrambler_->Scramble(scrambler_buffer_, ldpc_input, num_bytes_per_cb);
     ldpc_input = scrambler_buffer_;
   }
-  std::memset(&ldpc_input[num_bytes_per_cb], 0u, num_padding_bytes_per_cb);
+  if (num_padding_bytes_per_cb > 0) {
+    std::memset(&ldpc_input[num_bytes_per_cb], 0u, num_padding_bytes_per_cb);
+  }
 
   if (kDebugTxData) {
     std::stringstream dataprint;

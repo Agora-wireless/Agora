@@ -1157,7 +1157,6 @@ void Config::GenData() {
       ul_num_bytes_per_cb_ + ul_num_padding_bytes_per_cb_, std::byte(0));
 
   int8_t* ldpc_input = nullptr;
-
   // Encode uplink bits
   Table<int8_t> ul_encoded_bits;
   ul_encoded_bits.Malloc(this->frame_.NumULSyms() * ul_num_blocks_per_symbol,
@@ -1187,9 +1186,10 @@ void Config::GenData() {
           ldpc_input = GetInfoBits(ul_bits_, Direction::kUplink, i, j, k);
         }
         //Clean padding
-        std::memset(&ldpc_input[ul_num_bytes_per_cb_], 0u,
-                    ul_num_padding_bytes_per_cb_);
-
+        if (ul_num_bytes_per_cb_ > 0) {
+          std::memset(&ldpc_input[ul_num_bytes_per_cb_], 0u,
+                      ul_num_padding_bytes_per_cb_);
+        }
         LdpcEncodeHelper(ul_ldpc_config_.BaseGraph(),
                          ul_ldpc_config_.ExpansionFactor(),
                          ul_ldpc_config_.NumRows(), coded_bits_ptr,
@@ -1301,8 +1301,10 @@ void Config::GenData() {
         } else {
           ldpc_input = GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k);
         }
-        std::memset(&ldpc_input[dl_num_bytes_per_cb_], 0u,
-                    dl_num_padding_bytes_per_cb_);
+        if (dl_num_padding_bytes_per_cb_ > 0) {
+          std::memset(&ldpc_input[dl_num_bytes_per_cb_], 0u,
+                      dl_num_padding_bytes_per_cb_);
+        }
 
         LdpcEncodeHelper(dl_ldpc_config_.BaseGraph(),
                          dl_ldpc_config_.ExpansionFactor(),
