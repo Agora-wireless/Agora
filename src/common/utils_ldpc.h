@@ -12,6 +12,7 @@
 // Since the LDPC helper function input parameter undergoes 32byte read/write it
 // is necessary to pad the input buffers 32 bytes max (ie 32 will work for all
 // configurations)
+constexpr size_t kLdpcHelperFunctionInputBufferSizePaddingBytes = 32;
 
 LDPC_ADAPTER_P LdpcSelectAdapterFunc(uint16_t zcSize, uint8_t num_ways);
 

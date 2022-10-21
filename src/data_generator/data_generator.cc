@@ -465,7 +465,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   const LDPCconfig dl_ldpc_config =
       this->cfg_->LdpcConfig(Direction::kDownlink);
   const size_t dl_cb_bytes = cfg_->NumBytesPerCb(Direction::kDownlink);
-  const size_t dl_cb_padding = cfg_->NumPaddingBytesPerCb(Direction::kDownlink);
+  const size_t dl_cb_padding = kLdpcHelperFunctionInputBufferSizePaddingBytes;
 
   SimdAlignByteVector dl_scrambler_buffer(dl_cb_bytes + dl_cb_padding,
                                           std::byte(0));
