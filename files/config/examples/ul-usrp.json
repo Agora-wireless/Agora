@@ -8,7 +8,7 @@
     "tx_gain_a": 20,
     "rx_gain_b": 20,
     "tx_gain_b": 20,
-    "sample_rate": 5e6,
+    "sample_rate": 20e6,
     "cp_size": 32,
     "fft_size": 512,
     "ofdm_data_num": 304,
@@ -25,7 +25,7 @@
     "ofdm_rx_zero_prefix_cal_dl": 324,
     "ofdm_rx_zero_prefix_cal_ul": 136,
     "frame_schedule": [
-        "BGGGGGPGGGUUUGGG"
+        "BGGGGGPGGGGGGGGGGGGGGGGGGGGGUUUGGG"
     ],
     "client_ul_pilot_syms": 2,
     "beamsweep": false,
@@ -34,19 +34,19 @@
     "ue_resync_period": 200,
     "ue_channel": "A",
     "ue_rx_gain_a": [
-        20
+        20    
     ],
     "ue_tx_gain_a": [
-        20
+        20    
     ],
     "ue_rx_gain_b": [
-        20
+        20    
     ],
     "ue_tx_gain_b": [
-        20
+        20    
     ],
     "tx_advance": [
-        140
+        -840    
     ],
     "ue_hw_framer": false,
     "hw_framer": false,
@@ -55,12 +55,12 @@
         0
     ],
     /* UE (User) */
-    "ue_core_offset": 12,
+    "ue_core_offset": 32,
     "ue_worker_thread_num": 4,
     "ue_socket_thread_num": 1,
     /* BS (Agora) */
     "core_offset": 0,
     "worker_thread_num": 8,
     "socket_thread_num": 1,
-    "max_frame": 5000
+    "max_frame": 200000
 }

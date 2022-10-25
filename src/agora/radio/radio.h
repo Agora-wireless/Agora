@@ -36,7 +36,7 @@ class Radio {
 
   virtual void Init(const Config* cfg, size_t id, const std::string& serial,
                     const std::vector<size_t>& enabled_channels,
-                    bool hw_framer) = 0;
+                    bool hw_framer, bool isUE) = 0;
   virtual void Setup(const std::vector<double>& tx_gains,
                      const std::vector<double>& rx_gains) = 0;
 
@@ -88,6 +88,7 @@ class Radio {
   std::string serial_number_;
   std::vector<size_t> enabled_channels_;
   bool hw_framer_{false};
+  bool is_ue_{false};
 };
 
 #endif  // RADIO_H_
