@@ -321,7 +321,8 @@ float CommsLib::MeasureTone(std::vector<std::complex<float>> const& samps,
 }
 
 std::vector<size_t> CommsLib::GetDataSc(size_t fft_size, size_t data_sc_num,
-                                        size_t pilot_sc_offset) {
+                                        size_t pilot_sc_offset,
+                                        size_t pilot_sc_spacing) {
   std::vector<size_t> data_sc;
   if (fft_size == kFftSize_80211) {
     // We follow 802.11 PHY format here
@@ -330,15 +331,15 @@ std::vector<size_t> CommsLib::GetDataSc(size_t fft_size, size_t data_sc_num,
                                 38, 39, 40, 41, 42, 44, 45, 46, 47, 48, 49, 50,
                                 51, 52, 53, 54, 55, 56, 58, 59, 60, 61, 62, 63};
     data_sc.assign(sc_ind, sc_ind + 48u);
-  } else {  // Allocate the center subcarriers as data
-    size_t start_sc = (fft_size - data_sc_num) / 2;
-    size_t stop_sc = start_sc + data_sc_num;
-    unused(pilot_sc_offset);
+  } else {
+    // Allocate the center subcarriers as data
+    const size_t start_sc = (fft_size - data_sc_num) / 2;
+    const size_t stop_sc = start_sc + data_sc_num;
     for (size_t i = start_sc; i < stop_sc; i++) {
-      ///\todo temp
-      //if ((i - start_sc) % kPilotSubcarrierSpacing != pilot_sc_offset) {
-      data_sc.push_back(i);
-      //}
+      const size_t sc_cnt = i - start_sc;
+      if ((sc_cnt % pilot_sc_spacing) != pilot_sc_offset) {
+        data_sc.push_back(i);
+      }
     }
   }
   return data_sc;
@@ -364,7 +365,8 @@ std::vector<size_t> CommsLib::GetNullSc(size_t fft_size, size_t data_sc_num) {
 }
 
 std::vector<std::complex<float>> CommsLib::GetPilotScValue(
-    size_t fft_size, size_t data_sc_num, size_t pilot_sc_offset) {
+    size_t fft_size, size_t data_sc_num, size_t pilot_sc_offset,
+    size_t pilot_sc_spacing) {
   std::vector<std::complex<float>> pilot_sc;
   if (fft_size == kFftSize_80211) {
     // We follow 802.11 PHY format here
@@ -376,8 +378,7 @@ std::vector<std::complex<float>> CommsLib::GetPilotScValue(
     const auto zc_seq_double =
         CommsLib::GetSequence(data_sc_num, CommsLib::kLteZadoffChu);
     const auto zc_seq = Utils::DoubleToCfloat(zc_seq_double);
-    for (size_t i = pilot_sc_offset; i < zc_seq.size();
-         i += kPilotSubcarrierSpacing) {
+    for (size_t i = pilot_sc_offset; i < zc_seq.size(); i += pilot_sc_spacing) {
       pilot_sc.push_back(zc_seq.at(i));
     }
   }
@@ -385,7 +386,8 @@ std::vector<std::complex<float>> CommsLib::GetPilotScValue(
 }
 
 std::vector<size_t> CommsLib::GetPilotScIdx(size_t fft_size, size_t data_sc_num,
-                                            size_t pilot_sc_offset) {
+                                            size_t pilot_sc_offset,
+                                            size_t pilot_sc_spacing) {
   std::vector<size_t> pilot_sc;
   if (fft_size == kFftSize_80211) {
     // We follow 802.11 standard here
@@ -396,7 +398,7 @@ std::vector<size_t> CommsLib::GetPilotScIdx(size_t fft_size, size_t data_sc_num,
     const size_t stop_sc = start_sc + data_sc_num;
     // pilot at the center of each RB
     for (size_t i = start_sc + pilot_sc_offset; i < stop_sc;
-         i += kPilotSubcarrierSpacing) {
+         i += pilot_sc_spacing) {
       pilot_sc.push_back(i);
     }
   }
