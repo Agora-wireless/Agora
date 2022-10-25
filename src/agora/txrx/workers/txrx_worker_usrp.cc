@@ -175,7 +175,7 @@ std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(size_t radio_id,
         new (rx.RawPacket()) Packet(frame_id, symbol_id, 0, ant_id + ch);
         rx_packets.push_back(rx.RawPacket());
         // Push kPacketRX event into the queue
-        EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
+        const EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
         NotifyComplete(rx_message);
       }
     }
@@ -256,7 +256,7 @@ int TxRxWorkerUsrp::DequeueSend() {
         tid_, frame_id, symbol_id, ant_id, offset);
   }
 
-  auto complete_event = EventData(EventType::kPacketTX, event.tags_[0]);
+  const auto complete_event = EventData(EventType::kPacketTX, event.tags_[0]);
   NotifyComplete(complete_event);
   return event.tags_[0];
 }
@@ -329,7 +329,7 @@ int TxRxWorkerUsrp::DequeueSend(int frame_id, int symbol_id) {
         tid_, frame_id, symbol_id, ant_id, offset);
   }
 
-  auto complete_event = EventData(EventType::kPacketTX, event.tags_[0]);
+  const auto complete_event = EventData(EventType::kPacketTX, event.tags_[0]);
   NotifyComplete(complete_event);
   return event.tags_[0];
 }
