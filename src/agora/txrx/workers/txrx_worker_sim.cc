@@ -272,7 +272,7 @@ size_t TxRxWorkerSim::DequeueSend() {
         ->Send(reinterpret_cast<std::byte*>(pkt),
                Configuration()->DlPacketLength());
 
-    auto complete_event =
+    const auto complete_event =
         EventData(EventType::kPacketTX, current_event.tags_[0]);
     NotifyComplete(complete_event);
   }
