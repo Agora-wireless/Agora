@@ -186,17 +186,24 @@ void RecorderWorkerHDF5::Init() {
   hdf5_->WriteAttribute("PILOT_SEQ_TYPE", std::string("zadoff-chu"));
 
   // Data subcarriers
-  const auto data_idx = CommsLib::GetDataSc(fft_size, sym_data_sc_num);
+  const size_t ul_pilot_sc_spacing = 1;
+  //with sc_pilot_spacing set to 1, then the offset can be anything but 0
+  const auto data_idx =
+      CommsLib::GetDataSc(fft_size, sym_data_sc_num, 1, ul_pilot_sc_spacing);
   if (data_idx.size() > 0) {
     hdf5_->WriteAttribute("OFDM_DATA_SC", data_idx);
   }
+
+  const size_t ul_pilot_sc_offset = 0;
   // Pilot subcarriers (indexes)
-  const auto pilot_sc_idx = CommsLib::GetPilotScIdx(fft_size, sym_data_sc_num);
+  const auto pilot_sc_idx = CommsLib::GetPilotScIdx(
+      fft_size, sym_data_sc_num, ul_pilot_sc_offset, ul_pilot_sc_spacing);
   if (pilot_sc_idx.size() > 0) {
     hdf5_->WriteAttribute("OFDM_PILOT_SC", pilot_sc_idx);
   }
 
-  const auto pilot_sc = CommsLib::GetPilotScValue(fft_size, sym_data_sc_num);
+  const auto pilot_sc = CommsLib::GetPilotScValue(
+      fft_size, sym_data_sc_num, ul_pilot_sc_offset, ul_pilot_sc_spacing);
   if (pilot_sc.size() > 0) {
     hdf5_->WriteAttribute("OFDM_PILOT_SC_VALS", pilot_sc);
   }

@@ -23,12 +23,6 @@
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 
-///\todo temp *** evaluate
-//static constexpr size_t kPilotSubcarrierSpacing = 12;
-//static constexpr size_t kDefaultPilotScOffset = 6;
-static constexpr size_t kPilotSubcarrierSpacing = 1;
-static constexpr size_t kDefaultPilotScOffset = 0;
-
 static const std::map<std::string, size_t> kBeamformingStr{
     {"ZF", 0}, {"MMSE", 1}, {"MRC", 2}};
 
@@ -60,16 +54,16 @@ class CommsLib {
   static std::vector<std::complex<float>> Modulate(
       const std::vector<int8_t>& in, int type);
 
-  static std::vector<size_t> GetDataSc(
-      size_t fft_size, size_t data_sc_num,
-      size_t pilot_sc_offset = kDefaultPilotScOffset);
+  static std::vector<size_t> GetDataSc(size_t fft_size, size_t data_sc_num,
+                                       size_t pilot_sc_offset,
+                                       size_t pilot_sc_spacing);
   static std::vector<size_t> GetNullSc(size_t fft_size, size_t data_sc_num);
   static std::vector<std::complex<float>> GetPilotScValue(
-      size_t fft_size, size_t data_sc_num,
-      size_t pilot_sc_offset = kDefaultPilotScOffset);
-  static std::vector<size_t> GetPilotScIdx(
-      size_t fft_size, size_t data_sc_num,
-      size_t pilot_sc_offset = kDefaultPilotScOffset);
+      size_t fft_size, size_t data_sc_num, size_t pilot_sc_offset,
+      size_t pilot_sc_spacing);
+  static std::vector<size_t> GetPilotScIdx(size_t fft_size, size_t data_sc_num,
+                                           size_t pilot_sc_offset,
+                                           size_t pilot_sc_spacing);
 
   static MKL_LONG FFT(std::vector<std::complex<float>>& in_out, int fftsize);
   static MKL_LONG IFFT(std::vector<std::complex<float>>& in_out, int fftsize,
