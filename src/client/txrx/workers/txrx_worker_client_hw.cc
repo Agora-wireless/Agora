@@ -538,6 +538,34 @@ void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
       const size_t tx_ant = (radio_id * channels_per_interface_) + ch;
       auto* pkt = GetUlTxPacket(frame_id, tx_symbol_id, tx_ant);
       tx_data.at(ch) = reinterpret_cast<void*>(pkt->data_);
+
+      if (kDebugTxData) {
+        auto* data_truth =
+            &Configuration()
+                 ->UlIqT()[ul_symbol_idx]
+                          [tx_ant * Configuration()->SampsPerSymbol()];
+        auto* data_pkt = reinterpret_cast<std::complex<int16_t>*>(pkt->data_);
+        if (memcmp(data_truth, data_pkt, Configuration()->PacketLength()) ==
+            0) {
+          AGORA_LOG_INFO(
+              "TxRxWorkerClientHw: (Frame %zu Symbol %zu Ant %zu) TX data "
+              "matched UlIqT all %zu samples\n",
+              frame_id, tx_symbol_id, tx_ant,
+              Configuration()->SampsPerSymbol());
+        } else {
+          size_t samps_mismatch = 0;
+          for (size_t i = 0; i < Configuration()->SampsPerSymbol(); i++) {
+            if (data_truth[i] != data_pkt[i]) {
+              samps_mismatch++;
+            }
+          }
+          AGORA_LOG_INFO(
+              "TxRxWorkerClientHw: (Frame %zu Symbol %zu Ant %zu) TX data "
+              "mismatched UlIqT %zu of %zu samples\n",
+              frame_id, tx_symbol_id, tx_ant, samps_mismatch,
+              Configuration()->SampsPerSymbol());
+        }
+      }
     }
 
     if (Configuration()->UeHwFramer()) {
