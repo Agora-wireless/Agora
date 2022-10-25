@@ -106,7 +106,8 @@ std::vector<Packet*> TxRxWorkerClientSim::RecvEnqueue(size_t interface_id) {
           tid_, pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
     }
     // Push kPacketRX event into the queue.
-    EventData rx_message(EventType::kPacketRX, rx_tag_t(rx_placement).tag_);
+    const EventData rx_message(EventType::kPacketRX,
+                               rx_tag_t(rx_placement).tag_);
     NotifyComplete(rx_message);
     rx_packets.push_back(pkt);
   } else if (0 > rx_bytes) {

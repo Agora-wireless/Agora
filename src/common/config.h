@@ -252,6 +252,10 @@ class Config {
     return dir == Direction::kUplink ? this->ul_num_bytes_per_cb_
                                      : this->dl_num_bytes_per_cb_;
   }
+  inline size_t NumPaddingBytesPerCb(Direction dir) const {
+    return dir == Direction::kUplink ? this->ul_num_padding_bytes_per_cb_
+                                     : this->dl_num_padding_bytes_per_cb_;
+  }
   inline size_t MacDataBytesNumPerframe(Direction dir) const {
     return dir == Direction::kUplink ? this->ul_mac_data_bytes_num_perframe_
                                      : this->dl_mac_data_bytes_num_perframe_;
@@ -884,6 +888,10 @@ class Config {
   // Number of bytes per code block
   size_t ul_num_bytes_per_cb_;
   size_t dl_num_bytes_per_cb_;
+
+  // Number of padding bytes per code block
+  size_t ul_num_padding_bytes_per_cb_;
+  size_t dl_num_padding_bytes_per_cb_;
 
   bool fft_in_rru_;  // If true, the RRU does FFT instead of Agora
   const std::string config_filename_;
