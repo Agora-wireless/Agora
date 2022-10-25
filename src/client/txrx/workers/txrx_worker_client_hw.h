@@ -46,6 +46,15 @@ class TxRxWorkerClientHw : public TxRxWorker {
   bool IsRxSymbol(size_t symbol_id);
   void TxUplinkSymbols(size_t radio_id, size_t frame_id, long long time0);
   void TxPilot(size_t pilot_ant, size_t frame_id, long long time0);
+  bool IsTxSymbolNext(size_t radio_id, size_t current_symbol);
+  Radio::TxFlags GetTxFlags(size_t radio_id, size_t tx_symbol_id);
+  void WaitDetectBeacon(size_t local_interface);
+  long long EstablishTime0(size_t local_interface);
+  bool DoResync(const std::vector<Packet*>& check_pkts,
+                ssize_t& adjust_samples);
+  bool ResyncOnBeacon(size_t frame_id, size_t frame_sync_period,
+                      const std::vector<Packet*>& beacon_pkts,
+                      ssize_t& adjust_samples);
 
   //DoRx helper routines
   void InitRxStatus();
@@ -59,6 +68,11 @@ class TxRxWorkerClientHw : public TxRxWorker {
   std::vector<std::vector<std::complex<int16_t>>> frame_storage_;
   std::vector<RxPacket> rx_frame_pkts_;
   std::vector<RxPacket*> rx_pkts_ptrs_;
+
+  //Resync logic
+  bool attempt_resync_ = false;
+  size_t resync_success_cnt_ = 0;
+  size_t resync_retry_cnt_ = 0;
 
   //For each interface.
   std::vector<TxRxWorkerRx::RxStatusTracker> rx_status_;
