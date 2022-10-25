@@ -34,7 +34,8 @@ cdf_ydata = 1. * np.arange(n_rows) / (n_rows - 1)
 for i in range(1, n_cols):
   cdf_xdata = np.sort(arr[:,i])
   plt.plot(cdf_xdata, cdf_ydata)
-if len(sys.argv) == 4:
-  plt.xlabel(sys.argv[2])
+if len(sys.argv) > 3:
+  plt.xlabel(sys.argv[3])
+if len(sys.argv) > 4:
   plt.legend(leg)
 plt.show()
