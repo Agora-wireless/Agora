@@ -53,17 +53,46 @@ void RadioUHDSdr::Close() {
 
 void RadioUHDSdr::Init(const Config* cfg, size_t id, const std::string& serial,
                        const std::vector<size_t>& enabled_channels,
-                       bool hw_framer) {
+                       bool hw_framer, bool isUE) {
+  bool is_ue = isUE;
   if (dev_ == nullptr) {
     AGORA_LOG_TRACE("Init RadioUHDSdr %s(%zu)\n", serial.c_str(), id);
-    Radio::Init(cfg, id, serial, enabled_channels, hw_framer);
+    Radio::Init(cfg, id, serial, enabled_channels, hw_framer, isUE);
 
     std::map<std::string, std::string> args;
     std::map<std::string, std::string> sargs;
 
+    size_t real_num_radios = cfg->NumRadios();
+    AGORA_LOG_INFO("real_num_radios: %zu\n", real_num_radios);
+
+    size_t real_ue_num_radios = cfg->UeNum();
+    AGORA_LOG_INFO("real ue num_radios: %zu\n", real_ue_num_radios);
+
+    if (is_ue){
+      std::vector<std::string> address_list;
+      for (size_t i = 0; i < real_num_radios; i++) {
+        std::ostringstream oss;
+        oss << "addr" << i;
+        address_list.push_back(oss.str());
+        args[address_list.at(i)] = cfg->UeRadioId().at(i);
+        AGORA_LOG_INFO("args addr key is: %s, value is: %s\n", address_list.at(i), cfg->UeRadioId().at(i));
+      }    
+      // args["addr"] = SerialNumber();
+    }
+    else {
+      std::vector<std::string> address_list;
+      for (size_t i = 0; i < real_num_radios; i++) {
+        std::ostringstream oss;
+        oss << "addr" << i;
+        address_list.push_back(oss.str());
+        args[address_list.at(i)] = cfg->RadioId().at(i);
+        AGORA_LOG_INFO("args addr key is: %s, value is: %s\n", address_list.at(i), cfg->RadioId().at(i));
+      }
+    }
+
     args["timeout"] = "1000000";
     args["driver"] = "uhd";
-    args["addr"] = SerialNumber();
+    // args["addr"] = SerialNumber();
     //Need to make sure MTU is acceptable of this (assume 32 bit/4 byte samples)
     const std::string frame_size = std::to_string(cfg->SampsPerSymbol() * 4);
     args["send_frame_size"] = frame_size;
@@ -90,6 +119,8 @@ void RadioUHDSdr::Init(const Config* cfg, size_t id, const std::string& serial,
     device_info << "Hardware = " << dev_->get_mboard_name() << std::endl;
 
     if (kPrintRadioSettings) {
+      AGORA_LOG_INFO("number of mother boards in the device: %d\n", dev_->get_num_mboards());
+
       auto clock_sources = dev_->get_clock_sources(0);
       for ([[maybe_unused]] const auto& source : clock_sources) {
         AGORA_LOG_TRACE("Clock source %s\n", source.c_str());
@@ -468,7 +499,7 @@ void RadioUHDSdr::PrintSettings() const {
     }
   }
 
-  print_message << SerialNumber() << " (" << Id() << ")" << std::endl;
+  // print_message << SerialNumber() << " (" << Id() << ")" << std::endl;
 
   if (kPrintRadioSettings) {
     for (size_t i = 0; i < EnabledChannels().size(); i++) {

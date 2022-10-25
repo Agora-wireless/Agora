@@ -19,7 +19,7 @@ class RadioUHDSdr : public Radio {
 
   virtual void Init(const Config* cfg, size_t id, const std::string& serial,
                     const std::vector<size_t>& enabled_channels,
-                    bool hw_framer) final;
+                    bool hw_framer, bool isUE) final;
   virtual void Setup(const std::vector<double>& tx_gains,
                      const std::vector<double>& rx_gains) final;
 

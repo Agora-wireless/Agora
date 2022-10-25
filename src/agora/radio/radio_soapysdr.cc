@@ -111,10 +111,10 @@ void RadioSoapySdr::Close() {
 void RadioSoapySdr::Init(const Config* cfg, size_t id,
                          const std::string& serial,
                          const std::vector<size_t>& enabled_channels,
-                         bool hw_framer) {
+                         bool hw_framer, bool isUE) {
   if (dev_ == nullptr) {
     AGORA_LOG_TRACE("Init RadioSoapySdr %s(%zu)\n", serial.c_str(), id);
-    Radio::Init(cfg, id, serial, enabled_channels, hw_framer);
+    Radio::Init(cfg, id, serial, enabled_channels, hw_framer, isUE);
 
     SoapySDR::Kwargs args;
     SoapySDR::Kwargs sargs;
