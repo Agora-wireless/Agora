@@ -25,7 +25,7 @@ static constexpr bool kPrintClientBeaconSNR = true;
 static constexpr ssize_t kMaxBeaconAdjust = 5;
 static constexpr bool kThreadedTx = true;
 
-static constexpr bool kDebugRxTimes = true;
+static constexpr bool kDebugRxTimes = false;
 
 TxRxWorkerClientUhd::TxRxWorkerClientUhd(
     size_t core_offset, size_t tid, size_t interface_count,

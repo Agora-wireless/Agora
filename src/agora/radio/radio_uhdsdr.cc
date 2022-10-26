@@ -94,9 +94,9 @@ void RadioUHDSdr::Init(const Config* cfg, size_t id, const std::string& serial,
     args["driver"] = "uhd";
     // args["addr"] = SerialNumber();
     //Need to make sure MTU is acceptable of this (assume 32 bit/4 byte samples)
-    const std::string frame_size = std::to_string(cfg->SampsPerSymbol() * 4);
-    args["send_frame_size"] = frame_size;
-    args["recv_frame_size"] = frame_size;
+    // const std::string frame_size = std::to_string(cfg->SampsPerSymbol() * 4);
+    // args["send_frame_size"] = frame_size;
+    // args["recv_frame_size"] = frame_size;
 
     for (size_t tries = 0; tries < kMakeMaxAttempts; tries++) {
       try {

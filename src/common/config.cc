@@ -660,7 +660,13 @@ Config::Config(std::string jsonfilename)
 
   this->running_.store(true);
   /* 12 bit samples x2 for I + Q */
+#if defined(USE_PURE_UHD)
+  AGORA_LOG_INFO("Traffic calculated based on USRP ADC Settings\n");
+  static const size_t kBitsPerSample = 14 * 2;
+#else
+  AGORA_LOG_INFO("Traffic calculated based on Faros ADC Settings\n");
   static const size_t kBitsPerSample = 12 * 2;
+#endif
   const double bit_rate_mbps = (rate_ * kBitsPerSample) / 1e6;
   //For framer mode, we can ignore the Beacon
   //Double count the UlCal and DLCal to simplify things
@@ -703,7 +709,7 @@ Config::Config(std::string jsonfilename)
       "Basestation Network Traffic Avg  (Mbps): %.3f\n"
       "UE Network Traffic Peak (Mbps): %.3f\n"
       "UE Network Traffic Avg  (Mbps): %.3f\n"
-      "All UEs Network Traffic Avg (Mbps): %.3f\n"
+      "All UEs Network Traffic Peak (Mbps): %.3f\n"
       "All UEs Network Traffic Avg (Mbps): %.3f\n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, ul_modulation_.c_str(),
