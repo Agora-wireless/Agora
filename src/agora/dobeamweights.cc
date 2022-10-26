@@ -509,6 +509,13 @@ void DoBeamWeights::ComputePartialCsiBeams(size_t tag) {
   arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer_),
                         cfg_->BsAntNum(), cfg_->UeAntNum(), false);
 
+  //if (cfg_->Frame().NumDLSyms() > 0) {
+  //  ComputeCalib(frame_id, cur_sc_id, cal_sc_vec);
+  //}
+  if (num_ext_ref_ > 0) {
+    mat_csi.shed_rows(ext_ref_id_);
+  }
+
   float noise = 0;
   if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
     noise = phy_stats_->GetNoise(frame_id);
