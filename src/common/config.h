@@ -892,7 +892,7 @@ class Config {
   size_t ul_num_padding_bytes_per_cb_;
   size_t dl_num_padding_bytes_per_cb_;
 
-  bool fft_in_rru_;  // If true, the RRU does FFT instead of Agora
+  bool fft_in_rru_;     // If true, the RRU does FFT instead of Agora
   double channel_snr_;  // SNR of channels
   // Type of channel model (RAYLEIGH/AWGN/RAN_3GPP)
   std::string channel_type_;

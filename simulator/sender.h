@@ -139,7 +139,7 @@ class Sender {
   // Second dimension: symbol_num_perframe * BS_ANT_NUM
   // Third dimension: (CP_LEN + OFDM_CA_NUM) * 2
   PtrGrid<kNumGeneratedFrames, kMaxSymbols * kMaxAntennas, unsigned short>
-  Table<unsigned short> iq_data_short_;
+      Table<unsigned short> iq_data_short_;
 
   // Number of packets transmitted for each symbol in a frame
   size_t* packet_count_per_symbol_[kFrameWnd];

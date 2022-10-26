@@ -584,7 +584,8 @@ Config::Config(std::string jsonfilename)
            "FFT block size is set to an invalid value - all rx symbols per "
            "frame must fit inside an fft block");
 
-  encode_block_size_ = tdd_conf.value("encode_block_size", 1);  // Scrambler and descrambler configurations
+  // Scrambler and descrambler configurations
+  encode_block_size_ = tdd_conf.value("encode_block_size", 1);
   scramble_enabled_ = tdd_conf.value("wlan_scrambler", true);
 
   // LDPC Coding and Modulation configurations
@@ -681,7 +682,7 @@ Config::Config(std::string jsonfilename)
       "\tFrame time %.3f usec\n"
       "Uplink Max Mac data per-user tp (Mbps) %.3f\n"
       "Downlink Max Mac data per-user tp (Mbps) %.3f\n"
-	  "Channel model %s, SNR: %.2f\n"
+      "Channel model %s, SNR: %.2f\n"
       "Radio Network Traffic Peak (Mbps): %.3f\n"
       "Radio Network Traffic Avg  (Mbps): %.3f\n"
       "Basestation Network Traffic Peak (Mbps): %.3f\n"
@@ -702,9 +703,8 @@ Config::Config(std::string jsonfilename)
           (this->GetFrameDurationSec() * 1e6),
       (dl_mac_data_bytes_num_perframe_ * 8.0f) /
           (this->GetFrameDurationSec() * 1e6),
-      channel_type_.c_str(), channel_snr_,
-      per_bs_radio_traffic * bs_ant_num_, 2 * bit_rate_mbps,
-      per_ue_radio_traffic, 2 * bit_rate_mbps * ue_ant_num_,
+      channel_type_.c_str(), channel_snr_, per_bs_radio_traffic * bs_ant_num_,
+      2 * bit_rate_mbps, per_ue_radio_traffic, 2 * bit_rate_mbps * ue_ant_num_,
       per_ue_radio_traffic * ue_ant_num_);
 
   if (frame_.IsRecCalEnabled()) {

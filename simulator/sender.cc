@@ -557,15 +557,14 @@ void Sender::InitMultiFrameIqFromFile(const std::string& filename) {
       cfg_->Frame().NumTotalSyms() * cfg_->BsAntNum();
 
   PtrGrid<kNumGeneratedFrames, kMaxSymbols * kMaxAntennas, float> iq_data_float(
-      kNumGeneratedFrames, packets_per_frame,
-      (cfg_->SampsPerSymbol()) * 2);
+      kNumGeneratedFrames, packets_per_frame, (cfg_->SampsPerSymbol()) * 2);
 
   FILE* fp = std::fopen(filename.c_str(), "rb");
   RtAssert(fp != nullptr, "Failed to open IQ data file");
 
   for (size_t frame_id = 0; frame_id < kNumGeneratedFrames; frame_id++) {
     for (size_t i = 0; i < packets_per_frame; i++) {
-    const size_t expected_count = (cfg_->SampsPerSymbol()) * 2;
+      const size_t expected_count = (cfg_->SampsPerSymbol()) * 2;
       const size_t actual_count = std::fread(iq_data_float[frame_id][i],
                                              sizeof(float), expected_count, fp);
       if (expected_count != actual_count) {
@@ -583,10 +582,10 @@ void Sender::InitMultiFrameIqFromFile(const std::string& filename) {
             reinterpret_cast<uint8_t*>(multi_frame_iq_data_short_[frame_id][i]),
             expected_count);
       } else {
-      SimdConvertFloatToShort(iq_data_float[frame_id][i], multi_frame_iq_data_short_[frame_id][i],
-                              expected_count);
-
-
+        SimdConvertFloatToShort(iq_data_float[frame_id][i],
+                                multi_frame_iq_data_short_[frame_id][i],
+                                expected_count);
+      }
     }
   }
   std::fclose(fp);

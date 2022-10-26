@@ -13,7 +13,6 @@ static constexpr bool kPrintSNRCheck = false;
 static constexpr bool kPrintCSIFromFile = false;
 static constexpr double kMeanChannelGain = 0.1f;
 
-
 Channel::Channel(const Config* const config, std::string& in_channel_type,
                  double in_channel_snr)
     : cfg_(config),
