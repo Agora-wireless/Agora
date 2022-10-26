@@ -2,13 +2,13 @@
     "serial_file": "files/topology/bs-usrp-addr.json",
     "cells": 1,
     "channel": "A",
-    "frequency": 3e9,
+    "frequency": 1e9,
     "single_gain": true,
-    "rx_gain_a": 20,
-    "tx_gain_a": 20,
-    "rx_gain_b": 20,
-    "tx_gain_b": 20,
-    "sample_rate": 20e6,
+    "rx_gain_a": 15,
+    "tx_gain_a": 15,
+    "rx_gain_b": 15,
+    "tx_gain_b": 15,
+    "sample_rate": 100e6,
     "cp_size": 32,
     "fft_size": 512,
     "ofdm_data_num": 304,
@@ -34,19 +34,19 @@
     "ue_resync_period": 200,
     "ue_channel": "A",
     "ue_rx_gain_a": [
-        20    
+        15    
     ],
     "ue_tx_gain_a": [
-        20    
+        15    
     ],
     "ue_rx_gain_b": [
-        20    
+        15    
     ],
     "ue_tx_gain_b": [
-        20    
+        15    
     ],
     "tx_advance": [
-        -840    
+        -760    
     ],
     "ue_hw_framer": false,
     "hw_framer": false,

@@ -14,7 +14,7 @@
 
 static constexpr size_t kFirstBeaconFrameAdvance = 100;
 static constexpr size_t kTxFrameAdvance = 1;
-static constexpr bool kDebugRxTimes = true;
+static constexpr bool kDebugRxTimes = false;
 
 TxRxWorkerUsrp::TxRxWorkerUsrp(
     size_t core_offset, size_t tid, size_t radio_hi, size_t radio_lo,
