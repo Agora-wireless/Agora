@@ -5,19 +5,12 @@
 #ifndef DOIFFT_H_
 #define DOIFFT_H_
 
-#include <armadillo>
-#include <iostream>
-#include <vector>
-
-#include "buffer.h"
-#include "concurrentqueue.h"
+#include "common_typedef_sdk.h"
 #include "config.h"
 #include "doer.h"
-#include "gettime.h"
+#include "memory_manage.h"
 #include "mkl_dfti.h"
-#include "phy_stats.h"
 #include "stats.h"
-#include "symbols.h"
 
 class DoIFFT : public Doer {
  public:
@@ -56,6 +49,7 @@ class DoIFFT : public Doer {
   DurationStat* duration_stat_;
   DFTI_DESCRIPTOR_HANDLE mkl_handle_;
   float* ifft_out_;  // Buffer for IFFT output
+  complex_float* ifft_shift_tmp_;
   float ifft_scale_factor_;
 };
 

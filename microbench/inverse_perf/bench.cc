@@ -1,8 +1,10 @@
 #include <gflags/gflags.h>
 #include <mkl.h>
-#define ARMA_DONT_PRINT_ERRORS
-#include <armadillo>
+
 #include <iostream>
+
+#define ARMA_DONT_PRINT_ERRORS
+#include "armadillo"
 #include "timer.h"
 
 double freq_ghz = -1.0;  // RDTSC frequency
@@ -33,7 +35,7 @@ std::pair<std::vector<arma::cx_fmat>, double> arma_pseudo_inverses(
         output = arma::inv_sympd(input.t() * input) * input.t();
       } catch (std::runtime_error) {
         std::printf("Failed to invert A. Condition number of input = %.2f\n",
-               arma::cond(input.t() * input));
+                    arma::cond(input.t() * input));
         output = arma::pinv(input);
       }
     } else {
@@ -67,8 +69,8 @@ int main(int argc, char** argv) {
   // Header: "<matrix size> <Microseconds with formula> <Microseconds with SVD>
   // <Speedup with formula>"
   std::printf("%zux%zu %.1f %.1f %.1f\n", FLAGS_n_rows, FLAGS_n_cols,
-         ret_formula.second, ret_svd.second,
-         ret_svd.second / ret_formula.second);
+              ret_formula.second, ret_svd.second,
+              ret_svd.second / ret_formula.second);
 
   double norm_sum = 0.0;
   for (size_t i = 0; i < FLAGS_n_iters; i++) {

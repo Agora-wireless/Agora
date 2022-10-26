@@ -1,0 +1,64 @@
+{
+    "serial_file": "files/topology/topology-merlin.json",
+    "cells": 1,
+    "channel": "A",
+    "frequency": 3.6e9,
+    "rx_gain_a": 65,
+    "tx_gain_a": 81,
+    "rx_gain_b": 65,
+    "tx_gain_b": 81,
+    "sample_rate": 3.84e6,
+    "ofdm_tx_zero_prefix": 160,
+    "ofdm_tx_zero_postfix": 160,
+    "ofdm_rx_zero_prefix_bs": 160,
+    "ofdm_rx_zero_prefix_client": 160,
+    "ofdm_rx_zero_prefix_cal_dl": 288,
+    "ofdm_rx_zero_prefix_cal_ul": 168,
+    "cp_size": 32,
+    "fft_size": 512,
+    "ofdm_data_num": 304,
+    "dl_mcs": {
+        "modulation": "16QAM",
+        "Zc": 16
+    },
+    "ul_mcs": {
+        "modulation": "16QAM",
+        "Zc": 18
+    },
+    "beamsweep": true,
+    "beacon_antenna": 0,
+    "frame_schedule": [
+        "BGGGGGPGGGGGGUUUGGG"
+    ],
+    "client_ul_pilot_syms": 2,
+    "ue_radio_num": 1,
+    "ue_channel": "A",
+    "ue_rx_gain_a": [
+        85
+    ],
+    "ue_tx_gain_a": [
+        95
+    ],
+    "ue_rx_gain_b": [
+        85
+    ],
+    "ue_tx_gain_b": [
+        95
+    ],
+    "tx_advance": [
+        140
+    ],
+    "ue_hw_framer": false,
+    "hw_framer": true,
+    /* Compute configuration */
+    "exclude_cores": [],
+    "ue_core_offset": 7,
+    "ue_worker_thread_num": 4,
+    "ue_socket_thread_num": 2,
+    "core_offset": 0,
+    "worker_thread_num": 4,
+    "demul_block_size": 48,
+    "ue_demul_block_size": 48,
+    "socket_thread_num": 2,
+    "max_frame": 1000
+}

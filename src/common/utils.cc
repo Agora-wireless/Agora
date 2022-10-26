@@ -2,14 +2,22 @@
 // RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 
 /**
- * @file utils.cpp
+ * @file utils.cc
  * @brief Utility functions for file and text processing.
  */
 
 #include "utils.h"
 
+#include <numa.h>
+
+#include <cassert>
+#include <iomanip>   // std::setw
+#include <iostream>  // std::cout, std::endl
 #include <list>
 #include <mutex>
+#include <tuple>
+
+#include "datatype_conversion.h"
 
 struct CoreInfo {
   CoreInfo(size_t id, size_t mapped, size_t req, ThreadType type)
@@ -132,9 +140,9 @@ size_t GetPhysicalCoreId(size_t core_id) {
   return core;
 }
 
-int PinToCore(int core_id) {
+int PinToCore(size_t core_id) {
   int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
-  if ((core_id < 0) || (core_id >= num_cores)) {
+  if (static_cast<int>(core_id) >= num_cores) {
     return -1;
   }
 
@@ -146,8 +154,8 @@ int PinToCore(int core_id) {
   return pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset);
 }
 
-void PinToCoreWithOffset(ThreadType thread_type, int core_offset, int thread_id,
-                         bool verbose) {
+void PinToCoreWithOffset(ThreadType thread_type, size_t core_offset,
+                         size_t thread_id, bool allow_reuse, bool verbose) {
   std::scoped_lock lock(pin_core_mutex);
 
   if (kEnableThreadPinning == true) {
@@ -159,7 +167,7 @@ void PinToCoreWithOffset(ThreadType thread_type, int core_offset, int thread_id,
 
     size_t assigned_core = GetCoreId(requested_core);
 
-    if (kEnableCoreReuse == false) {
+    if (allow_reuse == false) {
       // Check to see if core has already been assigned
       //(faster search is possible here but isn't necessary)
       for (auto& assigned : core_list) {
@@ -175,7 +183,7 @@ void PinToCoreWithOffset(ThreadType thread_type, int core_offset, int thread_id,
     if (PinToCore(assigned_core) != 0) {
       std::fprintf(
           stderr,
-          "%s thread %d: failed to pin to core %zu. Exiting. This can happen "
+          "%s thread %zu: failed to pin to core %zu. Exiting. This can happen "
           "if the machine has insufficient cores. Set kEnableThreadPinning to "
           "false to run Agora to run despite this - performance will be low.\n",
           ThreadTypeStr(thread_type).c_str(), thread_id, assigned_core);
@@ -188,7 +196,7 @@ void PinToCoreWithOffset(ThreadType thread_type, int core_offset, int thread_id,
 
       core_list.insert(insertion_point, new_assignment);
       if (verbose == true) {
-        std::printf("%s thread %d: pinned to core %zu, requested core %zu \n",
+        std::printf("%s thread %zu: pinned to core %zu, requested core %zu \n",
                     ThreadTypeStr(thread_type).c_str(), thread_id,
                     assigned_core, requested_core);
       }
@@ -209,76 +217,90 @@ std::vector<size_t> Utils::StrToChannels(const std::string& channel) {
 }
 
 std::vector<std::complex<int16_t>> Utils::DoubleToCint16(
-    std::vector<std::vector<double>> in) {
-  int len = in[0].size();
+    const std::vector<std::vector<double>>& in) {
+  const int len = in.at(0).size();
+  assert(in.size() == 2 && (in.at(0).size() == in.at(1).size()));
   std::vector<std::complex<int16_t>> out(len, 0);
   for (int i = 0; i < len; i++) {
-    out[i] = std::complex<int16_t>((int16_t)(in[0][i] * 32768),
-                                   (int16_t)(in[1][i] * 32768));
+    out.at(i) = std::complex<int16_t>(
+        static_cast<int16_t>(in.at(0).at(i) * kShrtFltConvFactor),
+        static_cast<int16_t>(in.at(1).at(i) * kShrtFltConvFactor));
   }
   return out;
 }
 
 std::vector<std::complex<float>> Utils::DoubleToCfloat(
-    std::vector<std::vector<double>> in) {
-  int len = in[0].size();
+    const std::vector<std::vector<double>>& in) {
+  const int len = in.at(0).size();
+  assert(in.size() == 2 && (in.at(0).size() == in.at(1).size()));
   std::vector<std::complex<float>> out(len, 0);
   for (int i = 0; i < len; i++) {
-    out[i] = std::complex<float>(in[0][i], in[1][i]);
+    out.at(i) = std::complex<float>(in.at(0).at(i), in.at(1).at(i));
   }
   return out;
 }
 
 std::vector<std::complex<float>> Utils::Uint32tocfloat(
-    std::vector<uint32_t> in, const std::string& order) {
+    const std::vector<uint32_t>& in, const std::string& order) {
   int len = in.size();
   std::vector<std::complex<float>> out(len, 0);
   for (size_t i = 0; i < in.size(); i++) {
-    auto arr_hi_int = static_cast<int16_t>(in[i] >> 16);
-    auto arr_lo_int = static_cast<int16_t>(in[i] & 0x0FFFF);
-
-    float arr_hi = (float)arr_hi_int / 32768.0;
-    float arr_lo = (float)arr_lo_int / 32768.0;
+    const auto arr_hi_int = static_cast<int16_t>(in.at(i) >> 16);
+    const auto arr_lo_int = static_cast<int16_t>(in.at(i) & 0x0FFFF);
+    const float arr_hi = static_cast<float>(arr_hi_int) / kShrtFltConvFactor;
+    const float arr_lo = static_cast<float>(arr_lo_int) / kShrtFltConvFactor;
 
     if (order == "IQ") {
       std::complex<float> csamp(arr_hi, arr_lo);
-      out[i] = csamp;
+      out.at(i) = csamp;
     } else if (order == "QI") {
       std::complex<float> csamp(arr_lo, arr_hi);
-      out[i] = csamp;
+      out.at(i) = csamp;
     }
   }
   return out;
 }
 
+std::vector<std::complex<float>> Utils::Cint16ToCfloat32(
+    const std::vector<std::complex<int16_t>>& in) {
+  std::vector<std::complex<float>> samps(in.size());
+  std::transform(in.begin(), in.end(), samps.begin(),
+                 [](std::complex<int16_t> ci) {
+                   return std::complex<float>(ci.real() / kShrtFltConvFactor,
+                                              ci.imag() / kShrtFltConvFactor);
+                 });
+  return samps;
+}
+
 std::vector<uint32_t> Utils::Cint16ToUint32(
-    std::vector<std::complex<int16_t>> in, bool conj,
+    const std::vector<std::complex<int16_t>>& in, bool conj,
     const std::string& order) {
   std::vector<uint32_t> out(in.size(), 0);
   for (size_t i = 0; i < in.size(); i++) {
-    auto re = static_cast<uint16_t>(in[i].real());
-    auto im = static_cast<uint16_t>(conj ? -in[i].imag() : in[i].imag());
+    auto re = static_cast<uint16_t>(in.at(i).real());
+    auto im = static_cast<uint16_t>(conj ? -in.at(i).imag() : in.at(i).imag());
     if (order == "IQ") {
-      out[i] = (uint32_t)re << 16 | im;
+      out.at(i) = (uint32_t)re << 16 | im;
     } else if (order == "QI") {
-      out[i] = (uint32_t)im << 16 | re;
+      out.at(i) = (uint32_t)im << 16 | re;
     }
   }
   return out;
 }
 
 std::vector<uint32_t> Utils::Cfloat32ToUint32(
-    std::vector<std::complex<float>> in, bool conj, const std::string& order) {
+    const std::vector<std::complex<float>>& in, bool conj,
+    const std::string& order) {
   std::vector<uint32_t> out(in.size(), 0);
   for (size_t i = 0; i < in.size(); i++) {
-    auto re =
-        static_cast<uint16_t>(static_cast<int16_t>(in[i].real() * 32768.0));
-    auto im = static_cast<uint16_t>(
-        static_cast<int16_t>((conj ? -in[i].imag() : in[i].imag()) * 32768));
+    auto re = static_cast<uint16_t>(
+        static_cast<int16_t>(in.at(i).real() * kShrtFltConvFactor));
+    auto im = static_cast<uint16_t>(static_cast<int16_t>(
+        (conj ? -in.at(i).imag() : in.at(i).imag()) * kShrtFltConvFactor));
     if (order == "IQ") {
-      out[i] = (uint32_t)re << 16 | im;
+      out.at(i) = (uint32_t)re << 16 | im;
     } else if (order == "QI") {
-      out[i] = (uint32_t)im << 16 | re;
+      out.at(i) = (uint32_t)im << 16 | re;
     }
   }
   return out;
@@ -293,8 +315,8 @@ std::vector<std::vector<size_t>> Utils::LoadSymbols(
 
   for (size_t f = 0; f < num_frames; f++) {
     std::string frame = frames.at(f);
-    for (size_t g = 0; g < frame.length(); g++) {
-      if (frame.at(g) == sym) {
+    for (char g : frame) {
+      if (g == sym) {
         symbol_index_vector.at(f).push_back(g);
       }
     }
@@ -336,8 +358,8 @@ void Utils::LoadData(const char* filename,
     if (ret < 0) {
       break;
     }
-    data[i] =
-        std::complex<int16_t>(int16_t(real * 32768), int16_t(imag * 32768));
+    data.at(i) = std::complex<int16_t>(int16_t(real * kShrtFltConvFactor),
+                                       int16_t(imag * kShrtFltConvFactor));
   }
   std::fclose(fp);
 }
@@ -347,7 +369,7 @@ void Utils::LoadData(const char* filename, std::vector<unsigned>& data,
   FILE* fp = std::fopen(filename, "r");
   data.resize(samples);
   for (int i = 0; i < samples; i++) {
-    int ret = fscanf(fp, "%u", &data[i]);
+    int ret = fscanf(fp, "%u", &data.at(i));
     if (ret < 0) {
       break;
     }
@@ -366,7 +388,7 @@ void Utils::LoadTddConfig(const std::string& filename, std::string& jconfig) {
   }
 
   else {
-    std::printf("Unable to open config file %s\n", filename.c_str());
+    std::printf("Unable to open config file \"%s\"\n", filename.c_str());
   }
 }
 
@@ -380,20 +402,30 @@ std::vector<std::string> Utils::Split(const std::string& s, char delimiter) {
   return tokens;
 }
 
-void Utils::PrintVector(std::vector<std::complex<int16_t>>& data) {
-  for (auto& i : data) {
+void Utils::PrintVector(const std::vector<std::complex<int16_t>>& data) {
+  for (const auto& i : data) {
     std::cout << real(i) << " " << imag(i) << std::endl;
   }
 }
 
 void Utils::WriteBinaryFile(const std::string& name, size_t elem_size,
                             size_t buffer_size, void* buff) {
-  FILE* f_handle = std::fopen(name.c_str(), "wb");
-  std::fwrite(buff, elem_size, buffer_size, f_handle);
-  std::fclose(f_handle);
+  auto* f_handle = std::fopen(name.c_str(), "wb");
+  if (f_handle == nullptr) {
+    throw std::runtime_error("Failed to open binary file " + name);
+  }
+
+  const auto write_status = std::fwrite(buff, elem_size, buffer_size, f_handle);
+  if (write_status != buffer_size) {
+    throw std::runtime_error("Failed to write binary file " + name);
+  }
+  const auto close_status = std::fclose(f_handle);
+  if (close_status != 0) {
+    throw std::runtime_error("Failed to close binary file " + name);
+  }
 }
 
-void Utils::SaveMat(arma::cx_fmat c, const std::string& filename,
+void Utils::SaveMat(const arma::cx_fmat& c, const std::string& filename,
                     const std::string& ss, const bool append) {
   std::stringstream so;
   std::ofstream of;
@@ -417,7 +449,7 @@ void Utils::SaveMat(arma::cx_fmat c, const std::string& filename,
   of.close();
 }
 
-void Utils::PrintMat(arma::cx_fmat c, const std::string& ss) {
+void Utils::PrintMat(const arma::cx_fmat& c, const std::string& ss) {
   std::stringstream so;
   so << ss << " = [";
   for (size_t i = 0; i < c.n_cols; i++) {
@@ -433,7 +465,7 @@ void Utils::PrintMat(arma::cx_fmat c, const std::string& ss) {
   std::cout << so.str();
 }
 
-void Utils::SaveVec(arma::cx_fvec c, const std::string& filename,
+void Utils::SaveVec(const arma::cx_fvec& c, const std::string& filename,
                     const std::string& ss, const bool append) {
   std::stringstream so;
   std::ofstream of;
@@ -453,7 +485,7 @@ void Utils::SaveVec(arma::cx_fvec c, const std::string& filename,
   of.close();
 }
 
-void Utils::PrintVec(arma::cx_fvec c, const std::string& ss) {
+void Utils::PrintVec(const arma::cx_fvec& c, const std::string& ss) {
   std::stringstream so;
   so << ss << " = [";
   for (size_t j = 0; j < c.size(); j++) {

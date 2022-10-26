@@ -1,0 +1,24 @@
+{
+    "bs_radio_num": 8,
+    "ue_radio_num": 8,
+    "frame_schedule": [
+        "PUUUUUUUUUUUUU"
+    ],
+    "ul_mcs" : {
+      "modulation": "64QAM",
+      "code_rate": 0.333
+    },
+    "bs_server_addr": "127.0.0.1",
+    "bs_rru_addr": "127.0.0.1",
+    "fft_size": 2048,
+    "ofdm_data_num": 1200,
+    "demul_block_size": 64,
+    "freq_orthogonal_pilot": true,
+    /* Compute configuration */
+    "core_offset": 4,
+    "exclude_cores": [
+        0
+    ],
+    "worker_thread_num": 22,
+    "socket_thread_num": 1
+}

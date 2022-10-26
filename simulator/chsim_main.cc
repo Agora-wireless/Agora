@@ -5,6 +5,7 @@
 #include <gflags/gflags.h>
 
 #include "channel_sim.h"
+#include "logger.h"
 #include "version_config.h"
 
 DEFINE_uint64(bs_threads, 1,
@@ -16,8 +17,10 @@ DEFINE_uint64(
     "Number of worker threads handling packet transmissions to BS and UE "
     "Antennas");
 DEFINE_uint64(core_offset, 0, "Core ID of the first channel_sim thread");
-DEFINE_string(conf_file, TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim.json",
-              "Config filename");
+DEFINE_string(
+    conf_file,
+    TOSTRING(PROJECT_DIRECTORY) "/files/config/ci/tddconfig-sim-both.json",
+    "Config filename");
 DEFINE_string(chan_model, "RAYLEIGH",
               "Simulator Channel Type: RAYLEIGH/AWGN/RAN_3GPP");
 DEFINE_double(chan_snr, 20.0, "Signal-to-Noise Ratio");
@@ -26,6 +29,7 @@ int main(int argc, char* argv[]) {
   int ret = EXIT_FAILURE;
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   gflags::SetVersionString(GetAgoraProjectVersion());
+  AGORA_LOG_INIT();
   std::printf("Base Station configuration\n");
   auto config = std::make_unique<Config>(FLAGS_conf_file);
   {
@@ -38,7 +42,7 @@ int main(int argc, char* argv[]) {
           config.get(), FLAGS_bs_threads, FLAGS_ue_threads,
           FLAGS_worker_threads, FLAGS_core_offset, FLAGS_chan_model,
           FLAGS_chan_snr);
-      sim->Start();
+      sim->Run();
       ret = EXIT_SUCCESS;
     } catch (SignalException& e) {
       std::cerr << "chsim: SignalException: " << e.what() << std::endl;
@@ -48,5 +52,6 @@ int main(int argc, char* argv[]) {
   std::printf("Channel Simulator Exit\n");
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
+  AGORA_LOG_SHUTDOWN();
   return ret;
 }

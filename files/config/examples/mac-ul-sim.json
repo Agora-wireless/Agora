@@ -1,0 +1,39 @@
+{
+  /* General Settings */
+  "cells": 1,
+  "bs_radio_num": 8,
+  "ue_radio_num": 1,
+  "beamsweep": true,
+  "beacon_antenna": 0,
+  /* Waveform Parameters */
+  "fft_size": 512,
+  "ofdm_data_num": 400,
+  "demul_block_size": 48,
+  "cp_size": 32,
+  "ul_mcs" : {
+    "modulation": "16QAM",
+    "code_rate": 0.333
+  },
+  "ofdm_tx_zero_prefix": 160,
+  "ofdm_tx_zero_postfix": 160,
+  "ofdm_rx_zero_prefix_bs": 160,
+  "frequency": 3.6e9,
+  "rate": 7.68e6,
+  /* Frame definition */
+  "frame_schedule": [
+    "BPGUUUUG"
+  ],
+  "client_ul_pilot_syms": 2,
+  /* compute configuration */
+  "bs_mac_rx_port": 8070,
+  "bs_mac_tx_port": 8080,
+  "core_offset": 0,
+  "worker_thread_num": 8,
+  "socket_thread_num": 1,
+  "ue_mac_rx_port": 9070,
+  "ue_mac_tx_port": 9080,
+  "ue_core_offset": 11,
+  "ue_worker_thread_num": 2,
+  "ue_socket_thread_num": 1,
+  "max_frame": 9600
+}

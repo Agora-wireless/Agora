@@ -12,17 +12,20 @@
 #include <thread>
 #include <vector>
 
-#include "buffer.h"
+#include "common_typedef_sdk.h"
 #include "comms-lib.h"
 #include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "datatype_conversion.h"
 #include "mac_thread_client.h"
+#include "message.h"
 #include "modulation.h"
+#include "packet_txrx.h"
 #include "phy_stats.h"
+#include "recorder_thread.h"
+#include "simd_types.h"
 #include "stats.h"
-#include "txrx_client.h"
 #include "ue_worker.h"
 
 class PhyUe {
@@ -34,10 +37,6 @@ class PhyUe {
     kMacTxComplete = 0x04,
     kFrameComplete = (kDownlinkComplete | kMacTxComplete | kUplinkTxComplete)
   };
-
-  // dequeue bulk size, used to reduce the overhead of dequeue in main
-  // thread
-  static const int kDequeueBulkSizeTXRX = 8;
 
   explicit PhyUe(Config* config);
   ~PhyUe();
@@ -55,7 +54,7 @@ class PhyUe {
                           size_t symbol_id);
   void PrintPerFrameDone(PrintType print_type, size_t frame_id);
 
-  void ReceiveDownlinkSymbol(struct Packet* rx_packet, size_t tag);
+  void ReceiveDownlinkSymbol(Packet* rx_packet, size_t tag);
   void ScheduleDefferedDownlinkSymbols(size_t frame_id);
   void ClearCsi(size_t frame_id);
 
@@ -125,10 +124,7 @@ class PhyUe {
    * entries: TX_THREAD_NUM * TX_BUFFER_FRAME_NUM * UE_NUM * DL_SYM_PER_FRAME
    */
   char* tx_buffer_;
-  int* tx_buffer_status_;
-
   size_t tx_buffer_size_;
-  int tx_buffer_status_size_;
 
   /**
    * Data for IFFT, (prefix added)
@@ -157,7 +153,7 @@ class PhyUe {
   Table<complex_float> modul_buffer_;
 
   // Remote unit
-  std::unique_ptr<RadioTxRx> ru_;
+  std::unique_ptr<PacketTxRx> ru_;
 
   /**
    * Received data
@@ -182,14 +178,14 @@ class PhyUe {
    * First dimension: OFDM_CA_NUM * kFrameWnd
    * Second dimension: BS_ANT_NUM * UE_NUM
    */
-  std::vector<myVec> csi_buffer_;
+  Table<complex_float> csi_buffer_;
 
   /**
    * Data after equalization
    * First dimension: data_symbol_num_perframe * kFrameWnd
    * Second dimension: OFDM_CA_NUM * UE_NUM
    */
-  std::vector<myVec> equal_buffer_;
+  std::vector<SimdAlignCxFltVector> equal_buffer_;
 
   // Data after demodulation. Each buffer has kMaxModType * number of OFDM
   // data subcarriers
@@ -237,5 +233,6 @@ class PhyUe {
   FrameCounters tomac_counters_;
 
   size_t max_equaled_frame_ = 0;
+  std::vector<std::unique_ptr<Agora_recorder::RecorderThread>> recorders_;
 };
 #endif  // PHY_UE_H_

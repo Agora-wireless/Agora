@@ -15,29 +15,15 @@
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
-#include <numa.h>
-#include <pthread.h>
-#include <unistd.h>
-
-#include <armadillo>
-#include <atomic>
-#include <chrono>
 #include <complex>
-#include <condition_variable>
-#include <csignal>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <fstream>  // std::ifstream
-#include <iomanip>
-#include <iostream>
-#include <mutex>
 #include <random>
-#include <sstream>
 #include <string>
-#include <thread>
 #include <vector>
 
+#include "armadillo"
 #include "symbols.h"
 
 // Default argument is to exclude core 0 from the list
@@ -48,10 +34,11 @@ void SetCpuLayoutOnNumaNodes(
 size_t GetPhysicalCoreId(size_t core_id);
 
 /* Pin this thread to core with global index = core_id */
-int PinToCore(int core_id);
+int PinToCore(size_t core_id);
 
 /* Pin this thread to core (base_core_offset + thread_id) */
-void PinToCoreWithOffset(ThreadType thread, int base_core_offset, int thread_id,
+void PinToCoreWithOffset(ThreadType thread, size_t base_core_offset,
+                         size_t thread_id, bool allow_reuse = false,
                          bool verbose = false);
 
 void PrintCoreAssignmentSummary();
@@ -62,24 +49,6 @@ struct EventHandlerContext {
   int id_;
 };
 
-template <class C, void* (C::*run_thread)(size_t)>
-void* PthreadFunWrapper(void* context) {
-  auto* eh_context = static_cast<EventHandlerContext<C>*>(context);
-  C* obj = reinterpret_cast<C*>(eh_context->obj_ptr_);
-  int id = eh_context->id_;
-  delete eh_context;
-  return (obj->*run_thread)(id);
-}
-
-template <class C, void (C::*run_thread)(size_t)>
-void PthreadFunWrapper(void* context) {
-  auto* eh_context = static_cast<EventHandlerContext<C>*>(context);
-  C* obj = reinterpret_cast<C*>(eh_context->obj_ptr_);
-  int id = eh_context->id_;
-  delete eh_context;
-  return (obj->*run_thread)(id);
-}
-
 class Utils {
  public:
   Utils();
@@ -87,16 +56,19 @@ class Utils {
 
   static std::vector<size_t> StrToChannels(const std::string& channel);
   static std::vector<std::complex<int16_t>> DoubleToCint16(
-      std::vector<std::vector<double>> in);
+      const std::vector<std::vector<double>>& in);
   static std::vector<std::complex<float>> DoubleToCfloat(
-      std::vector<std::vector<double>> in);
+      const std::vector<std::vector<double>>& in);
   static std::vector<std::complex<float>> Uint32tocfloat(
-      std::vector<uint32_t> in, const std::string& order);
+      const std::vector<uint32_t>& in, const std::string& order);
+  static std::vector<std::complex<float>> Cint16ToCfloat32(
+      const std::vector<std::complex<int16_t>>& in);
   static std::vector<uint32_t> Cint16ToUint32(
-      std::vector<std::complex<int16_t>> in, bool conj,
+      const std::vector<std::complex<int16_t>>& in, bool conj,
       const std::string& order);
   static std::vector<uint32_t> Cfloat32ToUint32(
-      std::vector<std::complex<float>> in, bool conj, const std::string& order);
+      const std::vector<std::complex<float>>& in, bool conj,
+      const std::string& order);
   static std::vector<std::vector<size_t>> LoadSymbols(
       std::vector<std::string> const& frames, char sym);
   static void LoadDevices(std::string filename, std::vector<std::string>& data);
@@ -106,15 +78,15 @@ class Utils {
                        int samples);
   static void LoadTddConfig(const std::string& filename, std::string& jconfig);
   static std::vector<std::string> Split(const std::string& s, char delimiter);
-  static void PrintVector(std::vector<std::complex<int16_t>>& data);
+  static void PrintVector(const std::vector<std::complex<int16_t>>& data);
   static void WriteBinaryFile(const std::string& name, size_t elem_size,
                               size_t buffer_size, void* buff);
-  static void PrintVec(arma::cx_fvec /*c*/, const std::string& /*ss*/);
-  static void SaveVec(arma::cx_fvec /*c*/, const std::string& /*filename*/,
+  static void PrintVec(const arma::cx_fvec& c, const std::string& ss);
+  static void SaveVec(const arma::cx_fvec& c, const std::string& filename,
                       const std::string& /*ss*/, const bool /*append*/);
-  static void PrintMat(arma::cx_fmat /*c*/, const std::string& /*ss*/);
-  static void SaveMat(arma::cx_fmat /*c*/, const std::string& /*filename*/,
-                      const std::string& /*ss*/, const bool /*append*/);
+  static void PrintMat(const arma::cx_fmat& c, const std::string& ss);
+  static void SaveMat(const arma::cx_fmat& c, const std::string& filename,
+                      const std::string& ss, const bool append);
 };
 
 /// roundup<N>(x) returns x rounded up to the next multiple of N. N must be

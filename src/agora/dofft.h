@@ -5,15 +5,14 @@
 #ifndef DOFFT_H_
 #define DOFFT_H_
 
-#include <armadillo>
-#include <iostream>
-#include <vector>
+#include <complex>
+#include <cstdint>
 
-#include "buffer.h"
-#include "concurrentqueue.h"
+#include "common_typedef_sdk.h"
 #include "config.h"
 #include "doer.h"
-#include "gettime.h"
+#include "memory_manage.h"
+#include "message.h"
 #include "mkl_dfti.h"
 #include "phy_stats.h"
 #include "stats.h"
@@ -101,7 +100,8 @@ class DoFFT : public Doer {
   Table<complex_float>& calib_dl_buffer_;
   Table<complex_float>& calib_ul_buffer_;
   DFTI_DESCRIPTOR_HANDLE mkl_handle_;
-  complex_float* fft_inout_;  // Buffer for both FFT input and output
+  complex_float* fft_inout_;      // Buffer for both FFT input and output
+  complex_float* fft_shift_tmp_;  // Buffer for both FFT input and output
 
   // Buffer for store 16-bit IQ converted from 12-bit IQ
   uint16_t* temp_16bits_iq_;

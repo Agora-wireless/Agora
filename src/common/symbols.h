@@ -3,12 +3,12 @@
 
 #include <mkl.h>
 
+#include <array>
+#include <cstddef>
 #include <map>
 #include <string>
 
 #define EXPORT __attribute__((visibility("default")))
-
-#define ARMA_ALLOW_FAKE_GCC
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
@@ -19,18 +19,18 @@ static constexpr size_t kFrameWnd = 40;
 
 static constexpr size_t kNumGeneratedFrames = 1;
 
-#define TX_FRAME_DELTA 8
-#define SETTLE_TIME_MS 1
+#define TX_FRAME_DELTA (4)
+#define SETTLE_TIME_MS (1)
 
 // Just-in-time optimization for MKL cgemm is available only after MKL 2019
 // update 3. Disable this on systems with an older MKL version.
 #if __INTEL_MKL__ >= 2020 || (__INTEL_MKL__ == 2019 && __INTEL_MKL_UPDATE__ > 3)
-#define USE_MKL_JIT 1
+#define USE_MKL_JIT (1)
 #else
-#define USE_MKL_JIT 0
+#undef USE_MKL_JIT
 #endif
 
-#define ENABLE_RB_IND 0
+#define ENABLE_RB_IND (0)
 
 /// Return true at compile time iff a constant is a power of two
 template <typename T>
@@ -40,11 +40,11 @@ static constexpr inline bool IsPowerOfTwo(T x) {
 
 enum class Direction : int { kDownlink, kUplink };
 
-// TODO: Merge EventType and DoerType into WorkType
+/// \todo Merge EventType and DoerType into WorkType
 enum class EventType : int {
   kPacketRX,
   kFFT,
-  kZF,
+  kBeam,
   kDemul,
   kIFFT,
   kPrecode,
@@ -56,18 +56,20 @@ enum class EventType : int {
   kPacketFromMac,
   kPacketToMac,
   kFFTPilot,
-  kSNRReport,   // Signal new SNR measurement from PHY to MAC
-  kRANUpdate,   // Signal new RAN config to Agora
-  kRBIndicator  // Signal RB schedule to UEs
+  kSNRReport,    // Signal new SNR measurement from PHY to MAC
+  kRANUpdate,    // Signal new RAN config to Agora
+  kRBIndicator,  // Signal RB schedule to UEs
+  kThreadTermination
 };
+
 static constexpr size_t kNumEventTypes =
-    static_cast<size_t>(EventType::kPacketToMac) + 1;
+    static_cast<size_t>(EventType::kThreadTermination) + 1;
 
 // Types of Agora Doers
 enum class DoerType : size_t {
   kFFT,
   kCSI,
-  kZF,
+  kBeam,
   kDemul,
   kDecode,
   kEncode,
@@ -75,8 +77,9 @@ enum class DoerType : size_t {
   kPrecode,
   kRC
 };
+
 static constexpr std::array<DoerType, (static_cast<size_t>(DoerType::kRC) + 1)>
-    kAllDoerTypes = {DoerType::kFFT,   DoerType::kCSI,     DoerType::kZF,
+    kAllDoerTypes = {DoerType::kFFT,   DoerType::kCSI,     DoerType::kBeam,
                      DoerType::kDemul, DoerType::kDecode,  DoerType::kEncode,
                      DoerType::kIFFT,  DoerType::kPrecode, DoerType::kRC};
 static constexpr size_t kNumDoerTypes = kAllDoerTypes.size();
@@ -84,7 +87,7 @@ static constexpr size_t kNumDoerTypes = kAllDoerTypes.size();
 static const std::map<DoerType, std::string> kDoerNames = {
     {DoerType::kFFT, std::string("FFT")},
     {DoerType::kCSI, std::string("CSI")},
-    {DoerType::kZF, std::string("ZF")},
+    {DoerType::kBeam, std::string("Beamweights")},
     {DoerType::kDemul, std::string("Demul")},
     {DoerType::kDecode, std::string("Decode")},
     {DoerType::kEncode, std::string("Encode")},
@@ -98,7 +101,7 @@ enum class PrintType : int {
   kFFTPilots,
   kFFTData,
   kFFTCal,
-  kZF,
+  kBeam,
   kDemul,
   kIFFT,
   kPrecode,
@@ -112,47 +115,83 @@ enum class PrintType : int {
   kModul
 };
 
+enum ScheduleProcessingFlags : uint8_t {
+  kNone = 0,
+  kUplinkComplete = 0x1,
+  kDownlinkComplete = 0x2,
+  kProcessingComplete = (kUplinkComplete + kDownlinkComplete)
+};
+
+// Moved from Agora class
+/// \todo need organization
+static constexpr size_t kDefaultMessageQueueSize = 512;
+static constexpr size_t kDefaultWorkerQueueSize = 256;
+// Max number of worker threads allowed
+//static constexpr size_t kMaxWorkerNum = 50;
+static constexpr size_t kScheduleQueues = 2;
+// Dequeue batch size, used to reduce the overhead of dequeue in main thread
+static constexpr size_t kDequeueBulkSizeTXRX = 8;
+static constexpr size_t kDequeueBulkSizeWorker = 4;
+
 // Enable thread pinning and exit if thread pinning fails. Thread pinning is
 // crucial for good performance. For testing or developing Agora on machines
 // with insufficient cores, disable this flag.
 static constexpr bool kEnableThreadPinning = true;
 static constexpr bool kEnableCoreReuse = false;
 
-#define BIGSTATION 0
+#define BIGSTATION (0)
 #if defined(USE_DPDK)
 static constexpr bool kUseDPDK = true;
 #else
 static constexpr bool kUseDPDK = false;
 #endif
 
-#ifdef ENABLE_MAC
+#if defined(ENABLE_MAC)
 static constexpr bool kEnableMac = true;
 #else
 static constexpr bool kEnableMac = false;
 #endif
 
-#ifdef USE_ARGOS
+#if defined(USE_ARGOS)
 static constexpr bool kUseArgos = true;
 #else
 static constexpr bool kUseArgos = false;
 #endif
 
-#ifdef USE_UHD
+#if defined(USE_UHD)
 static constexpr bool kUseUHD = true;
 #else
 static constexpr bool kUseUHD = false;
 #endif
 
+#if defined(ENABLE_CSV_LOG)
+static constexpr bool kEnableCsvLog = true;
+#else
+static constexpr bool kEnableCsvLog = false;
+#endif
+
+#if defined(ENABLE_MAT_LOG)
+static constexpr bool kEnableMatLog = true;
+#else
+static constexpr bool kEnableMatLog = false;
+#endif
+
 // Use 12-bit IQ sample to reduce network throughput
 static constexpr bool kUse12BitIQ = false;
 static constexpr bool kDebug12BitIQ = false;
+static constexpr bool kDebugDownlink = false;
 
 static constexpr bool kUsePartialTrans = true;
+
+// Enable hard demodulation and disable LDPC decoding
+// Useful for evaluating constellation quality
+static constexpr bool kDownlinkHardDemod = false;
+static constexpr bool kUplinkHardDemod = false;
 
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = true;
 static constexpr bool kCollectPhyStats = true;
-static constexpr bool kPrintZfStats = true;
+static constexpr bool kPrintBeamStats = true;
 
 static constexpr bool kStatsPrintFrameSummary = true;
 static constexpr bool kDebugPrintPerFrameDone = true;
@@ -176,7 +215,7 @@ enum class ThreadType {
   kMaster,
   kWorker,
   kWorkerFFT,
-  kWorkerZF,
+  kWorkerBeam,
   kWorkerDemul,
   kWorkerDecode,
   kWorkerRX,
@@ -185,6 +224,7 @@ enum class ThreadType {
   kWorkerMacTXRX,
   kMasterRX,
   kMasterTX,
+  kRecorderWorker
 };
 
 static inline std::string ThreadTypeStr(ThreadType thread_type) {
@@ -195,8 +235,8 @@ static inline std::string ThreadTypeStr(ThreadType thread_type) {
       return "Worker";
     case ThreadType::kWorkerFFT:
       return "Worker (FFT)";
-    case ThreadType::kWorkerZF:
-      return "Worker (ZF)";
+    case ThreadType::kWorkerBeam:
+      return "Worker (Beamweights)";
     case ThreadType::kWorkerDemul:
       return "Worker (Demul)";
     case ThreadType::kWorkerDecode:
@@ -213,6 +253,8 @@ static inline std::string ThreadTypeStr(ThreadType thread_type) {
       return "Master (RX)";
     case ThreadType::kMasterTX:
       return "Master (TX)";
+    case ThreadType::kRecorderWorker:
+      return "Recorder Worker";
   }
   return "Invalid thread type";
 }
@@ -233,8 +275,7 @@ static const std::map<char, SymbolType> kSymbolMap = {
     {'L', SymbolType::kCalUL},  {'P', SymbolType::kPilot},
     {'U', SymbolType::kUL}};
 
-// Intervals for beacon detection at the client (in frames)
-static constexpr size_t kBeaconDetectInterval = 10;
+enum class SubcarrierType { kNull, kDMRS, kData };
 
 // Maximum number of symbols per frame allowed by Agora
 static constexpr size_t kMaxSymbols = 70;
@@ -293,7 +334,7 @@ static constexpr size_t kMacBaseLocalPort = 8180;
 
 // Agora sends control information over an out-of-band control channel
 // to each UE #i, at port kBaseClientPort + i
-// TODO: need to generalize for hostname, port pairs for each client
+/// \todo need to generalize for hostname, port pairs for each client
 static constexpr size_t kMacBaseClientPort = 7070;
 
 // Number of subcarriers in a partial transpose block
@@ -312,4 +353,10 @@ static constexpr bool kUseAVX2Encoder = false;
 
 // Enable debugging for sender and receiver applications
 static constexpr bool kDebugSenderReceiver = false;
+
+static constexpr bool kOutputUlScData = false;
+static constexpr size_t kOfdmSymbolPerSlot = 1;
+static constexpr size_t kOutputFrameNum = 1;
+
+static constexpr bool kDebugTxData = false;
 #endif  // SYMBOLS_H_

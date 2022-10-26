@@ -6,11 +6,22 @@
 
 #include <typeinfo>
 
+#include "gettime.h"
+#include "logger.h"
+
+static const std::string kProjectDir = TOSTRING(PROJECT_DIRECTORY);
+static const std::string kStatsOutputFilePath =
+    kProjectDir + "/files/experiment/";
+static const std::string kStatsDataFilename =
+    kStatsOutputFilePath + "timeresult.txt";
+static const std::string kStatsDetailedDataFilename =
+    kStatsOutputFilePath + "timeresult_detail.txt";
+
 Stats::Stats(const Config* const cfg)
     : config_(cfg),
       task_thread_num_(cfg->WorkerThreadNum()),
       fft_thread_num_(cfg->FftThreadNum()),
-      zf_thread_num_(cfg->ZfThreadNum()),
+      beam_thread_num_(cfg->BeamThreadNum()),
       demul_thread_num_(cfg->DemulThreadNum()),
       decode_thread_num_(cfg->DecodeThreadNum()),
       freq_ghz_(cfg->FreqGhz()),
@@ -63,35 +74,37 @@ void Stats::PrintPerThreadPerTask(std::string const& doer_string,
   }
 }
 
-void Stats::PrintPerFrame(std::string const& doer_string,
-                          FrameSummary const& frame_summary) {
+std::string Stats::PrintPerFrame(std::string const& doer_string,
+                                 FrameSummary const& frame_summary) {
+  std::stringstream output;
   if (frame_summary.count_all_threads_ > 0) {
-    std::printf("%s (%zu tasks): %.3f ms (~", doer_string.c_str(),
-                frame_summary.count_all_threads_,
-                (frame_summary.us_avg_threads_.at(0u) / 1000.0));
+    output << doer_string.c_str() << " (" << frame_summary.count_all_threads_
+           << " tasks): " << (frame_summary.us_avg_threads_.at(0u) / 1000.0f)
+           << " ms (~";
 
     for (size_t i = 1u; i < frame_summary.us_avg_threads_.size(); i++) {
       if (i != 1) {
-        std::printf("+ ");
+        output << "+ ";
       }
-      std::printf("%.4f ", frame_summary.us_avg_threads_.at(i) / 1000.0);
+      output << frame_summary.us_avg_threads_.at(i) / 1000.0f << " ";
     }
-    std::printf("ms), ");
+    output << "ms), ";
   }
+  return output.str();
 }
 
 void Stats::UpdateStats(size_t frame_id) {
   this->last_frame_id_ = frame_id;
   size_t frame_slot = (frame_id % kNumStatsFrames);
 
-  if (kIsWorkerTimingEnabled == true) {
+  if (kIsWorkerTimingEnabled) {
     std::vector<FrameSummary> work_summary(kAllDoerTypes.size());
     for (size_t i = 0u; i < task_thread_num_; i++) {
       for (size_t j = 0u; j < kAllDoerTypes.size(); j++) {
         PopulateSummary(&work_summary.at(j), i, kAllDoerTypes.at(j));
       }
 
-      if (kDebugPrintStatsPerThread == true) {
+      if (kDebugPrintStatsPerThread) {
         std::printf("In frame %zu, thread %zu, \t", frame_id, i);
         double sum_us_this_frame_this_thread = 0;
         for (size_t j = 0u; j < kAllDoerTypes.size(); j++) {
@@ -121,21 +134,24 @@ void Stats::UpdateStats(size_t frame_id) {
       }
     }
 
-    if (kStatsPrintFrameSummary == true) {
-      std::printf("Frame %zu summary: ", frame_id);
+    if (kStatsPrintFrameSummary) {
+      std::string print_summary =
+          "Frame " + std::to_string(frame_id) + " Summary: ";
+
       for (size_t i = 0u; i < kAllDoerTypes.size(); i++) {
-        PrintPerFrame(kDoerNames.at(kAllDoerTypes.at(i)), work_summary.at(i));
+        print_summary += PrintPerFrame(kDoerNames.at(kAllDoerTypes.at(i)),
+                                       work_summary.at(i));
       }
-      std::printf("Total: %.2f ms\n", sum_us / 1000);
+      print_summary += "Total: " + std::to_string(sum_us / 1000.0f) + " ms\n";
+      AGORA_LOG_INFO("%s", print_summary.c_str());
     }
   }
 }
 
 void Stats::SaveToFile() {
-  const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  const std::string filename = cur_directory + "/data/timeresult.txt";
-  std::printf("Stats: Saving master timestamps to %s\n", filename.c_str());
-  FILE* fp_debug = std::fopen(filename.c_str(), "w");
+  AGORA_LOG_INFO("Stats: Saving master timestamps to %s\n",
+                 kStatsDataFilename.c_str());
+  FILE* fp_debug = std::fopen(kStatsDataFilename.c_str(), "w");
   RtAssert(fp_debug != nullptr,
            std::string("Open file failed ") + std::to_string(errno));
 
@@ -155,9 +171,9 @@ void Stats::SaveToFile() {
     std::fprintf(fp_debug,
                  "Pilot RX by socket threads (= reference time), "
                  "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
-                 "kZFDone, kPrecodeDone, kIFFTDone, kEncodeDone, kDemulDone, "
+                 "kBeamDone, kPrecodeDone, kIFFTDone, kEncodeDone, kDemulDone, "
                  "kDecodeDone, kRXDone, time in CSI, time in "
-                 "FFT, time in ZF, time in Demul, time in Decode\n");
+                 "FFT, time in Beamweights, time in Demul, time in Decode\n");
 
     for (size_t frame = 0; frame < total_stat_frames; frame++) {
       const size_t i = (first_frame_idx + frame) % kNumStatsFrames;
@@ -174,7 +190,7 @@ void Stats::SaveToFile() {
           MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
           MasterGetUsFromRef(TsType::kPilotAllRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kFFTPilotsDone, i, ref_tsc),
-          MasterGetUsFromRef(TsType::kZFDone, i, ref_tsc),
+          MasterGetUsFromRef(TsType::kBeamDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kPrecodeDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kIFFTDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kEncodeDone, i, ref_tsc),
@@ -183,7 +199,7 @@ void Stats::SaveToFile() {
           MasterGetUsFromRef(TsType::kRXDone, i, ref_tsc),
           this->doer_us_.at(static_cast<size_t>(DoerType::kCSI)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kFFT)).at(i),
-          this->doer_us_.at(static_cast<size_t>(DoerType::kZF)).at(i),
+          this->doer_us_.at(static_cast<size_t>(DoerType::kBeam)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kDemul)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kDecode)).at(i));
     }
@@ -191,7 +207,7 @@ void Stats::SaveToFile() {
     std::fprintf(fp_debug,
                  "Pilot RX by socket threads (= reference time), "
                  "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
-                 "kZFDone, kPrecodeDone, kIFFTDone, kEncodeDone, kRXDone\n");
+                 "kBeamDone, kPrecodeDone, kIFFTDone, kEncodeDone, kRXDone\n");
     for (size_t frame = 0; frame < total_stat_frames; frame++) {
       const size_t i = (first_frame_idx + frame) % kNumStatsFrames;
       size_t ref_tsc = SIZE_MAX;
@@ -205,7 +221,7 @@ void Stats::SaveToFile() {
           MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
           MasterGetUsFromRef(TsType::kPilotAllRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kFFTPilotsDone, i, ref_tsc),
-          MasterGetUsFromRef(TsType::kZFDone, i, ref_tsc),
+          MasterGetUsFromRef(TsType::kBeamDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kPrecodeDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kIFFTDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kEncodeDone, i, ref_tsc),
@@ -217,8 +233,8 @@ void Stats::SaveToFile() {
         fp_debug,
         "Pilot RX by socket threads (= reference time), "
         "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
-        "kZFDone, kDemulDone, kDecodeDone, kRXDone, time in CSI, time in "
-        "FFT, time in ZF, time in Demul, time in Decode\n");
+        "kBeamDone, kDemulDone, kDecodeDone, kRXDone, time in CSI, time in "
+        "FFT, time in Beamweights, time in Demul, time in Decode\n");
     for (size_t frame = 0; frame < total_stat_frames; frame++) {
       const size_t i = (first_frame_idx + frame) % kNumStatsFrames;
       size_t ref_tsc = SIZE_MAX;
@@ -234,13 +250,13 @@ void Stats::SaveToFile() {
           MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
           MasterGetUsFromRef(TsType::kPilotAllRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kFFTPilotsDone, i, ref_tsc),
-          MasterGetUsFromRef(TsType::kZFDone, i, ref_tsc),
+          MasterGetUsFromRef(TsType::kBeamDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kDemulDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kDecodeDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kRXDone, i, ref_tsc),
           this->doer_us_.at(static_cast<size_t>(DoerType::kCSI)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kFFT)).at(i),
-          this->doer_us_.at(static_cast<size_t>(DoerType::kZF)).at(i),
+          this->doer_us_.at(static_cast<size_t>(DoerType::kBeam)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kDemul)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kDecode)).at(i));
     }
@@ -253,19 +269,18 @@ void Stats::SaveToFile() {
   std::fclose(fp_debug);
 
   if (kIsWorkerTimingEnabled == true) {
-    std::string filename_detailed =
-        cur_directory + "/data/timeresult_detail.txt";
-    std::printf("Stats: Printing detailed results to %s\n",
-                filename_detailed.c_str());
+    AGORA_LOG_INFO("Stats: Printing detailed results to %s\n",
+                   kStatsDetailedDataFilename.c_str());
 
-    FILE* fp_debug_detailed = std::fopen(filename_detailed.c_str(), "w");
+    FILE* fp_debug_detailed =
+        std::fopen(kStatsDetailedDataFilename.c_str(), "w");
     RtAssert(fp_debug_detailed != nullptr,
              std::string("Open file failed ") + std::to_string(errno));
     // Print the header
-    std::fprintf(
-        fp_debug_detailed,
-        "fft_0, fft_1, fft_2, zf_0, zf_1, zf_2, demul_0, demul_1, demul_2, "
-        "decode_0, decode_1, decode_2\n");
+    std::fprintf(fp_debug_detailed,
+                 "fft_0, fft_1, fft_2, beam_0, beam_1, beam_2, demul_0, "
+                 "demul_1, demul_2, "
+                 "decode_0, decode_1, decode_2\n");
 
     for (size_t frame = 0; frame < total_stat_frames; frame++) {
       const size_t i = (first_frame_idx + frame) % kNumStatsFrames;
@@ -290,13 +305,13 @@ void Stats::SaveToFile() {
               this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kCSI))
                   .at(2)
                   .at(i),
-          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kZF))
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kBeam))
               .at(0)
               .at(i),
-          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kZF))
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kBeam))
               .at(1)
               .at(i),
-          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kZF))
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kBeam))
               .at(2)
               .at(i),
           this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kDemul))
@@ -331,9 +346,10 @@ size_t Stats::GetTotalTaskCount(DoerType doer_type, size_t thread_num) {
 }
 
 void Stats::PrintSummary() {
-  std::printf("Stats: total processed frames %zu\n", this->last_frame_id_ + 1);
+  AGORA_LOG_INFO("Stats: total processed frames %zu\n",
+                 this->last_frame_id_ + 1);
   if (kIsWorkerTimingEnabled == false) {
-    std::printf("Stats: Worker timing is disabled. Not printing summary\n");
+    AGORA_LOG_INFO("Stats: Worker timing is disabled. Not printing summary\n");
   } else {
     std::vector<size_t> num_tasks;
 
@@ -346,9 +362,9 @@ void Stats::PrintSummary() {
         (static_cast<double>(
             num_tasks.at(static_cast<size_t>(DoerType::kCSI)))) /
         (this->config_->BsAntNum() * this->config_->Frame().NumPilotSyms());
-    double zf_frames = (static_cast<double>(
-                           num_tasks.at(static_cast<size_t>(DoerType::kZF)))) /
-                       this->config_->ZfEventsPerSymbol();
+    double beam_frames = (static_cast<double>(num_tasks.at(
+                             static_cast<size_t>(DoerType::kBeam)))) /
+                         this->config_->BeamEventsPerSymbol();
 
     if (config_->Frame().NumDLSyms() > 0) {
       double precode_frames =
@@ -362,14 +378,15 @@ void Stats::PrintSummary() {
       double encode_frames =
           (static_cast<double>(
               num_tasks.at(static_cast<size_t>(DoerType::kEncode)))) /
-          (this->config_->LdpcConfig().NumBlocksInSymbol() *
+          (this->config_->LdpcConfig(Direction::kDownlink).NumBlocksInSymbol() *
            this->config_->UeAntNum() * this->config_->Frame().NumDLSyms());
       std::printf("Downlink totals (tasks, frames): ");
       std::printf("CSI (%zu, %.2f), ",
                   num_tasks.at(static_cast<size_t>(DoerType::kCSI)),
                   csi_frames);
-      std::printf("ZF (%zu, %.2f), ",
-                  num_tasks.at(static_cast<size_t>(DoerType::kZF)), zf_frames);
+      std::printf("Beamweights (%zu, %.2f), ",
+                  num_tasks.at(static_cast<size_t>(DoerType::kBeam)),
+                  beam_frames);
       std::printf("Encode (%zu, %.2f), ",
                   num_tasks.at(static_cast<size_t>(DoerType::kEncode)),
                   encode_frames);
@@ -394,14 +411,15 @@ void Stats::PrintSummary() {
       double decode_frames =
           (static_cast<double>(
               num_tasks.at(static_cast<size_t>(DoerType::kDecode)))) /
-          (this->config_->LdpcConfig().NumBlocksInSymbol() *
+          (this->config_->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
            this->config_->UeAntNum() * this->config_->Frame().NumULSyms());
       std::printf("Uplink totals (tasks, frames): ");
       std::printf("CSI (%zu, %.2f), ",
                   num_tasks.at(static_cast<size_t>(DoerType::kCSI)),
                   csi_frames);
-      std::printf("ZF (%zu, %.2f), ",
-                  num_tasks.at(static_cast<size_t>(DoerType::kZF)), zf_frames);
+      std::printf("Beamweights (%zu, %.2f), ",
+                  num_tasks.at(static_cast<size_t>(DoerType::kBeam)),
+                  beam_frames);
       std::printf("FFT (%zu, %.2f), ",
                   num_tasks.at(static_cast<size_t>(DoerType::kFFT)),
                   fft_frames);
@@ -430,4 +448,224 @@ void Stats::PrintSummary() {
       std::printf("\n");
     }
   }  // kIsWorkerTimingEnabled == true
+}
+
+void Stats::PrintPerFrameDone(PrintType print_type, size_t frame_id) const {
+  if (kDebugPrintPerFrameDone == true) {
+    switch (print_type) {
+      case (PrintType::kPacketRXPilots):
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Received all pilots\n",
+                       frame_id,
+                       MasterGetDeltaMs(TsType::kPilotAllRX,
+                                        TsType::kFirstSymbolRX, frame_id));
+        break;
+      case (PrintType::kPacketRX):
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Received all packets\n",
+                       frame_id,
+                       MasterGetDeltaMs(TsType::kRXDone, TsType::kFirstSymbolRX,
+                                        frame_id));
+        break;
+      case (PrintType::kFFTPilots):
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: FFT-ed all pilots\n",
+                       frame_id,
+                       MasterGetDeltaMs(TsType::kFFTPilotsDone,
+                                        TsType::kFirstSymbolRX, frame_id));
+        break;
+      case (PrintType::kFFTCal):
+        AGORA_LOG_INFO(
+            "Main [frame %zu + %.2f ms]: FFT-ed all calibration symbols\n",
+            frame_id, MasterGetUsSince(TsType::kRCAllRX, frame_id) / 1000.0);
+        break;
+      case (PrintType::kBeam):
+        AGORA_LOG_INFO(
+            "Main [frame %zu + %.2f ms]: Completed %s beamweight calc\n",
+            frame_id,
+            MasterGetDeltaMs(TsType::kBeamDone, TsType::kFirstSymbolRX,
+                             frame_id),
+            config_->Beamforming().c_str());
+        break;
+      case (PrintType::kDemul):
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed demodulation\n",
+                       frame_id,
+                       MasterGetDeltaMs(TsType::kDemulDone,
+                                        TsType::kFirstSymbolRX, frame_id));
+        break;
+      case (PrintType::kDecode):
+        AGORA_LOG_INFO(
+            "Main [frame %zu + %.2f ms]: Completed LDPC decoding (%zu UL "
+            "symbols)\n",
+            frame_id,
+            MasterGetDeltaMs(TsType::kDecodeDone, TsType::kFirstSymbolRX,
+                             frame_id),
+            this->config_->Frame().NumULSyms());
+        break;
+      case (PrintType::kPacketFromMac):
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed MAC RX \n",
+                       frame_id,
+                       MasterGetMsSince(TsType::kFirstSymbolRX, frame_id));
+        break;
+      case (PrintType::kEncode):
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed LDPC encoding\n",
+                       frame_id,
+                       MasterGetDeltaMs(TsType::kEncodeDone,
+                                        TsType::kFirstSymbolRX, frame_id));
+        break;
+      case (PrintType::kPrecode):
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed precoding\n",
+                       frame_id,
+                       MasterGetDeltaMs(TsType::kPrecodeDone,
+                                        TsType::kFirstSymbolRX, frame_id));
+        break;
+      case (PrintType::kIFFT):
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed IFFT\n", frame_id,
+                       MasterGetDeltaMs(TsType::kIFFTDone,
+                                        TsType::kFirstSymbolRX, frame_id));
+        break;
+      case (PrintType::kPacketTXFirst):
+        AGORA_LOG_INFO(
+            "Main [frame %zu + %.2f ms]: Completed TX of first symbol\n",
+            frame_id,
+            MasterGetDeltaMs(TsType::kTXProcessedFirst, TsType::kFirstSymbolRX,
+                             frame_id));
+        break;
+      case (PrintType::kPacketTX):
+        AGORA_LOG_INFO(
+            "Main [frame %zu + %.2f ms]: Completed TX (%zu DL symbols)\n",
+            frame_id,
+            MasterGetDeltaMs(TsType::kTXDone, TsType::kFirstSymbolRX, frame_id),
+            this->config_->Frame().NumDLSyms());
+        break;
+      case (PrintType::kPacketToMac):
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed MAC TX \n",
+                       frame_id,
+                       MasterGetMsSince(TsType::kFirstSymbolRX, frame_id));
+        break;
+      default:
+        AGORA_LOG_ERROR("Wrong task type in frame done print!");
+    }
+  }
+}
+
+void Stats::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
+                               size_t symbol_id, size_t sub_count) const {
+  if (kDebugPrintPerSymbolDone == true) {
+    switch (print_type) {
+      case (PrintType::kFFTPilots):
+        AGORA_LOG_INFO(
+            "Main [frame %zu symbol %zu + %.3f ms]: FFT-ed pilot symbol, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            MasterGetMsSince(TsType::kFirstSymbolRX, frame_id), sub_count);
+        break;
+      case (PrintType::kFFTData):
+        AGORA_LOG_INFO(
+            "Main [frame %zu symbol %zu + %.3f ms]: FFT-ed data symbol, "
+            "%zu symbols done\n",  //precoder status: %d\n",
+            frame_id, symbol_id,
+            MasterGetMsSince(TsType::kFirstSymbolRX, frame_id), sub_count);
+        break;
+      case (PrintType::kDemul):
+        AGORA_LOG_INFO(
+            "Main [frame %zu symbol %zu + %.3f ms]: Completed "
+            "demodulation, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            MasterGetMsSince(TsType::kFirstSymbolRX, frame_id), sub_count);
+        break;
+      case (PrintType::kDecode):
+        AGORA_LOG_INFO(
+            "Main [frame %zu symbol %zu + %.3f ms]: Completed decoding, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            MasterGetMsSince(TsType::kFirstSymbolRX, frame_id), sub_count);
+        break;
+      case (PrintType::kEncode):
+        AGORA_LOG_INFO(
+            "Main [frame %zu symbol %zu + %.3f ms]: Completed encoding, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            MasterGetMsSince(TsType::kFirstSymbolRX, frame_id), sub_count);
+        break;
+      case (PrintType::kPrecode):
+        AGORA_LOG_INFO(
+            "Main [frame %zu symbol %zu + %.3f ms]: Completed precoding, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            MasterGetMsSince(TsType::kFirstSymbolRX, frame_id), sub_count);
+        break;
+      case (PrintType::kIFFT):
+        AGORA_LOG_INFO(
+            "Main [frame %zu symbol %zu + %.3f ms]: Completed IFFT, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            MasterGetMsSince(TsType::kFirstSymbolRX, frame_id), sub_count);
+        break;
+      case (PrintType::kPacketTX):
+        AGORA_LOG_INFO(
+            "Main [frame %zu symbol %zu + %.3f ms]: Completed TX, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            MasterGetMsSince(TsType::kFirstSymbolRX, frame_id), sub_count);
+        break;
+      case (PrintType::kPacketToMac):
+        AGORA_LOG_INFO(
+            "Main [frame %zu symbol %zu + %.3f ms]: Completed MAC TX, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            MasterGetMsSince(TsType::kFirstSymbolRX, frame_id), sub_count);
+        break;
+      default:
+        AGORA_LOG_INFO("Wrong task type in symbol done print!");
+    }
+  }
+}
+
+void Stats::PrintPerTaskDone(PrintType print_type, size_t frame_id,
+                             size_t symbol_id, size_t ant_or_sc_id,
+                             size_t task_count) const {
+  if (kDebugPrintPerTaskDone == true) {
+    switch (print_type) {
+      case (PrintType::kBeam):
+        AGORA_LOG_INFO(
+            "Main thread: Beamweights done frame: %zu, subcarrier %zu\n",
+            frame_id, ant_or_sc_id);
+        break;
+      case (PrintType::kRC):
+        AGORA_LOG_INFO("Main thread: RC done frame: %zu, subcarrier %zu\n",
+                       frame_id, ant_or_sc_id);
+        break;
+      case (PrintType::kDemul):
+        AGORA_LOG_INFO(
+            "Main thread: Demodulation done frame: %zu, symbol: %zu, sc: "
+            "%zu, num blocks done: %zu\n",
+            frame_id, symbol_id, ant_or_sc_id, task_count);
+        break;
+      case (PrintType::kDecode):
+        AGORA_LOG_INFO(
+            "Main thread: Decoding done frame: %zu, symbol: %zu, sc: %zu, "
+            "num blocks done: %zu\n",
+            frame_id, symbol_id, ant_or_sc_id, task_count);
+        break;
+      case (PrintType::kPrecode):
+        AGORA_LOG_INFO(
+            "Main thread: Precoding done frame: %zu, symbol: %zu, "
+            "subcarrier: %zu, total SCs: %zu\n",
+            frame_id, symbol_id, ant_or_sc_id, task_count);
+        break;
+      case (PrintType::kIFFT):
+        AGORA_LOG_INFO(
+            "Main thread: IFFT done frame: %zu, symbol: %zu, antenna: %zu, "
+            "total ants: %zu\n",
+            frame_id, symbol_id, ant_or_sc_id, task_count);
+        break;
+      case (PrintType::kPacketTX):
+        AGORA_LOG_INFO(
+            "Main thread: TX done frame: %zu, symbol: %zu, antenna: %zu, "
+            "total packets: %zu\n",
+            frame_id, symbol_id, ant_or_sc_id, task_count);
+        break;
+      default:
+        AGORA_LOG_INFO("Wrong task type in task done print!");
+    }
+  }
 }

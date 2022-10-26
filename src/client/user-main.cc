@@ -6,18 +6,21 @@
 
 #include "config.h"
 #include "gflags/gflags.h"
+#include "logger.h"
 #include "phy-ue.h"
 #include "signal_handler.h"
 #include "version_config.h"
 
 DEFINE_string(conf_file,
-              TOSTRING(PROJECT_DIRECTORY) "/data/userconfig_512.json",
+              TOSTRING(PROJECT_DIRECTORY) "/files/config/ci/chsim.json",
               "Config filename");
 
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("conf_file : set the configuration filename");
   gflags::SetVersionString(GetAgoraProjectVersion());
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+  AGORA_LOG_INIT();
 
   std::string filename;
   // For backwards compatibility
@@ -28,6 +31,7 @@ int main(int argc, char* argv[]) {
   } else {
     filename = FLAGS_conf_file;
   }
+
   auto config = std::make_unique<Config>(filename.c_str());
   config->GenData();
   int ret;
@@ -46,5 +50,7 @@ int main(int argc, char* argv[]) {
 
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
+  AGORA_LOG_SHUTDOWN();
+
   return ret;
 }

@@ -3,12 +3,12 @@
 
 sudo apt -y install cmake g++ libpython-dev python-numpy swig
 
-cd `mktemp -d`
-git clone --depth=1 https://github.com/pothosware/SoapySDR.git
+git clone --branch soapy-sdr-0.8.1 --depth 1 --single-branch https://github.com/pothosware/SoapySDR.git
 cd SoapySDR
-mkdir build
+mkdir -p build
 cd build
-cmake ..
-make -j8
+cmake ../
+make -j`nproc`
 sudo make install
+cd ../..
 sudo ldconfig

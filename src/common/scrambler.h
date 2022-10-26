@@ -5,22 +5,27 @@
 #ifndef SCRAMBLER_H_
 #define SCRAMBLER_H_
 
-#include <cstdio>
-#include <functional>
-#include <iostream>
+#include <bitset>
+#include <cstddef>
+#include <cstdint>
 #include <vector>
 
 namespace AgoraScrambler {
-static constexpr int8_t kScramblerInitState = 93;  // [1, 127]
-static constexpr int8_t kScramblerlength = 127;
+// [1, 127] (93)
+static constexpr uint8_t kScramblerInitState = 0x5D;
+static constexpr uint8_t kScramblerlength = 127;
 
 class Scrambler {
  public:
   Scrambler();
   ~Scrambler() = default;
 
-  void Scramble(void* byte_buffer, size_t byte_buffer_size);
-  void Descramble(void* byte_buffer, size_t byte_buffer_size);
+  void Scramble(void* scrambled, const void* to_scramble,
+                size_t bytes_to_scramble);
+  void Scramble(void* inout_bytes, size_t bytes_to_scramble);
+  void Descramble(void* descrambled, const void* scrambled,
+                  size_t bytes_to_descramble);
+  void Descramble(void* inout_bytes, size_t bytes_to_descramble);
 
  private:
   /**
@@ -35,13 +40,16 @@ class Scrambler {
    * [1,127]. The mapping of the seed to the generator is Bit0 ~ Bit6 to x1 ~
    * x7. The output is the scrambld data of the same size and type as the input.
    *
-   * @param  byte_buffer           Byte array for both input and scrambled data
-   * @param  byte_buffer_size      Byte array size
-   * @param  scram_init            Scamber initial state
+   * @param  output_buffer         Byte array for output scrambled data (can the the same as input)
+   * @param  input_buffer          Byte array for input to be scrambled
+   * @param  num_bytes             Byte array size - number of bytes to scramble / descramble
+   * @param  scram_buffer          Scratch memory
+   * @param  bit_buffer            Scratch memory
    */
-  void WlanScrambler(void* byte_buffer, size_t byte_buffer_size,
-                     std::vector<int8_t>& scram_buffer,
-                     std::vector<int8_t>& bit_buffer);
+  static void WlanScrambler(void* output_buffer, const void* input_buffer,
+                            size_t num_bytes,
+                            std::bitset<kScramblerlength>& scram_buffer,
+                            std::vector<std::byte>& bit_buffer);
 
   /**
    * @brief                        Convert a byte array to a bit array. MSB
@@ -51,8 +59,9 @@ class Scrambler {
    * @param  byte_buffer_size      Input byte array size
    * @param  out_bit_buffer        Output bit array
    */
-  void ConvertBitsToBytes(const int8_t* in_bit_buffer, size_t byte_buffer_size,
-                          int8_t* out_byte_buffer);
+  static void ConvertBitsToBytes(const std::byte* in_byte_buffer,
+                                 size_t byte_buffer_size,
+                                 std::byte* out_bit_buffer);
 
   /**
    * @brief                        Convert a bit array to a byte array. MSB
@@ -62,11 +71,12 @@ class Scrambler {
    * @param  byte_buffer_size      Output byte array size
    * @param  out_byte_buffer       Output byte array
    */
-  void ConvertBytesToBits(const int8_t* in_byte_buffer, size_t byte_buffer_size,
-                          int8_t* out_bit_buffer);
+  static void ConvertBytesToBits(const std::byte* in_bit_buffer,
+                                 size_t byte_buffer_size,
+                                 std::byte* out_byte_buffer);
 
-  std::vector<int8_t> scram_buffer_;
-  std::vector<int8_t> bit_buffer_;
+  std::bitset<kScramblerlength> scram_buffer_;
+  std::vector<std::byte> bit_buffer_;
 };  // class Scrambler
 
 };  // namespace AgoraScrambler

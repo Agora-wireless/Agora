@@ -14,22 +14,44 @@
 #include <queue>
 
 #include "comms-lib.h"
+#include "datatype_conversion.h"
+#include "simd_types.h"
 
 #define USE_AVX
-#define ALIGNMENT 32
-#define AVX_PACKED_SP 8   // single-precision
-#define AVX_PACKED_SI 16  // short int
-#define AVX_PACKED_CS 8   // complex short int
+#define ALIGNMENT (32)
+#define AVX_PACKED_SP (8)   // single-precision
+#define AVX_PACKED_SI (16)  // short int
+#define AVX_PACKED_CS (8)   // complex short int
+
+ssize_t CommsLib::FindBeaconAvx(const std::complex<int16_t>* iq,
+                                const std::vector<std::complex<float>>& seq,
+                                size_t sample_window, float corr_scale) {
+  //Sample window must be multiple of 64Bytes (for avx 512)
+  static constexpr size_t kWindowAlignment = 64;
+  const size_t padded_window =
+      (((sample_window / kWindowAlignment) + 1) * kWindowAlignment);
+
+  //Allocate memory, only used for beacon detection
+  std::vector<std::complex<float>> sync_compare(
+      padded_window, std::complex<float>(0.0f, 0.0f));
+
+  // convert entire frame data to complex float for sync detection
+  ConvertShortToFloat(reinterpret_cast<const short*>(&iq[0u]),
+                      reinterpret_cast<float*>(sync_compare.data()),
+                      sample_window * 2);
+  return CommsLib::FindBeaconAvx(sync_compare, seq, corr_scale);
+}
 
 /// Correlation and Peak detection of a beacon with Gold code  (2 repetitions)
 int CommsLib::FindBeaconAvx(const std::vector<std::complex<float>>& iq,
-                            const std::vector<std::complex<float>>& seq) {
+                            const std::vector<std::complex<float>>& seq,
+                            float corr_scale) {
   std::vector<int> valid_peaks;
 
   // Original LTS sequence
-  int seq_len = seq.size();
-  struct timespec tv;
-  struct timespec tv2;
+  const int seq_len = seq.size();
+  ::timespec tv;
+  ::timespec tv2;
   clock_gettime(CLOCK_MONOTONIC, &tv);
 
   // correlate signal with beacon
@@ -66,7 +88,7 @@ int CommsLib::FindBeaconAvx(const std::vector<std::complex<float>>& iq,
   // perform thresholding and find peak
   clock_gettime(CLOCK_MONOTONIC, &tv);
   for (size_t i = 0; i < gold_corr_avx_2.size(); i++) {
-    if (gold_corr_avx_2[i] > thresh_avx[i]) {
+    if (corr_scale * gold_corr_avx_2[i] > thresh_avx[i]) {
       valid_peaks.push_back(i);
     }
   }
@@ -489,7 +511,7 @@ std::vector<float> CommsLib::CorrelateAvxS(std::vector<float> const& f,
   std::vector<float> in(length_f + length_g, 0);
   size_t length = in.size();
 
-  // MLPD_TRACE("correlate_avx_s len_f: %zu, len_g: %zu, length: %zu\n",
+  // AGORA_LOG_TRACE("correlate_avx_s len_f: %zu, len_g: %zu, length: %zu\n",
   // length_f, length_g, length); in[length_g:length] = f[0:length_f]
   for (size_t i = length_g; i < length; i++) {
     size_t j = i - length_g;

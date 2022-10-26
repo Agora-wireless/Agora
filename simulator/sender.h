@@ -12,18 +12,19 @@
 #include <unistd.h>
 
 #include <algorithm>
-#include <boost/align/aligned_allocator.hpp>
 #include <chrono>
 #include <iostream>
 #include <numeric>
 #include <thread>
 #include <vector>
 
+#include "common_typedef_sdk.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "datatype_conversion.h"
 #include "gettime.h"
 #include "memory_manage.h"
+#include "message.h"
 #include "mkl_dfti.h"
 #include "symbols.h"
 #include "utils.h"
@@ -66,7 +67,7 @@ class Sender {
 
   // in_frame_start and in_frame_end must have space for at least
   // kNumStatsFrames entries
-  void StartTXfromMain(double* in_frame_start, double* in_frame_end);
+  void StartTxfromMain(double* in_frame_start, double* in_frame_end);
 
  private:
   void* MasterThread(int tid);
@@ -138,7 +139,7 @@ class Sender {
   // Second dimension: symbol_num_perframe * BS_ANT_NUM
   // Third dimension: (CP_LEN + OFDM_CA_NUM) * 2
   PtrGrid<kNumGeneratedFrames, kMaxSymbols * kMaxAntennas, unsigned short>
-      multi_frame_iq_data_short_;
+  Table<unsigned short> iq_data_short_;
 
   // Number of packets transmitted for each symbol in a frame
   size_t* packet_count_per_symbol_[kFrameWnd];
