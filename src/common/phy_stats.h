@@ -98,6 +98,7 @@ class PhyStats {
   CsvLog::MatLogger logger_ul_csi_;
   CsvLog::MatLogger logger_dl_csi_;
   CsvLog::MatLogger logger_dl_beam_;
+  size_t valid_EVM_count_;
 };
 
 #endif  // PHY_STATS_H_
