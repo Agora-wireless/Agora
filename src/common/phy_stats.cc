@@ -24,7 +24,8 @@ PhyStats::PhyStats(Config* const cfg, Direction dir)
       logger_calib_(CsvLog::kCalib, cfg, dir, true),
       logger_ul_csi_(CsvLog::kULCSI, cfg, dir),
       logger_dl_csi_(CsvLog::kDLCSI, cfg, dir),
-      logger_dl_beam_(CsvLog::kDlBeam, cfg, dir) {
+      logger_dl_beam_(CsvLog::kDlBeam, cfg, dir),
+      valid_EVM_count_(0) {
   if (dir_ == Direction::kDownlink) {
     num_rx_symbols_ = cfg->Frame().NumDLSyms();
     num_rxdata_symbols_ = cfg->Frame().NumDlDataSyms();
@@ -138,6 +139,9 @@ void PhyStats::PrintPhyStats() {
       size_t total_bit_errors(0);
       size_t total_decoded_blocks(0);
       size_t total_block_errors(0);
+      size_t true_total_block_errors(0);
+      size_t true_total_decoded_bits(0);
+      size_t true_total_bit_errors(0);
 
       for (size_t i = 0u; i < task_buffer_symbol_num; i++) {
         total_decoded_bits += decoded_bits_count_[ue_id][i];
@@ -145,6 +149,9 @@ void PhyStats::PrintPhyStats() {
         total_decoded_blocks += decoded_blocks_count_[ue_id][i];
         total_block_errors += block_error_count_[ue_id][i];
       }
+      true_total_block_errors = total_block_errors - (total_decoded_blocks - valid_EVM_count_);
+      true_total_decoded_bits = total_decoded_bits/total_decoded_blocks * valid_EVM_count_;
+      true_total_bit_errors = total_bit_errors - total_decoded_bits/total_decoded_blocks * (total_block_errors - true_total_block_errors)/2;
 
       AGORA_LOG_INFO(
           "UE %zu: %s bit errors (BER) %zu/%zu (%f), block errors (BLER) "
@@ -155,6 +162,17 @@ void PhyStats::PrintPhyStats() {
           total_block_errors, total_decoded_blocks,
           static_cast<float>(total_block_errors) /
               static_cast<float>(total_decoded_blocks));
+      AGORA_LOG_INFO("VALID frames after Sync is: %zu\n" , valid_EVM_count_);
+      AGORA_LOG_INFO(
+        "UE %zu: %s VALID bit errors (BER) %zu/%zu (%f), VALID block errors (BLER) "
+        "%zu/%zu (%f)\n",
+        ue_id, tx_type.c_str(),
+        true_total_bit_errors, true_total_decoded_bits,
+        static_cast<float>(true_total_bit_errors) /
+        static_cast<float>(true_total_decoded_bits),
+        true_total_block_errors, valid_EVM_count_,
+        static_cast<float>(true_total_block_errors) /
+        static_cast<float>(valid_EVM_count_));
     }
   }
 }
@@ -238,6 +256,9 @@ void PhyStats::PrintUlSnrStats(size_t frame_id) {
        << " ";
     if (max_snr - min_snr > 20 && min_snr < 0) {
       ss << "(Possible bad antenna " << min_snr_id << ") ";
+    }
+    if (min_snr > 5.0f){
+      valid_EVM_count_++;
     }
   }
   ss << std::endl;
