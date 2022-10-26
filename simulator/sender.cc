@@ -582,9 +582,10 @@ void Sender::InitMultiFrameIqFromFile(const std::string& filename) {
             reinterpret_cast<uint8_t*>(multi_frame_iq_data_short_[frame_id][i]),
             expected_count);
       } else {
-        SimdConvertFloatToShort(iq_data_float[frame_id][i],
-                                multi_frame_iq_data_short_[frame_id][i],
-                                expected_count);
+        SimdConvertFloatToShort(
+            iq_data_float[frame_id][i],
+            reinterpret_cast<short*>(multi_frame_iq_data_short_[frame_id][i]),
+            expected_count);
       }
     }
   }
