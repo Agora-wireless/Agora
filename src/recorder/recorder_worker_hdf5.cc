@@ -190,7 +190,7 @@ void RecorderWorkerHDF5::Init() {
   //with sc_pilot_spacing set to 1, then the offset can be anything but 0
   const auto data_idx =
       CommsLib::GetDataSc(fft_size, sym_data_sc_num, 1, ul_pilot_sc_spacing);
-  if (data_idx.size() > 0) {
+  if (data_idx.empty() == false) {
     hdf5_->WriteAttribute("OFDM_DATA_SC", data_idx);
   }
 
@@ -198,13 +198,13 @@ void RecorderWorkerHDF5::Init() {
   // Pilot subcarriers (indexes)
   const auto pilot_sc_idx = CommsLib::GetPilotScIdx(
       fft_size, sym_data_sc_num, ul_pilot_sc_offset, ul_pilot_sc_spacing);
-  if (pilot_sc_idx.size() > 0) {
+  if (pilot_sc_idx.empty() == false) {
     hdf5_->WriteAttribute("OFDM_PILOT_SC", pilot_sc_idx);
   }
 
   const auto pilot_sc = CommsLib::GetPilotScValue(
       fft_size, sym_data_sc_num, ul_pilot_sc_offset, ul_pilot_sc_spacing);
-  if (pilot_sc.size() > 0) {
+  if (pilot_sc.empty() == false) {
     hdf5_->WriteAttribute("OFDM_PILOT_SC_VALS", pilot_sc);
   }
 
@@ -231,7 +231,7 @@ void RecorderWorkerHDF5::Init() {
   hdf5_->WriteAttribute("UL_DATA_FRAME_NUM", 1);
 
   // Names of Files including uplink tx frequency-domain data
-  if (cfg_->UlTxFreqDataFiles().size() > 0) {
+  if (cfg_->UlTxFreqDataFiles().empty() == false) {
     hdf5_->WriteAttribute("TX_FD_DATA_FILENAMES", cfg_->UlTxFreqDataFiles());
   }
   // *****Temp compatibility values

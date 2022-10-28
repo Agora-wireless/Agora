@@ -230,7 +230,7 @@ class hdf5_lib:
 
         fft_length = int(np.power(2, np.ceil(np.log2(nonzero_sc_size))))
         if fft_length != fft_size:
-            print("Expected fftsize %d, given %d"%(fft_length, fft_size))
+            print("Expected fft size %d, given %d"%(fft_length, fft_size))
             return None, iq
         #start_i = int((fft_length - nonzero_sc_size) // 2)
         #stop_i = int(start_i + nonzero_sc_size)

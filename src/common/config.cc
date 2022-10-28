@@ -28,7 +28,7 @@ static constexpr size_t kMacAlignmentBytes = 64u;
 static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
-static constexpr bool KUseCyclicShift = !kOutputUlScData;
+static constexpr bool kUseCyclicShift = !kOutputUlScData;
 
 static const std::string kLogFilepath =
     TOSTRING(PROJECT_DIRECTORY) "/files/log/";
@@ -968,7 +968,7 @@ void Config::GenData() {
       CommsLib::GetSequence(this->ofdm_data_num_, CommsLib::kLteZadoffChu);
   auto zc_seq = Utils::DoubleToCfloat(zc_seq_double);
   this->common_pilot_ =
-      KUseCyclicShift
+      kUseCyclicShift
           ? CommsLib::SeqCyclicShift(zc_seq, M_PI / 4)  // Used in LTE SRS
           : zc_seq;
 
@@ -1013,7 +1013,7 @@ void Config::GenData() {
   auto zc_ue_pilot = Utils::DoubleToCfloat(zc_ue_pilot_double);
   for (size_t i = 0; i < ue_ant_num_; i++) {
     auto zc_ue_pilot_i =
-        KUseCyclicShift
+        kUseCyclicShift
             ? CommsLib::SeqCyclicShift(
                   zc_ue_pilot,
                   (i + this->ue_ant_offset_) * (float)M_PI / 6)  // LTE DMRS
