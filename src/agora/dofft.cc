@@ -207,6 +207,11 @@ EventData DoFFT::Launch(size_t tag) {
     PartialTranspose(csi_buffers_[frame_slot][ue_id], ant_id,
                      SymbolType::kPilot);
   } else if (sym_type == SymbolType::kUL) {
+    size_t ul_symbol_id = cfg_->Frame().GetULSymbolIdx(symbol_id);
+    if (kCollectPhyStats) {
+      phy_stats_->UpdateUlSnr(frame_id, ul_symbol_id, ant_id,
+                                   fft_inout_);
+    }
     PartialTranspose(cfg_->GetDataBuf(data_buffer_, frame_id, symbol_id),
                      ant_id, SymbolType::kUL);
   } else if (sym_type == SymbolType::kCalUL) {

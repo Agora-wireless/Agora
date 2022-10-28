@@ -87,6 +87,8 @@ PhyStats::PhyStats(Config* const cfg, Direction dir)
                          Agora_memory::Alignment_t::kAlign64);
   ul_pilot_snr_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
                        Agora_memory::Alignment_t::kAlign64);
+  ul_snr_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
+                       Agora_memory::Alignment_t::kAlign64);                 
   bs_noise_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
                    Agora_memory::Alignment_t::kAlign64);
   calib_pilot_snr_.Calloc(kFrameWnd, 2 * cfg->BsAntNum(),
@@ -118,6 +120,7 @@ PhyStats::~PhyStats() {
 
   calib_pilot_snr_.Free();
   ul_pilot_snr_.Free();
+  ul_snr_.Free();
   dl_pilot_snr_.Free();
 
   dl_pilot_rssi_.Free();
@@ -187,6 +190,36 @@ void PhyStats::PrintEvmStats(size_t frame_id) {
   ss << "Frame " << frame_id << " Constellation:\n"
      << "  EVM " << (100.0f * evm_mat) << ", SNR "
      << (-10.0f * arma::log10(evm_mat));
+
+  for (size_t i = 0; i < config_->UeAntNum(); i++) {
+    float max_snr = FLT_MIN;
+    float min_snr = FLT_MAX;
+    size_t min_snr_id = 0;
+    const float* frame_snr =
+        &ul_snr_[frame_id % kFrameWnd][i * config_->BsAntNum()];
+    for (size_t j = 0; j < config_->BsAntNum(); j++) {
+      const size_t radio_id = j / config_->NumChannels();
+      const size_t cell_id = config_->CellId().at(radio_id);
+      if (config_->ExternalRefNode(cell_id) == true &&
+          radio_id == config_->RefRadio(cell_id)) {
+        continue;
+      }
+      if (frame_snr[j] < min_snr) {
+        min_snr = frame_snr[j];
+        min_snr_id = j;
+      }
+      if (frame_snr[j] > max_snr) {
+        max_snr = frame_snr[j];
+      }
+    }
+    if (min_snr == FLT_MAX) {
+      min_snr = -100;
+    }
+    if (max_snr == FLT_MIN) {
+      max_snr = -100;
+    }
+    ss<< "True SNR is: " << (min_snr+max_snr)/2 << "\n";
+  }
   AGORA_LOG_INFO("%s\n", ss.str().c_str());
 }
 
@@ -257,7 +290,7 @@ void PhyStats::PrintUlSnrStats(size_t frame_id) {
     if (max_snr - min_snr > 20 && min_snr < 0) {
       ss << "(Possible bad antenna " << min_snr_id << ") ";
     }
-    if (min_snr > 5.0f){
+    if (min_snr > 10.0f){
       valid_EVM_count_++;
     }
   }
@@ -492,6 +525,27 @@ void PhyStats::UpdateUlPilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
   bs_noise_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
       fb_noise / config_->OfdmCaNum();
   ul_pilot_snr_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
+      (10.0f * std::log10(snr));
+}
+
+void PhyStats::UpdateUlSnr(size_t frame_id, size_t ue_id, size_t ant_id,
+                                complex_float* fft_data) {
+  const arma::cx_fmat fft_mat(reinterpret_cast<arma::cx_float*>(fft_data),
+                              config_->OfdmCaNum(), 1, false);
+  arma::fmat fft_abs_mat = arma::abs(fft_mat);
+  arma::fmat fft_abs_mag = fft_abs_mat % fft_abs_mat;
+  const float rssi = arma::as_scalar(arma::sum(fft_abs_mag));
+  const float noise_per_sc1 = arma::as_scalar(
+      arma::mean(fft_abs_mag.rows(0, config_->OfdmDataStart() - 1)));
+  const float noise_per_sc2 = arma::as_scalar(arma::mean(
+      fft_abs_mag.rows(config_->OfdmDataStop(), config_->OfdmCaNum() - 1)));
+  // Full band noise power
+  const float fb_noise =
+      config_->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
+  const float snr = (rssi - fb_noise) / fb_noise;
+  bs_noise_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
+      fb_noise / config_->OfdmCaNum();
+  ul_snr_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
       (10.0f * std::log10(snr));
 }
 
