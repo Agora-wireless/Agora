@@ -347,6 +347,12 @@ class hdf5_lib:
             ul_slot_num = int(metadata['UL_SYMS'])
         elif 'UL_SLOTS' in metadata:
             ul_slot_num = int(metadata['UL_SLOTS'])
+        if 'UL_PILOT_SLOTS' in metadata:
+            ul_pilot_slot_num = int(metadata['UL_PILOT_SLOTS'])
+        else:
+            ul_pilot_slot_num = 2
+            print('missing UL_PILOT_SLOTS in metadata; using default', ul_pilot_slot_num)
+        ul_data_slot_num = ul_slot_num - ul_pilot_slot_num
         data_sc_ind = np.array(metadata['OFDM_DATA_SC'])
         pilot_sc_ind = np.array(metadata['OFDM_PILOT_SC'])
         pilot_sc_val = np.array(metadata['OFDM_PILOT_SC_VALS'])
@@ -400,23 +406,23 @@ class hdf5_lib:
 
         ul_syms_f_tp = np.transpose(ul_syms_f[:, :, :, :, nonzero_sc_ind], (0, 1, 3, 2, 4))
         # UL DEMULT: #Frames, #OFDM Symbols, #User, #Sample (DATA + PILOT SCs)
-        # We assume the first two slots are pilots used for phase tracking
-        # Slot 2 onwards in Agora are data 
-        ul_demult0 = ofdm_obj.demult(csi, ul_syms_f_tp[:, 0, :, :, :], noise_samps_f, method=method)
-        phase_corr = np.sum(ul_demult0 * np.conj(ue_pilot), axis=3)
-        phase_shift0 = np.angle(phase_corr) 
-        ul_demult1 = ofdm_obj.demult(csi, ul_syms_f_tp[:, 1, :, :, :], noise_samps_f, method=method)
-        phase_corr = np.sum(ul_demult1 * np.conj(ue_pilot), axis=3)
-        phase_shift1 = np.angle(phase_corr)
-        phase_shift = phase_shift1 - phase_shift0
-        phase_err = phase_shift1 + phase_shift
-        ul_demult = ofdm_obj.demult(csi, ul_syms_f_tp[:, 2, :, :, :], noise_samps_f, method=method)
-        phase_comp = np.exp(-1j*phase_err)
-        phase_comp_ext = np.tile(np.expand_dims(phase_comp, axis=3), (1, 1, 1, data_sc_len))
-        ul_equal_syms = np.multiply(ul_demult, phase_comp_ext) #phase_comp_exp
+        # We assume the first two (or more) slots are pilots used for phase tracking
+        # Slot(s) onwards in Agora are data
+        for i in range(ul_pilot_slot_num):
+            ul_demult = ofdm_obj.demult(csi, ul_syms_f_tp[:, i, :, :, :], noise_samps_f, method=method)
+            phase_shift_cur = np.angle(np.sum(ul_demult * np.conj(ue_pilot), axis=3))
+            if i > 0:
+                phase_shift_diff = phase_shift_cur - phase_shift_prev
+            if i < ul_pilot_slot_num - 1:
+                phase_shift_prev = phase_shift_cur
+        for i in range(ul_data_slot_num):
+            phase_shift_cur += phase_shift_diff
+            ul_demult = ofdm_obj.demult(csi, ul_syms_f_tp[:, ul_pilot_slot_num + i, :, :, :], noise_samps_f, method=method)
+            phase_comp = np.exp(-1j * phase_shift_cur)
+            phase_comp_ext = np.tile(np.expand_dims(phase_comp, axis=3), (1, 1, 1, data_sc_len))
+            ul_equal_syms = np.multiply(ul_demult, phase_comp_ext)
         # UL DATA: #Frames, #User, #OFDM Symbols, #DATA SCs
         ul_equal_syms = np.transpose(ul_equal_syms, (0, 2, 1, 3))
-        #ul_equal_syms = np.transpose(ul_demult, (0, 2, 1, 3))
         # UL DATA: #Frames, #User, SLOT DATA SCs
         ul_equal_syms = np.reshape(ul_equal_syms, (ul_equal_syms.shape[0], ul_equal_syms.shape[1], symbol_per_slot * len(data_sc_ind)))
         ul_demod_syms = np.empty(ul_equal_syms.shape, dtype="int")
