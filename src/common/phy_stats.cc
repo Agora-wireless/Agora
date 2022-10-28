@@ -21,10 +21,10 @@ PhyStats::PhyStats(Config* const cfg, Direction dir)
       logger_ber_(CsvLog::kBER, cfg, dir),
       logger_ser_(CsvLog::kSER, cfg, dir),
       logger_csi_(CsvLog::kCSI, cfg, dir),
+      logger_calib_(CsvLog::kCalib, cfg, dir),
       logger_ul_csi_(CsvLog::kULCSI, cfg, dir),
       logger_dl_csi_(CsvLog::kDLCSI, cfg, dir),
-      logger_dl_beam_(CsvLog::kDlBeam, cfg, dir),
-      logger_calib_(CsvLog::kCalib, cfg, dir) {
+      logger_dl_beam_(CsvLog::kDlBeam, cfg, dir) {
   if (dir_ == Direction::kDownlink) {
     num_rx_symbols_ = cfg->Frame().NumDLSyms();
     num_rxdata_symbols_ = cfg->Frame().NumDlDataSyms();

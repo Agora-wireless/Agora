@@ -98,10 +98,10 @@ class PhyStats {
   CsvLog::CsvLogger logger_ber_;
   CsvLog::CsvLogger logger_ser_;
   CsvLog::CsvLogger logger_csi_;
+  CsvLog::CsvLogger logger_calib_;
   CsvLog::MatLogger logger_ul_csi_;
   CsvLog::MatLogger logger_dl_csi_;
   CsvLog::MatLogger logger_dl_beam_;
-  CsvLog::MatLogger logger_calib_;
 };
 
 #endif  // PHY_STATS_H_
