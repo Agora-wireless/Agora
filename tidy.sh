@@ -114,7 +114,7 @@ function performance_autofix() {
 
 
 #cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DDEBUG=true ..
-
+#remove #add_definitions(-DARMA_DONT_USE_WRAPPER -DARMA_DONT_USE_FORTRAN_HIDDEN_ARGS) for clean output
 
 #modernize_headers
 #performance
