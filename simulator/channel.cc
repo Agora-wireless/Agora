@@ -92,7 +92,9 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
       case kRan3Gpp:
         h_ = csi_matrices_.slice(time_slice_id_);
         time_slice_id_++;
-        if (time_slice_id_ == kNumStatsFrames) time_slice_id_ = 0;
+        if (time_slice_id_ == kNumStatsFrames) {
+          time_slice_id_ = 0;
+        }
         // Lte3gpp(fmat_src, fmat_dst);
         break;
     }

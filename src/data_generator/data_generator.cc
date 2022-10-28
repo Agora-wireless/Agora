@@ -474,7 +474,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         scrambler->Scramble(dl_scrambler_buffer.data(), dl_cb_bytes);
       }
 
-      if (dl_cb_padding) {
+      if (dl_cb_padding > 0u) {
         std::memset(&dl_scrambler_buffer.at(dl_cb_bytes), 0u, dl_cb_padding);
       }
       this->GenCodeblock(Direction::kDownlink,
