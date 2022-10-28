@@ -31,6 +31,7 @@ static constexpr bool kPrintDlTxData = false;
 static constexpr bool kPrintDlModData = false;
 static constexpr bool kPrintUplinkInformationBytes = false;
 static constexpr bool kPrintDownlinkInformationBytes = false;
+static constexpr size_t kNumPilotHopSc = 12;
 
 ///Output files
 static const std::string kUlDataPrefix = "orig_ul_data_";
@@ -327,7 +328,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       std::vector<complex_float> pilots_t_ue(
           this->cfg_->OfdmCaNum());  // Zeroed
       for (size_t j = this->cfg_->OfdmDataStart();
-           j < this->cfg_->OfdmDataStop(); j += this->cfg_->UeAntNum()) {
+           j < this->cfg_->OfdmDataStop();
+           j += kNumPilotHopSc > 0 ? kNumPilotHopSc : this->cfg_->UeAntNum()) {
         pilots_t_ue.at(i + j) = pilot_td.at(i + j);
       }
       // Load pilots
