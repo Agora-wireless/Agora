@@ -58,6 +58,8 @@ class PhyStats {
   void UpdateUlCsi(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
   void UpdateDlCsi(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
   void UpdateDlBeam(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
+  void RecordCalibMat(size_t frame_id, size_t sc_id,
+                      const arma::cx_fvec& calib_buffer);
 
  private:
   Config const* const config_;
@@ -81,6 +83,7 @@ class PhyStats {
   Table<float> calib_pilot_snr_;
   Table<float> csi_cond_;
   Table<float> bs_noise_;
+  Table<float> calib_;
 
   arma::cx_fcube gt_cube_;
   size_t num_rx_symbols_;
@@ -98,6 +101,7 @@ class PhyStats {
   CsvLog::MatLogger logger_ul_csi_;
   CsvLog::MatLogger logger_dl_csi_;
   CsvLog::MatLogger logger_dl_beam_;
+  CsvLog::MatLogger logger_calib_;
 };
 
 #endif  // PHY_STATS_H_
