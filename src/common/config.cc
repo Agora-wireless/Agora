@@ -164,24 +164,23 @@ Config::Config(std::string jsonfilename)
     }
   }
 
-  if (ue_radio_id_.empty() == false) {
-    ue_num_ = ue_radio_id_.size();
-    for (size_t i = 0; i < ue_num_; i++) {
-      ue_radio_name_.push_back(
-          "UE" + (ue_radio_id_.at(i).length() > kShortIdLen
-                      ? ue_radio_id_.at(i).substr(ue_radio_id_.at(i).length() -
-                                                  kShortIdLen)
-                      : ue_radio_id_.at(i)));
-    }
-  } else {
+  if (ue_radio_id_.empty()) {
     ue_num_ = tdd_conf.value("ue_radio_num", 8);
     for (size_t ue_radio = 0; ue_radio < ue_num_; ue_radio++) {
-      AGORA_LOG_TRACE("Adding UE_SIM_RADIO_%d\n", ue_radio);
-      const std::string ue_name = "UE_SIM_RADIO_" + std::to_string(ue_radio);
+      std::stringstream ss;
+      ss << std::setw(kShortIdLen) << std::setfill('0') << ue_radio;
+      const std::string ue_name = "UE_SIM_RADIO_" + ss.str();
+      AGORA_LOG_TRACE("Adding %s\n", ue_name.c_str());
       ue_radio_id_.push_back(ue_name);
-      ue_radio_name_.emplace_back(
-          ue_name.substr(ue_name.length() - kShortIdLen));
     }
+  }
+  ue_num_ = ue_radio_id_.size();
+  for (size_t i = 0; i < ue_num_; i++) {
+    ue_radio_name_.push_back(
+        "UE" + (ue_radio_id_.at(i).length() > kShortIdLen
+                    ? ue_radio_id_.at(i).substr(ue_radio_id_.at(i).length() -
+                                                kShortIdLen)
+                    : ue_radio_id_.at(i)));
   }
 
   channel_ = tdd_conf.value("channel", "A");

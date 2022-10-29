@@ -21,7 +21,7 @@ PhyStats::PhyStats(Config* const cfg, Direction dir)
       logger_ber_(CsvLog::kBER, cfg, dir),
       logger_ser_(CsvLog::kSER, cfg, dir),
       logger_csi_(CsvLog::kCSI, cfg, dir),
-      logger_calib_(CsvLog::kCalib, cfg, dir),
+      logger_calib_(CsvLog::kCalib, cfg, dir, true),
       logger_ul_csi_(CsvLog::kULCSI, cfg, dir),
       logger_dl_csi_(CsvLog::kDLCSI, cfg, dir),
       logger_dl_beam_(CsvLog::kDlBeam, cfg, dir) {
