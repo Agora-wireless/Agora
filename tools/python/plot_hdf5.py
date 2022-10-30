@@ -183,9 +183,9 @@ def verify_hdf5(hdf5, frame_i=100, cell_i=0, ofdm_sym_i=0, ant_i=0,
 
         if demod=='zf' or demod=='conj' or demod=='mmse':
             noise_f = None
-            tx_data, ue_pilot = hdf5_lib.load_tx_data(metadata, hdf5.dirpath, userCSI.shape[1])
+            tx_data = hdf5_lib.load_tx_data(metadata, hdf5.dirpath, userCSI.shape[1])
             equalized_symbols, demod_symbols, tx_symbols, slot_evm, slot_evm_snr, slot_ser = \
-                hdf5_lib.demodulate(ul_samps, userCSI, tx_data, ue_pilot, metadata, ue_frame_offset, offset, ul_slot_i, noise_f, demod)
+                hdf5_lib.demodulate(ul_samps, userCSI, tx_data, metadata, ue_frame_offset, offset, ul_slot_i, noise_f, demod)
             plot_constellation_stats(slot_evm, slot_evm_snr, slot_ser, equalized_symbols, tx_symbols, ref_frame, ul_slot_i)
 
     plt.show()

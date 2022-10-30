@@ -209,20 +209,13 @@ void RecorderWorkerHDF5::Init() {
   }
 
   // Freq. Domain Pilot symbols (2 for complex)
-  auto pilot_sym_f =
-      CommsLib::GetSequence(sym_data_sc_num, CommsLib::kLteZadoffChu);
-  RtAssert(pilot_sym_f.size() == 2,
-           "pilot_sym_f must be complex (dimension 2)");
-  const size_t pilot_f_samples = pilot_sym_f.at(0).size();
-  RtAssert(pilot_sym_f.at(0).size() == pilot_sym_f.at(1).size(),
-           "pilot_sym_f must have equal dimensions");
   std::vector<double> split_vec_pilot_f(2 * fft_size, 0.0);
   const auto ofdm_data_start = cfg_->OfdmDataStart();
-  for (size_t i = 0; i < pilot_f_samples; i++) {
+  for (size_t i = 0; i < cfg_->OfdmDataNum(); i++) {
     split_vec_pilot_f[(2 * (ofdm_data_start + i)) + 0] =
-        pilot_sym_f.at(0).at(i);
+        cfg_->CommonPilot().at(i).real();
     split_vec_pilot_f[(2 * (ofdm_data_start + i)) + 1] =
-        pilot_sym_f.at(1).at(i);
+        cfg_->CommonPilot().at(i).imag();
   }
   hdf5_->WriteAttribute("OFDM_PILOT_F", split_vec_pilot_f);
 

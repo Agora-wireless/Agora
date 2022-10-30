@@ -28,7 +28,6 @@ static constexpr size_t kMacAlignmentBytes = 64u;
 static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
-static constexpr bool kUseCyclicShift = !kOutputUlScData;
 
 static const std::string kLogFilepath =
     TOSTRING(PROJECT_DIRECTORY) "/files/log/";
@@ -38,8 +37,6 @@ static const std::string kUlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_ul_data_";
 static const std::string kDlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_dl_data_";
-static const std::string kUlPilotFreqPrefix =
-    kExperimentFilepath + "ue_pilot_data_f_";
 static const std::string kUlDataFreqPrefix = kExperimentFilepath + "ul_data_f_";
 
 Config::Config(std::string jsonfilename)
@@ -967,9 +964,7 @@ void Config::GenData() {
       CommsLib::GetSequence(this->ofdm_data_num_, CommsLib::kLteZadoffChu);
   auto zc_seq = Utils::DoubleToCfloat(zc_seq_double);
   this->common_pilot_ =
-      kUseCyclicShift
-          ? CommsLib::SeqCyclicShift(zc_seq, M_PI / 4)  // Used in LTE SRS
-          : zc_seq;
+      CommsLib::SeqCyclicShift(zc_seq, M_PI / 4);  // Used in LTE SRS
 
   this->pilots_ = static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64,
@@ -1007,16 +1002,10 @@ void Config::GenData() {
   Table<complex_float> ue_pilot_ifft;
   ue_pilot_ifft.Calloc(this->ue_ant_num_, this->ofdm_ca_num_,
                        Agora_memory::Alignment_t::kAlign64);
-  auto zc_ue_pilot_double =
-      CommsLib::GetSequence(this->ofdm_data_num_, CommsLib::kLteZadoffChu);
-  auto zc_ue_pilot = Utils::DoubleToCfloat(zc_ue_pilot_double);
   for (size_t i = 0; i < ue_ant_num_; i++) {
-    auto zc_ue_pilot_i =
-        kUseCyclicShift
-            ? CommsLib::SeqCyclicShift(
-                  zc_ue_pilot,
-                  (i + this->ue_ant_offset_) * (float)M_PI / 6)  // LTE DMRS
-            : zc_ue_pilot;
+    auto zc_ue_pilot_i = CommsLib::SeqCyclicShift(
+        zc_seq,
+        (i + this->ue_ant_offset_) * (float)M_PI / 6);  // LTE DMRS
     for (size_t j = 0; j < this->ofdm_data_num_; j++) {
       this->ue_specific_pilot_[i][j] = {zc_ue_pilot_i[j].real(),
                                         zc_ue_pilot_i[j].imag()};
@@ -1025,26 +1014,6 @@ void Config::GenData() {
                            ? j + ofdm_data_start_ - ofdm_ca_num_ / 2
                            : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
       ue_pilot_ifft[i][k] = this->ue_specific_pilot_[i][j];
-    }
-    if (kOutputUlScData) {
-      const std::string filename_ul_pilot_f =
-          kUlPilotFreqPrefix + std::to_string(i) + ".bin";
-      FILE* fp_tx_f = std::fopen(filename_ul_pilot_f.c_str(), "wb");
-      if (fp_tx_f == nullptr) {
-        AGORA_LOG_ERROR("Failed to create ul sc pilot file %s. Error %s.\n",
-                        filename_ul_pilot_f.c_str(), strerror(errno));
-        throw std::runtime_error("Config: Failed to create ul sc pilot file");
-      } else {
-        const auto write_status = std::fwrite(
-            ue_pilot_ifft[i], sizeof(complex_float), ofdm_ca_num_, fp_tx_f);
-        if (write_status != ofdm_ca_num_) {
-          AGORA_LOG_ERROR("Config: Failed to write ul sc pilot file\n");
-        }
-        const auto close_status = std::fclose(fp_tx_f);
-        if (close_status != 0) {
-          AGORA_LOG_ERROR("Config: Failed to close ul sc pilot file\n");
-        }
-      }
     }
     CommsLib::IFFT(ue_pilot_ifft[i], ofdm_ca_num_, false);
   }

@@ -305,29 +305,16 @@ class hdf5_lib:
                 I = np.array(txdata0[0::2])
                 Q = np.array(txdata0[1::2])
                 IQ = I + Q * 1j
+                # frames, users, ul_slots, sym_per_slots, fft_size
                 txdata[:, cl:cl+cl_ch_num, :, :, :] = np.transpose(np.reshape(IQ, (ul_data_frame_num, ul_slot_num,
                     cl_ch_num, symbol_per_slot, fft_size)), (0, 2, 1, 3, 4))
                 txdata = np.fft.fftshift(txdata, 4)
             cl = cl + cl_ch_num
         
-        data_sc_len = len(metadata['OFDM_DATA_SC'])
-        ue_pilot = np.empty((n_users, data_sc_len), dtype='complex64')
-        for i in range(n_users):
-            ue_pilot_file_path = "ue_pilot_data_f_" + str(i) + ".bin"
-            if dirpath != "":
-                ue_pilot_file_path = dirpath + '/' + ue_pilot_file_path
-            with open(ue_pilot_file_path, mode='rb') as f:
-                pilot_data = list(struct.unpack('f'*(2 * fft_size), f.read(4*2*fft_size)))
-                I = np.array(pilot_data[0::2])
-                Q = np.array(pilot_data[1::2])
-                IQ = I + Q * 1j
-                IQ = np.fft.fftshift(IQ, 0)
-                ue_pilot[i, :] = IQ[data_sc_ind] 
-                #print('pilot compare diff', ue_pilot[i, :] - pilot_sc_val)
-        return txdata, ue_pilot
+        return txdata
 
     @staticmethod
-    def demodulate(ul_samps, csi, txdata, ue_pilot, metadata, ue_frame_offset, offset, ul_slot_i, noise_samps_f=None, method='zf'):
+    def demodulate(ul_samps, csi, txdata, metadata, ue_frame_offset, offset, ul_slot_i, noise_samps_f=None, method='zf'):
         if method.lower() == 'mmse' and noise_samps_f is None:
             print("%s requires noise samples"%(method))
             return None
@@ -395,6 +382,7 @@ class hdf5_lib:
         if frac_fr > 0:
             frac = txdata[:frac_fr, :, :, :]
             tx_symbols = frac if rep == 0 else np.concatenate((tx_symbols, frac), axis=0)
+        # frames, users, ul_slots, sym_per_slots * sym_samps
         tx_data_syms = np.reshape(tx_symbols[:, :, :, :, data_sc_ind], (tx_symbols.shape[0], tx_symbols.shape[1], tx_symbols.shape[2], symbol_per_slot * data_sc_len))
         useful_frame_num = tx_data_syms.shape[0]
         if txdata.shape[0] > 1:
@@ -410,11 +398,15 @@ class hdf5_lib:
         # Slot(s) onwards in Agora are data
         for i in range(ul_pilot_slot_num):
             ul_demult = ofdm_obj.demult(csi, ul_syms_f_tp[:, i, :, :, :], noise_samps_f, method=method)
+            #tx_ue_pilot = np.transpose(tx_data_syms, (0, 2, 1, 3))
+            ue_pilot = tx_data_syms[0, :, 0, :]
+            #phase_shift_cur = np.angle(np.sum(np.multiply(ul_demult, np.conj(tx_ue_pilot[:, i:i+1, :, :])), axis=3))
             phase_shift_cur = np.angle(np.sum(ul_demult * np.conj(ue_pilot), axis=3))
             if i > 0:
                 phase_shift_diff = phase_shift_cur - phase_shift_prev # Only using the diff between the last two pilots
             if i < ul_pilot_slot_num - 1:
                 phase_shift_prev = phase_shift_cur
+        print(phase_shift_cur.shape)
         for i in range(ul_data_slot_num):
             phase_shift_cur += phase_shift_diff
             ul_demult = ofdm_obj.demult(csi, ul_syms_f_tp[:, ul_pilot_slot_num + i, :, :, :], noise_samps_f, method=method)
@@ -423,17 +415,10 @@ class hdf5_lib:
             ul_equal_syms = np.multiply(ul_demult, phase_comp_ext) # Only keeping the last data slot result
         # UL DATA: #Frames, #User, #OFDM Symbols, #DATA SCs
         ul_equal_syms = np.transpose(ul_equal_syms, (0, 2, 1, 3))
+        print(ul_equal_syms.shape)
         # UL DATA: #Frames, #User, SLOT DATA SCs
         ul_equal_syms = np.reshape(ul_equal_syms, (ul_equal_syms.shape[0], ul_equal_syms.shape[1], symbol_per_slot * len(data_sc_ind)))
         ul_demod_syms = np.empty(ul_equal_syms.shape, dtype="int")
-
-        M = 2
-        if modulation == 'QPSK':
-            M = 4
-        elif modulation == '16QAM':
-            M = 16
-        elif modulation == '64QAM':
-            M = 64
 
         for j in range(n_users):
             frame_start = 0 if txdata.shape[0] == 1 else min_ue_offset
