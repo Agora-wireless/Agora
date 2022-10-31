@@ -32,7 +32,7 @@ CsvLogger::CsvLogger([[maybe_unused]] size_t log_id,
       radio_name = "BS";
       data_avail = (bs_only == true || cfg->Frame().NumULSyms() > 0);
     } else {
-      radio_name = cfg->UeRadioName().at(0);
+      radio_name = "UE";
       data_avail = (bs_only == false && cfg->Frame().NumDLSyms() > 0);
     }
     if (data_avail) {
