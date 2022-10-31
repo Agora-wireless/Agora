@@ -53,28 +53,36 @@ class CommsLib {
   static std::vector<std::vector<double>> GetSequence(size_t seq_len, int type);
   static std::vector<std::complex<float>> Modulate(
       const std::vector<int8_t>& in, int type);
-  static std::vector<int> GetDataSc(int fftSize);
-  static std::vector<int> GetNullSc(int fftSize);
-  static std::vector<int> GetPilotScInd(int fftSize);
-  static std::vector<std::complex<float>> GetPilotSc(int fftSize);
-  static MKL_LONG FFT(std::vector<std::complex<float>>& in_out, int fftsize);
-  static MKL_LONG IFFT(std::vector<std::complex<float>>& in_out, int fftsize,
+
+  static std::vector<size_t> GetDataSc(size_t fft_size, size_t data_sc_num,
+                                       size_t pilot_sc_offset,
+                                       size_t pilot_sc_spacing);
+  static std::vector<size_t> GetNullSc(size_t fft_size, size_t data_sc_num);
+  static std::vector<std::complex<float>> GetPilotScValue(
+      size_t fft_size, size_t data_sc_num, size_t pilot_sc_offset,
+      size_t pilot_sc_spacing);
+  static std::vector<size_t> GetPilotScIdx(size_t fft_size, size_t data_sc_num,
+                                           size_t pilot_sc_offset,
+                                           size_t pilot_sc_spacing);
+
+  static MKL_LONG FFT(std::vector<std::complex<float>>& in_out, int fft_size);
+  static MKL_LONG IFFT(std::vector<std::complex<float>>& in_out, int fft_size,
                        bool normalize = true);
-  static MKL_LONG FFT(complex_float* in_out, int fftsize);
-  static MKL_LONG IFFT(complex_float* in_out, int fftsize,
+  static MKL_LONG FFT(complex_float* in_out, int fft_size);
+  static MKL_LONG IFFT(complex_float* in_out, int fft_size,
                        bool normalize = true);
   static std::vector<std::complex<float>> FFTShift(
       const std::vector<std::complex<float>>& in);
   static std::vector<complex_float> FFTShift(
       const std::vector<complex_float>& in);
-  static void FFTShift(complex_float* in, complex_float* tmp, int fftsize);
+  static void FFTShift(complex_float* in, complex_float* tmp, int fft_size);
 
   static float ComputeOfdmSnr(const std::vector<std::complex<float>>& data_t,
                               size_t data_start_index, size_t data_stop_index);
   static size_t FindPilotSeq(const std::vector<std::complex<float>>& iq,
                              const std::vector<std::complex<float>>& pilot,
                              size_t seq_len);
-  static int FindLts(const std::vector<std::complex<double>>& iq, int seqLen);
+  static int FindLts(const std::vector<std::complex<double>>& iq, int seq_len);
   template <typename T>
   static std::vector<T> Convolve(std::vector<std::complex<T>> const& f,
                                  std::vector<std::complex<T>> const& g);
@@ -89,19 +97,20 @@ class CommsLib {
   }
   static std::vector<float> MagnitudeFft(
       std::vector<std::complex<float>> const& samps,
-      std::vector<float> const& win, size_t fftSize);
-  static std::vector<float> HannWindowFunction(size_t fftSize);
+      std::vector<float> const& win, size_t fft_size);
+  static std::vector<float> HannWindowFunction(size_t fft_size);
   static double WindowFunctionPower(std::vector<float> const& win);
-  static float FindTone(std::vector<float> const& magnitude, double winGain,
-                        double fftBin, size_t fftSize, const size_t delta = 10);
+  static float FindTone(std::vector<float> const& magnitude, double win_gain,
+                        double fft_bin, size_t fft_size,
+                        const size_t delta = 10);
   static float MeasureTone(std::vector<std::complex<float>> const& samps,
-                           std::vector<float> const& win, double winGain,
-                           double fftBin, size_t fftSize,
+                           std::vector<float> const& win, double win_gain,
+                           double fft_bin, size_t fft_size,
                            const size_t delta = 10);
   static std::vector<std::complex<float>> ComposePartialPilotSym(
       const std::vector<std::complex<float>>& pilot, size_t offset,
-      size_t pilot_sc_num, size_t fftSize, size_t dataSize, size_t dataStart,
-      size_t CP_LEN, bool interleaved_pilot, bool timeDomain = true);
+      size_t pilot_sc_num, size_t fft_size, size_t data_size, size_t data_start,
+      size_t cp_len, bool interleaved_pilot, bool time_domain = true);
   static std::vector<std::complex<float>> SeqCyclicShift(
       const std::vector<std::complex<float>>& in, float alpha);
   static float FindMaxAbs(const complex_float* in, size_t len);

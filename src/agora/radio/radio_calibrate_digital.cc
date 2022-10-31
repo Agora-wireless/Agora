@@ -317,7 +317,7 @@ static void CheckSnr(
   RtAssert(data_stop < check_buff.at(0).size(),
            "Data samples go beyond received symbol boundary. Consider changing "
            "the ofdm_tx_zero_postfix parameter!");
-  for (auto& i : check_buff) {
+  for (const auto& i : check_buff) {
     //*2 for complex
     ConvertShortToFloat(reinterpret_cast<const short*>(i.data()),
                         reinterpret_cast<float*>(ofdm_data.data()),

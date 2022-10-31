@@ -20,7 +20,8 @@ static constexpr size_t kDExtendDimIdx = 0;
 
 Hdf5Lib::Hdf5Lib(H5std_string hdf5_name, H5std_string group_name)
     : hdf5_name_(std::move(hdf5_name)), group_name_(std::move(group_name)) {
-  AGORA_LOG_INFO("Creating output HD5F file: %s\n", hdf5_name_.c_str());
+  AGORA_LOG_TRACE("Hdf5Lib::Creating output HD5F file: %s\n",
+                  hdf5_name_.c_str());
   file_ = std::make_unique<H5::H5File>(hdf5_name_, H5F_ACC_TRUNC);
   group_ = std::make_unique<H5::Group>(file_->createGroup("/" + group_name_));
   ///Disable for debugging
@@ -29,11 +30,12 @@ Hdf5Lib::Hdf5Lib(H5std_string hdf5_name, H5std_string group_name)
 
 Hdf5Lib::~Hdf5Lib() {
   for (auto& value : ds_name_id_) {
-    AGORA_LOG_INFO("%s - Finalizing Dataset\n", value.first.c_str());
+    AGORA_LOG_INFO("Hdf5Lib::%s - Finalizing Dataset\n", value.first.c_str());
     if (datasets_.at(value.second) != nullptr) {
       datasets_.at(value.second)->close();
     } else {
-      AGORA_LOG_WARN("%s - Dataset already closed\n", value.first.c_str());
+      AGORA_LOG_WARN("Hdf5Lib::%s - Dataset already closed\n",
+                     value.first.c_str());
     }
     datasets_.at(value.second).reset();
   }

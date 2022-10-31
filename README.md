@@ -267,6 +267,40 @@ The steps to collect and analyze timestamp traces are as follows:
   * The timestamps will be saved in files/experiment/timeresult.txt after Agora finishes processing. We can then use a [MATLAB script](matlab/parsedata_ul.m) to process the timestamp trace. 
   * We also provide MATLAB scripts for [uplink](matlab/parse_multi_file_ul) and [downlink](matlab/parse_multi_file_dl) that are able to process multiple timestamp files and generate figures reported in our [paper](#documentation).
 
+Log and plot PHY stats:
+  * Compile the code with
+    <pre>
+    $ cmake .. -DENABLE_CSV_LOG=True
+    </pre>
+  * Run test with desired config; log files will be created in a directory named with timestamp under the files/log/ folder
+  * Run plot_csv.py with csv file input
+    <pre>
+    $ python3 tools/python/plot_csv.py [max_frames] [X_label] [Y_label] [legend_name] < path/to/log/log-xyz.csv
+    With optional paramters, e.g.,
+    $ python3 tools/python/plot_csv.py 1000 Frame EVM UE < files/log/2022-10-25-15-46-55/log-evm-BS.csv
+    or set max_frames to 0 to plot all frames, e.g.,
+    $ python3 tools/python/plot_csv.py 0 Frame EVM UE < files/log/2022-10-25-15-46-55/log-evm-BS.csv
+    or without any paramter to plot as default, e.g.,
+    $ python3 tools/python/plot_csv.py < files/log/2022-10-25-15-46-55/log-evm-BS.csv
+    Note the < operator is required.
+    </pre>
+  * (Optional) Run plot_csv.py with UDP input
+    Set log listener IP address and port in config file, e.g.,
+    <pre>
+    "log_listener_addr": "127.0.0.1",
+    "log_listener_port": 33300
+    </pre>
+    Before start, run the command on the listener machine (which has the specified IP address):
+    <pre>
+    $ nc -u -l [port_number] | python3 tools/python/plot_csv.py [max_frames] [X_label] [Y_label] [legend_name]
+    port_number (required) is log_listener_port + log_id (defined in csv_logger.h);
+    max_frames (required) is a positive integer no greater than the maximum transfered frames.
+    For example,
+    $ nc -u -l 33303 | python3 tools/python/plot_csv.py 1000 Frame EVM UE
+    Repeat with multiple ports for more logs if desired.
+    </pre>
+    Run test; plots will be shown when max_frames is reached.
+
 ## Contributing to Agora
 Agora is open-source and open to your contributions. Before contributing, please read [this](CONTRIBUTING.md).
 

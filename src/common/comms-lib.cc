@@ -51,12 +51,13 @@ size_t CommsLib::FindPilotSeq(const std::vector<std::complex<float>>& iq,
   return best_peak;
 }
 
-int CommsLib::FindLts(const std::vector<std::complex<double>>& iq, int seqLen) {
+int CommsLib::FindLts(const std::vector<std::complex<double>>& iq,
+                      int seq_len) {
   /*
    * Find 802.11-based LTS (Long Training Sequence)
    * Input:
    *     iq        - IQ complex samples (vector)
-   *     seqLen    - Length of sequence
+   *     seq_len    - Length of sequence
    * Output:
    *     best_peak - LTS peak index (correlation peak)
    */
@@ -65,16 +66,16 @@ int CommsLib::FindLts(const std::vector<std::complex<double>>& iq, int seqLen) {
   int best_peak;
 
   // Original LTS sequence
-  auto lts_seq = CommsLib::GetSequence(seqLen, kLtsSeq);
+  auto lts_seq = CommsLib::GetSequence(seq_len, kLtsSeq);
 
   // Re-arrange into complex vector, flip, and compute conjugate
   std::vector<std::complex<double>> lts_sym;
   std::vector<std::complex<double>> lts_sym_conj;
   for (int i = 0; i < 64; i++) {
-    // lts_seq is a 2x160 matrix (real/imag by seqLen=160 elements)
+    // lts_seq is a 2x160 matrix (real/imag by seq_len=160 elements)
     // grab one symbol and flip around
-    lts_sym.emplace_back(lts_seq.at(0).at(seqLen - 1 - i),
-                         lts_seq.at(1).at(seqLen - 1 - i));
+    lts_sym.emplace_back(lts_seq.at(0).at(seq_len - 1 - i),
+                         lts_seq.at(1).at(seq_len - 1 - i));
     // conjugate
     lts_sym_conj.push_back(std::conj(lts_sym.at(i)));
   }
@@ -235,24 +236,24 @@ std::vector<T> CommsLib::Convolve(std::vector<std::complex<T>> const& f,
 
 std::vector<float> CommsLib::MagnitudeFft(
     std::vector<std::complex<float>> const& samps,
-    std::vector<float> const& win, size_t fftSize) {
+    std::vector<float> const& win, size_t fft_size) {
   std::vector<std::complex<float>> pre_fft(samps.size());
 
-  for (size_t n = 0; n < fftSize; n++) {
+  for (size_t n = 0; n < fft_size; n++) {
     pre_fft[n] = samps[n] * win[n];
   }
 
-  CommsLib::FFT(pre_fft, fftSize);
+  CommsLib::FFT(pre_fft, fft_size);
   //pre_fft has now been modified, giving it another name for code clarity
   std::vector<std::complex<float>>& fft_samps = pre_fft;
 
   // compute magnitudes
   std::vector<float> fft_mag;
-  fft_mag.reserve(fftSize);
-  for (size_t n = (fftSize / 2); n < fftSize; n++) {
+  fft_mag.reserve(fft_size);
+  for (size_t n = (fft_size / 2); n < fft_size; n++) {
     fft_mag.push_back(std::norm(fft_samps[n]));
   }
-  for (size_t n = 0; n < fftSize / 2; n++) {
+  for (size_t n = 0; n < fft_size / 2; n++) {
     fft_mag.push_back(std::norm(fft_samps[n]));
   }
   // not sure why we need reverse here, but
@@ -262,21 +263,21 @@ std::vector<float> CommsLib::MagnitudeFft(
 }
 
 // Take ffsSize samples of (1 - cos(x)) / 2 from 0 up to 2pi
-std::vector<float> CommsLib::HannWindowFunction(size_t fftSize) {
+std::vector<float> CommsLib::HannWindowFunction(size_t fft_size) {
   std::vector<float> win_fcn(1, 0);
-  double step = 2 * M_PI / fftSize;
+  double step = 2 * M_PI / fft_size;
 
   // Compute the samples for the first half.
-  for (size_t n = 1; n < fftSize / 2; n++) {
+  for (size_t n = 1; n < fft_size / 2; n++) {
     win_fcn.push_back((1 - std::cos(step * n)) / 2);
   }
   // If a sample lies at the center, just use (1-cos(pi))/2 == 1.
-  if (fftSize % 2 == 0) {
+  if (fft_size % 2 == 0) {
     win_fcn.push_back(1);
   }
   // The second half is a mirror image of the first, so just copy.
-  for (size_t n = fftSize / 2 + 1; n < fftSize; n++) {
-    win_fcn.push_back(win_fcn[fftSize - n]);
+  for (size_t n = fft_size / 2 + 1; n < fft_size; n++) {
+    win_fcn.push_back(win_fcn[fft_size - n]);
   }
   return win_fcn;
 }
@@ -291,83 +292,127 @@ double CommsLib::WindowFunctionPower(std::vector<float> const& win) {
   return 20 * std::log10(window_size * window_power);
 }
 
-float CommsLib::FindTone(std::vector<float> const& magnitude, double winGain,
-                         double fftBin, size_t fftSize, const size_t delta) {
+float CommsLib::FindTone(std::vector<float> const& magnitude, double win_gain,
+                         double fft_bin, size_t fft_size, const size_t delta) {
   /*
    * Find the tone level at a specific interval in the input Power Spectrum
-   * fftBins assumed interval is [-0.5, 0.5] which is coverted to [0,
-   * fftSize-1]
+   * fft_bins assumed interval is [-0.5, 0.5] which is coverted to [0,
+   * fft_size-1]
    */
   // make sure we don't exceed array bounds
-  size_t first =
-      std::max<size_t>(0, std::lround((fftBin + 0.5) * fftSize) - delta);
-  size_t last = std::min<size_t>(fftSize - 1,
-                                 std::lround((fftBin + 0.5) * fftSize) + delta);
+  const size_t first =
+      std::max<size_t>(0, std::lround((fft_bin + 0.5) * fft_size) - delta);
+  const size_t last = std::min<size_t>(
+      fft_size - 1, std::lround((fft_bin + 0.5) * fft_size) + delta);
   float ref_level = magnitude[last];
   for (size_t n = first; n < last; n++) {
     if (magnitude[n] > ref_level) {
       ref_level = magnitude[n];
     }
   }
-  return 10 * std::max(std::log10(ref_level), (float)(-20.0)) - (float)winGain;
+  return 10 * std::max(std::log10(ref_level), (float)(-20.0f)) -
+         (float)win_gain;
 }
 
 float CommsLib::MeasureTone(std::vector<std::complex<float>> const& samps,
-                            std::vector<float> const& win, double winGain,
-                            double fftBin, size_t fftSize, const size_t delta) {
-  return FindTone(MagnitudeFft(samps, win, fftSize), winGain, fftBin, fftSize,
-                  delta);
+                            std::vector<float> const& win, double win_gain,
+                            double fft_bin, size_t fft_size,
+                            const size_t delta) {
+  return FindTone(MagnitudeFft(samps, win, fft_size), win_gain, fft_bin,
+                  fft_size, delta);
 }
 
-std::vector<int> CommsLib::GetDataSc(int fftSize) {
-  std::vector<int> data_sc;
-  if (fftSize == 64) {
-    int sc_ind[48] = {1,  2,  3,  4,  5,  6,  8,  9,  10, 11, 12, 13,
-                      14, 15, 16, 17, 18, 19, 20, 22, 23, 24, 25, 26,
-                      38, 39, 40, 41, 42, 44, 45, 46, 47, 48, 49, 50,
-                      51, 52, 53, 54, 55, 56, 58, 59, 60, 61, 62, 63};
-    data_sc.assign(sc_ind, sc_ind + 48);
+std::vector<size_t> CommsLib::GetDataSc(size_t fft_size, size_t data_sc_num,
+                                        size_t pilot_sc_offset,
+                                        size_t pilot_sc_spacing) {
+  std::vector<size_t> data_sc;
+  if (fft_size == kFftSize_80211) {
+    // We follow 802.11 PHY format here
+    const size_t sc_ind[48u] = {1,  2,  3,  4,  5,  6,  8,  9,  10, 11, 12, 13,
+                                14, 15, 16, 17, 18, 19, 20, 22, 23, 24, 25, 26,
+                                38, 39, 40, 41, 42, 44, 45, 46, 47, 48, 49, 50,
+                                51, 52, 53, 54, 55, 56, 58, 59, 60, 61, 62, 63};
+    data_sc.assign(sc_ind, sc_ind + 48u);
   } else {
-    for (int i = 0; i < fftSize; i++) {
-      data_sc.push_back(i);
+    // Allocate the center subcarriers as data
+    const size_t start_sc = (fft_size - data_sc_num) / 2;
+    const size_t stop_sc = start_sc + data_sc_num;
+    for (size_t i = start_sc; i < stop_sc; i++) {
+      const size_t sc_cnt = i - start_sc;
+      if ((sc_cnt % pilot_sc_spacing) != pilot_sc_offset) {
+        data_sc.push_back(i);
+      }
     }
   }
   return data_sc;
 }
 
-std::vector<int> CommsLib::GetNullSc(int fftSize) {
-  std::vector<int> null_sc;
-  if (fftSize == 64) {
-    int null[12] = {0, 1, 2, 3, 4, 5, 32, 59, 60, 61, 62, 63};
-    null_sc.assign(null, null + 12);
+std::vector<size_t> CommsLib::GetNullSc(size_t fft_size, size_t data_sc_num) {
+  std::vector<size_t> null_sc;
+  if (fft_size == kFftSize_80211) {
+    // We follow 802.11 PHY format here
+    size_t null[12u] = {0, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37};
+    null_sc.assign(null, null + 12u);
+  } else {  // Allocate the boundary subcarriers as null
+    const size_t start_sc = (fft_size - data_sc_num) / 2;
+    const size_t stop_sc = start_sc + data_sc_num;
+    for (size_t i = 0; i < start_sc; i++) {
+      null_sc.push_back(i);
+    }
+    for (size_t i = stop_sc; i < fft_size; i++) {
+      null_sc.push_back(i);
+    }
   }
   return null_sc;
 }
 
-std::vector<int> CommsLib::GetPilotScInd(int fftSize) {
-  std::vector<int> pilot_sc;
-  if (fftSize == 64) {
-    int sc_ind[4] = {7, 21, 43, 57};
-    pilot_sc.assign(sc_ind, sc_ind + 4);
-  }
-  return pilot_sc;
-}
-
-std::vector<std::complex<float>> CommsLib::GetPilotSc(int fftSize) {
+std::vector<std::complex<float>> CommsLib::GetPilotScValue(
+    size_t fft_size, size_t data_sc_num, size_t pilot_sc_offset,
+    size_t pilot_sc_spacing) {
   std::vector<std::complex<float>> pilot_sc;
-  if (fftSize == 64) {
-    std::complex<float> sc_val[4] = {1.0, 1.0, -1.0, 1.0};
-    pilot_sc.assign(sc_val, sc_val + 4);
+  if (fft_size == kFftSize_80211) {
+    // We follow 802.11 PHY format here
+    std::complex<float> sc_val[4] = {
+        std::complex<float>(1.0f, 0.0f), std::complex<float>(1.0f, 0.0f),
+        std::complex<float>(-1.0f, 0.0f), std::complex<float>(1.0f, 0.0f)};
+    pilot_sc.assign(sc_val, sc_val + 4u);
+  } else {
+    const auto zc_seq_double =
+        CommsLib::GetSequence(data_sc_num, CommsLib::kLteZadoffChu);
+    const auto zc_seq = Utils::DoubleToCfloat(zc_seq_double);
+    for (size_t i = pilot_sc_offset; i < zc_seq.size(); i += pilot_sc_spacing) {
+      pilot_sc.push_back(zc_seq.at(i));
+    }
   }
   return pilot_sc;
 }
 
-MKL_LONG CommsLib::IFFT(std::vector<std::complex<float>>& in_out, int fftsize,
+std::vector<size_t> CommsLib::GetPilotScIdx(size_t fft_size, size_t data_sc_num,
+                                            size_t pilot_sc_offset,
+                                            size_t pilot_sc_spacing) {
+  std::vector<size_t> pilot_sc;
+  if (fft_size == kFftSize_80211) {
+    // We follow 802.11 standard here
+    const size_t sc_ind[4u] = {7, 21, 43, 57};
+    pilot_sc.assign(sc_ind, sc_ind + 4);
+  } else {  // consider center subcarriers
+    const size_t start_sc = (fft_size - data_sc_num) / 2;
+    const size_t stop_sc = start_sc + data_sc_num;
+    // pilot at the center of each RB
+    for (size_t i = start_sc + pilot_sc_offset; i < stop_sc;
+         i += pilot_sc_spacing) {
+      pilot_sc.push_back(i);
+    }
+  }
+  return pilot_sc;
+}
+
+MKL_LONG CommsLib::IFFT(std::vector<std::complex<float>>& in_out, int fft_size,
                         bool normalize) {
   DFTI_DESCRIPTOR_HANDLE mkl_handle;
   MKL_LONG status;
   status =
-      DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
+      DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fft_size);
   if (status != DFTI_NO_ERROR) {
     AGORA_LOG_ERROR("Error creating descriptor in CommsLib::IFFT%s\n",
                     DftiErrorMessage(status));
@@ -393,29 +438,29 @@ MKL_LONG CommsLib::IFFT(std::vector<std::complex<float>>& in_out, int fftsize,
     if (normalize) {
       float max_val = 0;
       const float scale = 0.5;
-      for (int i = 0; i < fftsize; i++) {
+      for (int i = 0; i < fft_size; i++) {
         if (std::abs(in_out[i]) > max_val) {
           max_val = std::abs(in_out[i]);
         }
       }
       // std::cout << "IFFT output is normalized with "
       //         << std::to_string(max_val) << std::endl;
-      for (int i = 0; i < fftsize; i++) {
+      for (int i = 0; i < fft_size; i++) {
         in_out[i] /= (max_val / scale);
       }
     } else {
-      for (int i = 0; i < fftsize; i++) {
-        in_out[i] /= fftsize;
+      for (int i = 0; i < fft_size; i++) {
+        in_out[i] /= fft_size;
       }
     }
   }
   return status;
 }
 
-MKL_LONG CommsLib::FFT(std::vector<std::complex<float>>& in_out, int fftsize) {
+MKL_LONG CommsLib::FFT(std::vector<std::complex<float>>& in_out, int fft_size) {
   DFTI_DESCRIPTOR_HANDLE mkl_handle;
   MKL_LONG status =
-      DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
+      DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fft_size);
 
   if (status != DFTI_NO_ERROR) {
     AGORA_LOG_ERROR("Error creating descriptor in CommsLib::FFT%s\n",
@@ -444,11 +489,11 @@ MKL_LONG CommsLib::FFT(std::vector<std::complex<float>>& in_out, int fftsize) {
   return status;
 }
 
-MKL_LONG CommsLib::IFFT(complex_float* in_out, int fftsize, bool normalize) {
+MKL_LONG CommsLib::IFFT(complex_float* in_out, int fft_size, bool normalize) {
   DFTI_DESCRIPTOR_HANDLE mkl_handle;
 
   MKL_LONG status =
-      DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
+      DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fft_size);
   if (status != DFTI_NO_ERROR) {
     AGORA_LOG_ERROR("Error creating descriptor in CommsLib::IFFT%s\n",
                     DftiErrorMessage(status));
@@ -474,7 +519,7 @@ MKL_LONG CommsLib::IFFT(complex_float* in_out, int fftsize, bool normalize) {
     if (normalize == true) {
       float max_val = 0;
       const float scale = 0.5;
-      for (int i = 0; i < fftsize; i++) {
+      for (int i = 0; i < fft_size; i++) {
         const float sc_abs =
             std::abs(std::complex<float>(in_out[i].re, in_out[i].im));
         if (sc_abs > max_val) {
@@ -483,24 +528,24 @@ MKL_LONG CommsLib::IFFT(complex_float* in_out, int fftsize, bool normalize) {
       }
       // std::cout << "IFFT output is normalized with "
       //         << std::to_string(max_val) << std::endl;
-      for (int i = 0; i < fftsize; i++) {
+      for (int i = 0; i < fft_size; i++) {
         in_out[i] = {in_out[i].re / (max_val / scale),
                      in_out[i].im / (max_val / scale)};
       }
     } else {
-      for (int i = 0; i < fftsize; i++) {
-        in_out[i].re /= fftsize;
-        in_out[i].im /= fftsize;
+      for (int i = 0; i < fft_size; i++) {
+        in_out[i].re /= fft_size;
+        in_out[i].im /= fft_size;
       }
     }
   }
   return status;
 }
 
-MKL_LONG CommsLib::FFT(complex_float* in_out, int fftsize) {
+MKL_LONG CommsLib::FFT(complex_float* in_out, int fft_size) {
   DFTI_DESCRIPTOR_HANDLE mkl_handle;
   MKL_LONG status =
-      DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
+      DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fft_size);
   if (status != DFTI_NO_ERROR) {
     AGORA_LOG_ERROR("Error creating descriptor in CommsLib::IFFT%s\n",
                     DftiErrorMessage(status));
@@ -527,10 +572,10 @@ MKL_LONG CommsLib::FFT(complex_float* in_out, int fftsize) {
   return status;
 }
 
-void CommsLib::FFTShift(complex_float* in, complex_float* tmp, int fftsize) {
-  std::memcpy(tmp, in + fftsize / 2, sizeof(float) * fftsize);
-  std::memcpy(in + fftsize / 2, in, sizeof(float) * fftsize);
-  std::memcpy(in, tmp, sizeof(float) * fftsize);
+void CommsLib::FFTShift(complex_float* in, complex_float* tmp, int fft_size) {
+  std::memcpy(tmp, in + fft_size / 2, sizeof(float) * fft_size);
+  std::memcpy(in + fft_size / 2, in, sizeof(float) * fft_size);
+  std::memcpy(in, tmp, sizeof(float) * fft_size);
 }
 
 std::vector<std::complex<float>> CommsLib::FFTShift(
@@ -588,20 +633,21 @@ float CommsLib::ComputeOfdmSnr(const std::vector<std::complex<float>>& data_t,
 
 std::vector<std::complex<float>> CommsLib::ComposePartialPilotSym(
     const std::vector<std::complex<float>>& pilot, size_t offset,
-    size_t pilot_sc_num, size_t fftSize, size_t dataSize, size_t dataStart,
-    size_t CP_LEN, bool interleaved_pilot, bool timeDomain) {
-  std::vector<std::complex<float>> result(fftSize, 0);
-  size_t period = dataSize / pilot_sc_num;
+    size_t pilot_sc_num, size_t fft_size, size_t data_size, size_t data_start,
+    size_t cp_len, bool interleaved_pilot, bool time_domain) {
+  std::vector<std::complex<float>> result(fft_size, 0);
+  const size_t period = data_size / pilot_sc_num;
   for (size_t i = 0; i < pilot_sc_num; i++) {
-    const size_t index = interleaved_pilot ? i * period + offset : i + offset;
-    result[index + dataStart] = pilot[index];
+    const size_t index =
+        interleaved_pilot ? (i * period + offset) : (i + offset);
+    result[index + data_start] = pilot[index];
   }
-  if (timeDomain) {
-    CommsLib::IFFT(result, fftSize);
+  if (time_domain) {
+    CommsLib::IFFT(result, fft_size);
     for (auto& i : result) {
       i /= std::sqrt(period);
     }
-    result.insert(result.begin(), result.end() - CP_LEN,
+    result.insert(result.begin(), result.end() - cp_len,
                   result.end());  // add CP
   }
   return result;
