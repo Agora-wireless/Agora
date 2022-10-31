@@ -178,6 +178,7 @@ static constexpr bool kEnableMatLog = false;
 static constexpr bool kUse12BitIQ = false;
 static constexpr bool kDebug12BitIQ = false;
 static constexpr bool kDebugDownlink = false;
+static constexpr bool kDebugUplink = false;
 
 static constexpr bool kUsePartialTrans = true;
 
@@ -352,7 +353,12 @@ static constexpr bool kUseAVX2Encoder = false;
 // Enable debugging for sender and receiver applications
 static constexpr bool kDebugSenderReceiver = false;
 
+#if defined(ENABLE_HDF5)
+static constexpr bool kOutputUlScData = true;
+#else
 static constexpr bool kOutputUlScData = false;
+#endif
+
 static constexpr size_t kOfdmSymbolPerSlot = 1;
 static constexpr size_t kOutputFrameNum = 1;
 

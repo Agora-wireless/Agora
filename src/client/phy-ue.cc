@@ -141,14 +141,14 @@ PhyUe::PhyUe(Config* config)
     workers_.push_back(std::move(new_worker));
   }
 
-  if (kRecordDownlinkFrame) {
+  if (kRecordDownlinkFrame && config_->Frame().NumDLSyms() > 0) {
     auto& new_recorder = recorders_.emplace_back(
         std::make_unique<Agora_recorder::RecorderThread>(
             config_, 0, core_offset_worker + config_->UeWorkerThreadNum(),
             kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntNum() *
                 kDefaultQueueSize,
-            0, config_->UeAntNum(), kRecordFrameInterval, kRecorderTypes,
-            true));
+            0, config_->UeAntNum(), kRecordFrameInterval, Direction::kDownlink,
+            kRecorderTypes, true));
     new_recorder->Start();
   }
 
