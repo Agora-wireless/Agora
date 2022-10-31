@@ -71,7 +71,7 @@ def plot_csi(csi, bs_nodes, good_frames, frame_i, ant_i, subcarrier_i, offset, d
     axes[3, 0].legend(loc='lower right', frameon=False)
 
 def plot_constellation_stats(evm, evm_snr, ser, ul_data, txdata, frame_i, ul_slot_i, data_str = "Uplink"):
-    n_users = ul_data.shape[1]
+    n_users = ul_data.shape[2]
     plt_x_len = int(np.ceil(np.sqrt(n_users)))
     plt_y_len = int(np.ceil(n_users / plt_x_len))
     fig5, axes5 = plt.subplots(nrows=plt_y_len, ncols=plt_x_len, squeeze=False, figsize=(10, 8))
@@ -85,15 +85,15 @@ def plot_constellation_stats(evm, evm_snr, ser, ul_data, txdata, frame_i, ul_slo
     for i in range(n_users):
         y_i = int(i // plt_x_len)
         x_i = i % plt_x_len
-        tx_max = np.max(np.real(txdata[frame_i, i, :]))
-        tx_color = (tx_max - np.real(txdata[frame_i, i, :])) * 2 * tx_max + (tx_max - np.imag(txdata[frame_i, i, :]))
+        tx_max = np.max(np.real(txdata[frame_i, ul_slot_i, i, :]))
+        tx_color = (tx_max - np.real(txdata[frame_i, ul_slot_i, i, :])) * 2 * tx_max + (tx_max - np.imag(txdata[frame_i, ul_slot_i, i, :]))
         axes5[y_i, x_i].set_title('User %d'%(i))
-        axes5[y_i, x_i].scatter(np.real(ul_data[frame_i, i, :]), np.imag(ul_data[frame_i, i, :]), c=tx_color, cmap='rainbow')
-        axes5[y_i, x_i].scatter(np.real(txdata[frame_i, i, :]), np.imag(txdata[frame_i, i, :]), marker='*', s=300, c=tx_color, cmap='rainbow')
+        axes5[y_i, x_i].scatter(np.real(ul_data[frame_i, ul_slot_i, i, :]), np.imag(ul_data[frame_i, ul_slot_i, i, :]), c=tx_color, cmap='rainbow')
+        axes5[y_i, x_i].scatter(np.real(txdata[frame_i, ul_slot_i, i, :]), np.imag(txdata[frame_i, ul_slot_i, i, :]), marker='*', s=300, c=tx_color, cmap='rainbow')
 
-        axes6[0, 0].plot(range(evm.shape[0]), 100 * evm[:, i], label='User %d'%(i))
-        axes6[1, 0].plot(range(evm.shape[0]), evm_snr[:, i], label='User %d'%(i))
-        axes6[2, 0].plot(range(ser.shape[0]), ser[:, i], label='User %d'%(i))
+        axes6[0, 0].plot(range(evm.shape[0]), 100 * evm[:, ul_slot_i, i], label='User %d'%(i))
+        axes6[1, 0].plot(range(evm.shape[0]), evm_snr[:, ul_slot_i, i], label='User %d'%(i))
+        axes6[2, 0].plot(range(ser.shape[0]), ser[:, ul_slot_i, i], label='User %d'%(i))
     axes6[0, 0].legend(loc='upper right', frameon=False)
 
 def plot_snr_map(snr, n_frm_st, n_frm_end, n_ant, sub_sample=1):
