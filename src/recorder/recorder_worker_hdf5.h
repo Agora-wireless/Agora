@@ -16,7 +16,8 @@ namespace Agora_recorder {
 class RecorderWorkerHDF5 : public RecorderWorker {
  public:
   explicit RecorderWorkerHDF5(const Config* in_cfg, size_t antenna_offset,
-                              size_t num_antennas, size_t record_interval);
+                              size_t num_antennas, size_t record_interval,
+                              Direction rx_direction);
   ~RecorderWorkerHDF5() override;
 
   void Init() final;
@@ -30,11 +31,15 @@ class RecorderWorkerHDF5 : public RecorderWorker {
   void Open();
   void Close();
 
+  void WriteDatasetValue(const Packet* pkt, size_t symbol_index,
+                         size_t dataset_index);
+
   const Config* cfg_;
 
   size_t antenna_offset_;
   size_t num_antennas_;
   size_t interval_;
+  Direction rx_direction_;
 
   std::unique_ptr<Hdf5Lib> hdf5_;
   size_t max_frame_number_;

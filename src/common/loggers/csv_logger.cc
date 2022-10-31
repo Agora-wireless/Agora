@@ -13,6 +13,7 @@
 #include "spdlog/async.h"
 #include "spdlog/pattern_formatter.h"
 #include "spdlog/sinks/basic_file_sink.h"
+#include "spdlog/sinks/udp_sink.h"
 #endif
 
 namespace CsvLog {
@@ -31,15 +32,28 @@ CsvLogger::CsvLogger([[maybe_unused]] size_t log_id,
       radio_name = "BS";
       data_avail = (bs_only == true || cfg->Frame().NumULSyms() > 0);
     } else {
-      radio_name = cfg->UeRadioName().at(0);
+      radio_name = "UE";
       data_avail = (bs_only == false && cfg->Frame().NumDLSyms() > 0);
     }
     if (data_avail) {
       const std::string filename = "files/log/" + cfg->Timestamp() + "/log-" +
                                    kCsvName.at(log_id) + "-" + radio_name +
                                    ".csv";
-      logger_ = spdlog::create_async_nb<spdlog::sinks::basic_file_sink_mt>(
-          kCsvName.at(log_id), filename);
+      auto file_sink =
+          std::make_shared<spdlog::sinks::basic_file_sink_mt>(filename, true);
+      file_sink->set_level(spdlog::level::info);
+      std::shared_ptr<spdlog::sinks::udp_sink_mt> udp_sink = {};
+      if (cfg->LogListenerAddr().empty() == false) {
+        udp_sink = std::make_shared<spdlog::sinks::udp_sink_mt>(
+            spdlog::sinks::udp_sink_config(cfg->LogListenerAddr(),
+                                           cfg->LogListenerPort() + log_id));
+        udp_sink->set_level(spdlog::level::info);
+      }
+      const spdlog::sinks_init_list sink_file = {file_sink};
+      const spdlog::sinks_init_list sink_file_udp = {file_sink, udp_sink};
+      logger_ = std::make_shared<spdlog::async_logger>(
+          kCsvName.at(log_id), udp_sink ? sink_file_udp : sink_file,
+          spdlog::thread_pool(), spdlog::async_overflow_policy::overrun_oldest);
       logger_->set_level(spdlog::level::info);
       logger_->set_pattern("%v");
     }

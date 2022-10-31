@@ -323,6 +323,12 @@ class Config {
   inline size_t UeMacRxPort() const { return this->ue_mac_rx_port_; }
   inline size_t UeMacTxPort() const { return this->ue_mac_tx_port_; }
 
+  inline const std::string& LogListenerAddr() const {
+    return this->log_listener_addr_;
+  }
+
+  inline size_t LogListenerPort() const { return this->log_listener_port_; }
+
   /* Inline accessors (complex types) */
   inline const std::vector<int>& ClTxAdvance() const {
     return this->cl_tx_advance_;
@@ -559,6 +565,9 @@ class Config {
   inline const std::string& ConfigFilename() const { return config_filename_; }
   inline const std::string& TraceFilename() const { return trace_file_; }
   inline const std::string& Timestamp() const { return timestamp_; }
+  inline const std::vector<std::string>& UlTxFreqDataFiles(void) const {
+    return ul_tx_f_data_files_;
+  }
 
  private:
   void Print() const;
@@ -849,6 +858,9 @@ class Config {
   // IP address of the data source/sink server communicating with MAC (BS/UE)
   std::string mac_remote_addr_;
 
+  // IP address of the listening server for runtime stats log
+  std::string log_listener_addr_;
+
   int bs_server_port_;  // Base UDP port used by BS to receive data
 
   // Base RRU/channel simulator UDP port used by BS to transmit downlink data
@@ -876,6 +888,9 @@ class Config {
   size_t ue_mac_rx_port_;
   size_t ue_mac_tx_port_;
 
+  // Port ID at log listening server
+  size_t log_listener_port_;
+
   // Number of frames_ sent by sender during testing = number of frames_
   // processed by Agora before exiting.
   size_t frames_to_test_;
@@ -897,5 +912,6 @@ class Config {
   const std::string config_filename_;
   std::string trace_file_;
   std::string timestamp_;
+  std::vector<std::string> ul_tx_f_data_files_;
 };
 #endif /* CONFIG_HPP_ */

@@ -434,6 +434,7 @@ message(VERBOSE "Common libs: ${COMMON_LIBS}")
 # against sources reduces performance.
 add_executable(agora
   src/agora/main.cc
+  $<TARGET_OBJECTS:recorder_sources_lib>
   $<TARGET_OBJECTS:agora_sources_lib>
   $<TARGET_OBJECTS:shared_txrx_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
@@ -490,8 +491,8 @@ target_link_libraries(macbs ${COMMON_LIBS})
 if(RADIO_TYPE STREQUAL SOAPY_IRIS)
 add_executable(radio_test
     test/radio_test/main.cc
-    $<TARGET_OBJECTS:agora_sources_lib>
     $<TARGET_OBJECTS:recorder_sources_lib>
+    $<TARGET_OBJECTS:agora_sources_lib>
     $<TARGET_OBJECTS:client_sources_lib>
     $<TARGET_OBJECTS:shared_txrx_sources_lib>
     $<TARGET_OBJECTS:common_sources_lib>)
@@ -501,6 +502,7 @@ endif()
 # End-to-end test
 add_executable(test_agora
   test/test_agora/main.cc
+  $<TARGET_OBJECTS:recorder_sources_lib>
   $<TARGET_OBJECTS:agora_sources_lib>
   $<TARGET_OBJECTS:shared_txrx_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
@@ -526,6 +528,7 @@ set(UNIT_TESTS test_armadillo test_datatype_conversion test_udp_client_server
 foreach(test_name IN LISTS UNIT_TESTS)
   add_executable(${test_name}
     test/unit_tests/${test_name}.cc
+    $<TARGET_OBJECTS:recorder_sources_lib>
     $<TARGET_OBJECTS:agora_sources_lib>
     $<TARGET_OBJECTS:shared_txrx_sources_lib>
     $<TARGET_OBJECTS:common_sources_lib>)

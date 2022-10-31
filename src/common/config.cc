@@ -37,8 +37,6 @@ static const std::string kUlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_ul_data_";
 static const std::string kDlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_dl_data_";
-static const std::string kUlPilotFreqPrefix =
-    kExperimentFilepath + "ue_pilot_data_f_";
 static const std::string kUlDataFreqPrefix = kExperimentFilepath + "ul_data_f_";
 
 Config::Config(std::string jsonfilename)
@@ -82,7 +80,7 @@ Config::Config(std::string jsonfilename)
 
   std::string serials_str;
   std::string serial_file = tdd_conf.value("serial_file", "");
-  if (!serial_file.empty()) {
+  if (serial_file.empty() == false) {
     Utils::LoadTddConfig(serial_file, serials_str);
   }
   if (serials_str.empty() == false) {
@@ -151,26 +149,35 @@ Config::Config(std::string jsonfilename)
         "Hardware is enabled but the serials files was not accessable");
   }
 
-  if (radio_id_.empty() == true) {
+  if (radio_id_.empty()) {
     num_radios_ = tdd_conf.value("bs_radio_num", 8);
     external_ref_node_.resize(num_cells_, false);
     cell_id_.resize(num_radios_, 0);
+
+    //Add in serial numbers
+    for (size_t radio = 0; radio < num_radios_; radio++) {
+      AGORA_LOG_TRACE("Adding BS_SIM_RADIO_%d\n", radio);
+      radio_id_.emplace_back("BS_SIM_RADIO_" + std::to_string(radio));
+    }
   }
 
-  if (ue_radio_id_.empty() == false) {
-    ue_num_ = ue_radio_id_.size();
-    for (size_t i = 0; i < ue_num_; i++) {
-      ue_radio_name_.push_back(
-          "UE" + (ue_radio_id_.at(i).length() > kShortIdLen
-                      ? ue_radio_id_.at(i).substr(ue_radio_id_.at(i).length() -
-                                                  kShortIdLen)
-                      : ue_radio_id_.at(i)));
-    }
-  } else {
+  if (ue_radio_id_.empty()) {
     ue_num_ = tdd_conf.value("ue_radio_num", 8);
-    for (size_t i = 0; i < ue_num_; i++) {
-      ue_radio_name_.push_back("UE" + std::to_string(i));
+    for (size_t ue_radio = 0; ue_radio < ue_num_; ue_radio++) {
+      std::stringstream ss;
+      ss << std::setw(kShortIdLen) << std::setfill('0') << ue_radio;
+      const std::string ue_name = "UE_SIM_RADIO_" + ss.str();
+      AGORA_LOG_TRACE("Adding %s\n", ue_name.c_str());
+      ue_radio_id_.push_back(ue_name);
     }
+  }
+  ue_num_ = ue_radio_id_.size();
+  for (size_t i = 0; i < ue_num_; i++) {
+    ue_radio_name_.push_back(
+        "UE" + (ue_radio_id_.at(i).length() > kShortIdLen
+                    ? ue_radio_id_.at(i).substr(ue_radio_id_.at(i).length() -
+                                                kShortIdLen)
+                    : ue_radio_id_.at(i)));
   }
 
   channel_ = tdd_conf.value("channel", "A");
@@ -276,6 +283,9 @@ Config::Config(std::string jsonfilename)
   bs_mac_tx_port_ = tdd_conf.value("bs_mac_tx_port", kMacBaseRemotePort);
   bs_mac_rx_port_ = tdd_conf.value("bs_mac_rx_port", kMacBaseLocalPort);
 
+  log_listener_addr_ = tdd_conf.value("log_listener_addr", "");
+  log_listener_port_ = tdd_conf.value("log_listener_port", 33300);
+
   /* frame configurations */
   cp_len_ = tdd_conf.value("cp_size", 0);
   ofdm_ca_num_ = tdd_conf.value("fft_size", 2048);
@@ -294,8 +304,11 @@ Config::Config(std::string jsonfilename)
   RtAssert(ofdm_data_num_ % kTransposeBlockSize == 0,
            "Transpose block size must divide number of OFDM data subcarriers");
   ofdm_pilot_spacing_ = tdd_conf.value("ofdm_pilot_spacing", 16);
-  ofdm_data_start_ =
-      tdd_conf.value("ofdm_data_start", (ofdm_ca_num_ - ofdm_data_num_) / 2);
+  ofdm_data_start_ = tdd_conf.value("ofdm_data_start",
+                                    ((ofdm_ca_num_ - ofdm_data_num_) / 2) /
+                                        kSCsPerCacheline * kSCsPerCacheline);
+  RtAssert(ofdm_data_start_ % kSCsPerCacheline == 0,
+           "ofdm_data_start must be a multiple of subcarriers per cacheline");
   ofdm_data_stop_ = ofdm_data_start_ + ofdm_data_num_;
 
   // Build subcarrier map for data ofdm symbols
@@ -989,12 +1002,9 @@ void Config::GenData() {
   Table<complex_float> ue_pilot_ifft;
   ue_pilot_ifft.Calloc(this->ue_ant_num_, this->ofdm_ca_num_,
                        Agora_memory::Alignment_t::kAlign64);
-  auto zc_ue_pilot_double =
-      CommsLib::GetSequence(this->ofdm_data_num_, CommsLib::kLteZadoffChu);
-  auto zc_ue_pilot = Utils::DoubleToCfloat(zc_ue_pilot_double);
   for (size_t i = 0; i < ue_ant_num_; i++) {
     auto zc_ue_pilot_i = CommsLib::SeqCyclicShift(
-        zc_ue_pilot,
+        zc_seq,
         (i + this->ue_ant_offset_) * (float)M_PI / 6);  // LTE DMRS
     for (size_t j = 0; j < this->ofdm_data_num_; j++) {
       this->ue_specific_pilot_[i][j] = {zc_ue_pilot_i[j].real(),
@@ -1004,26 +1014,6 @@ void Config::GenData() {
                            ? j + ofdm_data_start_ - ofdm_ca_num_ / 2
                            : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
       ue_pilot_ifft[i][k] = this->ue_specific_pilot_[i][j];
-    }
-    if (kOutputUlScData) {
-      const std::string filename_ul_pilot_f =
-          kUlPilotFreqPrefix + std::to_string(i) + ".bin";
-      FILE* fp_tx_f = std::fopen(filename_ul_pilot_f.c_str(), "wb");
-      if (fp_tx_f == nullptr) {
-        AGORA_LOG_ERROR("Failed to create ul sc pilot file %s. Error %s.\n",
-                        filename_ul_pilot_f.c_str(), strerror(errno));
-        throw std::runtime_error("Config: Failed to create ul sc pilot file");
-      } else {
-        const auto write_status = std::fwrite(
-            ue_pilot_ifft[i], sizeof(complex_float), ofdm_ca_num_, fp_tx_f);
-        if (write_status != ofdm_ca_num_) {
-          AGORA_LOG_ERROR("Config: Failed to write ul sc pilot file\n");
-        }
-        const auto close_status = std::fclose(fp_tx_f);
-        if (close_status != 0) {
-          AGORA_LOG_ERROR("Config: Failed to close ul sc pilot file\n");
-        }
-      }
     }
     CommsLib::IFFT(ue_pilot_ifft[i], ofdm_ca_num_, false);
   }
@@ -1218,6 +1208,8 @@ void Config::GenData() {
           std::to_string(this->frame_.NumULSyms()) + "_" +
           std::to_string(kOutputFrameNum) + "_" + ue_channel_ + "_" +
           std::to_string(i) + ".bin";
+      ul_tx_f_data_files_.push_back(filename_ul_data_f.substr(
+          filename_ul_data_f.find_last_of("/\\") + 1));
       FILE* fp_tx_f = std::fopen(filename_ul_data_f.c_str(), "wb");
       if (fp_tx_f == nullptr) {
         AGORA_LOG_ERROR("Failed to create ul sc data file %s. Error %s.\n",
