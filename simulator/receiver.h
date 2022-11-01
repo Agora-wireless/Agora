@@ -17,10 +17,10 @@
 #include <numeric>
 #include <vector>
 
-#include "buffer.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "gettime.h"
+#include "message.h"
 #include "symbols.h"
 
 using ushort = unsigned short;

@@ -1,0 +1,56 @@
+{
+    "serial_file": "files/topology/topology.json",
+    "cells": 1,
+    "channel": "A",
+    "frequency": 3.6e9,
+    "rx_gain_a": 65,
+    "tx_gain_a": 80,
+    "rx_gain_b": 65,
+    "tx_gain_b": 80,
+    "sample_rate": 7.68e6,
+    "ofdm_tx_zero_prefix": 160,
+    "ofdm_tx_zero_postfix": 160,
+    "ofdm_rx_zero_prefix_bs": 160,
+    "cp_size": 32,
+    "fft_size": 2048,
+    "ofdm_data_num": 1200,
+    "ul_mcs": {
+        "modulation": "16QAM",
+        "code_rate": 0.333
+    },
+    "beamsweep": false,
+    "beacon_antenna": 0,
+    "frame_schedule": [
+        "BPPPPGUUUUG"
+    ],
+    "client_ul_pilot_syms": 2,
+    "socket_thread_num": 1,
+    "worker_thread_num": 20,
+    "core_offset": 10,
+    "demul_block_size": 48,
+    "ue_channel": "AB",
+    "ue_rx_gain_a": [
+        65,
+        65
+    ],
+    "ue_tx_gain_a": [
+        80,
+        80
+    ],
+    "ue_rx_gain_b": [
+        65,
+        65
+    ],
+    "ue_tx_gain_b": [
+        80,
+        80
+    ],
+    "ue_hw_framer": false,
+    "tx_advance": [
+        144,
+        144
+    ],
+    "ue_worker_thread_num": 2,
+    "ue_demul_block_size": 48,
+    "ue_core_offset": 26
+}

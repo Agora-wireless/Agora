@@ -5,7 +5,7 @@
 #ifndef MAC_DATA_RECEIVER_H_
 #define MAC_DATA_RECEIVER_H_
 
-#include <cstdint>
+#include <cstddef>
 
 /**
  * @brief The MacDataReceiver interface class
@@ -15,7 +15,7 @@ class MacDataReceiver {
   virtual size_t Load(unsigned char *destination, size_t requested_bytes) = 0;
 
  protected:
-  inline MacDataReceiver() = default;;
+  inline MacDataReceiver() = default;
   virtual ~MacDataReceiver() = default;
 };
 

@@ -6,17 +6,17 @@
 #define CHANNEL_H_
 
 #include <algorithm>
-#include <armadillo>
 #include <cassert>
 #include <cmath>
 #include <ctime>
 #include <iomanip>
 #include <numeric>
 
-#include "buffer.h"
+#include "armadillo"
 #include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"
+#include "message.h"
 #include "signal_handler.h"
 #include "symbols.h"
 #include "utils.h"
@@ -58,6 +58,7 @@ class Channel {
 
   std::string sim_chan_model_;
   double channel_snr_db_;
+  double noise_samp_std_;
   enum ChanModel { kAwgn, kRayleigh, kRan3Gpp } chan_model_;
 
   arma::cx_fmat h_;

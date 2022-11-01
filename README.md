@@ -1,4 +1,4 @@
-[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fmaster)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/master/)
+[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fdevelop)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/develop/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
@@ -76,7 +76,7 @@ The following are steps to set up both Agora and the packet generator:
     $ ./test/test_agora/test_agora.sh 10 out # Runs test for 10 iterations
     </pre>
 
- * Run Agora with emulated RRU traffic
+#### Run Agora with emulated RRU traffic
    * **NOTE**: We recommend running Agora and the emulated RRU on two different machines.\
    If you are running them on the same machine, make sure Agora and the emulated RRU are using different set of cores,
      otherwise there will be performance slow down. 
@@ -87,45 +87,45 @@ The following are steps to set up both Agora and the packet generator:
    
    * First, return to the base directory (`cd ..`), then run
    <pre>
-   $ ./build/data_generator --conf_file data/tddconfig-sim-ul.json
+   $ ./build/data_generator --conf_file files/config/ci/tddconfig-sim-ul.json
    </pre>
      to generate data files.
    * In one terminal, run 
    <pre>
-   $ ./build/agora --conf_file data/tddconfig-sim-ul.json
+   $ ./build/agora --conf_file files/config/ci/tddconfig-sim-ul.json
    </pre>
     to start Agora with uplink configuration.
    * In another terminal, run
    <pre>
-   $ ./build/sender --num_threads=2 --core_offset=1 --frame_duration=5000 --enable_slow_start=1 --conf_file=data/tddconfig-sim-ul.json
+   $ ./build/sender --num_threads=2 --core_offset=1 --frame_duration=5000 --enable_slow_start=1 --conf_file=files/config/ci/tddconfig-sim-ul.json
    </pre>
    to start the emulated RRU with uplink configuration.
    * To test the real-time performance of Agora, see the [Running performance test](#running-performance-test) section below.
 
- * Run Agora with channel simulator and clients
+#### Run Agora with channel simulator and clients
    * First, return to the base directory (`cd ..`), then run
    <pre>
-   $ ./build/data_generator --conf_file data/chsim.json
+   $ ./build/data_generator --conf_file files/config/ci/chsim.json
    </pre>
     to generate data files.
    * In one terminal, run
    <pre>
-   $ ./build/user --conf_file data/chsim.json
+   $ ./build/user --conf_file files/config/ci/chsim.json
    </pre>
      to start clients with
      combined uplink & downlink configuration.
    * In another terminal, run
    <pre>
-   $ ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 24 --conf_file data/chsim.json
+   $ ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 24 --conf_file files/config/ci/chsim.json
    </pre>
    * In another terminal, run
    <pre>
-   $ ./build/agora --conf_file data/chsim.json
+   $ ./build/agora --conf_file files/config/ci/chsim.json
    </pre>
    to start Agora with the combined configuration.
    * Note: make sure Agora and sender are using different set of cores, otherwise there will be performance slow down.
 
- * Run Agora with channel simulator, clients, and mac enabled.
+#### Run Agora with channel simulator, clients, and mac enabled
    * Compile the code with
    <pre>
    $ cmake .. -DENABLE_MAC=true
@@ -135,37 +135,34 @@ The following are steps to set up both Agora and the packet generator:
    * Combined Testing  (`--conf_file mac-sim.json`)
      * Terminal 1:
      <pre>
-       $./build/data_generator --conf_file data/mac-sim.json
+       $./build/data_generator --conf_file files/config/examples/mac-sim.json
      </pre>
        to generate data files.
      <pre>
-       $./build/user --conf_file data/mac-sim.json
+       $./build/user --conf_file files/config/examples/mac-sim.json
      </pre>
        to start users.
      * Terminal 2:
      <pre>
-     $ ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 28 --bs_conf_file data/mac-sim.json --ue_conf_file data/mac-sim.json
+     $ ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 28 --conf_file files/config/examples/mac-sim.json
      </pre>
        to run the channel simulator
      * Terminal 3:
      <pre>
-       $ ./build/macuser --enable_slow_start 1 --conf_file data/mac-sim.json
+       $ ./build/macuser --enable_slow_start 1 --conf_file files/config/examples/mac-sim.json
      </pre>
       to run to user mac app.  Specify `--data_file ""` to generate patterned data and `--conf_file` options as necessary.
      * Terminal 4:
      <pre>
-     $ ./build/agora --conf_file data/mac-sim.json
+     $ ./build/agora --conf_file files/config/examples/mac-sim.json
      </pre>
       run agora before running macbs.  Run macuser -> agora -> macbs in quick succession. 
      * Terminal 5:
      <pre>
-     $ ./build/macbs --enable_slow_start 1 --conf_file data/mac-sim.json
+     $ ./build/macbs --enable_slow_start 1 --conf_file files/config/examples/mac-sim.json
      </pre>
      to run to base station mac app. specify `--data_file ""` to generate patterned data and `--conf_file` options as necessary.
    * Note: make sure agora / user / chsim / macuser / macbs are using different set of cores, otherwise there will be performance slow down.
-
- * To run with real wireless traffic from Faros/Iris hardware UEs, see the
-   [Agora with real RRU](#agora-with-real-rru) section below.
 
 ## Building and running with real RRU
 Agora supports a 64-antenna Faros base station as RRU and Iris UE devices. Both are commercially available from [Skylark Wireless](https://skylarkwireless.com) and are used in the [POWER-RENEW PAWR testbed](https://powderwireless.net/).\
@@ -180,28 +177,28 @@ Agora supports both uplink and downlink with real RRU and UEs. For downlink, a r
 
 We describe how to get the uplink and downlink demos working. Below XX can be replaced with either `ul` and `dl`.
  * Rebuild the code on both servers for RRU side the UE side.
-    * For Faros RRU and Iris UEs, pass `-DUSE_ARGOS=on -DUSE_UHD=off` to cmake
-    * For USRP-based RRU and UEs, pass `-DUSE_ARGOS=off -DUSE_UHD=on` to cmake
+    * For Faros RRU and Iris UEs, pass `-DRADIO_TYPE=SOAPY_IRIS` to cmake
+    * For USRP-based RRU and UEs, pass `-DRADIO_TYPE=SOAPY_UHD` to cmake
     * Run `make -j` to recompile the code.
  * Run the UE code on the server connected to the Iris UEs
-   * For Iris UEs, run the pyfaros tool in the `data` directory as follows:
+   * For Iris UEs, run the pyfaros tool in the `files/topology` directory as follows:
      <pre>
      $ python3 -m pyfaros.discover --json-out
      </pre>
      This will output a file named `topology.json` with all the discoverable serial IDs included.
-   * Modify `data/topology.json` by adding/removing serials of client Irises you'd like to include
+   * Modify `files/topology/topology.json` by adding/removing serials of client Irises you'd like to include
      from your setup.
-   * For USRP-based RRU and UEs, modify the existing `data/topology.json` and enter the appropriate IDs.
-   * Run `./build/data_generator --conf_file data/XX-hw.json` to generate required data files.
-   * Run `./build/user --conf_file data/XX-hw.json`.
+   * For USRP-based RRU and UEs, modify the existing `files/topology/topology.json` and enter the appropriate IDs.
+   * Run `./build/data_generator --conf_file files/config/XX-hw.json` to generate required data files.
+   * Run `./build/user --conf_file files/config/XX-hw.json`.
  * Run Agora on the server connected to the Faros RRU
-   * scp over the generated file `data/LDPC_orig_XX_data_512_ant2.bin` from the client
-     machine to the server's `data` directory.
+   * scp over the generated file `files/experiment/LDPC_orig_XX_data_512_ant2.bin` from the client
+     machine to the server's `files/experiment` directory.
    * Rebuild the code
      * Run `make -j` to compile the code.
-   * For Faros RRU, use the pyfaros tool the same as with the UEs to generate a new `data/topology.json`
-   * Modify `data/topology.json` by adding/removing serials of your RRU Irises, and the hub.
-   * Run `./build/agora --conf_file data/XX-hw.json`.
+   * For Faros RRU, use the pyfaros tool the same as with the UEs to generate a new `files/topology/topology.json`
+   * Modify `files/topology/topology.json` by adding/removing serials of your RRU Irises, and the hub.
+   * Run `./build/agora --conf_file files/config/XX-hw.json`.
 
 ## Running performance test
 To test the real-time performance of Agora for processing 64x16 MU-MIMO with 20 MHz bandwidth and 64QAM modulation, we recommend using two servers 
@@ -213,7 +210,7 @@ The servers are connected by 40 GbE Intel XL710 dual-port NICs.
 * **NOTE**: We recommend using at least 10 GbE NIC and a server with more than 10 cores for testing real-time performance of 8x8 MU-MIMO. For 8x8 MU-MIMO, our test on a machine with AVX-512 and CPU frequency\
 of 2.3 GHz support shows that at least 7 worker cores are required to achieve real-time performance. Additionally, Agora requires one core for the manager thread and at least 1 core for network threads.\
 
-We change "worker_thread_num" and "socket_thread_num" to change the number cores assigned to of worker threads and network threads in the json files, e.g., data/tddconfig-sim-ul.json.\
+We change "worker_thread_num" and "socket_thread_num" to change the number cores assigned to of worker threads and network threads in the json files, e.g., files/config/ci/tddconfig-sim-ul.json.\
 If you do not have a powerful server or high throughput NICs, we recommend increasing the value of `--frame_duration` when you run `./build/sender`, which will increase frame duration and reduce throughput.
 
 To process 64x16 MU-MIMO in real-time, we use both ports of 40 GbE Intel XL710 NIC with DPDK (see [DPDK_README.md](DPDK_README.md))
@@ -243,32 +240,66 @@ To reduce performance variations, we did the following configurations for the se
     
 The steps to collect and analyze timestamp traces are as follows:
   * Enable DPDK in Agora.  Make sure it is compiled / configured for supporting your specific hardware NICs (see [DPDK_README.md](DPDK_README.md)).
-  * We use data/tddconfig-sim-ul.json for uplink experiments and data/tddconfig-sim-dl.json for downlink experiments.\
+  * We use files/config/ci/tddconfig-sim-ul.json for uplink experiments and files/config/ci/tddconfig-sim-dl.json for downlink experiments.\
     In our [paper](#documentation), we change “antenna_num”,  “ue_num” and “symbol_num_perframe” 
     to different values to collect different data points in the figures. 
   * Generate source data files by running
     <pre>
-    $ ./build/data_generator --conf_file data/tddconfig-sim-ul.json
+    $ ./build/data_generator --conf_file files/config/ci/tddconfig-sim-ul.json
     </pre>
   * Run Agora as a real-time process (to prevent OS from doing context switches) using 
     <pre>
-    $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} chrt -rr 99 ./build/agora --conf_file data/tddconfig-sim-ul.json
+    $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} chrt -rr 99 ./build/agora --conf_file files/config/ci/tddconfig-sim-ul.json
     </pre>
 
     (**NOTE**: Using a process priority 99 is dangerous. Before running it, 
     make sure you have directed OS interrupts away from cores used by Agora. If you have not done so, run
     <pre>
-    $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/agora --conf_file data/tddconfig-sim-ul.json
+    $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/agora --conf_file files/config/ci/tddconfig-sim-ul.json
     </pre>
     instead to run Agora as a normal process.)
   * Run the emulated RRU using
     <pre>
     $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/sender --num_threads=2 --core_offset=0 \
-      --conf_file=data/tddconfig-sim-ul.json --frame_duration=5000 --enable_slow_start=1
+      --conf_file=files/config/ci/tddconfig-sim-ul.json --frame_duration=5000 --enable_slow_start=1
     </pre>
     For DPDK, add `--server_mac_addr=` and set it to the MAC address of the NIC used by Agora. 
-  * The timestamps will be saved in data/timeresult.txt after Agora finishes processing. We can then use a [MATLAB script](matlab/parsedata_ul.m) to process the timestamp trace. 
+  * The timestamps will be saved in files/experiment/timeresult.txt after Agora finishes processing. We can then use a [MATLAB script](matlab/parsedata_ul.m) to process the timestamp trace. 
   * We also provide MATLAB scripts for [uplink](matlab/parse_multi_file_ul) and [downlink](matlab/parse_multi_file_dl) that are able to process multiple timestamp files and generate figures reported in our [paper](#documentation).
+
+Log and plot PHY stats:
+  * Compile the code with
+    <pre>
+    $ cmake .. -DENABLE_CSV_LOG=True
+    </pre>
+  * Run test with desired config; log files will be created in a directory named with timestamp under the files/log/ folder
+  * Run plot_csv.py with csv file input
+    <pre>
+    $ python3 tools/python/plot_csv.py [max_frames] [X_label] [Y_label] [legend_name] < path/to/log/log-xyz.csv
+    With optional paramters, e.g.,
+    $ python3 tools/python/plot_csv.py 1000 Frame EVM UE < files/log/2022-10-25-15-46-55/log-evm-BS.csv
+    or set max_frames to 0 to plot all frames, e.g.,
+    $ python3 tools/python/plot_csv.py 0 Frame EVM UE < files/log/2022-10-25-15-46-55/log-evm-BS.csv
+    or without any paramter to plot as default, e.g.,
+    $ python3 tools/python/plot_csv.py < files/log/2022-10-25-15-46-55/log-evm-BS.csv
+    Note the < operator is required.
+    </pre>
+  * (Optional) Run plot_csv.py with UDP input
+    Set log listener IP address and port in config file, e.g.,
+    <pre>
+    "log_listener_addr": "127.0.0.1",
+    "log_listener_port": 33300
+    </pre>
+    Before start, run the command on the listener machine (which has the specified IP address):
+    <pre>
+    $ nc -u -l [port_number] | python3 tools/python/plot_csv.py [max_frames] [X_label] [Y_label] [legend_name]
+    port_number (required) is log_listener_port + log_id (defined in csv_logger.h);
+    max_frames (required) is a positive integer no greater than the maximum transfered frames.
+    For example,
+    $ nc -u -l 33303 | python3 tools/python/plot_csv.py 1000 Frame EVM UE
+    Repeat with multiple ports for more logs if desired.
+    </pre>
+    Run test; plots will be shown when max_frames is reached.
 
 ## Contributing to Agora
 Agora is open-source and open to your contributions. Before contributing, please read [this](CONTRIBUTING.md).

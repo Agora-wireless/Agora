@@ -1,0 +1,42 @@
+{
+  "cells": 1,
+  "bs_radio_num": 42,
+  "channel": "A",
+  "ue_radio_num": 4,
+  "ue_channel": "A",
+  "frequency": 3.56e9,
+  "single_gain": true,
+  "sample_rate": 5e6,
+  "cp_size": 32,
+  "fft_size": 2048,
+  "ofdm_data_num": 1200,
+  "demul_block_size": 48,
+  "ue_demul_block_size": 48,
+  "ul_mcs" : {
+    "modulation": "16QAM",
+    "code_rate": 0.333
+  },
+  "ofdm_tx_zero_prefix": 160,
+  "ofdm_tx_zero_postfix": 160,
+  "ofdm_rx_zero_prefix_bs": 160,
+  "ofdm_rx_zero_prefix_client": 160,
+  "frame_schedule": [
+    "BGGGGGPPPPGGGUUUGGG"
+  ],
+  "client_ul_pilot_syms": 2,
+  "beamsweep": false,
+  "beacon_antenna": 0,
+  /* UE configuration */
+  "ue_hw_framer": false,
+  "hw_framer": true,
+  /* Compute configuration */
+  "exclude_cores": [],
+  "ue_core_offset": 30,
+  "ue_worker_thread_num": 4,
+  "ue_socket_thread_num": 2,
+  "core_offset": 16,
+  "worker_thread_num": 8,
+  /* 21 bs radios */
+  "socket_thread_num": 4,
+  "max_frame": 5000
+}

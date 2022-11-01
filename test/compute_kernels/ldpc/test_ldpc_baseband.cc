@@ -7,13 +7,13 @@
 #include <gflags/gflags.h>
 #include <immintrin.h>
 
-#include <armadillo>
 #include <bitset>
 #include <chrono>
 #include <fstream>
 #include <iostream>
 #include <random>
 
+#include "armadillo"
 #include "comms-lib.h"
 #include "config.h"
 #include "data_generator.h"
@@ -32,9 +32,10 @@ static constexpr float kSnrLevels[15] = {-5, -2.5, 0,  2.5,  5,  7.5,  10, 12.5,
                                          15, 17.5, 20, 22.5, 25, 27.5, 30};
 DEFINE_string(profile, "random",
               "The profile of the input user bytes (e.g., 'random', '123')");
-DEFINE_string(conf_file,
-              TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
-              "Agora config filename");
+DEFINE_string(
+    conf_file,
+    TOSTRING(PROJECT_DIRECTORY) "/files/config/ci/tddconfig-sim-ul.json",
+    "Agora config filename");
 
 int main(int argc, char* argv[]) {
   unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
@@ -44,6 +45,8 @@ int main(int argc, char* argv[]) {
   const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   auto cfg = std::make_unique<Config>(FLAGS_conf_file.c_str());
+  Direction dir =
+      cfg->Frame().NumULSyms() > 0 ? Direction::kUplink : Direction::kDownlink;
 
   const DataGenerator::Profile profile =
       FLAGS_profile == "123" ? DataGenerator::Profile::kProfile123
@@ -64,10 +67,10 @@ int main(int argc, char* argv[]) {
   // Step 1: Generate the information buffers and LDPC-encoded buffers for
   // uplink
   size_t num_symbols_per_cb = 1;
-  size_t bits_per_symbol = cfg->OfdmDataNum() * cfg->ModOrderBits();
-  if (cfg->LdpcConfig().NumCbCodewLen() > bits_per_symbol) {
+  size_t bits_per_symbol = cfg->OfdmDataNum() * cfg->ModOrderBits(dir);
+  if (cfg->LdpcConfig(dir).NumCbCodewLen() > bits_per_symbol) {
     num_symbols_per_cb =
-        (cfg->LdpcConfig().NumCbCodewLen() + bits_per_symbol - 1) /
+        (cfg->LdpcConfig(dir).NumCbCodewLen() + bits_per_symbol - 1) /
         bits_per_symbol;
   }
   size_t num_cbs_per_ue = cfg->Frame().NumDataSyms() / num_symbols_per_cb;
@@ -76,23 +79,24 @@ int main(int argc, char* argv[]) {
 
   const size_t num_codeblocks = num_cbs_per_ue * cfg->UeAntNum();
   std::printf("Total number of blocks: %zu\n", num_codeblocks);
-  size_t input_size = LdpcEncodingInputBufSize(
-      cfg->LdpcConfig().BaseGraph(), cfg->LdpcConfig().ExpansionFactor());
-  auto* input_ptr =
-      new int8_t[input_size + kLdpcHelperFunctionInputBufferSizePaddingBytes];
+  size_t input_size = Roundup<64>(
+      LdpcEncodingInputBufSize(cfg->LdpcConfig(dir).BaseGraph(),
+                               cfg->LdpcConfig(dir).ExpansionFactor()));
+  auto* input_ptr = new int8_t[input_size];
   for (size_t noise_id = 0; noise_id < 15; noise_id++) {
     std::vector<std::vector<int8_t>> information(num_codeblocks);
     std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
     for (size_t i = 0; i < num_codeblocks; i++) {
-      data_generator.GenRawData(information.at(i),
+      data_generator.GenRawData(dir, information.at(i),
                                 i % cfg->UeAntNum() /* UE ID */);
       std::memcpy(input_ptr, information.at(i).data(), input_size);
-      data_generator.GenCodeblock(input_ptr, encoded_codewords.at(i));
+      data_generator.GenCodeblock(dir, input_ptr, encoded_codewords.at(i));
     }
 
     // Save uplink information bytes to file
-    const size_t input_bytes_per_cb = BitsToBytes(LdpcNumInputBits(
-        cfg->LdpcConfig().BaseGraph(), cfg->LdpcConfig().ExpansionFactor()));
+    const size_t input_bytes_per_cb =
+        BitsToBytes(LdpcNumInputBits(cfg->LdpcConfig(dir).BaseGraph(),
+                                     cfg->LdpcConfig(dir).ExpansionFactor()));
     if (kPrintUplinkInformationBytes) {
       std::printf("Uplink information bytes\n");
       for (size_t n = 0; n < num_codeblocks; n++) {
@@ -112,7 +116,7 @@ int main(int argc, char* argv[]) {
     size_t num_unused_symbol = cfg->Frame().NumDataSyms() - num_used_symbol;
     for (size_t ue_id = 0; ue_id < cfg->UeAntNum(); ue_id++) {
       for (size_t i = 0; i < num_cbs_per_ue; i++) {
-        size_t remaining_bits = cfg->LdpcConfig().NumCbCodewLen();
+        size_t remaining_bits = cfg->LdpcConfig(dir).NumCbCodewLen();
         size_t offset = 0;
         for (size_t j = 0; j < num_symbols_per_cb; j++) {
           size_t num_bits =
@@ -244,7 +248,7 @@ int main(int argc, char* argv[]) {
       for (size_t j = 0; j < cfg->OfdmCaNum(); j++) {
         arma::cx_fmat mat_csi(
             reinterpret_cast<arma::cx_float*>(csi_matrices_data[j]),
-            cfg->BsAntNum(), cfg->UeAntNum());
+            cfg->BsAntNum(), cfg->UeAntNum(), false);
         mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
       }
     }
@@ -296,12 +300,12 @@ int main(int argc, char* argv[]) {
         size_t symbol_id_in_cb = (i - data_sym_start) % num_symbols_per_cb;
         auto* demod_ptr = demod_data_all_symbols[j] +
                           (cb_id * num_symbols_per_cb * 8 +
-                           symbol_id_in_cb * cfg->ModOrderBits()) *
+                           symbol_id_in_cb * cfg->ModOrderBits(dir)) *
                               cfg->OfdmDataNum();
         auto* equal_t_ptr =
             (float*)(equalized_data_all_symbols[i - data_sym_start] +
                      j * cfg->OfdmDataNum());
-        switch (cfg->ModOrderBits()) {
+        switch (cfg->ModOrderBits(dir)) {
           case (4):
             Demod16qamSoftAvx2(equal_t_ptr, demod_ptr, cfg->OfdmDataNum());
             break;
@@ -310,12 +314,12 @@ int main(int argc, char* argv[]) {
             break;
           default:
             std::printf("Demodulation: modulation type %s not supported!\n",
-                        cfg->Modulation().c_str());
+                        cfg->Modulation(dir).c_str());
         }
       }
     }
 
-    const LDPCconfig& ldpc_config = cfg->LdpcConfig();
+    const LDPCconfig& ldpc_config = cfg->LdpcConfig(dir);
 
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
     struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {};

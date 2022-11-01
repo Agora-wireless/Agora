@@ -6,8 +6,11 @@
 #ifndef CONCURRENT_QUEUE_WRAPPER_H_
 #define CONCURRENT_QUEUE_WRAPPER_H_
 
-#include "buffer.h"
+#include <cstddef>
+
 #include "concurrentqueue.h"
+#include "message.h"
+#include "symbols.h"
 #include "utils.h"
 
 /// Enqueue one event to a concurrent queue and print a warning message

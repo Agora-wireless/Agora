@@ -6,11 +6,14 @@
 #ifndef STATS_H_
 #define STATS_H_
 
-#include <iostream>
+#include <array>
+#include <cstddef>
+#include <string>
 
 #include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"
+#include "message.h"
 #include "symbols.h"
 
 static constexpr size_t kMaxStatBreakdown = 4;
@@ -40,7 +43,7 @@ enum class TsType : size_t {
   kPilotAllRX,         // All pilot packets received
   kRCAllRX,            // All Reciprocity Calibration Symbols received
   kFFTPilotsDone,      // Completed FFT for all pilots in this frame
-  kZFDone,             // Completed zeroforcing for this frame
+  kBeamDone,           // Completed zeroforcing for this frame
   kDemulDone,          // Completed demodulation for this frame
   kRXDone,             // All packets of a frame received
   kRCDone,             // Recirocity Calibration Computation done
@@ -148,6 +151,12 @@ class Stats {
                                this->freq_ghz_);
   }
 
+  void PrintPerFrameDone(PrintType print_type, size_t frame_id) const;
+  void PrintPerSymbolDone(PrintType print_type, size_t frame_id,
+                          size_t symbol_id, size_t sub_count) const;
+  void PrintPerTaskDone(PrintType print_type, size_t frame_id, size_t symbol_id,
+                        size_t ant_or_sc_id, size_t task_count) const;
+
   /// Get the DurationStat object used by thread thread_id for DoerType
   /// doer_type
   DurationStat* GetDurationStat(DoerType doer_type, size_t thread_id) {
@@ -179,8 +188,8 @@ class Stats {
                                     size_t thread_num, size_t break_down_num);
   static void PrintPerThreadPerTask(std::string const& doer_string,
                                     FrameSummary const& s);
-  static void PrintPerFrame(std::string const& doer_string,
-                            FrameSummary const& frame_summary);
+  static std::string PrintPerFrame(std::string const& doer_string,
+                                   FrameSummary const& frame_summary);
 
   size_t GetTotalTaskCount(DoerType doer_type, size_t thread_num);
 
@@ -188,7 +197,7 @@ class Stats {
 
   const size_t task_thread_num_;
   const size_t fft_thread_num_;
-  const size_t zf_thread_num_;
+  const size_t beam_thread_num_;
   const size_t demul_thread_num_;
   const size_t decode_thread_num_;
   const size_t break_down_num_ = kMaxStatBreakdown;

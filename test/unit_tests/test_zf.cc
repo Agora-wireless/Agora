@@ -2,14 +2,14 @@
 // For some reason, gtest include order matters
 #include "concurrentqueue.h"
 #include "config.h"
-#include "dozf.h"
+#include "dobeamweights.h"
 #include "gettime.h"
 #include "utils.h"
 
 /// Measure performance of zeroforcing
 TEST(TestZF, Perf) {
   static constexpr size_t kNumIters = 10000;
-  auto cfg = std::make_unique<Config>("data/tddconfig-sim-ul.json");
+  auto cfg = std::make_unique<Config>("files/config/ci/tddconfig-sim-ul.json");
   cfg->GenData();
 
   int tid = 0;
@@ -45,7 +45,7 @@ TEST(TestZF, Perf) {
   auto phy_stats = std::make_unique<PhyStats>(cfg.get(), Direction::kUplink);
   auto stats = std::make_unique<Stats>(cfg.get());
 
-  auto compute_zf = std::make_unique<DoZF>(
+  auto compute_zf = std::make_unique<DoBeamWeights>(
       cfg.get(), tid, csi_buffers, calib_dl_msum_buffer, calib_ul_msum_buffer,
       calib_dl_buffer, calib_ul_buffer, ul_zf_matrices, dl_zf_matrices,
       phy_stats.get(), stats.get());
@@ -55,8 +55,8 @@ TEST(TestZF, Perf) {
   for (size_t i = 0; i < kNumIters; i++) {
     uint32_t frame_id = fast_rand.NextU32();
     size_t base_sc_id =
-        (fast_rand.NextU32() % (cfg->OfdmDataNum() / cfg->ZfBlockSize())) *
-        cfg->ZfBlockSize();
+        (fast_rand.NextU32() % (cfg->OfdmDataNum() / cfg->BeamBlockSize())) *
+        cfg->BeamBlockSize();
     compute_zf->Launch(gen_tag_t::FrmSc(frame_id, base_sc_id).tag_);
   }
   double ms = GetTime::CyclesToMs(GetTime::Rdtsc() - start_tsc, cfg->FreqGhz());
