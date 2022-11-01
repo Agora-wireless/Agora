@@ -14,7 +14,6 @@
 std::unique_ptr<Radio> Radio::Create(Radio::RadioType type) {
   switch (type) {
     case kSoapySdrStream: {
-      AGORA_LOG_INFO("SoapySDR is created here \n");
       return std::make_unique<RadioSoapySdr>(RadioDataPlane::kSoapyStream);
     }
     case kSoapySdrSocket: {
@@ -22,7 +21,6 @@ std::unique_ptr<Radio> Radio::Create(Radio::RadioType type) {
     }
 #if defined(USE_PURE_UHD)
     case kUhdNative: {
-      AGORA_LOG_INFO("UHDSdr is created here\n");
       return std::make_unique<RadioUHDSdr>();
     }
 #endif

@@ -29,7 +29,7 @@ static constexpr size_t kNumRecSc = 4;
 //Recording parameters
 static constexpr size_t kRecordFrameInterval = 1;
 #if defined(ENABLE_HDF5)
-static constexpr bool kRecordDownlinkFrame = false;
+static constexpr bool kRecordDownlinkFrame = true;
 
 //set the recording types, can add multiple
 static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
