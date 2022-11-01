@@ -22,6 +22,7 @@
 #include "memory_manage.h"
 #include "modulation.h"
 #include "scrambler.h"
+#include "simd_types.h"
 #include "utils_ldpc.h"
 
 static constexpr bool kPrintDebugCSI = false;
@@ -55,14 +56,12 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   srand(time(nullptr));
   auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
   std::unique_ptr<DoCRC> crc_obj = std::make_unique<DoCRC>();
-  size_t ul_cb_bytes = cfg_->NumBytesPerCb(Direction::kUplink);
+  const size_t ul_cb_bytes = cfg_->NumBytesPerCb(Direction::kUplink);
+  const size_t ul_cb_padding = cfg_->NumPaddingBytesPerCb(Direction::kUplink);
   LDPCconfig ul_ldpc_config = this->cfg_->LdpcConfig(Direction::kUplink);
-  // size_t ul_cb_bytes =
-  //    LdpcEncodingInputBufSize(this->cfg_->LdpcConfig().BaseGraph(),
-  //                             this->cfg_->LdpcConfig().ExpansionFactor());
 
-  auto* ul_scrambler_buffer =
-      new int8_t[ul_cb_bytes + kLdpcHelperFunctionInputBufferSizePaddingBytes];
+  SimdAlignByteVector ul_scrambler_buffer(ul_cb_bytes + ul_cb_padding,
+                                          std::byte(0));
 
   // Step 1: Generate the information buffers (MAC Packets) and LDPC-encoded
   // buffers for uplink
@@ -157,15 +156,18 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       ul_information.at(cb) =
           std::vector<int8_t>(cb_start, cb_start + ul_cb_bytes);
 
-      std::memcpy(ul_scrambler_buffer, ul_information.at(cb).data(),
+      std::memcpy(ul_scrambler_buffer.data(), ul_information.at(cb).data(),
                   ul_cb_bytes);
 
       if (this->cfg_->ScrambleEnabled()) {
-        scrambler->Scramble(ul_scrambler_buffer, ul_cb_bytes);
+        scrambler->Scramble(ul_scrambler_buffer.data(), ul_cb_bytes);
       }
-      std::memset(&ul_scrambler_buffer[ul_cb_bytes], 0u,
-                  kLdpcHelperFunctionInputBufferSizePaddingBytes);
-      this->GenCodeblock(Direction::kUplink, ul_scrambler_buffer,
+
+      if (ul_cb_padding > 0) {
+        std::memset(&ul_scrambler_buffer.at(ul_cb_bytes), 0u, ul_cb_padding);
+      }
+      this->GenCodeblock(Direction::kUplink,
+                         reinterpret_cast<int8_t*>(ul_scrambler_buffer.data()),
                          ul_encoded_codewords.at(cb));
     }
 
@@ -463,10 +465,14 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   /* ------------------------------------------------
    * Generate data for downlink test
    * ------------------------------------------------ */
-  size_t dl_cb_bytes = cfg_->NumBytesPerCb(Direction::kDownlink);
-  LDPCconfig dl_ldpc_config = this->cfg_->LdpcConfig(Direction::kDownlink);
-  auto* dl_scrambler_buffer =
-      new int8_t[dl_cb_bytes + kLdpcHelperFunctionInputBufferSizePaddingBytes];
+  const LDPCconfig dl_ldpc_config =
+      this->cfg_->LdpcConfig(Direction::kDownlink);
+  const size_t dl_cb_bytes = cfg_->NumBytesPerCb(Direction::kDownlink);
+  const size_t dl_cb_padding = cfg_->NumPaddingBytesPerCb(Direction::kDownlink);
+
+  SimdAlignByteVector dl_scrambler_buffer(dl_cb_bytes + dl_cb_padding,
+                                          std::byte(0));
+
   if (this->cfg_->Frame().NumDLSyms() > 0) {
     const size_t num_dl_mac_bytes =
         this->cfg_->MacBytesNumPerframe(Direction::kDownlink);
@@ -543,26 +549,29 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     std::vector<std::vector<int8_t>> dl_encoded_codewords(num_dl_codeblocks);
     for (size_t cb = 0; cb < num_dl_codeblocks; cb++) {
       // i : symbol -> ue -> cb (repeat)
-      size_t sym_id = cb / (symbol_blocks);
+      const size_t sym_id = cb / (symbol_blocks);
       // ue antenna for code block
-      size_t sym_offset = cb % (symbol_blocks);
-      size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
-      size_t ue_cb_id = sym_offset % dl_ldpc_config.NumBlocksInSymbol();
-      size_t ue_cb_cnt =
+      const size_t sym_offset = cb % (symbol_blocks);
+      const size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
+      const size_t ue_cb_id = sym_offset % dl_ldpc_config.NumBlocksInSymbol();
+      const size_t ue_cb_cnt =
           (sym_id * dl_ldpc_config.NumBlocksInSymbol()) + ue_cb_id;
       int8_t* cb_start = &dl_mac_info.at(ue_id).at(ue_cb_cnt * dl_cb_bytes);
       dl_information.at(cb) =
           std::vector<int8_t>(cb_start, cb_start + dl_cb_bytes);
 
-      std::memcpy(dl_scrambler_buffer, dl_information.at(cb).data(),
+      std::memcpy(dl_scrambler_buffer.data(), dl_information.at(cb).data(),
                   dl_cb_bytes);
 
       if (this->cfg_->ScrambleEnabled()) {
-        scrambler->Scramble(dl_scrambler_buffer, dl_cb_bytes);
+        scrambler->Scramble(dl_scrambler_buffer.data(), dl_cb_bytes);
       }
-      std::memset(&dl_scrambler_buffer[dl_cb_bytes], 0u,
-                  kLdpcHelperFunctionInputBufferSizePaddingBytes);
-      this->GenCodeblock(Direction::kDownlink, dl_scrambler_buffer,
+
+      if (dl_cb_padding > 0u) {
+        std::memset(&dl_scrambler_buffer.at(dl_cb_bytes), 0u, dl_cb_padding);
+      }
+      this->GenCodeblock(Direction::kDownlink,
+                         reinterpret_cast<int8_t*>(dl_scrambler_buffer.data()),
                          dl_encoded_codewords.at(cb));
     }
 
@@ -570,8 +579,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     std::vector<std::vector<complex_float>> dl_modulated_codewords(
         num_dl_codeblocks);
     for (size_t i = 0; i < num_dl_codeblocks; i++) {
-      size_t sym_offset = i % (symbol_blocks);
-      size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
+      const size_t sym_offset = i % (symbol_blocks);
+      const size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
       dl_modulated_codewords.at(i) = this->GetDLModulation(
           dl_encoded_codewords.at(i), ue_specific_pilot[ue_id]);
     }
@@ -821,6 +830,4 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   rx_data_all_symbols.Free();
   ue_specific_pilot.Free();
   std::free(ifft_shift_tmp);
-  delete[] ul_scrambler_buffer;
-  delete[] dl_scrambler_buffer;
 }

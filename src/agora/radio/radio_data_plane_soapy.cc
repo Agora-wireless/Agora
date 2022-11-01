@@ -33,7 +33,7 @@ inline void RadioDataPlaneSoapy::Close() { return RadioDataPlane::Close(); }
 inline void RadioDataPlaneSoapy::Setup() {
   SoapySDR::Kwargs sargs;
   //Helps with the disable stream, errors (-2)
-  //sargs["SYNC_ACTIVATE"] = "false";
+  sargs["SYNC_ACTIVATE"] = "false";
   return RadioDataPlane::Setup(sargs);
 }
 

@@ -61,7 +61,8 @@ void Scrambler::WlanScrambler(void* output_buffer, const void* input_buffer,
                               size_t num_bytes,
                               std::bitset<kScramblerlength>& scram_buffer,
                               std::vector<std::byte>& bit_buffer) {
-  auto* input_buffer_ptr = reinterpret_cast<const std::byte*>(input_buffer);
+  const auto* input_buffer_ptr =
+      reinterpret_cast<const std::byte*>(input_buffer);
   auto* output_buffer_ptr = reinterpret_cast<std::byte*>(output_buffer);
 
   std::bitset<kBitsInitArraySize> scrambler_init_bits{kScramblerInitState};
@@ -95,10 +96,7 @@ void Scrambler::WlanScrambler(void* output_buffer, const void* input_buffer,
       //  x7 xor x4
       res_xor[0] = scrambler_init_bits[0] ^ scrambler_init_bits[3];
       scram_buffer[i] = res_xor[0];
-      //  Left-shift
-      for (size_t i = 0; i < 6; i++) {
-        scrambler_init_bits[i] = scrambler_init_bits[i + 1];
-      }
+      scrambler_init_bits = scrambler_init_bits >> 1;
       //  Update x1
       scrambler_init_bits[6] = res_xor[0];
     }
@@ -112,7 +110,8 @@ void Scrambler::WlanScrambler(void* output_buffer, const void* input_buffer,
         j++;
       }
       bit_buffer.at(i) =
-          bit_buffer.at(i) ^ std::byte(0x01 & scram_buffer[j - 1]);
+          bit_buffer.at(i) ^ std::byte(static_cast<int>(std::bitset<1>(1)[0] &
+                                                        scram_buffer[j - 1]));
     }
   }
   ConvertBitsToBytes(bit_buffer.data(), num_bytes, output_buffer_ptr);

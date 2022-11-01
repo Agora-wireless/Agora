@@ -138,7 +138,8 @@ void TxRxWorkerHw::DoTxRx() {
         if (ignore == false) {
           //Publish the symbols to the scheduler
           for (auto* packet : pkts) {
-            EventData rx_message(EventType::kPacketRX, rx_tag_t(packet).tag_);
+            const EventData rx_message(EventType::kPacketRX,
+                                       rx_tag_t(packet).tag_);
             NotifyComplete(rx_message);
           }
 
@@ -564,7 +565,7 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
           "TxRxWorkerHw[%zu]: Transmitted frame %zu, symbol %zu, ant %zu\n",
           tid_, frame_id, symbol_id, ant_id);
     }
-    auto complete_event =
+    const auto complete_event =
         EventData(EventType::kPacketTX, current_event.tags_[0]);
     NotifyComplete(complete_event);
   }
@@ -598,8 +599,6 @@ bool TxRxWorkerHw::IsTxSymbolNext(size_t radio_id, size_t current_symbol) {
 
 Radio::TxFlags TxRxWorkerHw::GetTxFlags(size_t radio_id, size_t tx_symbol_id) {
   Radio::TxFlags tx_flags;
-  //Flags == 1   // HAS_TIME
-  //Flags == 2;  // HAS_TIME & END_BURST, name me
   const auto tx_again = IsTxSymbolNext(radio_id, tx_symbol_id);
   if (tx_again) {
     tx_flags = Radio::TxFlags::kTxFlagNone;

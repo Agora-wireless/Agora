@@ -72,7 +72,7 @@ void TxRxWorker::WaitSync() {
   AGORA_LOG_INFO("TxRxWorker[%zu]: synchronized\n", tid_);
 }
 
-bool TxRxWorker::NotifyComplete(EventData& complete_event) {
+bool TxRxWorker::NotifyComplete(const EventData& complete_event) {
   auto enqueue_status =
       event_notify_q_->enqueue(notify_producer_token_, complete_event);
   if (enqueue_status == false) {

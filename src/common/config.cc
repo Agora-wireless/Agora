@@ -19,6 +19,7 @@
 #include "message.h"
 #include "modulation.h"
 #include "scrambler.h"
+#include "simd_types.h"
 #include "utils_ldpc.h"
 
 using json = nlohmann::json;
@@ -37,8 +38,6 @@ static const std::string kUlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_ul_data_";
 static const std::string kDlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_dl_data_";
-static const std::string kUlPilotFreqPrefix =
-    kExperimentFilepath + "ue_pilot_data_f_";
 static const std::string kUlDataFreqPrefix = kExperimentFilepath + "ul_data_f_";
 
 Config::Config(std::string jsonfilename)
@@ -163,24 +162,23 @@ Config::Config(std::string jsonfilename)
     }
   }
 
-  if (ue_radio_id_.empty() == false) {
-    ue_num_ = ue_radio_id_.size();
-    for (size_t i = 0; i < ue_num_; i++) {
-      ue_radio_name_.push_back(
-          "UE" + (ue_radio_id_.at(i).length() > kShortIdLen
-                      ? ue_radio_id_.at(i).substr(ue_radio_id_.at(i).length() -
-                                                  kShortIdLen)
-                      : ue_radio_id_.at(i)));
-    }
-  } else {
+  if (ue_radio_id_.empty()) {
     ue_num_ = tdd_conf.value("ue_radio_num", 8);
     for (size_t ue_radio = 0; ue_radio < ue_num_; ue_radio++) {
-      AGORA_LOG_TRACE("Adding UE_SIM_RADIO_%d\n", ue_radio);
-      const std::string ue_name = "UE_SIM_RADIO_" + std::to_string(ue_radio);
+      std::stringstream ss;
+      ss << std::setw(kShortIdLen) << std::setfill('0') << ue_radio;
+      const std::string ue_name = "UE_SIM_RADIO_" + ss.str();
+      AGORA_LOG_TRACE("Adding %s\n", ue_name.c_str());
       ue_radio_id_.push_back(ue_name);
-      ue_radio_name_.emplace_back(
-          ue_name.substr(ue_name.length() - kShortIdLen));
     }
+  }
+  ue_num_ = ue_radio_id_.size();
+  for (size_t i = 0; i < ue_num_; i++) {
+    ue_radio_name_.push_back(
+        "UE" + (ue_radio_id_.at(i).length() > kShortIdLen
+                    ? ue_radio_id_.at(i).substr(ue_radio_id_.at(i).length() -
+                                                kShortIdLen)
+                    : ue_radio_id_.at(i)));
   }
 
   channel_ = tdd_conf.value("channel", "A");
@@ -632,6 +630,8 @@ Config::Config(std::string jsonfilename)
   }
 
   ul_num_bytes_per_cb_ = ul_ldpc_config_.NumCbLen() / 8;
+  ul_num_padding_bytes_per_cb_ =
+      Roundup<64>(ul_num_bytes_per_cb_) - ul_num_bytes_per_cb_;
   ul_data_bytes_num_persymbol_ =
       ul_num_bytes_per_cb_ * ul_ldpc_config_.NumBlocksInSymbol();
   ul_mac_packet_length_ = ul_data_bytes_num_persymbol_;
@@ -645,6 +645,8 @@ Config::Config(std::string jsonfilename)
   ul_mac_bytes_num_perframe_ = ul_mac_packet_length_ * ul_mac_packets_perframe_;
 
   dl_num_bytes_per_cb_ = dl_ldpc_config_.NumCbLen() / 8;
+  dl_num_padding_bytes_per_cb_ =
+      Roundup<64>(dl_num_bytes_per_cb_) - dl_num_bytes_per_cb_;
   dl_data_bytes_num_persymbol_ =
       dl_num_bytes_per_cb_ * dl_ldpc_config_.NumBlocksInSymbol();
   dl_mac_packet_length_ = dl_data_bytes_num_persymbol_;
@@ -1003,16 +1005,10 @@ void Config::GenData() {
   Table<complex_float> ue_pilot_ifft;
   ue_pilot_ifft.Calloc(this->ue_ant_num_, this->ofdm_ca_num_,
                        Agora_memory::Alignment_t::kAlign64);
-  auto zc_ue_pilot_double =
-      CommsLib::GetSequence(this->ofdm_data_num_, CommsLib::kLteZadoffChu);
-  auto zc_ue_pilot = Utils::DoubleToCfloat(zc_ue_pilot_double);
   for (size_t i = 0; i < ue_ant_num_; i++) {
-    auto zc_ue_pilot_i =
-        KUseCyclicShift
-            ? CommsLib::SeqCyclicShift(
-                  zc_ue_pilot,
-                  (i + this->ue_ant_offset_) * (float)M_PI / 6)  // LTE DMRS
-            : zc_ue_pilot;
+    auto zc_ue_pilot_i = CommsLib::SeqCyclicShift(
+        zc_seq,
+        (i + this->ue_ant_offset_) * (float)M_PI / 6);  // LTE DMRS
     for (size_t j = 0; j < this->ofdm_data_num_; j++) {
       this->ue_specific_pilot_[i][j] = {zc_ue_pilot_i[j].real(),
                                         zc_ue_pilot_i[j].imag()};
@@ -1022,26 +1018,6 @@ void Config::GenData() {
                            : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
       ue_pilot_ifft[i][k] = this->ue_specific_pilot_[i][j];
     }
-    if (kOutputUlScData) {
-      const std::string filename_ul_pilot_f =
-          kUlPilotFreqPrefix + std::to_string(i) + ".bin";
-      FILE* fp_tx_f = std::fopen(filename_ul_pilot_f.c_str(), "wb");
-      if (fp_tx_f == nullptr) {
-        AGORA_LOG_ERROR("Failed to create ul sc pilot file %s. Error %s.\n",
-                        filename_ul_pilot_f.c_str(), strerror(errno));
-        throw std::runtime_error("Config: Failed to create ul sc pilot file");
-      } else {
-        const auto write_status = std::fwrite(
-            ue_pilot_ifft[i], sizeof(complex_float), ofdm_ca_num_, fp_tx_f);
-        if (write_status != ofdm_ca_num_) {
-          AGORA_LOG_ERROR("Config: Failed to write ul sc pilot file\n");
-        }
-        const auto close_status = std::fclose(fp_tx_f);
-        if (close_status != 0) {
-          AGORA_LOG_ERROR("Config: Failed to close ul sc pilot file\n");
-        }
-      }
-    }
     CommsLib::IFFT(ue_pilot_ifft[i], ofdm_ca_num_, false);
   }
 
@@ -1049,7 +1025,7 @@ void Config::GenData() {
   const size_t dl_num_bytes_per_ue_pad =
       Roundup<64>(this->dl_num_bytes_per_cb_) *
       this->dl_ldpc_config_.NumBlocksInSymbol();
-  dl_bits_.Malloc(this->frame_.NumDLSyms(),
+  dl_bits_.Calloc(this->frame_.NumDLSyms(),
                   dl_num_bytes_per_ue_pad * this->ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
   dl_iq_f_.Calloc(this->frame_.NumDLSyms(), ofdm_data_num_ * ue_ant_num_,
@@ -1061,7 +1037,7 @@ void Config::GenData() {
   const size_t ul_num_bytes_per_ue_pad =
       Roundup<64>(this->ul_num_bytes_per_cb_) *
       this->ul_ldpc_config_.NumBlocksInSymbol();
-  ul_bits_.Malloc(this->frame_.NumULSyms(),
+  ul_bits_.Calloc(this->frame_.NumULSyms(),
                   ul_num_bytes_per_ue_pad * this->ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
   ul_iq_f_.Calloc(this->frame_.NumULSyms(),
@@ -1170,12 +1146,10 @@ void Config::GenData() {
   const size_t ul_num_blocks_per_symbol =
       this->ul_ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
 
-  // Used as an input ptr to
-  auto* ul_scramble_buffer =
-      new int8_t[ul_num_bytes_per_cb_ +
-                 kLdpcHelperFunctionInputBufferSizePaddingBytes]();
-  int8_t* ldpc_input = nullptr;
+  SimdAlignByteVector ul_scramble_buffer(
+      ul_num_bytes_per_cb_ + ul_num_padding_bytes_per_cb_, std::byte(0));
 
+  int8_t* ldpc_input = nullptr;
   // Encode uplink bits
   Table<int8_t> ul_encoded_bits;
   ul_encoded_bits.Malloc(this->frame_.NumULSyms() * ul_num_blocks_per_symbol,
@@ -1196,17 +1170,19 @@ void Config::GenData() {
                             j * ul_ldpc_config_.NumBlocksInSymbol() + k];
 
         if (scramble_enabled_) {
-          std::memcpy(ul_scramble_buffer,
-                      GetInfoBits(ul_bits_, Direction::kUplink, i, j, k),
-                      ul_num_bytes_per_cb_);
-          scrambler->Scramble(ul_scramble_buffer, ul_num_bytes_per_cb_);
-          std::memset(&ul_scramble_buffer[ul_num_bytes_per_cb_], 0u,
-                      kLdpcHelperFunctionInputBufferSizePaddingBytes);
-          ldpc_input = ul_scramble_buffer;
+          scrambler->Scramble(
+              ul_scramble_buffer.data(),
+              GetInfoBits(ul_bits_, Direction::kUplink, i, j, k),
+              ul_num_bytes_per_cb_);
+          ldpc_input = reinterpret_cast<int8_t*>(ul_scramble_buffer.data());
         } else {
           ldpc_input = GetInfoBits(ul_bits_, Direction::kUplink, i, j, k);
         }
-
+        //Clean padding
+        if (ul_num_bytes_per_cb_ > 0) {
+          std::memset(&ldpc_input[ul_num_bytes_per_cb_], 0u,
+                      ul_num_padding_bytes_per_cb_);
+        }
         LdpcEncodeHelper(ul_ldpc_config_.BaseGraph(),
                          ul_ldpc_config_.ExpansionFactor(),
                          ul_ldpc_config_.NumRows(), coded_bits_ptr,
@@ -1290,9 +1266,8 @@ void Config::GenData() {
   const size_t dl_num_blocks_per_symbol =
       this->dl_ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
 
-  auto* dl_scramble_buffer =
-      new int8_t[dl_num_bytes_per_cb_ +
-                 kLdpcHelperFunctionInputBufferSizePaddingBytes]();
+  SimdAlignByteVector dl_scramble_buffer(
+      dl_num_bytes_per_cb_ + dl_num_padding_bytes_per_cb_, std::byte(0));
 
   Table<int8_t> dl_encoded_bits;
   dl_encoded_bits.Malloc(this->frame_.NumDLSyms() * dl_num_blocks_per_symbol,
@@ -1313,15 +1288,17 @@ void Config::GenData() {
                             j * dl_ldpc_config_.NumBlocksInSymbol() + k];
 
         if (scramble_enabled_) {
-          std::memcpy(dl_scramble_buffer,
-                      GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k),
-                      dl_num_bytes_per_cb_);
-          scrambler->Scramble(dl_scramble_buffer, dl_num_bytes_per_cb_);
-          std::memset(&dl_scramble_buffer[dl_num_bytes_per_cb_], 0u,
-                      kLdpcHelperFunctionInputBufferSizePaddingBytes);
-          ldpc_input = dl_scramble_buffer;
+          scrambler->Scramble(
+              dl_scramble_buffer.data(),
+              GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k),
+              dl_num_bytes_per_cb_);
+          ldpc_input = reinterpret_cast<int8_t*>(dl_scramble_buffer.data());
         } else {
           ldpc_input = GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k);
+        }
+        if (dl_num_padding_bytes_per_cb_ > 0) {
+          std::memset(&ldpc_input[dl_num_bytes_per_cb_], 0u,
+                      dl_num_padding_bytes_per_cb_);
         }
 
         LdpcEncodeHelper(dl_ldpc_config_.BaseGraph(),
@@ -1472,8 +1449,6 @@ void Config::GenData() {
   dl_encoded_bits.Free();
   ul_encoded_bits.Free();
   FreeBuffer1d(&pilot_ifft);
-  delete[] ul_scramble_buffer;
-  delete[] dl_scramble_buffer;
 }
 
 Config::~Config() {

@@ -186,36 +186,36 @@ void RecorderWorkerHDF5::Init() {
   hdf5_->WriteAttribute("PILOT_SEQ_TYPE", std::string("zadoff-chu"));
 
   // Data subcarriers
-  const auto data_idx = CommsLib::GetDataSc(fft_size, sym_data_sc_num);
-  if (data_idx.size() > 0) {
+  const size_t ul_pilot_sc_spacing = 1;
+  //with sc_pilot_spacing set to 1, then the offset can be anything but 0
+  const auto data_idx =
+      CommsLib::GetDataSc(fft_size, sym_data_sc_num, 1, ul_pilot_sc_spacing);
+  if (data_idx.empty() == false) {
     hdf5_->WriteAttribute("OFDM_DATA_SC", data_idx);
   }
+
+  const size_t ul_pilot_sc_offset = 0;
   // Pilot subcarriers (indexes)
-  const auto pilot_sc_idx = CommsLib::GetPilotScIdx(fft_size, sym_data_sc_num);
-  if (pilot_sc_idx.size() > 0) {
+  const auto pilot_sc_idx = CommsLib::GetPilotScIdx(
+      fft_size, sym_data_sc_num, ul_pilot_sc_offset, ul_pilot_sc_spacing);
+  if (pilot_sc_idx.empty() == false) {
     hdf5_->WriteAttribute("OFDM_PILOT_SC", pilot_sc_idx);
   }
 
-  const auto pilot_sc = CommsLib::GetPilotScValue(fft_size, sym_data_sc_num);
-  if (pilot_sc.size() > 0) {
+  const auto pilot_sc = CommsLib::GetPilotScValue(
+      fft_size, sym_data_sc_num, ul_pilot_sc_offset, ul_pilot_sc_spacing);
+  if (pilot_sc.empty() == false) {
     hdf5_->WriteAttribute("OFDM_PILOT_SC_VALS", pilot_sc);
   }
 
   // Freq. Domain Pilot symbols (2 for complex)
-  auto pilot_sym_f =
-      CommsLib::GetSequence(sym_data_sc_num, CommsLib::kLteZadoffChu);
-  RtAssert(pilot_sym_f.size() == 2,
-           "pilot_sym_f must be complex (dimension 2)");
-  const size_t pilot_f_samples = pilot_sym_f.at(0).size();
-  RtAssert(pilot_sym_f.at(0).size() == pilot_sym_f.at(1).size(),
-           "pilot_sym_f must have equal dimensions");
   std::vector<double> split_vec_pilot_f(2 * fft_size, 0.0);
   const auto ofdm_data_start = cfg_->OfdmDataStart();
-  for (size_t i = 0; i < pilot_f_samples; i++) {
+  for (size_t i = 0; i < cfg_->OfdmDataNum(); i++) {
     split_vec_pilot_f[(2 * (ofdm_data_start + i)) + 0] =
-        pilot_sym_f.at(0).at(i);
+        cfg_->CommonPilot().at(i).real();
     split_vec_pilot_f[(2 * (ofdm_data_start + i)) + 1] =
-        pilot_sym_f.at(1).at(i);
+        cfg_->CommonPilot().at(i).imag();
   }
   hdf5_->WriteAttribute("OFDM_PILOT_F", split_vec_pilot_f);
 
@@ -224,7 +224,7 @@ void RecorderWorkerHDF5::Init() {
   hdf5_->WriteAttribute("UL_DATA_FRAME_NUM", 1);
 
   // Names of Files including uplink tx frequency-domain data
-  if (cfg_->UlTxFreqDataFiles().size() > 0) {
+  if (cfg_->UlTxFreqDataFiles().empty() == false) {
     hdf5_->WriteAttribute("TX_FD_DATA_FILENAMES", cfg_->UlTxFreqDataFiles());
   }
   // *****Temp compatibility values
@@ -383,7 +383,7 @@ void RecorderWorkerHDF5::WriteDatasetValue(const Packet* pkt,
       frame_id, pkt->cell_id_, symbol_index, antenna_index, 0};
 
   auto& dataset = datasets_.at(dataset_index);
-  AGORA_LOG_FRAME("Writting to dataset %s - [%lld, %lld, %lld, %lld, %lld]\n",
+  AGORA_LOG_TRACE("Writting to dataset %s - [%lld, %lld, %lld, %lld, %lld]\n",
                   dataset.first.c_str(), start.at(0), start.at(1), start.at(2),
                   start.at(3), start.at(4));
   ///If the frame id is > than the current 0 indexed dimension then we need to extend

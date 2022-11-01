@@ -47,8 +47,6 @@ static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
                        kRecorderWorkerMultiFile};
 #endif
 
-static std::unique_ptr<Agora_recorder::RecorderThread> recorder_;
-
 Agora::Agora(Config* const cfg)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
       config_(cfg),

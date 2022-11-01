@@ -95,10 +95,10 @@ int main(int argc, char* argv[]) {
 
   const size_t num_codeblocks = num_cbs_per_ue * cfg->UeAntNum();
   std::printf("Total number of blocks: %zu\n", num_codeblocks);
-  size_t input_size = LdpcEncodingInputBufSize(
-      cfg->LdpcConfig(dir).BaseGraph(), cfg->LdpcConfig(dir).ExpansionFactor());
-  auto* input_ptr =
-      new int8_t[input_size + kLdpcHelperFunctionInputBufferSizePaddingBytes];
+  size_t input_size = Roundup<64>(
+      LdpcEncodingInputBufSize(cfg->LdpcConfig(dir).BaseGraph(),
+                               cfg->LdpcConfig(dir).ExpansionFactor()));
+  auto* input_ptr = new int8_t[input_size];
   for (size_t noise_id = 0; noise_id < 15; noise_id++) {
     std::vector<std::vector<int8_t>> information(num_codeblocks);
     std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
