@@ -59,7 +59,7 @@ class Scrambler {
    * @param  byte_buffer_size      Input byte array size
    * @param  out_bit_buffer        Output bit array
    */
-  static void ConvertBitsToBytes(const std::byte* in_byte_buffer,
+  static void ConvertBytesToBits(const std::byte* in_byte_buffer,
                                  size_t byte_buffer_size,
                                  std::byte* out_bit_buffer);
 
@@ -71,7 +71,7 @@ class Scrambler {
    * @param  byte_buffer_size      Output byte array size
    * @param  out_byte_buffer       Output byte array
    */
-  static void ConvertBytesToBits(const std::byte* in_bit_buffer,
+  static void ConvertBitsToBytes(const std::byte* in_bit_buffer,
                                  size_t byte_buffer_size,
                                  std::byte* out_byte_buffer);
 

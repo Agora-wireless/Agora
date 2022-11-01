@@ -359,7 +359,12 @@ static constexpr bool kUseAVX2Encoder = false;
 // Enable debugging for sender and receiver applications
 static constexpr bool kDebugSenderReceiver = false;
 
+#if defined(ENABLE_HDF5)
 static constexpr bool kOutputUlScData = true;
+#else
+static constexpr bool kOutputUlScData = false;
+#endif
+
 static constexpr size_t kOfdmSymbolPerSlot = 1;
 static constexpr size_t kOutputFrameNum = 1;
 

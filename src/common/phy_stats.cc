@@ -21,6 +21,7 @@ PhyStats::PhyStats(Config* const cfg, Direction dir)
       logger_ber_(CsvLog::kBER, cfg, dir),
       logger_ser_(CsvLog::kSER, cfg, dir),
       logger_csi_(CsvLog::kCSI, cfg, dir),
+      logger_calib_(CsvLog::kCalib, cfg, dir, true),
       logger_ul_csi_(CsvLog::kULCSI, cfg, dir),
       logger_dl_csi_(CsvLog::kDLCSI, cfg, dir),
       logger_dl_beam_(CsvLog::kDlBeam, cfg, dir) {
@@ -384,6 +385,18 @@ void PhyStats::RecordDlCsi(size_t frame_id, size_t num_rec_sc,
       }
     }
     logger_csi_.Write(ss.str());
+  }
+}
+
+void PhyStats::RecordCalibMat(size_t frame_id, size_t sc_id,
+                              const arma::cx_fvec& calib_buffer) {
+  if (kEnableCsvLog) {
+    std::stringstream ss;
+    ss << frame_id << "," << sc_id;
+    for (size_t j = 0; j < config_->BfAntNum(); j++) {
+      ss << "," << calib_buffer[j].real() << "," << calib_buffer[j].imag();
+    }
+    logger_calib_.Write(ss.str());
   }
 }
 
