@@ -16,7 +16,6 @@
 #include "modulation.h"
 #include "packet_txrx_radio.h"
 #include "packet_txrx_sim.h"
-#include "recorder_thread.h"
 #include "signal_handler.h"
 
 static const bool kDebugPrintPacketsFromMac = false;

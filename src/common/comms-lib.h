@@ -23,12 +23,6 @@
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 
-///\todo temp *** evaluate
-//static constexpr size_t kPilotSubcarrierSpacing = 12;
-//static constexpr size_t kDefaultPilotScOffset = 6;
-static constexpr size_t kPilotSubcarrierSpacing = 1;
-static constexpr size_t kDefaultPilotScOffset = 0;
-
 static const std::map<std::string, size_t> kBeamformingStr{
     {"ZF", 0}, {"MMSE", 1}, {"MRC", 2}};
 

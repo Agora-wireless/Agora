@@ -10,7 +10,7 @@
 
 static constexpr size_t kNotifyWaitMs = 100;
 static constexpr size_t kWorkerStartWaitMs = 10;
-static constexpr size_t kWorkerStartWaitMsMax = 50000;
+static constexpr size_t kWorkerStartWaitMsMax = 5000;
 
 PacketTxRx::PacketTxRx(AgoraTxRx::TxRxTypes type, Config* const cfg,
                        size_t core_offset,

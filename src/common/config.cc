@@ -28,7 +28,6 @@ static constexpr size_t kMacAlignmentBytes = 64u;
 static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
-static constexpr bool KUseCyclicShift = !kOutputUlScData;
 
 static const std::string kLogFilepath =
     TOSTRING(PROJECT_DIRECTORY) "/files/log/";
@@ -965,9 +964,7 @@ void Config::GenData() {
       CommsLib::GetSequence(this->ofdm_data_num_, CommsLib::kLteZadoffChu);
   auto zc_seq = Utils::DoubleToCfloat(zc_seq_double);
   this->common_pilot_ =
-      KUseCyclicShift
-          ? CommsLib::SeqCyclicShift(zc_seq, M_PI / 4)  // Used in LTE SRS
-          : zc_seq;
+      CommsLib::SeqCyclicShift(zc_seq, M_PI / 4);  // Used in LTE SRS
 
   this->pilots_ = static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64,

@@ -24,19 +24,14 @@ int main(int argc, char* argv[]) {
   // For backwards compatibility
   if (argc == 2) {
     conf_file = std::string(argv[1]);
-    std::cout << "main agora went here: ch1" << std::endl;
     std::printf("User: Setting configuration filename to %s\n",
                 conf_file.c_str());
   } else {
-    std::cout << "main agora went here: ch2" << std::endl;
     conf_file = FLAGS_conf_file;
-    std::printf("User: Setting configuration filename to %s\n",
-                conf_file.c_str());
   }
 
   std::unique_ptr<Config> cfg = std::make_unique<Config>(conf_file.c_str());
   cfg->GenData();
-  std::cout << "data is being generated" << std::endl;
 
   int ret;
   try {
