@@ -8,6 +8,7 @@
 
 static constexpr bool kPrintChannelOutput = false;
 static constexpr bool kPrintSNRCheck = false;
+static constexpr double kMeanChannelGain = 0.1f;
 
 Channel::Channel(const Config* const config, std::string& in_channel_type,
                  double in_channel_snr)
@@ -29,6 +30,10 @@ Channel::Channel(const Config* const config, std::string& in_channel_type,
   } else {
     chan_model_ = kAwgn;
   }
+  float snr_lin = std::pow(10, channel_snr_db_ / 10.0f);
+  noise_samp_std_ = std::sqrt(kMeanChannelGain / (snr_lin * 2.0f));
+  std::cout << "Noise level to be used is: " << std::fixed << std::setw(5)
+            << std::setprecision(2) << noise_samp_std_ << std::endl;
 }
 
 Channel::~Channel() = default;
@@ -52,7 +57,7 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
           arma::fmat rmat(ue_ant_, bs_ant_, arma::fill::randn);
           arma::fmat imat(ue_ant_, bs_ant_, arma::fill::randn);
           h_ = arma::cx_fmat(rmat, imat);
-          h_ = (1 / sqrt(2)) * h_;
+          h_ = sqrt(kMeanChannelGain / 2.0f) * h_;
           // H = H / abs(H).max();
         }
         break;
@@ -63,7 +68,7 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
     }
   }
   if (is_downlink) {
-    fmat_h = fmat_src * h_.st() / std::sqrt(cfg_->BsAntNum());
+    fmat_h = fmat_src * h_.st();
   } else {
     fmat_h = fmat_src * h_;
   }
@@ -80,14 +85,6 @@ void Channel::Awgn(const arma::cx_fmat& src, arma::cx_fmat& dst) const {
   if (channel_snr_db_ < 120.0f) {
     const int n_row = src.n_rows;
     const int n_col = src.n_cols;
-    float snr_lin = pow(10, channel_snr_db_ / 10);
-
-    // Power spectral density of noise
-    arma::fmat src_sq = square(abs(src));
-    // pwr = sum(abs(samps)ˆ2)/length(samps)
-    arma::frowvec pwr_vec = mean(src_sq, 0);
-    arma::frowvec n0 = pwr_vec / snr_lin;
-    arma::frowvec n = sqrt(n0 / 2);
 
     // Generate noise
     arma::cx_fmat noise(arma::randn<arma::fmat>(n_row, n_col),
@@ -97,17 +94,17 @@ void Channel::Awgn(const arma::cx_fmat& src, arma::cx_fmat& dst) const {
     // arma::fmat y(n_row, n_col, arma::fill::arma::randn);
     // arma::cx_fmat noise = arma::cx_fmat(x, y);
 
-    arma::fmat n_mat = repmat(n, n_row, 1);
-    // Element-wise multiplication
-    noise = noise % n_mat;
     // Add noise to signal
+    noise *= noise_samp_std_;
     dst = src + noise;
 
     // Check SNR
     if (kPrintSNRCheck) {
-      arma::fmat noise_sq = square(abs(noise));
-      arma::frowvec noise_vec = mean(noise_sq, 0);
-      arma::frowvec snr = 10 * log10(pwr_vec / noise_vec);
+      arma::fmat noise_sq = arma::square(abs(noise));
+      arma::frowvec noise_vec = arma::mean(noise_sq, 0);
+      arma::fmat src_sq = arma::square(abs(src));
+      arma::frowvec pwr_vec = arma::mean(src_sq, 0);
+      arma::frowvec snr = 10.0f * arma::log10(pwr_vec / noise_vec);
       std::cout << "SNR: " << snr;
     }
   } else {

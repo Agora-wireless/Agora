@@ -4,16 +4,21 @@
  */
 #include "agora.h"
 #include "gflags/gflags.h"
+#include "logger.h"
+#include "signal_handler.h"
 #include "version_config.h"
 
-DEFINE_string(conf_file,
-              TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-both.json",
-              "Config filename");
+DEFINE_string(
+    conf_file,
+    TOSTRING(PROJECT_DIRECTORY) "/files/config/ci/tddconfig-sim-both.json",
+    "Config filename");
 
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("conf_file : set the configuration filename");
   gflags::SetVersionString(GetAgoraProjectVersion());
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+  AGORA_LOG_INIT();
   std::string conf_file;
 
   // For backwards compatibility
@@ -41,7 +46,10 @@ int main(int argc, char* argv[]) {
     std::cerr << "SignalException: " << e.what() << std::endl;
     ret = EXIT_FAILURE;
   }
+
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
+  AGORA_LOG_SHUTDOWN();
+
   return ret;
 }

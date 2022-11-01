@@ -1,6 +1,8 @@
 #ifndef RAN_CONFIG_H_
 #define RAN_CONFIG_H_
 
+#include <cstddef>
+
 /**
  * @brief The struct that contains the RAN configuration that Agora must
  * apply for a particular frame.

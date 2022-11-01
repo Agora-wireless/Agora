@@ -17,11 +17,11 @@
 #include <tuple>
 #include <vector>
 
-#include "buffer.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"
+#include "message.h"
 #include "receiver.h"
 #include "sender.h"
 #include "signal_handler.h"

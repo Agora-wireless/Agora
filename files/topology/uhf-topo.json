@@ -1,0 +1,18 @@
+{
+    "BaseStations": {
+        "BS0": {
+            "hub": "",
+            "sdr": [
+                "RF3E000375",
+                "RF3E000125"
+            ],
+            "reference": "RF3E000201"
+        }
+    },
+    "Clients": {
+        "sdr": [
+            "RF3E000094"
+        ]
+    }
+}
+

@@ -4,6 +4,7 @@
  */
 #include <gflags/gflags.h>
 
+#include "logger.h"
 #include "sender.h"
 #include "version_config.h"
 
@@ -13,9 +14,10 @@ DEFINE_uint64(frame_duration, 0, "Frame duration in microseconds");
 DEFINE_uint64(inter_frame_delay, 0, "Delay between two frames in microseconds");
 DEFINE_string(server_mac_addr, "ff:ff:ff:ff:ff:ff",
               "MAC address of the remote Agora server to send data to");
-DEFINE_string(conf_file,
-              TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
-              "Config filename");
+DEFINE_string(
+    conf_file,
+    TOSTRING(PROJECT_DIRECTORY) "/files/config/ci/tddconfig-sim-ul.json",
+    "Config filename");
 DEFINE_uint64(
     enable_slow_start, 1,
     "Send frames slower than the specified frame duration during warmup");
@@ -23,8 +25,8 @@ DEFINE_uint64(
 int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   gflags::SetVersionString(GetAgoraProjectVersion());
-  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = FLAGS_conf_file;
+  AGORA_LOG_INIT();
 
   {
     auto cfg = std::make_unique<Config>(filename.c_str());
@@ -40,5 +42,6 @@ int main(int argc, char* argv[]) {
 
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
+  AGORA_LOG_SHUTDOWN();
   return 0;
 }

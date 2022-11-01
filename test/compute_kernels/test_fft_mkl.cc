@@ -9,6 +9,7 @@
 #include <iostream>
 
 #include "cpu_attach.h"
+#include "datatype_conversion.h"
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 
@@ -150,7 +151,7 @@ static double bench_data_type_convert(unsigned N, unsigned iterations) {
   long long bigger_than_cachesize = 1000 * 1024 * 1024;  // 100 * 1024 * 1024;
   long* p = new long[bigger_than_cachesize];
 
-  float csi_format_offset = 1.0 / 32768;
+  float csi_format_offset = 1.0 / kShrtFltConvFactor;
 
   srand(0);
   for (unsigned i = 0; i < 2 * N * 10000; i++) {
@@ -172,7 +173,8 @@ static double bench_data_type_convert(unsigned N, unsigned iterations) {
     float* input_float = input_buffer_float;  // + i% 10000 * N;
     float* output = output_buffer;            // + i% 10000 * N;
     // start_time = fft_get_time();
-    const __m256 magic = _mm256_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
+    const __m256 magic =
+        _mm256_set1_ps(float((1 << 23) + (1 << 15)) / kShrtFltConvFactor);
     const __m256i magic_i = _mm256_castps_si256(magic);
     for (int j = 0; j < N * 2; j += 16) {
       // get input:
@@ -284,7 +286,7 @@ static double bench_demod(unsigned N, unsigned iterations) {
   long long bigger_than_cachesize = 1000 * 1024 * 1024;  // 100 * 1024 * 1024;
   long* p = new long[bigger_than_cachesize];
 
-  float csi_format_offset = 1.0 / 32768;
+  float csi_format_offset = 1.0 / kShrtFltConvFactor;
 
   srand(0);
   for (unsigned i = 0; i < 2 * N * 10000; i++) {

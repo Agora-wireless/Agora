@@ -1,0 +1,23 @@
+{
+  "fft_size": 2048,
+  "ofdm_data_num": 1200,
+  "demul_block_size": 40,
+  "bs_radio_num": 8,
+  "ue_radio_num": 8,
+  "ul_mcs" : {
+    "modulation": "64QAM",
+    "code_rate": 0.333
+  },
+  "symbol_num_perframe": 70,
+  "client_ul_pilot_syms": 0,
+  "dl_data_symbol_start": 0,
+  "dl_symbol_num_perframe": 0,
+  "ul_data_symbol_start": 9,
+  "ul_symbol_num_perframe": 61,
+  "beacon_position": 0,
+  "core_offset": 1,
+  "worker_thread_num": 1,
+  "socket_thread_num": 1,
+  "max_frame": 1,
+  "noise_level": 0.01
+}

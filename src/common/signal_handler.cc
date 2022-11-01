@@ -42,7 +42,7 @@ void SignalHandler::ExitSignalHandler(int /*unused*/) {
  * Set up the signal handlers for CTRL-C.
  */
 void SignalHandler::SetupSignalHandlers() {
-  if (signal((int)SIGINT, SignalHandler::ExitSignalHandler) == SIG_ERR) {
+  if (std::signal((int)SIGINT, SignalHandler::ExitSignalHandler) == SIG_ERR) {
     throw SignalException("!!!!! Error setting up signal handlers !!!!!");
   }
 }

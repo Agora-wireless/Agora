@@ -1,0 +1,124 @@
+{
+  /* Instance a BS or UE */
+  "UE": false,
+  /* Experiment setup (topology), either enter section 1a or 1b */
+  /* 1a */
+  "cells": 1,
+  "antenna_num": 8,
+  "ue_num": 8,
+  /*1b */
+  "hubs": "",
+  "irises": "",
+  /* 1c */
+  "ref_ant": 0,
+  "external_ref_node": false,
+  "channel": "A",
+  "radio_num": 8,
+  "sample_rate": 5e6,
+  "demul_block_size": 48,
+  "cp_size": 0,
+  "fft_size": 2048,
+  "ofdm_data_num": 1200,
+  "ofdm_pilot_spacing": 16,
+  /*  (fft_size - ofdm_data_num_) / 2 */
+  "ofdm_data_start": 424,
+  "ofdm_tx_zero_prefix": 0,
+  "ofdm_tx_zero_postfix": 0,
+  "ofdm_rx_zero_prefix_bs": 0,
+  "ofdm_rx_zero_prefix_client": 0,
+  "ofdm_rx_zero_prefix_cal_ul": 0,
+  "ofdm_rx_zero_prefix_cal_dl": 0,
+  /* Modulation and Coding settings */
+  "ul_mcs" : {
+    "modulation": "16QAM",
+    "code_rate": 0.333
+  },
+  "dl_mcs" : {
+    "modulation": "16QAM",
+    "code_rate": 0.333
+  },
+  /* General settings */
+  "beamforming": "ZF",
+  "beamsweep": false,
+  "beacon_antenna": 0,
+  "calibrate_digital": false,
+  "calibrate_analog": false,
+  "init_calib_repeat": 1,
+  "correct_phase_shift": false,
+  /* Hardware specific information */
+  "frequency": 3.6e9,
+  /* 0.75*rate */
+  "nco_frequency": 3.75e6,
+  "single_gain": true,
+  "rx_gain_a": 20,
+  "tx_gain_a": 20,
+  "rx_gain_b": 20,
+  "tx_gain_b": 20,
+  "tx_advance": [
+    0
+  ],
+  "corr_scale": [
+    1
+  ],
+  "calib_tx_gain_a": 20,
+  "calib_tx_gain_b": 20,
+  "client_gain_adjust_a": [
+    20
+  ],
+  "client_gain_adjust_b": [
+    20
+  ],
+  "hw_framer": true,
+  /* Frame definition */
+  /* 2a explicit frame construction */
+  "frame_schedule": [
+    "BPGUUUUG"
+  ],
+  /* 2b wordy frame construction */
+  "symbol_num_perframe": 70,
+  "pilot_num": 1,
+  "beacon_position": 65535,
+  "ul_data_symbol_start": 30,
+  "ul_symbol_num_perframe": 9,
+  "dl_data_symbol_start": 30,
+  "dl_symbol_num_perframe": 40,
+  /* For all frame constructions */
+  "client_ul_pilot_syms": 0,
+  "client_dl_pilot_syms": 0,
+  "freq_orthogonal_pilot": false,
+  /* Ue instance */
+  "ue_ant_offset": 0,
+  "ue_ant_total": 8,
+  /* Big station mode */
+  "bigstation_mode": false,
+  "fft_thread_num": 5,
+  "demul_thread_num": 5,
+  "decode_thread_num": 10,
+  /* */
+  "noise_level": 0.03,
+  "wlan_scrambler": true,
+  "fft_in_rru": false,
+  "zf_batch_size": 1,
+  "zf_block_size": 1,
+  "fft_block_size": 1,
+  "encode_block_size": 1,
+  /* compute configuration */
+  "bs_server_addr": "127.0.0.1",
+  "bs_rru_addr": "127.0.0.1",
+  "ue_server_addr": "127.0.0.1",
+  "mac_remote_addr": "127.0.0.1",
+  "bs_server_port": 8000,
+  "bs_rru_port": 9000,
+  "ue_rru_port": 7000,
+  "ue_server_port": 6000,
+  "dpdk_num_ports": 1,
+  "dpdk_port_offset": 0,
+  "bs_mac_rx_port": 9070,
+  "bs_mac_tx_port": 9170,
+  "ue_mac_rx_port": 8080,
+  "ue_mac_tx_port": 8180,
+  "core_offset": 0,
+  "worker_thread_num": 25,
+  "socket_thread_num": 4,
+  "max_frame": 9600
+}

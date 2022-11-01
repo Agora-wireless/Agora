@@ -1,0 +1,36 @@
+{
+  "fft_size": 2048,
+  "ofdm_data_num": 1200,
+  "demul_block_size": 48,
+  "ul_mcs": {
+      "modulation": "64QAM",
+      "code_rate": 0.333
+  },
+  "dl_mcs": {
+      "modulation": "64QAM",
+      "code_rate": 0.333
+  },
+  "ue_radio_num": 1,
+  "bs_radio_num": 8,
+  "freq_orthogonal_pilot": true,
+  "pilot_num" : 1,
+  "symbol_num_perframe": 70,
+  "client_ul_pilot_syms": 2,
+  "ul_data_symbol_start": 3,
+  "ul_symbol_num_perframe": 3,
+  "client_dl_pilot_syms": 2,
+  "dl_data_symbol_start": 8,
+  "dl_symbol_num_perframe": 3,
+  "beacon_position": 0,
+  "mac_rx_port": 8070,
+  "mac_tx_port": 8080,
+  "core_offset": 16,
+  "worker_thread_num": 8,
+  "socket_thread_num": 1,
+  "ue_mac_rx_port": 9070,
+  "ue_mac_tx_port": 9080,
+  "ue_core_offset": 12,
+  "ue_worker_thread_num": 1,
+  "ue_socket_thread_num": 1,
+  "max_frame": 5
+}

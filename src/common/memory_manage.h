@@ -5,10 +5,11 @@
  */
 #ifndef MEMORY_MANAGE_H_
 #define MEMORY_MANAGE_H_
+
 #include <array>
 #include <cassert>
 #include <complex>
-#include <cstdio>
+#include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <random>
@@ -84,17 +85,20 @@ class Table {
     if (this->data_ != nullptr) {
       std::free(this->data_);
     }
-    this->dim2_ = 0;
-    this->dim1_ = 0;
+    this->dim2_ = 0u;
+    this->dim1_ = 0u;
     this->data_ = nullptr;
   }
 
-  T* At(size_t dim1) const { return (*this)[dim1]; }
+  const T* At(size_t dim1) const { return (data_ + (dim1 * dim2_)); }
 
   T* operator[](size_t dim1) {
     assert(this->dim1_ > dim1);
     return (this->data_ + (dim1 * this->dim2_));
   }
+
+  size_t Dim1() { return (this->dim1_); }
+  size_t Dim2() { return (this->dim2_); }
 };
 
 template <typename T, typename U>

@@ -1,8 +1,9 @@
 #include <gflags/gflags.h>
 #include <mkl.h>
-#define ARMA_DONT_PRINT_ERRORS
-#include <armadillo>
+
 #include <iostream>
+#define ARMA_DONT_PRINT_ERRORS
+#include "armadillo"
 #include "timer.h"
 
 DEFINE_uint64(n_iters, 10000, "Number of iterations of inversion");
@@ -15,7 +16,7 @@ static void condition_number_distribution(size_t n_rows, size_t n_cols) {
   }
   std::sort(cond_vec.begin(), cond_vec.end());
   std::printf("%zux%zu %.1f %.1f %.1f\n", n_rows, n_cols, mean(cond_vec),
-         cond_vec[cond_vec.size() * 0.50], cond_vec.back());
+              cond_vec[cond_vec.size() * 0.50], cond_vec.back());
 }
 
 int main(int argc, char** argv) {

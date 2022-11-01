@@ -4,11 +4,14 @@
  */
 #include "doifft_client.h"
 
-#include <armadillo>
 #include <vector>
 
+#include "comms-lib.h"
 #include "concurrent_queue_wrapper.h"
 #include "datatype_conversion.h"
+#include "gettime.h"
+#include "logger.h"
+#include "message.h"
 
 static constexpr bool kPrintIFFTOutput = false;
 static constexpr bool kPrintSocketOutput = false;
@@ -33,6 +36,9 @@ DoIFFTClient::DoIFFTClient(Config* in_config, int in_tid,
   ifft_out_ = static_cast<float*>(
       Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
                                        2 * cfg_->OfdmCaNum() * sizeof(float)));
+  ifft_shift_tmp_ = static_cast<complex_float*>(
+      Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
+                                       2 * cfg_->OfdmCaNum() * sizeof(float)));
   // ifft_scale_factor_ = cfg_->Scale();
   ifft_scale_factor_ = cfg_->OfdmCaNum() / std::sqrt(cfg_->BfAntNum() * 1.f);
 }
@@ -40,6 +46,7 @@ DoIFFTClient::DoIFFTClient(Config* in_config, int in_tid,
 DoIFFTClient::~DoIFFTClient() {
   DftiFreeDescriptor(&mkl_handle_);
   std::free(ifft_out_);
+  std::free(ifft_shift_tmp_);
 }
 
 EventData DoIFFTClient::Launch(size_t tag) {
@@ -52,8 +59,9 @@ EventData DoIFFTClient::Launch(size_t tag) {
   const size_t symbol_idx_ul = cfg_->Frame().GetULSymbolIdx(symbol_id);
 
   if (kDebugPrintInTask) {
-    std::printf("In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n",
-                tid_, frame_id, symbol_id, ant_id);
+    AGORA_LOG_INFO(
+        "In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n", tid_,
+        frame_id, symbol_id, ant_id);
   }
 
   size_t offset = (cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul) *
@@ -67,13 +75,14 @@ EventData DoIFFTClient::Launch(size_t tag) {
   auto* ifft_out_ptr =
       (kUseOutOfPlaceIFFT || kMemcpyBeforeIFFT) ? ifft_out_ : ifft_in_ptr;
 
+  std::memset(ifft_in_ptr, 0, sizeof(float) * cfg_->OfdmDataStart() * 2);
+  std::memset(ifft_in_ptr + (cfg_->OfdmDataStop()) * 2, 0,
+              sizeof(float) * cfg_->OfdmDataStart() * 2);
+  CommsLib::FFTShift(reinterpret_cast<complex_float*>(ifft_in_ptr),
+                     ifft_shift_tmp_, cfg_->OfdmCaNum());
   if (kMemcpyBeforeIFFT) {
-    std::memset(ifft_out_ptr, 0, sizeof(float) * cfg_->OfdmDataStart() * 2);
-    std::memset(ifft_out_ptr + (cfg_->OfdmDataStop() * 2), 0,
-                sizeof(float) * cfg_->OfdmDataStart() * 2);
-    std::memcpy(ifft_out_ptr + (cfg_->OfdmDataStart() * 2),
-                ifft_in_ptr + (cfg_->OfdmDataStart() * 2),
-                sizeof(float) * cfg_->OfdmDataNum() * 2);
+    std::memcpy(ifft_out_ptr, ifft_in_ptr,
+                sizeof(float) * cfg_->OfdmCaNum() * 2);
     DftiComputeBackward(mkl_handle_, ifft_out_ptr);
   } else {
     if (kUseOutOfPlaceIFFT) {
@@ -82,9 +91,6 @@ EventData DoIFFTClient::Launch(size_t tag) {
       // to 0 since their values are not changed after IFFT
       DftiComputeBackward(mkl_handle_, ifft_in_ptr, ifft_out_ptr);
     } else {
-      std::memset(ifft_in_ptr, 0, sizeof(float) * cfg_->OfdmDataStart() * 2);
-      std::memset(ifft_in_ptr + (cfg_->OfdmDataStop()) * 2, 0,
-                  sizeof(float) * cfg_->OfdmDataStart() * 2);
       DftiComputeBackward(mkl_handle_, ifft_in_ptr);
     }
   }
@@ -98,7 +104,7 @@ EventData DoIFFTClient::Launch(size_t tag) {
          << " ";
     }
     ss << "];" << std::endl;
-    std::cout << ss.str();
+    AGORA_LOG_INFO("%s\n", ss.str().c_str());
   }
 
   size_t start_tsc2 = GetTime::WorkerRdtsc();
@@ -110,8 +116,8 @@ EventData DoIFFTClient::Launch(size_t tag) {
 
   // IFFT scaled results by OfdmCaNum(), we scale down IFFT results
   // during data type coversion
-  SimdConvertFloatToShort(ifft_out_ptr, socket_ptr, cfg_->OfdmCaNum(),
-                          cfg_->CpLen(), ifft_scale_factor_);
+  SimdConvertFloatToShort(ifft_out_ptr, socket_ptr, cfg_->OfdmCaNum() * 2,
+                          cfg_->CpLen() * 2, ifft_scale_factor_);
 
   duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc2;
 
@@ -122,7 +128,7 @@ EventData DoIFFTClient::Launch(size_t tag) {
       ss << socket_ptr[i * 2] << "+1j*" << socket_ptr[i * 2 + 1] << " ";
     }
     ss << "];" << std::endl;
-    std::cout << ss.str();
+    AGORA_LOG_INFO("%s\n", ss.str().c_str());
   }
 
   duration_stat_->task_count_++;

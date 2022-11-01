@@ -11,6 +11,8 @@
 #include <cassert>
 #include <utility>
 
+#include "logger.h"
+
 FrameStats::FrameStats(std::string new_frame_id)
     : frame_identifier_(std::move(new_frame_id)),
       client_ul_pilot_symbols_(0),
@@ -53,8 +55,8 @@ FrameStats::FrameStats(std::string new_frame_id)
       }
 
       default: {
-        std::printf("!!!!! Unknown symbol in frame: %c : %s !!!!!\n", symbol,
-                    frame_identifier_.c_str());
+        AGORA_LOG_ERROR("!!!!! Unknown symbol in frame: %c : %s !!!!!\n",
+                        symbol, frame_identifier_.c_str());
       }
     }
   }
@@ -143,6 +145,10 @@ size_t FrameStats::GetSymbolIdx(const std::vector<size_t>& search_vector,
   }
 }
 
+size_t FrameStats::GetBeaconSymbolIdx(size_t symbol_number) const {
+  return FrameStats::GetSymbolIdx(this->beacon_symbols_, symbol_number);
+}
+
 size_t FrameStats::GetDLSymbolIdx(size_t symbol_number) const {
   return FrameStats::GetSymbolIdx(this->dl_symbols_, symbol_number);
 }
@@ -153,4 +159,8 @@ size_t FrameStats::GetULSymbolIdx(size_t symbol_number) const {
 
 size_t FrameStats::GetPilotSymbolIdx(size_t symbol_number) const {
   return FrameStats::GetSymbolIdx(this->pilot_symbols_, symbol_number);
+}
+
+size_t FrameStats::GetDLCalSymbolIdx(size_t symbol_number) const {
+  return FrameStats::GetSymbolIdx(this->dl_cal_symbols_, symbol_number);
 }

@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# Set up a fresh Ubuntu 18.04 box with packages for building Agora.
+# Set up a fresh Ubuntu 20.04 box with packages for building Agora.
 # This does not include installing Intel compilers and FlexRAN
-
 sudo apt update
 
 # Toolchain
@@ -21,33 +20,21 @@ sudo apt -y python-numpy python-pyqt5 libpython-dev
 (cd /usr/src/gtest && sudo cmake . && sudo make && sudo mv libg* /usr/lib/)
 
 # Install Armadillo from source
-wget http://sourceforge.net/projects/arma/files/armadillo-10.7.1.tar.xz .
-tar xf armadillo-10.7.1.tar.xz
-(cd armadillo-10.7.1; cmake .; make -j; sudo make install)
+wget http://sourceforge.net/projects/arma/files/armadillo-11.2.3.tar.xz .
+tar -xf armadillo-11.2.3.tar.xz
+(cd armadillo-11.2.3; cmake -DALLOW_OPENBLAS_MACOS=ON .; make -j4; sudo make install)
 rm -rf armadillo*
-
-# Install nlohmann json-dev from the GitHub repo
-cd `mktemp -d`
-git clone --depth=1 https://github.com/nlohmann/json.git
-cd json
-mkdir build
-cd build
-cmake ..
-make -j
-sudo make install
 sudo ldconfig
+cd ../
 
 # Install SoapySDR from the GitHub repo
 cd `mktemp -d`
-git clone --depth=1 https://github.com/pothosware/SoapySDR.git
+git clone --branch soapy-sdr-0.8.1 --depth 1 --single-branch https://github.com/pothosware/SoapySDR.git
 cd SoapySDR
-mkdir build
+mkdir -p build
 cd build
-cmake ..
-make -j
+cmake ../
+make -j`nproc`
 sudo make install
+cd ../..
 sudo ldconfig
-
-# DPDK drivers
-# Latest DPDK: sudo make install T=x86_64-native-linuxapp-gcc DESTDIR=/usr
-# sudo apt -y install dpdk libdpdk-dev dpdk-igb-uio-dkms
