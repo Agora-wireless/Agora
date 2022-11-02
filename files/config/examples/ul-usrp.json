@@ -2,12 +2,12 @@
     "serial_file": "files/topology/bs-usrp-addr.json",
     "cells": 1,
     "channel": "A",
-    "frequency": 1e9,
+    "frequency": 3e9,
     "single_gain": true,
-    "rx_gain_a": 10,
-    "tx_gain_a": 10,
-    "rx_gain_b": 10,
-    "tx_gain_b": 10,
+    "rx_gain_a": 25,
+    "tx_gain_a": 25,
+    "rx_gain_b": 25,
+    "tx_gain_b": 25,
     "sample_rate": 100e6,
     "cp_size": 32,
     "fft_size": 512,
@@ -15,7 +15,11 @@
     "demul_block_size": 48,
     "ue_demul_block_size": 48,
     "ul_mcs": {
-        "modulation": "16QAM",
+        "modulation": "64QAM",
+        "code_rate": 0.333
+    },
+    "dl_mcs" : {
+        "modulation": "64QAM",
         "code_rate": 0.333
     },
     "ofdm_tx_zero_prefix": 160,
@@ -25,7 +29,7 @@
     "ofdm_rx_zero_prefix_cal_dl": 324,
     "ofdm_rx_zero_prefix_cal_ul": 136,
     "frame_schedule": [
-        "BGGGGGPGGGGGGGGGGGGGGGGGGGGGUUUGGG"
+        "BGGGGGPGGGGGGGGGGGGGGGGGGGGGUUUGGGGGGGGGGGGGGGGGGGG"
     ],
     "client_ul_pilot_syms": 2,
     "beamsweep": false,
@@ -34,16 +38,16 @@
     "ue_resync_period": 200,
     "ue_channel": "A",
     "ue_rx_gain_a": [
-        10    
+        25    
     ],
     "ue_tx_gain_a": [
-        10    
+        25    
     ],
     "ue_rx_gain_b": [
-        10    
+        25    
     ],
     "ue_tx_gain_b": [
-        10    
+        25    
     ],
     "tx_advance": [
         -760    

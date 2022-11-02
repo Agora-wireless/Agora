@@ -144,6 +144,7 @@ void PhyStats::PrintPhyStats() {
       size_t true_total_block_errors(0);
       size_t true_total_decoded_bits(0);
       size_t true_total_bit_errors(0);
+      float valid_average_ber(0.00);
 
       for (size_t i = 0u; i < task_buffer_symbol_num; i++) {
         total_decoded_bits += decoded_bits_count_[ue_id][i];
@@ -151,9 +152,14 @@ void PhyStats::PrintPhyStats() {
         total_decoded_blocks += decoded_blocks_count_[ue_id][i];
         total_block_errors += block_error_count_[ue_id][i];
       }
+
+      for (size_t j = total_decoded_blocks - valid_EVM_count_; j < total_decoded_blocks; j++) {
+        true_total_bit_errors += error_bits_per_frame_[j];
+      }
+
+      valid_average_ber = static_cast<float> (valid_average_ber / valid_EVM_count_);
       true_total_block_errors = total_block_errors - (total_decoded_blocks - valid_EVM_count_);
       true_total_decoded_bits = total_decoded_bits/total_decoded_blocks * valid_EVM_count_;
-      true_total_bit_errors = total_bit_errors - total_decoded_bits/total_decoded_blocks * (total_block_errors - true_total_block_errors)/2;
 
       AGORA_LOG_INFO(
           "UE %zu: %s bit errors (BER) %zu/%zu (%f), block errors (BLER) "
@@ -289,7 +295,7 @@ void PhyStats::PrintUlSnrStats(size_t frame_id) {
     if (max_snr - min_snr > 20 && min_snr < 0) {
       ss << "(Possible bad antenna " << min_snr_id << ") ";
     }
-    if (min_snr > 10.0f){
+    if (min_snr > 15.0f){
       valid_EVM_count_++;
     }
   }
@@ -448,6 +454,7 @@ void PhyStats::RecordBer(size_t frame_id) {
     const size_t frame_slot = frame_id % kFrameWnd;
     for (size_t i = 0; i < config_->UeAntNum(); i++) {
       size_t& error_bits = frame_bit_errors_[i][frame_slot];
+      error_bits_per_frame_.push_back(error_bits);
       size_t& total_bits = frame_decoded_bits_[i][frame_slot];
       ss << ","
          << (static_cast<float>(error_bits) / static_cast<float>(total_bits));
@@ -455,6 +462,13 @@ void PhyStats::RecordBer(size_t frame_id) {
       total_bits = 0;
     }
     logger_ber_.Write(ss.str());
+  }
+  else{
+    for (size_t i = 0; i < config_->UeAntNum(); i++) {
+      size_t& error_bits = frame_bit_errors_[i][frame_id % kFrameWnd];
+      error_bits_per_frame_.push_back(error_bits);
+      error_bits = 0;
+    }
   }
 }
 
