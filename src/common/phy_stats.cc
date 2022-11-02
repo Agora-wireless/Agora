@@ -145,7 +145,6 @@ void PhyStats::PrintPhyStats() {
       size_t true_total_block_errors(0);
       size_t true_total_decoded_bits(0);
       size_t true_total_bit_errors(0);
-      float valid_average_ber(0.00);
 
       for (size_t i = 0u; i < task_buffer_symbol_num; i++) {
         total_decoded_bits += decoded_bits_count_[ue_id][i];
@@ -157,8 +156,6 @@ void PhyStats::PrintPhyStats() {
       for (size_t j = total_decoded_blocks - valid_EVM_count_; j < total_decoded_blocks; j++) {
         true_total_bit_errors += error_bits_per_frame_[j];
       }
-
-      valid_average_ber = static_cast<float> (valid_average_ber / valid_EVM_count_);
       true_total_block_errors = total_block_errors - (total_decoded_blocks - valid_EVM_count_);
       true_total_decoded_bits = total_decoded_bits/total_decoded_blocks * valid_EVM_count_;
 
