@@ -44,7 +44,7 @@ class TxRxWorker {
  protected:
   void WaitSync();
   inline Config* Configuration() { return cfg_; }
-  bool NotifyComplete(EventData& complete_event);
+  bool NotifyComplete(const EventData& complete_event);
   std::vector<EventData> GetPendingTxEvents(size_t max_events = 0);
   RxPacket& GetRxPacket();
   void ReturnRxPacket(RxPacket& unused_packet);

@@ -29,7 +29,7 @@ static constexpr size_t kNumRecSc = 4;
 //Recording parameters
 static constexpr size_t kRecordFrameInterval = 1;
 #if defined(ENABLE_HDF5)
-static constexpr bool kRecordDownlinkFrame = false;
+static constexpr bool kRecordDownlinkFrame = true;
 
 //set the recording types, can add multiple
 static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
@@ -141,7 +141,7 @@ PhyUe::PhyUe(Config* config)
     workers_.push_back(std::move(new_worker));
   }
 
-  if (kRecordDownlinkFrame) {
+  if (kRecordDownlinkFrame && config_->Frame().NumDLSyms() > 0) {
     auto& new_recorder = recorders_.emplace_back(
         std::make_unique<Agora_recorder::RecorderThread>(
             config_, 0, core_offset_worker + config_->UeWorkerThreadNum(),
