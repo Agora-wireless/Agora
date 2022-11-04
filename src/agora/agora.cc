@@ -873,6 +873,7 @@ void Agora::HandleEventFft(size_t tag) {
             this->phy_stats_->PrintUlSnrStats(frame_id);
           }
           this->phy_stats_->RecordUlPilotSnr(frame_id);
+          this->phy_stats_->RecordUlSnr(frame_id);
           if (kEnableMac == true) {
             SendSnrReport(EventType::kSNRReport, frame_id, symbol_id);
           }

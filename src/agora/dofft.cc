@@ -125,7 +125,8 @@ EventData DoFFT::Launch(size_t tag) {
     }
 
     if ((kPrintPilotCorrStats == true) &&
-        ((sym_type == SymbolType::kPilot) || (sym_type == SymbolType::kUL)  || (sym_type == SymbolType::kCalUL) ||
+        ((sym_type == SymbolType::kPilot) || (sym_type == SymbolType::kUL) ||
+         (sym_type == SymbolType::kCalUL) ||
          ((sym_type == SymbolType::kCalDL) &&
           (ant_id == cfg_->RefAnt(cell_id))))) {
       SimdConvertShortToFloat(pkt->data_,
@@ -209,8 +210,7 @@ EventData DoFFT::Launch(size_t tag) {
   } else if (sym_type == SymbolType::kUL) {
     size_t ul_symbol_id = cfg_->Frame().GetULSymbolIdx(symbol_id);
     if (kCollectPhyStats) {
-      phy_stats_->UpdateUlSnr(frame_id, ul_symbol_id, ant_id,
-                                   rx_samps_tmp_);
+      phy_stats_->UpdateUlSnr(frame_id, ul_symbol_id, ant_id, rx_samps_tmp_);
     }
     PartialTranspose(cfg_->GetDataBuf(data_buffer_, frame_id, symbol_id),
                      ant_id, SymbolType::kUL);

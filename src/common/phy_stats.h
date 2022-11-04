@@ -43,11 +43,12 @@ class PhyStats {
   void UpdateUlPilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
                         std::complex<float>* rx_samps_tmp_);
   void UpdateUlSnr(size_t frame_id, size_t ue_id, size_t ant_id,
-                        std::complex<float>* rx_samps_tmp_);
+                   std::complex<float>* rx_samps_tmp_);
   void UpdateDlPilotSnr(size_t frame_id, size_t symbol_id, size_t ant_id,
                         complex_float* fft_data);
   void PrintUlSnrStats(size_t frame_id);
   void RecordUlPilotSnr(size_t frame_id);
+  void RecordUlSnr(size_t frame_id);
   void PrintDlSnrStats(size_t frame_id);
   void RecordDlPilotSnr(size_t frame_id);
   void RecordDlCsi(size_t frame_id, size_t num_rec_sc,
@@ -93,6 +94,7 @@ class PhyStats {
   size_t num_rxdata_symbols_;
 
   CsvLog::CsvLogger logger_snr_;
+  CsvLog::CsvLogger logger_ul_snr_;
   CsvLog::CsvLogger logger_rssi_;
   CsvLog::CsvLogger logger_noise_;
   CsvLog::CsvLogger logger_evm_;

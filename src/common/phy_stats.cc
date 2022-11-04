@@ -13,6 +13,7 @@ PhyStats::PhyStats(Config* const cfg, Direction dir)
     : config_(cfg),
       dir_(dir),
       logger_snr_(CsvLog::kSNR, cfg, dir),
+      logger_ul_snr_(CsvLog::kSNRUL, cfg, dir),
       logger_rssi_(CsvLog::kRSSI, cfg, dir),
       logger_noise_(CsvLog::kNOISE, cfg, dir),
       logger_evm_(CsvLog::kEVM, cfg, dir),
@@ -88,7 +89,7 @@ PhyStats::PhyStats(Config* const cfg, Direction dir)
   ul_pilot_snr_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
                        Agora_memory::Alignment_t::kAlign64);
   ul_snr_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
-                       Agora_memory::Alignment_t::kAlign64);                 
+                 Agora_memory::Alignment_t::kAlign64);
   bs_noise_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
                    Agora_memory::Alignment_t::kAlign64);
   calib_pilot_snr_.Calloc(kFrameWnd, 2 * cfg->BsAntNum(),
@@ -153,11 +154,14 @@ void PhyStats::PrintPhyStats() {
         total_block_errors += block_error_count_[ue_id][i];
       }
 
-      for (size_t j = total_decoded_blocks - valid_EVM_count_; j < total_decoded_blocks; j++) {
+      for (size_t j = total_decoded_blocks - valid_EVM_count_;
+           j < total_decoded_blocks; j++) {
         true_total_bit_errors += error_bits_per_frame_[j];
       }
-      true_total_block_errors = total_block_errors - (total_decoded_blocks - valid_EVM_count_);
-      true_total_decoded_bits = total_decoded_bits/total_decoded_blocks * valid_EVM_count_;
+      true_total_block_errors =
+          total_block_errors - (total_decoded_blocks - valid_EVM_count_);
+      true_total_decoded_bits =
+          total_decoded_bits / total_decoded_blocks * valid_EVM_count_;
 
       AGORA_LOG_INFO(
           "UE %zu: %s bit errors (BER) %zu/%zu (%f), block errors (BLER) "
@@ -168,17 +172,18 @@ void PhyStats::PrintPhyStats() {
           total_block_errors, total_decoded_blocks,
           static_cast<float>(total_block_errors) /
               static_cast<float>(total_decoded_blocks));
-      AGORA_LOG_INFO("VALID frames after Sync is: %zu\n" , valid_EVM_count_);
+      AGORA_LOG_INFO("VALID frames after Sync is: %zu\n", valid_EVM_count_);
       AGORA_LOG_INFO(
-        "UE %zu: %s VALID bit errors (BER) %zu/%zu (%f), VALID block errors (BLER) "
-        "%zu/%zu (%f)\n",
-        ue_id, tx_type.c_str(),
-        true_total_bit_errors, true_total_decoded_bits,
-        static_cast<float>(true_total_bit_errors) /
-        static_cast<float>(true_total_decoded_bits),
-        true_total_block_errors, valid_EVM_count_,
-        static_cast<float>(true_total_block_errors) /
-        static_cast<float>(valid_EVM_count_));
+          "UE %zu: %s VALID bit errors (BER) %zu/%zu (%f), VALID block errors "
+          "(BLER) "
+          "%zu/%zu (%f)\n",
+          ue_id, tx_type.c_str(), true_total_bit_errors,
+          true_total_decoded_bits,
+          static_cast<float>(true_total_bit_errors) /
+              static_cast<float>(true_total_decoded_bits),
+          true_total_block_errors, valid_EVM_count_,
+          static_cast<float>(true_total_block_errors) /
+              static_cast<float>(valid_EVM_count_));
     }
   }
 }
@@ -221,7 +226,7 @@ void PhyStats::PrintEvmStats(size_t frame_id) {
     if (max_snr == FLT_MIN) {
       max_snr = -100;
     }
-    ss<< "True SNR is: " << (min_snr) << "\n";
+    ss << "True SNR is: " << (min_snr) << "\n";
   }
   AGORA_LOG_INFO("%s\n", ss.str().c_str());
 }
@@ -293,7 +298,7 @@ void PhyStats::PrintUlSnrStats(size_t frame_id) {
     if (max_snr - min_snr > 20 && min_snr < 0) {
       ss << "(Possible bad antenna " << min_snr_id << ") ";
     }
-    if (min_snr > 15.0f){
+    if (min_snr > 15.0f) {
       valid_EVM_count_++;
     }
   }
@@ -353,6 +358,19 @@ void PhyStats::RecordUlPilotSnr(size_t frame_id) {
       }
     }
     logger_snr_.Write(ss.str());
+  }
+}
+
+void PhyStats::RecordUlSnr(size_t frame_id) {
+  if (kEnableCsvLog) {
+    std::stringstream ss;
+    ss << frame_id;
+    for (size_t i = 0; i < config_->UeAntNum(); i++) {
+      for (size_t j = 0; j < config_->BsAntNum(); j++) {
+        ss << "," << ul_snr_[frame_id % kFrameWnd][i * config_->BsAntNum() + j];
+      }
+    }
+    logger_ul_snr_.Write(ss.str());
   }
 }
 
@@ -472,8 +490,7 @@ void PhyStats::RecordBer(size_t frame_id) {
       total_bits = 0;
     }
     logger_ber_.Write(ss.str());
-  }
-  else{
+  } else {
     for (size_t i = 0; i < config_->UeAntNum(); i++) {
       size_t& error_bits = frame_bit_errors_[i][frame_id % kFrameWnd];
       error_bits_per_frame_.push_back(error_bits);
@@ -523,15 +540,14 @@ void PhyStats::UpdateUlPilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
   const arma::cx_fmat sig_mat(reinterpret_cast<arma::cx_float*>(rx_samps_tmp_),
                               config_->SampsPerSymbol(), 1, false);
   arma::fmat sig_abs_mat = arma::abs(sig_mat);
-  arma::fmat sig_abs_mag = arma::pow(sig_abs_mat,2);
+  arma::fmat sig_abs_mag = arma::pow(sig_abs_mat, 2);
   const float rssi = arma::as_scalar(arma::sum(sig_abs_mag));
-  const float noise_per_sc1 = arma::as_scalar(
-      arma::mean(sig_abs_mag.rows(0, 100)));
-  const float noise_per_sc2 = arma::as_scalar(arma::mean(
-      sig_abs_mag.rows(760, 860)));
+  const float noise_per_sc1 =
+      arma::as_scalar(arma::mean(sig_abs_mag.rows(0, 100)));
+  const float noise_per_sc2 =
+      arma::as_scalar(arma::mean(sig_abs_mag.rows(760, 860)));
   // Full band noise power
-  const float fb_noise =
-      890 * (noise_per_sc1 + noise_per_sc2) / 2;
+  const float fb_noise = 890 * (noise_per_sc1 + noise_per_sc2) / 2;
   const float snr = rssi / 0.6 / fb_noise;
   bs_noise_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
       fb_noise / config_->OfdmCaNum();
@@ -540,19 +556,18 @@ void PhyStats::UpdateUlPilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
 }
 
 void PhyStats::UpdateUlSnr(size_t frame_id, size_t ue_id, size_t ant_id,
-                               std::complex<float>* rx_samps_tmp_) {
+                           std::complex<float>* rx_samps_tmp_) {
   const arma::cx_fmat sig_mat(reinterpret_cast<arma::cx_float*>(rx_samps_tmp_),
                               config_->SampsPerSymbol(), 1, false);
   arma::fmat sig_abs_mat = arma::abs(sig_mat);
-  arma::fmat sig_abs_mag = arma::pow(sig_abs_mat,2);
+  arma::fmat sig_abs_mag = arma::pow(sig_abs_mat, 2);
   const float rssi = arma::as_scalar(arma::sum(sig_abs_mag));
-  const float noise_per_sc1 = arma::as_scalar(
-      arma::mean(sig_abs_mag.rows(0, 100)));
-  const float noise_per_sc2 = arma::as_scalar(arma::mean(
-      sig_abs_mag.rows(760, 860)));
+  const float noise_per_sc1 =
+      arma::as_scalar(arma::mean(sig_abs_mag.rows(0, 100)));
+  const float noise_per_sc2 =
+      arma::as_scalar(arma::mean(sig_abs_mag.rows(760, 860)));
   // Full band noise power
-  const float fb_noise =
-      890 * (noise_per_sc1 + noise_per_sc2) / 2;
+  const float fb_noise = 890 * (noise_per_sc1 + noise_per_sc2) / 2;
   const float snr = rssi / 0.6 / fb_noise;
   bs_noise_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
       fb_noise / config_->OfdmCaNum();

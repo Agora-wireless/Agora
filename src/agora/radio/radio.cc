@@ -52,7 +52,8 @@ void Radio::Close() {
 }
 
 void Radio::Init(const Config* cfg, size_t id, const std::string& serial,
-                 const std::vector<size_t>& enabled_channels, bool hw_framer, bool isUE) {
+                 const std::vector<size_t>& enabled_channels, bool hw_framer,
+                 bool isUE) {
   AGORA_LOG_TRACE("Init Radio %s(%zu)\n", serial.c_str(), id);
 
   id_ = id;

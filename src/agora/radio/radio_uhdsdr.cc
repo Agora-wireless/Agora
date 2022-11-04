@@ -68,25 +68,26 @@ void RadioUHDSdr::Init(const Config* cfg, size_t id, const std::string& serial,
     size_t real_ue_num_radios = cfg->UeNum();
     AGORA_LOG_INFO("real ue num_radios: %zu\n", real_ue_num_radios);
 
-    if (is_ue){
+    if (is_ue) {
       std::vector<std::string> address_list;
       for (size_t i = 0; i < real_num_radios; i++) {
         std::ostringstream oss;
         oss << "addr" << i;
         address_list.push_back(oss.str());
         args[address_list.at(i)] = cfg->UeRadioId().at(i);
-        AGORA_LOG_INFO("args addr key is: %s, value is: %s\n", address_list.at(i), cfg->UeRadioId().at(i));
-      }    
+        AGORA_LOG_INFO("args addr key is: %s, value is: %s\n",
+                       address_list.at(i), cfg->UeRadioId().at(i));
+      }
       // args["addr"] = SerialNumber();
-    }
-    else {
+    } else {
       std::vector<std::string> address_list;
       for (size_t i = 0; i < real_num_radios; i++) {
         std::ostringstream oss;
         oss << "addr" << i;
         address_list.push_back(oss.str());
         args[address_list.at(i)] = cfg->RadioId().at(i);
-        AGORA_LOG_INFO("args addr key is: %s, value is: %s\n", address_list.at(i), cfg->RadioId().at(i));
+        AGORA_LOG_INFO("args addr key is: %s, value is: %s\n",
+                       address_list.at(i), cfg->RadioId().at(i));
       }
     }
 
@@ -119,7 +120,8 @@ void RadioUHDSdr::Init(const Config* cfg, size_t id, const std::string& serial,
     device_info << "Hardware = " << dev_->get_mboard_name() << std::endl;
 
     if (kPrintRadioSettings) {
-      AGORA_LOG_INFO("number of mother boards in the device: %d\n", dev_->get_num_mboards());
+      AGORA_LOG_INFO("number of mother boards in the device: %d\n",
+                     dev_->get_num_mboards());
 
       auto clock_sources = dev_->get_clock_sources(0);
       for ([[maybe_unused]] const auto& source : clock_sources) {
