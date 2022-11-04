@@ -11,7 +11,7 @@
 
 static constexpr bool kPrintFFTInput = false;
 static constexpr bool kPrintInputPilot = false;
-static constexpr bool kPrintPilotCorrStats = false;
+static constexpr bool kPrintPilotCorrStats = true;
 
 DoFFT::DoFFT(Config* config, size_t tid, Table<complex_float>& data_buffer,
              PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
@@ -125,7 +125,7 @@ EventData DoFFT::Launch(size_t tag) {
     }
 
     if ((kPrintPilotCorrStats == true) &&
-        ((sym_type == SymbolType::kPilot) || (sym_type == SymbolType::kCalUL) ||
+        ((sym_type == SymbolType::kPilot) || (sym_type == SymbolType::kUL)  || (sym_type == SymbolType::kCalUL) ||
          ((sym_type == SymbolType::kCalDL) &&
           (ant_id == cfg_->RefAnt(cell_id))))) {
       SimdConvertShortToFloat(pkt->data_,
@@ -201,7 +201,7 @@ EventData DoFFT::Launch(size_t tag) {
     size_t pilot_symbol_id = cfg_->Frame().GetPilotSymbolIdx(symbol_id);
     if (kCollectPhyStats) {
       phy_stats_->UpdateUlPilotSnr(frame_id, pilot_symbol_id, ant_id,
-                                   fft_inout_);
+                                   rx_samps_tmp_);
     }
     const size_t ue_id = pilot_symbol_id;
     PartialTranspose(csi_buffers_[frame_slot][ue_id], ant_id,
@@ -210,7 +210,7 @@ EventData DoFFT::Launch(size_t tag) {
     size_t ul_symbol_id = cfg_->Frame().GetULSymbolIdx(symbol_id);
     if (kCollectPhyStats) {
       phy_stats_->UpdateUlSnr(frame_id, ul_symbol_id, ant_id,
-                                   fft_inout_);
+                                   rx_samps_tmp_);
     }
     PartialTranspose(cfg_->GetDataBuf(data_buffer_, frame_id, symbol_id),
                      ant_id, SymbolType::kUL);
