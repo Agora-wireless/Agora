@@ -235,11 +235,11 @@ void DoBeamWeights::ComputeCalib(size_t frame_id, size_t sc_id,
     arma::cx_fmat cur_calib_dl_msum_mat(
         reinterpret_cast<arma::cx_float*>(
             calib_dl_msum_buffer_[cal_slot_complete]),
-        cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+        cfg_->BfAntNum(), cfg_->OfdmDataNum(), false);
     arma::cx_fmat cur_calib_ul_msum_mat(
         reinterpret_cast<arma::cx_float*>(
             calib_ul_msum_buffer_[cal_slot_complete]),
-        cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+        cfg_->BfAntNum(), cfg_->OfdmDataNum(), false);
 
     arma::cx_fmat calib_mat(
         reinterpret_cast<arma::cx_float*>(calib_buffer_[cal_slot_complete]),
@@ -283,22 +283,22 @@ void DoBeamWeights::ComputeCalib(size_t frame_id, size_t sc_id,
         const arma::cx_fmat prev_calib_dl_msum_mat(
             reinterpret_cast<arma::cx_float*>(
                 calib_dl_msum_buffer_[cal_slot_prev]),
-            cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+            cfg_->BfAntNum(), cfg_->OfdmDataNum(), false);
         const arma::cx_fmat prev_calib_ul_msum_mat(
             reinterpret_cast<arma::cx_float*>(
                 calib_ul_msum_buffer_[cal_slot_prev]),
-            cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+            cfg_->BfAntNum(), cfg_->OfdmDataNum(), false);
 
         // Add new value to old rolling sum.  Then subtract out the oldest.
-        cur_calib_dl_msum_mat.row(sc_id) =
-            (cur_calib_dl_mat.row(sc_id) + prev_calib_dl_msum_mat.row(sc_id)) -
-            old_calib_dl_mat.row(sc_id);
-        cur_calib_ul_msum_mat.row(sc_id) =
-            (cur_calib_ul_mat.row(sc_id) + prev_calib_ul_msum_mat.row(sc_id)) -
-            old_calib_ul_mat.row(sc_id);
-        calib_mat.col(sc_id) = (cur_calib_ul_msum_mat.row(sc_id) /
-                                cur_calib_dl_msum_mat.row(sc_id))
-                                   .st();
+
+        cur_calib_dl_msum_mat.col(sc_id) =
+            prev_calib_dl_msum_mat.col(sc_id) +
+            (cur_calib_dl_mat.row(sc_id) - old_calib_dl_mat.row(sc_id)).st();
+        cur_calib_ul_msum_mat.col(sc_id) =
+            prev_calib_ul_msum_mat.col(sc_id) +
+            (cur_calib_ul_mat.row(sc_id) - old_calib_ul_mat.row(sc_id)).st();
+        calib_mat.col(sc_id) =
+            cur_calib_ul_msum_mat.col(sc_id) / cur_calib_dl_msum_mat.col(sc_id);
       } else {
         calib_mat.col(sc_id) =
             (cur_calib_ul_mat.row(sc_id) / cur_calib_dl_mat.row(sc_id)).st();
