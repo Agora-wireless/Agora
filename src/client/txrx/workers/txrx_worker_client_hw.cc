@@ -448,7 +448,7 @@ ssize_t TxRxWorkerClientHw::SyncBeacon(size_t local_interface,
           sync_index = FindSyncBeacon(
               reinterpret_cast<std::complex<int16_t>*>(
                   rx_pkts_ptrs_.at(kSyncDetectChannel)->RawPacket()->data_),
-              sample_window);
+              sample_window, Configuration()->ClCorrScale().at(tid_));
           //Throw out samples until we detect the beacon
           request_samples = sample_window;
           rx_tracker.Reset(rx_pkts_ptrs_);
