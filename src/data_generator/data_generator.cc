@@ -31,7 +31,6 @@ static constexpr bool kPrintDlTxData = false;
 static constexpr bool kPrintDlModData = false;
 static constexpr bool kPrintUplinkInformationBytes = false;
 static constexpr bool kPrintDownlinkInformationBytes = false;
-static constexpr size_t kNumPilotHopSc = 12;
 
 ///Output files
 static const std::string kUlDataPrefix = "orig_ul_data_";
@@ -315,7 +314,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   }
 
   // Generate common sounding pilots
-  std::vector<complex_float> pilot_td = this->GetCommonPilotTimeDomain();
+  std::vector<complex_float> pilot_fd = this->GetCommonPilotFreqDomain();
 
   // Put pilot and data symbols together
   Table<complex_float> tx_data_all_symbols;
@@ -325,24 +324,23 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
   if (this->cfg_->FreqOrthogonalPilot() == true) {
     for (size_t i = 0; i < this->cfg_->UeAntNum(); i++) {
-      std::vector<complex_float> pilots_t_ue(
+      std::vector<complex_float> pilots_f_ue(
           this->cfg_->OfdmCaNum());  // Zeroed
       for (size_t j = this->cfg_->OfdmDataStart();
-           j < this->cfg_->OfdmDataStop();
-           j += kNumPilotHopSc > 0 ? kNumPilotHopSc : this->cfg_->UeAntNum()) {
-        pilots_t_ue.at(i + j) = pilot_td.at(i + j);
+           j < this->cfg_->OfdmDataStop(); j += kPilotScIndent) {
+        pilots_f_ue.at(i + j) = pilot_fd.at(i + j);
       }
       // Load pilots
       std::memcpy(tx_data_all_symbols[this->cfg_->Frame().NumBeaconSyms()] +
                       (i * this->cfg_->OfdmCaNum()),
-                  &pilots_t_ue.at(0),
+                  &pilots_f_ue.at(0),
                   (this->cfg_->OfdmCaNum() * sizeof(complex_float)));
     }
   } else {
     for (size_t i = 0; i < this->cfg_->UeAntNum(); i++) {
       std::memcpy(tx_data_all_symbols[i + this->cfg_->Frame().NumBeaconSyms()] +
                       i * this->cfg_->OfdmCaNum(),
-                  &pilot_td.at(0),
+                  &pilot_fd.at(0),
                   (this->cfg_->OfdmCaNum() * sizeof(complex_float)));
     }
   }

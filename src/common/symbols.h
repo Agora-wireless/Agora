@@ -341,6 +341,9 @@ static constexpr size_t kTransposeBlockSize = 8;
 static_assert(IsPowerOfTwo(kTransposeBlockSize));  // For cheap modulo
 static_assert(kTransposeBlockSize % kSCsPerCacheline == 0);
 
+// Number of indent subcarriers for each UE in a frequency orthogonal pilot
+static constexpr size_t kPilotScIndent = 12;
+
 static constexpr size_t kCalibScGroupSize = 8;
 static_assert(kCalibScGroupSize % kSCsPerCacheline == 0);
 

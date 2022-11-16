@@ -40,6 +40,6 @@ class TxRxWorkerClientSim : public TxRxWorker {
 
   //Helper tx vectors
   std::vector<uint8_t> tx_pkt_zeros_;
-  std::vector<uint8_t> tx_pkt_pilot_;
+  std::vector<std::vector<uint8_t>> tx_pkt_pilot_;
 };
 #endif  // TXRX_WORKER_CLIENT_SIM_H_

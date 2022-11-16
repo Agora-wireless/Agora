@@ -984,6 +984,30 @@ void Config::GenData() {
   complex_float* pilot_ifft;
   AllocBuffer1d(&pilot_ifft, this->ofdm_ca_num_,
                 Agora_memory::Alignment_t::kAlign64, 1);
+  this->pilot_ue_ci16_.resize(ue_ant_num_);
+  std::vector<complex_float> pilot_ue_f(this->ofdm_data_num_);  // Zeroed
+  for (size_t ue_id = 0; ue_id < this->ue_ant_num_; ue_id++) {
+    const size_t sc_step = this->freq_orthogonal_pilot_ ? kPilotScIndent : 1;
+    const size_t sc_offset = this->freq_orthogonal_pilot_ ? ue_id : 0;
+    for (size_t base_sc = 0; base_sc < ofdm_data_num_; base_sc += sc_step) {
+      const size_t cur_sc = base_sc + sc_offset;
+      pilot_ue_f[cur_sc] = {this->common_pilot_[cur_sc].real(),
+                            this->common_pilot_[cur_sc].imag()};
+    }
+    for (size_t j = 0; j < ofdm_data_num_; j++) {
+      // FFT Shift
+      const size_t k = j + ofdm_data_start_ >= ofdm_ca_num_ / 2
+                           ? j + ofdm_data_start_ - ofdm_ca_num_ / 2
+                           : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
+      pilot_ifft[k] = pilot_ue_f[j];
+    }
+    CommsLib::IFFT(pilot_ifft, this->ofdm_ca_num_, false);
+    this->pilot_ue_ci16_.at(ue_id).resize(samps_per_symbol_, 0);
+    CommsLib::Ifft2tx(pilot_ifft,
+                      reinterpret_cast<std::complex<int16_t>*>(
+                          this->pilot_ue_ci16_.at(ue_id).data()),
+                      ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
+  }
   for (size_t j = 0; j < ofdm_data_num_; j++) {
     // FFT Shift
     const size_t k = j + ofdm_data_start_ >= ofdm_ca_num_ / 2

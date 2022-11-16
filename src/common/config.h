@@ -377,6 +377,9 @@ class Config {
   inline std::vector<std::complex<int16_t>>& PilotCi16() {
     return this->pilot_ci16_;
   };
+  inline std::vector<std::vector<std::complex<int16_t>>>& PilotUeCi16() {
+    return this->pilot_ue_ci16_;
+  };
   inline std::vector<std::complex<int16_t>>& BeaconCi16() {
     return this->beacon_ci16_;
   };
@@ -577,7 +580,7 @@ class Config {
 
   /* Class constants */
   inline static const size_t kDefaultSymbolNumPerFrame = 70;
-  inline static const size_t kDefaultPilotSymPerFrame = 8;
+  inline static const size_t kDefaultPilotSymPerFrame = 1;
   inline static const size_t kDefaultULSymPerFrame = 30;
   inline static const size_t kDefaultULSymStart = 9;
   inline static const size_t kDefaultDLSymPerFrame = 30;
@@ -670,6 +673,7 @@ class Config {
   std::vector<std::complex<int16_t>> beacon_ci16_;
   std::vector<uint32_t> coeffs_;
   std::vector<std::complex<int16_t>> pilot_ci16_;
+  std::vector<std::vector<std::complex<int16_t>>> pilot_ue_ci16_;
   std::vector<std::complex<float>> pilot_cf32_;
   std::vector<uint32_t> pilot_;
   std::vector<uint32_t> beacon_;

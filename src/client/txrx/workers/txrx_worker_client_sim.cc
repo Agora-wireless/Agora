@@ -30,7 +30,7 @@ TxRxWorkerClientSim::TxRxWorkerClientSim(
                  event_notify_q, tx_pending_q, tx_producer, notify_producer,
                  rx_memory, tx_memory, sync_mutex, sync_cond, can_proceed),
       tx_pkt_zeros_(config->PacketLength(), 0u),
-      tx_pkt_pilot_(config->PacketLength(), 0u) {
+      tx_pkt_pilot_(config->UeAntNum(), tx_pkt_zeros_) {
   for (size_t interface = 0; interface < num_interfaces_; interface++) {
     const uint16_t local_port_id =
         config->UeServerPort() + interface + interface_offset_;
@@ -47,9 +47,11 @@ TxRxWorkerClientSim::TxRxWorkerClientSim(
         config->UeRruAddr(), rem_port_id);
   }
 
-  auto* pilot_pkt = reinterpret_cast<Packet*>(tx_pkt_pilot_.data());
-  std::memcpy(pilot_pkt->data_, config->PilotCi16().data(),
-              config->PacketLength() - Packet::kOffsetOfData);
+  for (size_t ue_id = 0; ue_id < config->UeAntNum(); ue_id++) {
+    auto* pilot_pkt = reinterpret_cast<Packet*>(tx_pkt_pilot_.at(ue_id).data());
+    std::memcpy(pilot_pkt->data_, config->PilotUeCi16().at(ue_id).data(),
+                config->PacketLength() - Packet::kOffsetOfData);
+  }
 }
 
 TxRxWorkerClientSim::~TxRxWorkerClientSim() = default;
@@ -155,14 +157,16 @@ size_t TxRxWorkerClientSim::DequeueSend() {
           Configuration()->Frame().GetPilotSymbol(pilot_symbol_idx);
 
       Packet* tx_packet = nullptr;
-      if (pilot_symbol_idx == ue_ant) {
-        tx_packet = reinterpret_cast<Packet*>(tx_pkt_pilot_.data());
+      if (Configuration()->FreqOrthogonalPilot() ||
+          pilot_symbol_idx == ue_ant) {
+        tx_packet = reinterpret_cast<Packet*>(tx_pkt_pilot_.at(ue_ant).data());
       } else {
         tx_packet = reinterpret_cast<Packet*>(tx_pkt_zeros_.data());
       }
 
       if (kDebugPrintInTask) {
-        if (pilot_symbol_idx == ue_ant) {
+        if (Configuration()->FreqOrthogonalPilot() ||
+            pilot_symbol_idx == ue_ant) {
           AGORA_LOG_INFO(
               "TxRxWorkerClientSim[%zu]: Transmitted pilot frame %zu, symbol "
               "%zu, ant %zu\n",

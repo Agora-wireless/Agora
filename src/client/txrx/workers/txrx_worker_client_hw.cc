@@ -610,7 +610,7 @@ void TxRxWorkerClientHw::TxPilot(size_t pilot_ant, size_t frame_id,
   std::vector<void*> tx_data(channels_per_interface_);
   for (size_t ch = 0; ch < channels_per_interface_; ch++) {
     if (ch == pilot_channel) {
-      tx_data.at(ch) = Configuration()->PilotCi16().data();
+      tx_data.at(ch) = Configuration()->PilotUeCi16().at(pilot_ant).data();
     } else {
       tx_data.at(ch) = frame_zeros_.at(ch).data();
     }
