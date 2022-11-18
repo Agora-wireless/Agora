@@ -48,8 +48,10 @@ void MatLogger::SaveMatBuf() {
         for (size_t i = 0; i < kBSAnts; i++) {
           for (size_t j = 0; j < kUEAnts; j++) {
             const arma::cx_float& cx = mat_buffer_.at(frame_id).at(sc_id)(i, j);
-            logger_->info("{},{},{},{},{},{}", frame_id + kFrameStart, sc_id, i,
-                          j, cx.real(), cx.imag());
+            if (kWriteZeroVals || cx != 0.0f) {
+              logger_->info("{},{},{},{},{},{}", frame_id + kFrameStart, sc_id,
+                            i, j, cx.real(), cx.imag());
+            }
           }  // end kUEAnts
         }    // end kBSAnts
       }      // end kSCs
