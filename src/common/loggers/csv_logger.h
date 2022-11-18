@@ -29,11 +29,10 @@ enum CsvLogId {
   kBER,
   kSER,
   kCSI,
-  kCalib,
   kCsvLogs
 };
 
-enum MatLogId { kULCSI, kDLCSI, kDlBeam, kMatLogs };
+enum MatLogId { kCalib, kULCSI, kDLCSI, kDlBeam, kMatLogs };
 
 static constexpr size_t kAllLogs = kCsvLogs + kMatLogs;
 

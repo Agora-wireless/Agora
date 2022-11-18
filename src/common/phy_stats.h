@@ -58,8 +58,8 @@ class PhyStats {
   void UpdateUlCsi(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
   void UpdateDlCsi(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
   void UpdateDlBeam(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
-  void RecordCalibMat(size_t frame_id, size_t sc_id,
-                      const arma::cx_fvec& calib_buffer);
+  void UpdateCalibMat(size_t frame_id, size_t sc_id,
+                      arma::cx_fvec& calib_buffer);
 
  private:
   Config const* const config_;
@@ -98,7 +98,7 @@ class PhyStats {
   CsvLog::CsvLogger logger_ber_;
   CsvLog::CsvLogger logger_ser_;
   CsvLog::CsvLogger logger_csi_;
-  CsvLog::CsvLogger logger_calib_;
+  CsvLog::MatLogger logger_calib_;
   CsvLog::MatLogger logger_ul_csi_;
   CsvLog::MatLogger logger_dl_csi_;
   CsvLog::MatLogger logger_dl_beam_;
