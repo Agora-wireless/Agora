@@ -41,7 +41,7 @@ class PhyStats {
   float GetNoise(size_t frame_id);
   void ClearEvmBuffer(size_t frame_id);
   void UpdateUlPilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
-                        std::complex<float>* rx_samps_tmp_);
+                        complex_float* fft_data);
   void UpdateUlSnr(size_t frame_id, size_t ue_id, size_t ant_id,
                    std::complex<float>* rx_samps_tmp_);
   void UpdateDlPilotSnr(size_t frame_id, size_t symbol_id, size_t ant_id,
@@ -107,8 +107,8 @@ class PhyStats {
   CsvLog::MatLogger logger_ul_csi_;
   CsvLog::MatLogger logger_dl_csi_;
   CsvLog::MatLogger logger_dl_beam_;
-  size_t valid_EVM_count_;
-  std::vector<size_t> error_bits_per_frame_;
+  std::vector<size_t> valid_EVM_count_;
+  std::vector<std::vector<size_t> > error_bits_per_frame_;
 };
 
 #endif  // PHY_STATS_H_

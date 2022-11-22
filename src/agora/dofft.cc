@@ -11,7 +11,7 @@
 
 static constexpr bool kPrintFFTInput = false;
 static constexpr bool kPrintInputPilot = false;
-static constexpr bool kPrintPilotCorrStats = true;
+static constexpr bool kPrintPilotCorrStats = false;
 
 DoFFT::DoFFT(Config* config, size_t tid, Table<complex_float>& data_buffer,
              PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
@@ -147,6 +147,10 @@ EventData DoFFT::Launch(size_t tag) {
           "In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu, "
           "sig_offset %zu, peak %2.4f\n",
           tid_, frame_id, symbol_id, ant_id, sig_offset, peak);
+    } else{
+      SimdConvertShortToFloat(pkt->data_,
+                              reinterpret_cast<float*>(rx_samps_tmp_),
+                              2 * cfg_->SampsPerSymbol());
     }
     if (kPrintInputPilot) {
       std::stringstream ss;
@@ -202,7 +206,7 @@ EventData DoFFT::Launch(size_t tag) {
     size_t pilot_symbol_id = cfg_->Frame().GetPilotSymbolIdx(symbol_id);
     if (kCollectPhyStats) {
       phy_stats_->UpdateUlPilotSnr(frame_id, pilot_symbol_id, ant_id,
-                                   rx_samps_tmp_);
+                                   fft_inout_);
     }
     const size_t ue_id = pilot_symbol_id;
     PartialTranspose(csi_buffers_[frame_slot][ue_id], ant_id,
