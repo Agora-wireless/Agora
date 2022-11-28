@@ -294,8 +294,8 @@ void DoBeamWeights::ComputeCalib(size_t frame_id, size_t sc_id,
         (cur_calib_ul_msum_mat.row(sc_id) / cur_calib_dl_msum_mat.row(sc_id))
             .st();
 
-    if (frame_update) {
-      phy_stats_->RecordCalibMat(frame_id, sc_id, calib_sc_vec);
+    if (kEnableMatLog && frame_update) {
+      phy_stats_->UpdateCalibMat(frame_id, sc_id, calib_sc_vec);
     }
   }
   // Otherwise calib_sc_vec = identity from init
