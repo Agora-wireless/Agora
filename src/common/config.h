@@ -22,6 +22,7 @@
 #include "nlohmann/json.hpp"
 #include "symbols.h"
 #include "utils.h"
+#include "armadillo"
 
 class Config {
  public:
@@ -377,8 +378,11 @@ class Config {
   inline std::vector<std::complex<int16_t>>& PilotCi16() {
     return this->pilot_ci16_;
   };
-  inline std::vector<std::vector<std::complex<int16_t>>>& PilotUeCi16() {
-    return this->pilot_ue_ci16_;
+  inline std::vector<std::complex<int16_t>>& PilotUeCi16(size_t ue_id) {
+    return this->pilot_ue_ci16_.at(ue_id);
+  };
+  inline const arma::uvec& PilotUeSc(size_t ue_id) const {
+    return this->pilot_ue_sc_.at(ue_id);
   };
   inline std::vector<std::complex<int16_t>>& BeaconCi16() {
     return this->beacon_ci16_;
@@ -673,8 +677,9 @@ class Config {
   std::vector<std::complex<int16_t>> beacon_ci16_;
   std::vector<uint32_t> coeffs_;
   std::vector<std::complex<int16_t>> pilot_ci16_;
-  std::vector<std::vector<std::complex<int16_t>>> pilot_ue_ci16_;
   std::vector<std::complex<float>> pilot_cf32_;
+  std::vector<std::vector<std::complex<int16_t>>> pilot_ue_ci16_;
+  std::vector<arma::uvec> pilot_ue_sc_;
   std::vector<uint32_t> pilot_;
   std::vector<uint32_t> beacon_;
   complex_float* pilots_;

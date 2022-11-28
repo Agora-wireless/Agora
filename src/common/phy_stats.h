@@ -40,13 +40,13 @@ class PhyStats {
   float GetEvmSnr(size_t frame_id, size_t ue_id);
   float GetNoise(size_t frame_id);
   void ClearEvmBuffer(size_t frame_id);
-  void UpdateUlPilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
+  void UpdatePilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
                         complex_float* fft_data);
   void UpdateDlPilotSnr(size_t frame_id, size_t symbol_id, size_t ant_id,
                         complex_float* fft_data);
   void PrintUlSnrStats(size_t frame_id);
-  void RecordUlPilotSnr(size_t frame_id);
   void PrintDlSnrStats(size_t frame_id);
+  void RecordPilotSnr(size_t frame_id);
   void RecordDlPilotSnr(size_t frame_id);
   void RecordDlCsi(size_t frame_id, size_t num_rec_sc,
                    const Table<complex_float>& csi_buffer);
@@ -76,13 +76,14 @@ class PhyStats {
   Table<size_t> uncoded_bit_error_count_;
   Table<float> evm_buffer_;
   Table<float> evm_sc_buffer_;
-  Table<float> ul_pilot_snr_;
+  Table<float> pilot_snr_;
+  Table<float> pilot_rssi_;
+  Table<float> pilot_noise_;
   Table<float> dl_pilot_snr_;
   Table<float> dl_pilot_rssi_;
   Table<float> dl_pilot_noise_;
   Table<float> calib_pilot_snr_;
   Table<float> csi_cond_;
-  Table<float> bs_noise_;
   Table<float> calib_;
 
   arma::cx_fcube gt_cube_;

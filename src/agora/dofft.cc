@@ -200,7 +200,7 @@ EventData DoFFT::Launch(size_t tag) {
   if (sym_type == SymbolType::kPilot) {
     size_t pilot_symbol_id = cfg_->Frame().GetPilotSymbolIdx(symbol_id);
     if (kCollectPhyStats) {
-      phy_stats_->UpdateUlPilotSnr(frame_id, pilot_symbol_id, ant_id,
+      phy_stats_->UpdatePilotSnr(frame_id, pilot_symbol_id, ant_id,
                                    fft_inout_);
     }
     const size_t ue_id = pilot_symbol_id;

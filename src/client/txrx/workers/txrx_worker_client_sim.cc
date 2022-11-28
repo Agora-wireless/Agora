@@ -49,7 +49,7 @@ TxRxWorkerClientSim::TxRxWorkerClientSim(
 
   for (size_t ue_id = 0; ue_id < config->UeAntNum(); ue_id++) {
     auto* pilot_pkt = reinterpret_cast<Packet*>(tx_pkt_pilot_.at(ue_id).data());
-    std::memcpy(pilot_pkt->data_, config->PilotUeCi16().at(ue_id).data(),
+    std::memcpy(pilot_pkt->data_, config->PilotUeCi16(ue_id).data(),
                 config->PacketLength() - Packet::kOffsetOfData);
   }
 }
