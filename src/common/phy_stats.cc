@@ -25,7 +25,7 @@ PhyStats::PhyStats(Config* const cfg, Direction dir)
       logger_calib_(CsvLog::kCalib, cfg, dir, true),
       logger_ul_csi_(CsvLog::kULCSI, cfg, dir),
       logger_dl_csi_(CsvLog::kDLCSI, cfg, dir),
-      logger_dl_beam_(CsvLog::kDlBeam, cfg, dir){
+      logger_dl_beam_(CsvLog::kDlBeam, cfg, dir) {
   valid_EVM_count_.assign(cfg->UeAntNum(), 0);
   error_bits_per_frame_.assign(cfg->UeAntNum(), std::vector<size_t>());
   if (dir_ == Direction::kDownlink) {
@@ -173,7 +173,8 @@ void PhyStats::PrintPhyStats() {
           total_block_errors, total_decoded_blocks,
           static_cast<float>(total_block_errors) /
               static_cast<float>(total_decoded_blocks));
-      AGORA_LOG_INFO("VALID frames after Sync is: %zu\n", valid_EVM_count_[ue_id]);
+      AGORA_LOG_INFO("VALID frames after Sync is: %zu\n",
+                     valid_EVM_count_[ue_id]);
       AGORA_LOG_INFO(
           "UE %zu: %s VALID bit errors (BER) %zu/%zu (%f), VALID block errors "
           "(BLER) "

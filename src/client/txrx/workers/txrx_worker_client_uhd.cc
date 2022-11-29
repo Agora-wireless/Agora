@@ -244,69 +244,69 @@ void TxRxWorkerClientUhd::DoTxRx() {
         }
 
         //If we have a beacon and we would like to resync
-        // if (resync &&
-        //     (rx_symbol_id == Configuration()->Frame().GetBeaconSymbolLast())) {
-        //   //This is adding a race condition on this data, it is ok for now but we should fix this
-        //   const ssize_t sync_index = FindSyncBeacon(
-        //       reinterpret_cast<std::complex<int16_t>*>(
-        //           rx_pkts.at(kSyncDetectChannel)->data_),
-        //       samples_per_symbol, Configuration()->ClCorrScale().at(tid_));
-        //   if (sync_index >= 0) {
-        //     const ssize_t adjust = sync_index - Configuration()->BeaconLen() -
-        //                            Configuration()->OfdmTxZeroPrefix();
-        //     if (std::abs(adjust) > kMaxBeaconAdjust) {
-        //       AGORA_LOG_WARN(
-        //           "TxRxWorkerClientUhd [%zu]: Re-syncing ignored due to "
-        //           "excess "
-        //           "offset %ld - channel %zu, sync_index: %ld, tries %zu\n ",
-        //           tid_, adjust, kSyncDetectChannel, sync_index,
-        //           resync_retry_cnt);
-        //     } else {
-        //       AGORA_LOG_INFO(
-        //           "TxRxWorkerClientUhd [%zu]: Re-syncing channel %zu, "
-        //           "sync_index: %ld, rx sample offset: %ld tries %zu\n ",
-        //           tid_, kSyncDetectChannel, sync_index, adjust,
-        //           resync_retry_cnt);
-        //       resync_success++;
-        //       resync = false;
-        //       //Display all the other channels
-        //       if (kDebugBeaconChannels) {
-        //         for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-        //           if (ch != kSyncDetectChannel) {
-        //             const ssize_t aux_channel_sync =
-        //                 FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
-        //                                    rx_pkts.at(ch)->data_),
-        //                                samples_per_symbol,
-        //                                Configuration()->ClCorrScale().at(tid_));
-        //             AGORA_LOG_INFO(
-        //                 "TxRxWorkerClientUhd [%zu]: beacon status channel "
-        //                 "%zu, "
-        //                 "sync_index: %ld, rx sample offset: %ld\n",
-        //                 tid_, ch, aux_channel_sync,
-        //                 aux_channel_sync -
-        //                     (Configuration()->BeaconLen() +
-        //                      Configuration()->OfdmTxZeroPrefix()));
-        //           }
-        //         }
-        //       }
-        //       resync_retry_cnt = 0;
-        //     }
-        //   } else {
-        //     resync_retry_cnt++;
-        //     if (resync_retry_cnt > kReSyncRetryCount) {
-        //       AGORA_LOG_ERROR(
-        //           "TxRxWorkerClientUhd [%zu]: Exceeded resync retry limit "
-        //           "(%zu) "
-        //           "for client %zu reached after %zu resync successes at "
-        //           "frame: "
-        //           "%zu.  Stopping!\n",
-        //           tid_, kReSyncRetryCount, local_interface + interface_offset_,
-        //           resync_success, rx_frame_id);
-        //       Configuration()->Running(false);
-        //       break;
-        //     }
-        //   }
-        // }  // end resync
+        if (resync &&
+            (rx_symbol_id == Configuration()->Frame().GetBeaconSymbolLast())) {
+          //This is adding a race condition on this data, it is ok for now but we should fix this
+          const ssize_t sync_index = FindSyncBeacon(
+              reinterpret_cast<std::complex<int16_t>*>(
+                  rx_pkts.at(kSyncDetectChannel)->data_),
+              samples_per_symbol, Configuration()->ClCorrScale().at(tid_));
+          if (sync_index >= 0) {
+            const ssize_t adjust = sync_index - Configuration()->BeaconLen() -
+                                   Configuration()->OfdmTxZeroPrefix();
+            if (std::abs(adjust) > kMaxBeaconAdjust) {
+              AGORA_LOG_WARN(
+                  "TxRxWorkerClientUhd [%zu]: Re-syncing ignored due to "
+                  "excess "
+                  "offset %ld - channel %zu, sync_index: %ld, tries %zu\n ",
+                  tid_, adjust, kSyncDetectChannel, sync_index,
+                  resync_retry_cnt);
+            } else {
+              AGORA_LOG_INFO(
+                  "TxRxWorkerClientUhd [%zu]: Re-syncing channel %zu, "
+                  "sync_index: %ld, rx sample offset: %ld tries %zu\n ",
+                  tid_, kSyncDetectChannel, sync_index, adjust,
+                  resync_retry_cnt);
+              resync_success++;
+              resync = false;
+              //Display all the other channels
+              if (kDebugBeaconChannels) {
+                for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+                  if (ch != kSyncDetectChannel) {
+                    const ssize_t aux_channel_sync =
+                        FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
+                                           rx_pkts.at(ch)->data_),
+                                       samples_per_symbol,
+                                       Configuration()->ClCorrScale().at(tid_));
+                    AGORA_LOG_INFO(
+                        "TxRxWorkerClientUhd [%zu]: beacon status channel "
+                        "%zu, "
+                        "sync_index: %ld, rx sample offset: %ld\n",
+                        tid_, ch, aux_channel_sync,
+                        aux_channel_sync -
+                            (Configuration()->BeaconLen() +
+                             Configuration()->OfdmTxZeroPrefix()));
+                  }
+                }
+              }
+              resync_retry_cnt = 0;
+            }
+          } else {
+            resync_retry_cnt++;
+            if (resync_retry_cnt > kReSyncRetryCount) {
+              AGORA_LOG_ERROR(
+                  "TxRxWorkerClientUhd [%zu]: Exceeded resync retry limit "
+                  "(%zu) "
+                  "for client %zu reached after %zu resync successes at "
+                  "frame: "
+                  "%zu.  Stopping!\n",
+                  tid_, kReSyncRetryCount, local_interface + interface_offset_,
+                  resync_success, rx_frame_id);
+              Configuration()->Running(false);
+              break;
+            }
+          }
+        }  // end resync
 
       }  //    if (rx_pkts.size() > 0) {
 
@@ -586,7 +586,7 @@ ssize_t TxRxWorkerClientUhd::SyncBeacon(size_t local_interface,
           sync_index = FindSyncBeacon(
               reinterpret_cast<std::complex<int16_t>*>(
                   rx_pkts_ptrs_.at(kSyncDetectChannel)->RawPacket()->data_),
-              sample_window);
+              sample_window, Configuration()->ClCorrScale().at(tid_));
           //Throw out samples until we detect the beacon
           request_samples = sample_window;
           rx_tracker.Reset(rx_pkts_ptrs_);

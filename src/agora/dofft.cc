@@ -147,7 +147,7 @@ EventData DoFFT::Launch(size_t tag) {
           "In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu, "
           "sig_offset %zu, peak %2.4f\n",
           tid_, frame_id, symbol_id, ant_id, sig_offset, peak);
-    } else{
+    } else {
       SimdConvertShortToFloat(pkt->data_,
                               reinterpret_cast<float*>(rx_samps_tmp_),
                               2 * cfg_->SampsPerSymbol());
