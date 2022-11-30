@@ -4,10 +4,10 @@
     "channel": "A",
     "frequency": 3e9,
     "single_gain": true,
-    "rx_gain_a": 5,
-    "tx_gain_a": 5,
-    "rx_gain_b": 5,
-    "tx_gain_b": 5,
+    "rx_gain_a": 10,
+    "tx_gain_a": 10,
+    "rx_gain_b": 10,
+    "tx_gain_b": 10,
     "sample_rate": 20e6,
     "cp_size": 32,
     "fft_size": 512,
@@ -29,7 +29,7 @@
     "ofdm_rx_zero_prefix_cal_dl": 324,
     "ofdm_rx_zero_prefix_cal_ul": 136,
     "frame_schedule": [
-        "BGGGGGGGPGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGUUUGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+        "BGGGGGGGPGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGUGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
     ],
     "client_ul_pilot_syms": 2,
     "beamsweep": false,
@@ -38,16 +38,16 @@
     "ue_resync_period": 200,
     "ue_channel": "A",
     "ue_rx_gain_a": [
-        5
+        15
     ],
     "ue_tx_gain_a": [
-        5  
+        15  
     ],
     "ue_rx_gain_b": [
-        5   
+        15   
     ],
     "ue_tx_gain_b": [
-        5 
+        15 
     ],
     "tx_advance": [
         -840  
@@ -67,5 +67,5 @@
     "worker_thread_num": 8,
     "socket_thread_num": 1,
     "max_frame": 200000,
-    "corr_scale": [1000]
+    "corr_scale": [100000]
 }

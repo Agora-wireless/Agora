@@ -155,14 +155,29 @@ void PhyStats::PrintPhyStats() {
         total_block_errors += block_error_count_[ue_id][i];
       }
 
-      for (size_t j = total_decoded_blocks - valid_EVM_count_[ue_id];
-           j < total_decoded_blocks; j++) {
+      for (size_t j = (total_decoded_blocks -
+                       valid_EVM_count_[ue_id] *
+                           (num_rx_symbols_ -
+                            this->config_->Frame().ClientUlPilotSymbols())) /
+                      (num_rx_symbols_ -
+                       this->config_->Frame().ClientUlPilotSymbols());
+           j < total_decoded_blocks /
+                   (num_rx_symbols_ -
+                    this->config_->Frame().ClientUlPilotSymbols());
+           j++) {
         true_total_bit_errors += error_bits_per_frame_[ue_id][j];
       }
+      true_total_bit_errors *=
+          (num_rx_symbols_ - this->config_->Frame().ClientUlPilotSymbols());
       true_total_block_errors =
-          total_block_errors - (total_decoded_blocks - valid_EVM_count_[ue_id]);
+          total_block_errors -
+          (total_decoded_blocks -
+           valid_EVM_count_[ue_id] *
+               (num_rx_symbols_ -
+                this->config_->Frame().ClientUlPilotSymbols()));
       true_total_decoded_bits =
-          total_decoded_bits / total_decoded_blocks * valid_EVM_count_[ue_id];
+          total_decoded_bits / total_decoded_blocks * valid_EVM_count_[ue_id] *
+          (num_rx_symbols_ - this->config_->Frame().ClientUlPilotSymbols());
 
       AGORA_LOG_INFO(
           "UE %zu: %s bit errors (BER) %zu/%zu (%f), block errors (BLER) "
@@ -174,7 +189,9 @@ void PhyStats::PrintPhyStats() {
           static_cast<float>(total_block_errors) /
               static_cast<float>(total_decoded_blocks));
       AGORA_LOG_INFO("VALID frames after Sync is: %zu\n",
-                     valid_EVM_count_[ue_id]);
+                     valid_EVM_count_[ue_id] *
+                         (num_rx_symbols_ -
+                          this->config_->Frame().ClientUlPilotSymbols()));
       AGORA_LOG_INFO(
           "UE %zu: %s VALID bit errors (BER) %zu/%zu (%f), VALID block errors "
           "(BLER) "
@@ -183,9 +200,14 @@ void PhyStats::PrintPhyStats() {
           true_total_decoded_bits,
           static_cast<float>(true_total_bit_errors) /
               static_cast<float>(true_total_decoded_bits),
-          true_total_block_errors, valid_EVM_count_[ue_id],
+          true_total_block_errors,
+          valid_EVM_count_[ue_id] *
+              (num_rx_symbols_ - this->config_->Frame().ClientUlPilotSymbols()),
           static_cast<float>(true_total_block_errors) /
-              static_cast<float>(valid_EVM_count_[ue_id]));
+              static_cast<float>(
+                  valid_EVM_count_[ue_id] *
+                  (num_rx_symbols_ -
+                   this->config_->Frame().ClientUlPilotSymbols())));
     }
   }
 }
