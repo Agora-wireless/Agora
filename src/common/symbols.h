@@ -162,6 +162,12 @@ static constexpr bool kUseUHD = true;
 static constexpr bool kUseUHD = false;
 #endif
 
+#if defined(USE_PURE_UHD)
+static constexpr bool kUsePureUHD = true;
+#else
+static constexpr bool kUsePureUHD = false;
+#endif
+
 #if defined(ENABLE_CSV_LOG)
 static constexpr bool kEnableCsvLog = true;
 #else

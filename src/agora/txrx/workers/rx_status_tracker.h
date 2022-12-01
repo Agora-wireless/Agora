@@ -11,6 +11,7 @@
 
 #include "logger.h"
 #include "message.h"
+#include "utils.h"
 
 namespace TxRxWorkerRx {
 
