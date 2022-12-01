@@ -17,7 +17,7 @@
 
 static constexpr bool kDebugBeaconChannels = false;
 static constexpr size_t kSyncDetectChannel = 0;
-static constexpr bool kVerifyFirstSync = false;
+static constexpr bool kVerifyFirstSync = true;
 static constexpr size_t kReSyncRetryCount = 100u;
 static constexpr float kBeaconDetectWindow = 2.33f;
 static constexpr size_t kBeaconsToStart = 2;

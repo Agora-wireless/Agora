@@ -378,7 +378,8 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
 ssize_t SyncBeacon(const std::complex<int16_t>* samples, size_t detect_window,
                    const Config* cfg) {
   ssize_t sync_index = 0;
-  sync_index = CommsLib::FindBeaconAvx(samples, cfg->GoldCf32(), detect_window);
+  sync_index =
+      CommsLib::FindBeaconAvx(samples, cfg->GoldCf32(), detect_window, 1.0f);
 
   if (sync_index >= 0) {
     auto rx_adjust_samples =

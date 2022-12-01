@@ -90,7 +90,7 @@ RadioSetUhd::RadioSetUhd(Config* cfg, Radio::RadioType radio_type)
 
 void RadioSetUhd::InitRadio(size_t radio_id) {
   radios_.at(radio_id)->Init(cfg_, radio_id, cfg_->RadioId().at(radio_id),
-                             Utils::StrToChannels(cfg_->Channel()), false, false);
+                             Utils::StrToChannels(cfg_->Channel()), false);
   num_radios_initialized_.fetch_add(1);
 }
 
