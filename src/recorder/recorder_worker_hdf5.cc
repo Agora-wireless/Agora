@@ -426,7 +426,7 @@ int RecorderWorkerHDF5::Record(const Packet* pkt) {
   } else if ((frame_id % interval_) == 0) {
     if (kDebugPrint) {
       const size_t ant_id = pkt->ant_id_;
-      AGORA_LOG_INFO(
+      AGORA_LOG_TRACE(
           "RecorderWorkerHDF5::record [frame %zu, symbol %zu, cell %d, "
           "ant %zu] samples: %d %d %d %d %d %d %d %d ....\n",
           frame_id, symbol_id, pkt->cell_id_, ant_id, pkt->data_[0u],

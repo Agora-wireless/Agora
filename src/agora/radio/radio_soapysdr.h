@@ -16,41 +16,45 @@
 class RadioSoapySdr : public Radio {
  public:
   explicit RadioSoapySdr(RadioDataPlane::DataPlaneType rx_dp_type);
-  ~RadioSoapySdr() final;
+  virtual ~RadioSoapySdr() final;
 
-  void Init(const Config* cfg, size_t id, const std::string& serial,
-            const std::vector<size_t>& enabled_channels, bool hw_framer) final;
-  void Setup(const std::vector<double>& tx_gains,
-             const std::vector<double>& rx_gains) final;
-  void Activate(Radio::ActivationTypes type = Radio::ActivationTypes::kActivate,
-                long long act_time_ns = 0, size_t samples = 0) final;
-  void Deactivate() final;
-  void Close() final;
-  void Flush() final;
+  virtual void Init(const Config* cfg, size_t id, const std::string& serial,
+                    const std::vector<size_t>& enabled_channels,
+                    bool hw_framer) final;
+  virtual void Setup(const std::vector<double>& tx_gains,
+                     const std::vector<double>& rx_gains) final;
+  virtual void Activate(
+      Radio::ActivationTypes type = Radio::ActivationTypes::kActivate,
+      long long act_time_ns = 0, size_t samples = 0) final;
+  virtual void Deactivate() final;
+  virtual void Close() final;
+  virtual void Flush() final;
 
-  int Tx(const void* const* tx_buffs, size_t tx_size, Radio::TxFlags tx_flags,
-         long long& tx_time_ns) final;
+  virtual int Tx(const void* const* tx_buffs, size_t tx_size,
+                 Radio::TxFlags tx_flags, long long& tx_time_ns) final;
 
-  int Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-         size_t rx_size, RxFlags& out_flags, long long& rx_time_ns) final;
+  virtual int Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,
+                 size_t rx_size, RxFlags& out_flags,
+                 long long& rx_time_ns) final;
 
-  int Rx(std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
-         size_t rx_size, RxFlags& out_flags, long long& rx_time_ns) final;
+  virtual int Rx(std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
+                 size_t rx_size, RxFlags& out_flags,
+                 long long& rx_time_ns) final;
 
-  int Rx(std::vector<void*>& rx_locs, size_t rx_size, RxFlags& out_flags,
-         long long& rx_time_ns) final;
+  virtual int Rx(std::vector<void*>& rx_locs, size_t rx_size,
+                 RxFlags& out_flags, long long& rx_time_ns) final;
 
-  void SetTimeAtTrigger(long long time_ns = 0) final;
-  long long GetTimeNs() final;
+  virtual void SetTimeAtTrigger(long long time_ns = 0) final;
+  virtual long long GetTimeNs() final;
   //End of generic interface
 
-  void ConfigureTddModeBs(bool is_ref_radio) final;
-  void ConfigureTddModeUe() final;
-  void ClearSyncDelay() final;
-  void PrintSettings() const final;
-  void Trigger() final;
-  void ReadSensor() const final;
-  void AdjustDelay(const std::string& delay) final;
+  virtual void ConfigureTddModeBs(bool is_ref_radio) final;
+  virtual void ConfigureTddModeUe() final;
+  virtual void ClearSyncDelay() final;
+  virtual void PrintSettings() const final;
+  virtual void Trigger() final;
+  virtual void ReadSensor() const final;
+  virtual void AdjustDelay(const std::string& delay) final;
 
   // Calibration helper functions
   void InitRefTx(size_t channel, double freq);

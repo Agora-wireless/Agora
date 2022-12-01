@@ -7,9 +7,9 @@
 #ifndef PACKETTXRX_CLIENT_RADIO_H_
 #define PACKETTXRX_CLIENT_RADIO_H_
 
-#include "client_radio.h"
 #include "common_typedef_sdk.h"
 #include "packet_txrx.h"
+#include "radio_set.h"
 
 /**
  * @brief Implementations of this class provide packet I/O for Agora.
@@ -38,7 +38,7 @@ class PacketTxRxClientRadio : public PacketTxRx {
                     size_t* rx_frame_start, std::vector<RxPacket>& rx_memory,
                     std::byte* const tx_memory) final;
 
-  std::unique_ptr<ClientRadioConfig> radio_config_;
+  std::unique_ptr<RadioSet> radio_config_;
 };
 
 #endif  // PACKETTXRX_CLIENT_RADIO_H_

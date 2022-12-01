@@ -103,7 +103,7 @@ PhyUe::PhyUe(Config* config)
   // downlink buffers init (rx)
   InitializeDownlinkBuffers();
 
-  if (kUseArgos) {
+  if (kUseArgos || kUsePureUHD) {
     ru_ = std::make_unique<PacketTxRxClientRadio>(
         config_, config_->UeCoreOffset() + 1, &complete_queue_, &tx_queue_,
         rx_ptoks_ptr_, tx_ptoks_ptr_, rx_buffer_,
