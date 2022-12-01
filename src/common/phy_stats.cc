@@ -586,12 +586,15 @@ void PhyStats::UpdateUlSnr(size_t frame_id, size_t ue_id, size_t ant_id,
   arma::fmat sig_abs_mag = arma::pow(sig_abs_mat, 2);
   const float rssi = arma::as_scalar(arma::sum(sig_abs_mag));
   const float noise_per_sc1 =
-      arma::as_scalar(arma::mean(sig_abs_mag.rows(0, 100)));
+      arma::as_scalar(arma::mean(sig_abs_mag.rows(0, (config_->OfdmTxZeroPrefix()))/2));
   const float noise_per_sc2 =
-      arma::as_scalar(arma::mean(sig_abs_mag.rows(760, 860)));
+      arma::as_scalar(arma::mean(sig_abs_mag.rows(config_->SampsPerSymbol() - (config_->OfdmTxZeroPostfix()/2), config_->SampsPerSymbol() - 1)));
   // Full band noise power
-  const float fb_noise = 890 * (noise_per_sc1 + noise_per_sc2) / 2;
-  const float snr = rssi / 0.6 / fb_noise;
+  const float fb_noise = config_->SampsPerSymbol() * ((noise_per_sc1 + noise_per_sc2) / 2);
+  float dataSamps = config_->OfdmCaNum();
+  float numSamps = config_->SampsPerSymbol();
+  float ratio = dataSamps / numSamps;
+  const float snr = rssi / ratio / fb_noise;
   bs_noise_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
       fb_noise / config_->OfdmCaNum();
   ul_snr_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =

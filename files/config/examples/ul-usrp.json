@@ -4,10 +4,10 @@
     "channel": "A",
     "frequency": 3e9,
     "single_gain": true,
-    "rx_gain_a": 10,
-    "tx_gain_a": 10,
-    "rx_gain_b": 10,
-    "tx_gain_b": 10,
+    "rx_gain_a": 12,
+    "tx_gain_a": 12,
+    "rx_gain_b": 12,
+    "tx_gain_b": 12,
     "sample_rate": 20e6,
     "cp_size": 32,
     "fft_size": 512,
@@ -29,7 +29,7 @@
     "ofdm_rx_zero_prefix_cal_dl": 324,
     "ofdm_rx_zero_prefix_cal_ul": 136,
     "frame_schedule": [
-        "BGGGGGGGPGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGUGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+        "BPUUUUUUUUUUUUUUUUUUG"
     ],
     "client_ul_pilot_syms": 2,
     "beamsweep": false,

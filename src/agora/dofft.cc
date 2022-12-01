@@ -209,13 +209,15 @@ EventData DoFFT::Launch(size_t tag) {
   } else if (sym_type == SymbolType::kUL) {
     if (kCollectPhyStats) {
       const size_t ul_symbol_id = cfg_->Frame().GetULSymbolIdx(symbol_id);
-      SimdConvertShortToFloat(pkt->data_,
-                              reinterpret_cast<float*>(rx_samps_tmp_),
-                              2 * cfg_->SampsPerSymbol());
-      std::printf("frame_id %zu, ul_symbol_id %zu, ant_id %zu\n", frame_id,
-                  ul_symbol_id, ant_id);
-      std::fflush(stdout);
-      //phy_stats_->UpdateUlSnr(frame_id, ul_symbol_id, ant_id, rx_samps_tmp_);
+      if (ul_symbol_id == cfg_->Frame().ClientUlPilotSymbols()) {
+        SimdConvertShortToFloat(pkt->data_,
+                                reinterpret_cast<float*>(rx_samps_tmp_),
+                                2 * cfg_->SampsPerSymbol());
+        std::printf("frame_id %zu, ul_symbol_id %zu, ant_id %zu\n", frame_id,
+                    ul_symbol_id, ant_id);
+        std::fflush(stdout);
+        phy_stats_->UpdateUlSnr(frame_id, ul_symbol_id, ant_id, rx_samps_tmp_);
+      }
     }
     PartialTranspose(cfg_->GetDataBuf(data_buffer_, frame_id, symbol_id),
                      ant_id, SymbolType::kUL);
