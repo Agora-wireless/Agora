@@ -188,11 +188,11 @@ void PhyStats::PrintPhyStats() {
           total_block_errors, total_decoded_blocks,
           static_cast<float>(total_block_errors) /
               static_cast<float>(total_decoded_blocks));
-      AGORA_LOG_INFO("VALID frames after Sync is: %zu\n",
-                     valid_EVM_count_[ue_id] *
-                         (num_rx_symbols_ -
-                          this->config_->Frame().ClientUlPilotSymbols()));
-      AGORA_LOG_INFO(
+      AGORA_LOG_FRAME("VALID frames after Sync is: %zu\n",
+                      valid_EVM_count_[ue_id] *
+                          (num_rx_symbols_ -
+                           this->config_->Frame().ClientUlPilotSymbols()));
+      AGORA_LOG_FRAME(
           "UE %zu: %s VALID bit errors (BER) %zu/%zu (%f), VALID block errors "
           "(BLER) "
           "%zu/%zu (%f)\n",
