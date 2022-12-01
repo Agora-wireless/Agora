@@ -226,7 +226,6 @@ void PhyStats::PrintEvmStats(size_t frame_id) {
   for (size_t i = 0; i < config_->UeAntNum(); i++) {
     float max_snr = FLT_MIN;
     float min_snr = FLT_MAX;
-    size_t min_snr_id = 0;
     const float* frame_snr =
         &ul_snr_[frame_id % kFrameWnd][i * config_->BsAntNum()];
     for (size_t j = 0; j < config_->BsAntNum(); j++) {
@@ -238,7 +237,6 @@ void PhyStats::PrintEvmStats(size_t frame_id) {
       }
       if (frame_snr[j] < min_snr) {
         min_snr = frame_snr[j];
-        min_snr_id = j;
       }
       if (frame_snr[j] > max_snr) {
         max_snr = frame_snr[j];
