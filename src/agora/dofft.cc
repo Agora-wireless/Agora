@@ -125,8 +125,7 @@ EventData DoFFT::Launch(size_t tag) {
     }
 
     if ((kPrintPilotCorrStats == true) &&
-        ((sym_type == SymbolType::kPilot) || (sym_type == SymbolType::kUL) ||
-         (sym_type == SymbolType::kCalUL) ||
+        ((sym_type == SymbolType::kPilot) || (sym_type == SymbolType::kCalUL) ||
          ((sym_type == SymbolType::kCalDL) &&
           (ant_id == cfg_->RefAnt(cell_id))))) {
       SimdConvertShortToFloat(pkt->data_,
@@ -147,10 +146,6 @@ EventData DoFFT::Launch(size_t tag) {
           "In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu, "
           "sig_offset %zu, peak %2.4f\n",
           tid_, frame_id, symbol_id, ant_id, sig_offset, peak);
-    } else {
-      SimdConvertShortToFloat(pkt->data_,
-                              reinterpret_cast<float*>(rx_samps_tmp_),
-                              2 * cfg_->SampsPerSymbol());
     }
     if (kPrintInputPilot) {
       std::stringstream ss;
@@ -212,9 +207,15 @@ EventData DoFFT::Launch(size_t tag) {
     PartialTranspose(csi_buffers_[frame_slot][ue_id], ant_id,
                      SymbolType::kPilot);
   } else if (sym_type == SymbolType::kUL) {
-    size_t ul_symbol_id = cfg_->Frame().GetULSymbolIdx(symbol_id);
     if (kCollectPhyStats) {
-      phy_stats_->UpdateUlSnr(frame_id, ul_symbol_id, ant_id, rx_samps_tmp_);
+      const size_t ul_symbol_id = cfg_->Frame().GetULSymbolIdx(symbol_id);
+      SimdConvertShortToFloat(pkt->data_,
+                              reinterpret_cast<float*>(rx_samps_tmp_),
+                              2 * cfg_->SampsPerSymbol());
+      std::printf("frame_id %zu, ul_symbol_id %zu, ant_id %zu\n", frame_id,
+                  ul_symbol_id, ant_id);
+      std::fflush(stdout);
+      //phy_stats_->UpdateUlSnr(frame_id, ul_symbol_id, ant_id, rx_samps_tmp_);
     }
     PartialTranspose(cfg_->GetDataBuf(data_buffer_, frame_id, symbol_id),
                      ant_id, SymbolType::kUL);
