@@ -587,7 +587,7 @@ Config::Config(std::string jsonfilename)
 
   beam_batch_size_ = tdd_conf.value("beam_batch_size", 1);
   beam_block_size_ = freq_orthogonal_pilot_
-                         ? ue_ant_num_
+                         ? kPilotScIndent
                          : tdd_conf.value("beam_block_size", 1);
   beam_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / beam_block_size_;
 
@@ -1388,47 +1388,13 @@ void Config::GenData() {
     CommsLib::Ifft2tx(ue_pilot_ifft[i], this->ue_specific_pilot_t_[i],
                       this->ofdm_ca_num_, this->ofdm_tx_zero_prefix_,
                       this->cp_len_, kDebugDownlink ? 1 : this->scale_);
-    if (kDebugPrintPilot == true) {
-      std::printf("ue_specific_pilot_t%zu=[", i);
-      for (size_t j = 0; j < this->ofdm_ca_num_; j++) {
-        std::printf("%2.4f+%2.4fi ", ue_pilot_ifft[i][j].re,
-                    ue_pilot_ifft[i][j].im);
-      }
-      std::printf("]\n");
-    }
   }
 
   this->pilot_ci16_.resize(samps_per_symbol_, 0);
-  CommsLib::Ifft2tx(pilot_ifft,
-                    reinterpret_cast<std::complex<int16_t>*>(this->pilot_ci16_.data()),
-                    ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
-
-  this->pilot_ue_sc_.resize(ue_ant_num_);
-  this->pilot_ue_ci16_.resize(ue_ant_num_);
-  for (size_t ue_id = 0; ue_id < this->ue_ant_num_; ue_id++) {
-    std::vector<arma::uword> pilot_sc_list;
-    for (size_t j = 0; j < ofdm_data_num_; j++) {
-      // FFT Shift
-      const size_t k = j + ofdm_data_start_ >= ofdm_ca_num_ / 2
-                           ? j + ofdm_data_start_ - ofdm_ca_num_ / 2
-                           : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
-      if (this->freq_orthogonal_pilot_ == false || j % kPilotScIndent == ue_id) {
-        pilot_ifft[k] = this->pilots_[j];
-        pilot_sc_list.push_back(k);
-      }
-      else {
-        pilot_ifft[k].re = 0.0f;
-        pilot_ifft[k].im = 0.0f;
-      }
-      pilot_ue_sc_.at(ue_id) = arma::uvec(pilot_sc_list);
-    }
-    CommsLib::IFFT(pilot_ifft, this->ofdm_ca_num_, false);
-    this->pilot_ue_ci16_.at(ue_id).resize(samps_per_symbol_, 0);
-    CommsLib::Ifft2tx(pilot_ifft,
-                      reinterpret_cast<std::complex<int16_t>*>(
-                          this->pilot_ue_ci16_.at(ue_id).data()),
-                      ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
-  }
+  CommsLib::Ifft2tx(
+      pilot_ifft,
+      reinterpret_cast<std::complex<int16_t>*>(this->pilot_ci16_.data()),
+      ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
 
   for (size_t i = 0; i < ofdm_ca_num_; i++) {
     this->pilot_cf32_.emplace_back(pilot_ifft[i].re / scale_,
@@ -1446,22 +1412,55 @@ void Config::GenData() {
                       pre_uint32.end());
   this->pilot_.resize(this->samps_per_symbol_);
 
-  if (kDebugPrintPilot == true) {
-    std::cout << "Pilot data: " << std::endl;
-    for (size_t i = 0; i < this->ofdm_data_num_; i++) {
-      std::cout << this->pilots_[i].re << "+1i*" << this->pilots_[i].im << ",";
+  this->pilot_ue_sc_.resize(ue_ant_num_);
+  this->pilot_ue_ci16_.resize(ue_ant_num_);
+  for (size_t ue_id = 0; ue_id < this->ue_ant_num_; ue_id++) {
+    std::vector<arma::uword> pilot_sc_list;
+    for (size_t sc_id = 0; sc_id < ofdm_data_num_; sc_id++) {
+      const size_t org_sc = sc_id + ofdm_data_start_;
+      const size_t center_sc = ofdm_ca_num_ / 2;
+      // FFT Shift
+      const size_t shifted_sc =
+          (org_sc >= center_sc) ? (org_sc - center_sc) : (org_sc + center_sc);
+      if (this->freq_orthogonal_pilot_ == false ||
+          sc_id % kPilotScIndent == ue_id) {
+        pilot_ifft[shifted_sc] = this->pilots_[sc_id];
+        pilot_sc_list.push_back(org_sc);
+      } else {
+        pilot_ifft[shifted_sc].re = 0.0f;
+        pilot_ifft[shifted_sc].im = 0.0f;
+      }
     }
-    std::cout << std::endl;
+    pilot_ue_sc_.at(ue_id) = arma::uvec(pilot_sc_list);
+    CommsLib::IFFT(pilot_ifft, this->ofdm_ca_num_, false);
+    this->pilot_ue_ci16_.at(ue_id).resize(samps_per_symbol_, 0);
+    CommsLib::Ifft2tx(pilot_ifft,
+                      reinterpret_cast<std::complex<int16_t>*>(
+                          this->pilot_ue_ci16_.at(ue_id).data()),
+                      ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
   }
 
   if (kDebugPrintPilot) {
+    std::cout << "Pilot data = [" << std::endl;
+    for (size_t sc_id = 0; sc_id < ofdm_data_num_; sc_id++) {
+      std::cout << pilots_[sc_id].re << "+1i*" << pilots_[sc_id].im << " ";
+    }
+    std::cout << std::endl << "];" << std::endl;
     for (size_t ue_id = 0; ue_id < ue_ant_num_; ue_id++) {
-      std::cout << "UE" << ue_id << "_pilot_data =[" << std::endl;
-      for (size_t i = 0; i < ofdm_data_num_; i++) {
-        std::cout << ue_specific_pilot_[ue_id][i].re << "+1i*"
-                  << ue_specific_pilot_[ue_id][i].im << " ";
+      std::cout << "pilot_ue_sc_[" << ue_id << "] = [" << std::endl
+                << pilot_ue_sc_.at(ue_id).as_row() << "];" << std::endl;
+      std::cout << "ue_specific_pilot_[" << ue_id << "] = [" << std::endl;
+      for (size_t sc_id = 0; sc_id < ofdm_data_num_; sc_id++) {
+        std::cout << ue_specific_pilot_[ue_id][sc_id].re << "+1i*"
+                  << ue_specific_pilot_[ue_id][sc_id].im << " ";
       }
-      std::cout << "];" << std::endl;
+      std::cout << std::endl << "];" << std::endl;
+      std::cout << "ue_pilot_ifft[" << ue_id << "] = [" << std::endl;
+      for (size_t ifft_idx = 0; ifft_idx < ofdm_ca_num_; ifft_idx++) {
+        std::cout << ue_pilot_ifft[ue_id][ifft_idx].re << "+1i*"
+                  << ue_pilot_ifft[ue_id][ifft_idx].im << " ";
+      }
+      std::cout << std::endl << "];" << std::endl;
     }
   }
 

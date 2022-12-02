@@ -85,11 +85,11 @@ PhyStats::PhyStats(Config* const cfg, Direction dir)
                          cfg->UeAntNum() * cfg->Frame().ClientDlPilotSymbols(),
                          Agora_memory::Alignment_t::kAlign64);
   pilot_snr_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
-                       Agora_memory::Alignment_t::kAlign64);
+                    Agora_memory::Alignment_t::kAlign64);
   pilot_rssi_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
-                       Agora_memory::Alignment_t::kAlign64);
+                     Agora_memory::Alignment_t::kAlign64);
   pilot_noise_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
-                   Agora_memory::Alignment_t::kAlign64);
+                      Agora_memory::Alignment_t::kAlign64);
   calib_pilot_snr_.Calloc(kFrameWnd, 2 * cfg->BsAntNum(),
                           Agora_memory::Alignment_t::kAlign64);
   csi_cond_.Calloc(kFrameWnd, cfg->OfdmDataNum(),
@@ -453,16 +453,14 @@ void PhyStats::UpdateCalibPilotSnr(size_t frame_id, size_t calib_sym_id,
 }
 
 void PhyStats::UpdatePilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
-                                complex_float* fft_data) {
+                              complex_float* fft_data) {
   const arma::cx_fvec fft_vec(reinterpret_cast<arma::cx_float*>(fft_data),
                               config_->OfdmCaNum(), false);
   arma::fvec fft_abs_vec = arma::abs(fft_vec);
   arma::fvec fft_abs_mag = fft_abs_vec % fft_abs_vec;
   const float rssi_per_sc = arma::mean(fft_abs_mag(config_->PilotUeSc(ue_id)));
-  const float noise_per_sc = (
-      arma::mean(fft_abs_mag.subvec(0, config_->OfdmDataStart() - 1)) + 
-      arma::mean(fft_abs_mag.subvec(config_->OfdmDataStop(),
-                                    config_->OfdmCaNum() - 1))) / 2;
+  fft_abs_mag.shed_rows(config_->OfdmDataStart(), config_->OfdmDataStop() - 1);
+  const float noise_per_sc = arma::mean(fft_abs_mag);
   const float snr = (rssi_per_sc - noise_per_sc) / noise_per_sc;
   const size_t frame_slot = frame_id % kFrameWnd;
   const size_t idx_offset = ue_id * config_->BsAntNum() + ant_id;
@@ -478,13 +476,12 @@ void PhyStats::UpdateDlPilotSnr(size_t frame_id, size_t symbol_id,
   arma::fvec fft_abs_vec = arma::abs(fft_vec);
   arma::fvec fft_abs_mag = fft_abs_vec % fft_abs_vec;
   const float rssi_per_sc = arma::mean(fft_abs_mag);
-  const float noise_per_sc = (
-      arma::mean(fft_abs_mag.subvec(0, config_->OfdmDataStart() - 1)) +
-      arma::mean(fft_abs_mag.subvec(config_->OfdmDataStop(),
-                                    config_->OfdmCaNum() - 1))) / 2;
+  fft_abs_mag.shed_rows(config_->OfdmDataStart(), config_->OfdmDataStop() - 1);
+  const float noise_per_sc = arma::mean(fft_abs_mag);
   const float snr = (rssi_per_sc - noise_per_sc) / noise_per_sc;
   const size_t frame_slot = frame_id % kFrameWnd;
-  const size_t idx_offset = ant_id * config_->Frame().ClientDlPilotSymbols() + symbol_id;
+  const size_t idx_offset =
+      ant_id * config_->Frame().ClientDlPilotSymbols() + symbol_id;
   dl_pilot_snr_[frame_slot][idx_offset] = 10.0f * std::log10(snr);
   dl_pilot_rssi_[frame_slot][idx_offset] = rssi_per_sc;
   dl_pilot_noise_[frame_slot][idx_offset] = noise_per_sc;

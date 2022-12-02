@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 
+#include "armadillo"
 #include "common_typedef_sdk.h"
 #include "framestats.h"
 #include "ldpc_config.h"
@@ -22,7 +23,6 @@
 #include "nlohmann/json.hpp"
 #include "symbols.h"
 #include "utils.h"
-#include "armadillo"
 
 class Config {
  public:
