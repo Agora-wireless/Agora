@@ -1,15 +1,14 @@
 /**
- * @file radio_lib.h
- * @brief Declaration file for the RadioConfig class.
+ * @file radio_set_bs.h
+ * @brief Declaration file for the RadioSetBs class.
  */
-#ifndef RADIO_LIB_H_
-#define RADIO_LIB_H_
+#ifndef RADIO_SET_BS_H_
+#define RADIO_SET_BS_H_
 
 #include <atomic>
 #include <complex>
 #include <cstdint>
 #include <cstdlib>
-#include <memory>
 #include <vector>
 
 #include "SoapySDR/Device.hpp"
@@ -17,42 +16,29 @@
 #include "config.h"
 #include "memory_manage.h"
 #include "radio.h"
+#include "radio_set.h"
 
-class RadioConfig {
+class RadioSetBs : public RadioSet {
  public:
-  RadioConfig(Config* cfg, Radio::RadioType radio_type);
-  ~RadioConfig();
+  RadioSetBs(Config* cfg, Radio::RadioType radio_type);
+  virtual ~RadioSetBs() final;
 
-  bool RadioStart();
-  void RadioStop();
-  void ReadSensors();
-  int RadioTx(size_t radio_id, const void* const* buffs, Radio::TxFlags flags,
-              long long& tx_time);
-  int RadioTx(size_t radio_id,
-              const std::vector<std::vector<std::complex<int16_t>>>& tx_data,
-              Radio::TxFlags flags, long long& tx_time_ns);
+  virtual bool RadioStart() final;
+  virtual void Go() final;
 
-  int RadioRx(size_t radio_id,
-              std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-              size_t rx_size, Radio::RxFlags& out_flags, long long& rx_time_ns);
-
-  int RadioRx(size_t radio_id,
-              std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
-              size_t rx_size, Radio::RxFlags& out_flags, long long& rx_time_ns);
-
-  int RadioRx(size_t radio_id, std::vector<void*>& rx_locs, size_t rx_size,
-              Radio::RxFlags& out_flags, long long& rx_time_ns);
-
-  bool DoCalib() const { return calib_; }
-  void Go();
-  arma::cx_float* GetCalibUl() { return init_calib_ul_processed_; }
-  arma::cx_float* GetCalibDl() { return init_calib_dl_processed_; }
-
-  // Thread functions
-  void InitBsRadio(size_t radio_id);
-  void ConfigureBsRadio(size_t radio_id);
+  virtual bool DoCalib() const final { return calib_; }
+  virtual arma::cx_float* GetCalibUl() final {
+    return init_calib_ul_processed_;
+  }
+  virtual arma::cx_float* GetCalibDl() final {
+    return init_calib_dl_processed_;
+  }
 
  private:
+  // Thread functions
+  void InitRadio(size_t radio_id);
+  void ConfigureRadio(size_t radio_id);
+
   long long SyncArrayTime();
 
   void CalibrateSampleOffset();
@@ -83,7 +69,6 @@ class RadioConfig {
   void DciqCalibrationProc(size_t channel);
   Config* cfg_;
   std::vector<SoapySDR::Device*> hubs_;
-  std::vector<std::unique_ptr<Radio>> radios_;
   arma::cx_float* init_calib_ul_processed_;
   arma::cx_float* init_calib_dl_processed_;
   Table<arma::cx_float> init_calib_ul_;
@@ -96,4 +81,4 @@ class RadioConfig {
   std::atomic<size_t> num_radios_initialized_;
   std::atomic<size_t> num_radios_configured_;
 };
-#endif  // RADIO_LIB_H_
+#endif  // RADIO_SET_BS_H_

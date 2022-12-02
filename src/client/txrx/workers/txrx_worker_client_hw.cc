@@ -1,5 +1,5 @@
 /**
- * @file txrx_worker_hw.cc
+ * @file txrx_worker_client_hw.cc
  * @brief Implementation of PacketTxRx datapath functions for communicating
  * with real iris / faros hardware
  */
@@ -34,7 +34,7 @@ TxRxWorkerClientHw::TxRxWorkerClientHw(
     moodycamel::ProducerToken& notify_producer,
     std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
     std::mutex& sync_mutex, std::condition_variable& sync_cond,
-    std::atomic<bool>& can_proceed, ClientRadioConfig& radio_config)
+    std::atomic<bool>& can_proceed, RadioSet& radio_config)
     : TxRxWorker(core_offset, tid, interface_count, interface_offset,
                  config->NumUeChannels(), config, rx_frame_start,
                  event_notify_q, tx_pending_q, tx_producer, notify_producer,
