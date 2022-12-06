@@ -468,7 +468,7 @@ void DoBeamWeights::ComputePartialCsiBeams(size_t tag) {
     const size_t cur_sc_id = base_sc_id + i;
     auto* dst_csi_ptr =
         reinterpret_cast<float*>(csi_gather_buffer_ + cfg_->BsAntNum() * i);
-    PartialTransposeGather(cur_sc_id, (float*)csi_buffers_[frame_slot][0],
+    PartialTransposeGather(cur_sc_id, (float*)csi_buffers_[frame_slot][i],
                            dst_csi_ptr, cfg_->BsAntNum());
   }
 

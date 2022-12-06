@@ -205,13 +205,32 @@ EventData DoFFT::Launch(size_t tag) {
           phy_stats_->UpdatePilotSnr(frame_id, ue_id, ant_id, fft_inout_);
         }
       } else {
-        const size_t ue_id = pilot_symbol_id;
-        phy_stats_->UpdatePilotSnr(frame_id, ue_id, ant_id, fft_inout_);
+        phy_stats_->UpdatePilotSnr(frame_id, pilot_symbol_id, ant_id, fft_inout_);
       }
     }
-    const size_t ue_id = pilot_symbol_id;
-    PartialTranspose(csi_buffers_[frame_slot][ue_id], ant_id,
+    PartialTranspose(csi_buffers_[frame_slot][pilot_symbol_id], ant_id,
                      SymbolType::kPilot);
+    if (cfg_->FreqOrthogonalPilot() && pilot_symbol_id == 0) {
+      const size_t num_blocks = cfg_->OfdmDataNum() / kTransposeBlockSize;
+      for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
+        const size_t block_base_offset =
+            block_idx * (kTransposeBlockSize * cfg_->BsAntNum());
+        const size_t block_offset = kUsePartialTrans
+                                    ? block_base_offset +
+                                      (ant_id * kTransposeBlockSize)
+                                    : (cfg_->OfdmDataNum() * ant_id) +
+                                      (block_idx * kTransposeBlockSize);
+        complex_float* src = &csi_buffers_[frame_slot][0][block_offset];
+        //AGORA_LOG_INFO("Writting CSI in block %zu\n", block_idx);
+        for (ssize_t ue_id = cfg_->UeAntNum() - 1; ue_id >= 0; ue_id--) {
+          complex_float* dst = &csi_buffers_[frame_slot][ue_id][block_offset];
+          //AGORA_LOG_INFO("Writting CSI for UE %zu\n", ue_id);
+          for (size_t sc_idx = 0; sc_idx < kTransposeBlockSize; sc_idx++) {
+            dst[sc_idx] = src[ue_id];
+          }
+        }
+      }
+    }
   } else if (sym_type == SymbolType::kUL) {
     PartialTranspose(cfg_->GetDataBuf(data_buffer_, frame_id, symbol_id),
                      ant_id, SymbolType::kUL);

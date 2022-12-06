@@ -327,7 +327,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       std::vector<complex_float> pilots_f_ue(
           this->cfg_->OfdmCaNum());  // Zeroed
       for (size_t j = this->cfg_->OfdmDataStart();
-           j < this->cfg_->OfdmDataStop(); j += kPilotScIndent) {
+           j < this->cfg_->OfdmDataStop(); j += kTransposeBlockSize) {
         pilots_f_ue.at(i + j) = pilot_fd.at(i + j);
       }
       // Load pilots

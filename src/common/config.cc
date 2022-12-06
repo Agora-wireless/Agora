@@ -587,7 +587,7 @@ Config::Config(std::string jsonfilename)
 
   beam_batch_size_ = tdd_conf.value("beam_batch_size", 1);
   beam_block_size_ = freq_orthogonal_pilot_
-                         ? kPilotScIndent
+                         ? kTransposeBlockSize
                          : tdd_conf.value("beam_block_size", 1);
   beam_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / beam_block_size_;
 
@@ -1423,7 +1423,7 @@ void Config::GenData() {
       const size_t shifted_sc =
           (org_sc >= center_sc) ? (org_sc - center_sc) : (org_sc + center_sc);
       if (this->freq_orthogonal_pilot_ == false ||
-          sc_id % kPilotScIndent == ue_id) {
+          sc_id % kTransposeBlockSize == ue_id) {
         pilot_ifft[shifted_sc] = this->pilots_[sc_id];
         pilot_sc_list.push_back(org_sc);
       } else {
