@@ -205,7 +205,8 @@ EventData DoFFT::Launch(size_t tag) {
           phy_stats_->UpdatePilotSnr(frame_id, ue_id, ant_id, fft_inout_);
         }
       } else {
-        phy_stats_->UpdatePilotSnr(frame_id, pilot_symbol_id, ant_id, fft_inout_);
+        phy_stats_->UpdatePilotSnr(frame_id, pilot_symbol_id, ant_id,
+                                   fft_inout_);
       }
     }
     PartialTranspose(csi_buffers_[frame_slot][pilot_symbol_id], ant_id,
@@ -215,11 +216,11 @@ EventData DoFFT::Launch(size_t tag) {
       for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
         const size_t block_base_offset =
             block_idx * (kTransposeBlockSize * cfg_->BsAntNum());
-        const size_t block_offset = kUsePartialTrans
-                                    ? block_base_offset +
-                                      (ant_id * kTransposeBlockSize)
-                                    : (cfg_->OfdmDataNum() * ant_id) +
-                                      (block_idx * kTransposeBlockSize);
+        const size_t block_offset =
+            kUsePartialTrans
+                ? block_base_offset + (ant_id * kTransposeBlockSize)
+                : (cfg_->OfdmDataNum() * ant_id) +
+                      (block_idx * kTransposeBlockSize);
         complex_float* src = &csi_buffers_[frame_slot][0][block_offset];
         //AGORA_LOG_INFO("Writting CSI in block %zu\n", block_idx);
         for (ssize_t ue_id = cfg_->UeAntNum() - 1; ue_id >= 0; ue_id--) {

@@ -84,11 +84,11 @@ DoBeamWeights::~DoBeamWeights() {
 }
 
 EventData DoBeamWeights::Launch(size_t tag) {
-  if (cfg_->FreqOrthogonalPilot()) {
-    ComputePartialCsiBeams(tag);
-  } else {
-    ComputeFullCsiBeams(tag);
-  }
+  //if (cfg_->FreqOrthogonalPilot()) {
+  //  ComputePartialCsiBeams(tag);
+  //} else {
+  ComputeFullCsiBeams(tag);
+  //}
 
   return EventData(EventType::kBeam, tag);
 }
@@ -431,7 +431,7 @@ void DoBeamWeights::ComputeFullCsiBeams(size_t tag) {
     if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
       noise = phy_stats_->GetNoise(frame_id);
     }
-    auto rcond =
+    float rcond =
         ComputePrecoder(frame_id, cur_sc_id, mat_csi, cal_sc_vec, noise,
                         ul_beam_matrices_[frame_slot][cur_sc_id],
                         dl_beam_matrices_[frame_slot][cur_sc_id]);

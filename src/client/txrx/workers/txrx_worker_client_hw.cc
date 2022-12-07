@@ -616,8 +616,8 @@ void TxRxWorkerClientHw::TxPilot(size_t pilot_ant, size_t frame_id,
     }
   }
 
-  const size_t pilot_symbol_id =
-      Configuration()->Frame().GetPilotSymbol(pilot_ant);
+  const size_t pilot_symbol_id = Configuration()->Frame().GetPilotSymbol(
+      Configuration()->FreqOrthogonalPilot() ? 0 : pilot_ant);
 
   if (Configuration()->UeHwFramer()) {
     tx_time = ((long long)tx_frame_id << 32) | (pilot_symbol_id << 16);
