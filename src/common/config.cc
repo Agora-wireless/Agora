@@ -200,7 +200,7 @@ Config::Config(std::string jsonfilename)
     }
   }
 
-  if ((kUseArgos == true) || (kUseUHD == true)) {
+  if ((kUseArgos == true) || (kUseUHD == true) || (kUsePureUHD == true)) {
     RtAssert(num_radios_ != 0, "Error: No radios exist in Argos mode");
   }
 
@@ -332,7 +332,7 @@ Config::Config(std::string jsonfilename)
   correct_phase_shift_ = tdd_conf.value("correct_phase_shift", false);
 
   hw_framer_ = tdd_conf.value("hw_framer", true);
-  if (kUseUHD) {
+  if (kUseUHD || kUsePureUHD) {
     hw_framer_ = false;
   } else {
     RtAssert(hw_framer_ == true,
@@ -907,7 +907,7 @@ void Config::DumpMcsInfo() {
 }
 
 void Config::GenData() {
-  if ((kUseArgos == true) || (kUseUHD == true)) {
+  if ((kUseArgos == true) || (kUseUHD == true) || (kUsePureUHD == true)) {
     std::vector<std::vector<double>> gold_ifft =
         CommsLib::GetSequence(128, CommsLib::kGoldIfft);
     std::vector<std::complex<int16_t>> gold_ifft_ci16 =

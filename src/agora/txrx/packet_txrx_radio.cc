@@ -10,6 +10,14 @@
 #include "txrx_worker_hw.h"
 #include "txrx_worker_usrp.h"
 
+#if defined(USE_PURE_UHD)
+#include "radio_set_uhd.h"
+static constexpr Radio::RadioType kRadioType = Radio::kUhdNative;
+#else
+#include "radio_set_bs.h"
+static constexpr Radio::RadioType kRadioType = Radio::kSoapySdrStream;
+#endif
+
 static constexpr size_t kRadioTriggerWaitMs = 100;
 
 PacketTxRxRadio::PacketTxRxRadio(
@@ -23,8 +31,13 @@ PacketTxRxRadio::PacketTxRxRadio(
                  event_notify_q, tx_pending_q, notify_producer_tokens,
                  tx_producer_tokens, rx_buffer, packet_num_in_buffer,
                  frame_start, tx_buffer) {
-  //radio_config_ = std::make_unique<RadioConfig>(cfg, Radio::kSoapySdrSocket);
-  radio_config_ = std::make_unique<RadioConfig>(cfg, Radio::kSoapySdrStream);
+#if defined(USE_PURE_UHD)
+  AGORA_LOG_INFO("Using UHD");
+  radio_config_ = std::make_unique<RadioSetUhd>(cfg, kRadioType);
+#else
+  AGORA_LOG_INFO("Using SoapySDR");
+  radio_config_ = std::make_unique<RadioSetBs>(cfg, kRadioType);
+#endif
 }
 
 PacketTxRxRadio::~PacketTxRxRadio() {
@@ -86,11 +99,15 @@ bool PacketTxRxRadio::CreateWorker(size_t tid, size_t interface_count,
         *tx_producer_tokens_[tid], *notify_producer_tokens_[tid], rx_memory,
         tx_memory, mutex_, cond_, proceed_, *radio_config_.get()));
   } else if (kUseUHD) {
+#if defined(USE_PURE_UHD)
     worker_threads_.emplace_back(std::make_unique<TxRxWorkerUsrp>(
         core_offset_, tid, interface_count, interface_offset, cfg_,
         rx_frame_start, event_notify_q_, tx_pending_q_,
         *tx_producer_tokens_[tid], *notify_producer_tokens_[tid], rx_memory,
         tx_memory, mutex_, cond_, proceed_, *radio_config_.get()));
+#else
+    std::runtime_error("SOAPY UHD NOT SUPPORTED AT THIS TIME");
+#endif
   } else {
     RtAssert(false, "This class does not support the current configuration");
   }

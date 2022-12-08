@@ -8,7 +8,6 @@
 #define PACKETTXRX_CLIENT_SIM_H_
 
 #include "packet_txrx.h"
-#include "radio_lib.h"
 
 /**
  * @brief Implementations of this class provide packet I/O for Agora.
