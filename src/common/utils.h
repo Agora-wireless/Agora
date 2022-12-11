@@ -87,6 +87,8 @@ class Utils {
   static void PrintMat(const arma::cx_fmat& c, const std::string& ss);
   static void SaveMat(const arma::cx_fmat& c, const std::string& filename,
                       const std::string& ss, const bool append);
+  static void WriteVector(const std::string filename, const std::string desc,
+                          const std::vector<int> vec_data);
 };
 
 /// roundup<N>(x) returns x rounded up to the next multiple of N. N must be

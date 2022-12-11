@@ -449,8 +449,6 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/doprecode.cc
   src/agora/dodecode.cc
   src/agora/radio/radio_set/radio_set_bs.cc
-  src/agora/radio/radio_set/radio_calibrate_digital.cc
-  src/agora/radio/radio_set/radio_calibrate_analog.cc
   src/mac/mac_thread_basestation.cc
   src/agora/txrx/packet_txrx_sim.cc
   src/agora/txrx/packet_txrx_radio.cc
@@ -487,6 +485,15 @@ add_executable(agora
   $<TARGET_OBJECTS:shared_txrx_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(agora ${COMMON_LIBS})
+
+add_executable(calibrate
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/calibrate_main.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/radio_set_calibrate.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/radio_calibrate_digital.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/radio_calibrate_analog.cc
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(calibrate ${COMMON_LIBS})
+target_compile_definitions(calibrate PRIVATE CALIBRATE)
 
 add_executable(data_generator
   ${CMAKE_CURRENT_SOURCE_DIR}/src/data_generator/data_generator_main.cc

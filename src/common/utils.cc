@@ -496,3 +496,17 @@ void Utils::PrintVec(const arma::cx_fvec& c, const std::string& ss) {
   so << std::endl;
   std::cout << so.str();
 }
+
+void Utils::WriteVector(const std::string filename, const std::string desc,
+                        const std::vector<int> vec_data) {
+  std::stringstream so;
+  std::ofstream of;
+  of.open(filename);
+  if (desc.size() > 0) so << desc << std::endl;
+  for (size_t j = 0; j < vec_data.size(); j++) {
+    so << vec_data.at(j);
+    if (j < vec_data.size() - 1) so << std::endl;
+  }
+  of << so.str();
+  of.close();
+}
