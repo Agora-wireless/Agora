@@ -332,7 +332,10 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
     if ((ant_offset + 1) == channels_per_interface_) {
       // Transmit pilot(s)
       if (Configuration()->UeHwFramer() == false) {
-        for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+        const size_t num_pilot_slots = Configuration()->FreqOrthogonalPilot()
+                                           ? 1
+                                           : channels_per_interface_;
+        for (size_t ch = 0; ch < num_pilot_slots; ch++) {
           const size_t pilot_ant = (radio_id * channels_per_interface_) + ch;
           //Each pilot will be in a different tx slot (called for each pilot)
           TxPilot(pilot_ant, frame_id, time0);
@@ -609,8 +612,9 @@ void TxRxWorkerClientHw::TxPilot(size_t pilot_ant, size_t frame_id,
 
   std::vector<void*> tx_data(channels_per_interface_);
   for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-    if (ch == pilot_channel) {
-      tx_data.at(ch) = Configuration()->PilotUeCi16(pilot_ant).data();
+    if (Configuration()->FreqOrthogonalPilot() || ch == pilot_channel) {
+      const size_t ue_id = (pilot_radio * channels_per_interface_) + ch;
+      tx_data.at(ch) = Configuration()->PilotUeCi16(ue_id).data();
     } else {
       tx_data.at(ch) = frame_zeros_.at(ch).data();
     }
