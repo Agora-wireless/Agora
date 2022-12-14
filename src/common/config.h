@@ -486,8 +486,8 @@ class Config {
   /// Return the subcarrier ID to which we should refer to for the zeroforcing
   /// matrices of subcarrier [sc_id].
   inline size_t GetBeamScId(size_t sc_id) const {
-    return /*this->freq_orthogonal_pilot_ ? sc_id - (sc_id % kTransposeBlockSize) :*/
-        sc_id;
+    return this->freq_orthogonal_pilot_ ? sc_id - (sc_id % kTransposeBlockSize)
+                                        : sc_id;
   }
 
   /// Get the calibration buffer for this frame and subcarrier ID

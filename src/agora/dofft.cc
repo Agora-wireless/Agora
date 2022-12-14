@@ -211,6 +211,8 @@ EventData DoFFT::Launch(size_t tag) {
     }
     PartialTranspose(csi_buffers_[frame_slot][pilot_symbol_id], ant_id,
                      SymbolType::kPilot);
+
+    // Expand partial CSI to full CSI per UE
     if (cfg_->FreqOrthogonalPilot() && pilot_symbol_id == 0) {
       const size_t num_blocks = cfg_->OfdmDataNum() / kTransposeBlockSize;
       for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
@@ -222,10 +224,8 @@ EventData DoFFT::Launch(size_t tag) {
                 : (cfg_->OfdmDataNum() * ant_id) +
                       (block_idx * kTransposeBlockSize);
         complex_float* src = &csi_buffers_[frame_slot][0][block_offset];
-        //AGORA_LOG_INFO("Writting CSI in block %zu\n", block_idx);
         for (ssize_t ue_id = cfg_->UeAntNum() - 1; ue_id >= 0; ue_id--) {
           complex_float* dst = &csi_buffers_[frame_slot][ue_id][block_offset];
-          //AGORA_LOG_INFO("Writting CSI for UE %zu\n", ue_id);
           for (size_t sc_idx = 0; sc_idx < kTransposeBlockSize; sc_idx++) {
             dst[sc_idx] = src[ue_id];
           }

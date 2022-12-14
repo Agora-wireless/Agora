@@ -84,12 +84,7 @@ DoBeamWeights::~DoBeamWeights() {
 }
 
 EventData DoBeamWeights::Launch(size_t tag) {
-  //if (cfg_->FreqOrthogonalPilot()) {
-  //  ComputePartialCsiBeams(tag);
-  //} else {
   ComputeFullCsiBeams(tag);
-  //}
-
   return EventData(EventType::kBeam, tag);
 }
 
@@ -388,8 +383,10 @@ void DoBeamWeights::ComputeFullCsiBeams(size_t tag) {
     std::printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid_,
                 frame_id, base_sc_id);
   }
-  size_t num_subcarriers =
-      std::min(cfg_->BeamBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
+  const size_t num_subcarriers =
+      cfg_->FreqOrthogonalPilot()
+          ? 1
+          : std::min(cfg_->BeamBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
 
   // Handle each subcarrier one by one
   for (size_t i = 0; i < num_subcarriers; i++) {
@@ -431,10 +428,10 @@ void DoBeamWeights::ComputeFullCsiBeams(size_t tag) {
     if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
       noise = phy_stats_->GetNoise(frame_id);
     }
-    float rcond =
-        ComputePrecoder(frame_id, cur_sc_id, mat_csi, cal_sc_vec, noise,
-                        ul_beam_matrices_[frame_slot][cur_sc_id],
-                        dl_beam_matrices_[frame_slot][cur_sc_id]);
+    float rcond = ComputePrecoder(
+        frame_id, cur_sc_id, mat_csi, cal_sc_vec, noise,
+        ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)],
+        dl_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
     if (kPrintBeamStats) {
       phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
     }
@@ -468,7 +465,7 @@ void DoBeamWeights::ComputePartialCsiBeams(size_t tag) {
     const size_t cur_sc_id = base_sc_id + i;
     auto* dst_csi_ptr =
         reinterpret_cast<float*>(csi_gather_buffer_ + cfg_->BsAntNum() * i);
-    PartialTransposeGather(cur_sc_id, (float*)csi_buffers_[frame_slot][i],
+    PartialTransposeGather(cur_sc_id, (float*)csi_buffers_[frame_slot][0],
                            dst_csi_ptr, cfg_->BsAntNum());
   }
 
