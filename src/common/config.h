@@ -102,6 +102,7 @@ class Config {
   inline size_t BeaconAnt() const { return this->beacon_ant_; }
   inline size_t BeaconLen() const { return this->beacon_len_; }
 
+  inline bool SmoothCalib() const { return this->smooth_calib_; }
   inline bool Beamsweep() const { return this->beamsweep_; }
   inline bool SampleCalEn() const { return this->sample_cal_en_; }
   inline bool ImbalanceCalEn() const { return this->imbalance_cal_en_; }
@@ -723,6 +724,7 @@ class Config {
   size_t beacon_ant_;
   size_t beacon_len_;
   size_t init_calib_repeat_;
+  bool smooth_calib_;
   bool beamsweep_;
   bool sample_cal_en_;
   bool imbalance_cal_en_;

@@ -78,6 +78,9 @@ void AgoraBuffer::AllocateTables() {
     calib_ul_msum_buffer_.Malloc(kFrameWnd,
                                  config_->BfAntNum() * config_->OfdmDataNum(),
                                  Agora_memory::Alignment_t::kAlign64);
+    calib_buffer_.Malloc(kFrameWnd,
+                         config_->BfAntNum() * config_->OfdmDataNum(),
+                         Agora_memory::Alignment_t::kAlign64);
     //initialize the calib buffers
     const complex_float complex_init = {0.0f, 0.0f};
     //const complex_float complex_init = {1.0f, 0.0f};
@@ -88,6 +91,7 @@ void AgoraBuffer::AllocateTables() {
         calib_ul_buffer_[frame][i] = complex_init;
         calib_dl_msum_buffer_[frame][i] = complex_init;
         calib_ul_msum_buffer_[frame][i] = complex_init;
+        calib_buffer_[frame][i] = complex_init;
       }
     }
     dl_mod_bits_buffer_.Calloc(
@@ -112,6 +116,7 @@ void AgoraBuffer::FreeTables() {
     calib_ul_buffer_.Free();
     calib_dl_msum_buffer_.Free();
     calib_ul_msum_buffer_.Free();
+    calib_buffer_.Free();
     dl_mod_bits_buffer_.Free();
     dl_bits_buffer_.Free();
     dl_bits_buffer_status_.Free();
