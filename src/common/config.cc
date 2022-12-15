@@ -256,6 +256,7 @@ Config::Config(std::string jsonfilename)
   sample_cal_en_ = tdd_conf.value("calibrate_digital", false);
   imbalance_cal_en_ = tdd_conf.value("calibrate_analog", false);
   init_calib_repeat_ = tdd_conf.value("init_calib_repeat", 0);
+  smooth_calib_ = tdd_conf.value("smooth_calib", false);
   beamforming_str_ = tdd_conf.value("beamforming", "ZF");
   beamforming_algo_ = kBeamformingStr.at(beamforming_str_);
 

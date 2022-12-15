@@ -597,10 +597,8 @@ void PhyStats::UpdateDlBeam(size_t frame_id, size_t sc_id,
 }
 
 void PhyStats::UpdateCalibMat(size_t frame_id, size_t sc_id,
-                              arma::cx_fvec& calib_buffer) {
-  const arma::cx_fmat mat_in(calib_buffer.memptr(), config_->BfAntNum(), 1,
-                             false);
-  logger_calib_.UpdateMatBuf(frame_id, sc_id, mat_in);
+                              const arma::cx_fvec& vec_in) {
+  logger_calib_.UpdateMatBuf(frame_id, sc_id, vec_in);
 }
 
 float PhyStats::GetNoise(size_t frame_id) {

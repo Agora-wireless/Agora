@@ -295,15 +295,15 @@ EventData DoFFT::Launch(size_t tag) {
 void DoFFT::PartialTranspose(complex_float* out_buf, size_t ant_id,
                              SymbolType symbol_type) const {
   // We have OfdmDataNum() % kTransposeBlockSize == 0
-  const size_t num_blocks = cfg_->OfdmDataNum() / kTransposeBlockSize;
+  const size_t num_sc_blocks = cfg_->OfdmDataNum() / kTransposeBlockSize;
 
-  for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
-    const size_t block_base_offset =
-        block_idx * (kTransposeBlockSize * cfg_->BsAntNum());
+  for (size_t sc_block_idx = 0; sc_block_idx < num_sc_blocks; sc_block_idx++) {
+    const size_t sc_block_base_offset =
+        sc_block_idx * (kTransposeBlockSize * cfg_->BsAntNum());
     // We have kTransposeBlockSize % kSCsPerCacheline == 0
     for (size_t sc_j = 0; sc_j < kTransposeBlockSize;
          sc_j += kSCsPerCacheline) {
-      const size_t sc_idx = (block_idx * kTransposeBlockSize) + sc_j;
+      const size_t sc_idx = (sc_block_idx * kTransposeBlockSize) + sc_j;
       const complex_float* src = &fft_inout_[sc_idx + cfg_->OfdmDataStart()];
 
       complex_float* dst = nullptr;
@@ -312,10 +312,10 @@ void DoFFT::PartialTranspose(complex_float* out_buf, size_t ant_id,
         dst = &out_buf[sc_idx];
       } else {
         dst = kUsePartialTrans
-                  ? &out_buf[block_base_offset +
+                  ? &out_buf[sc_block_base_offset +
                              (ant_id * kTransposeBlockSize) + sc_j]
                   : &out_buf[(cfg_->OfdmDataNum() * ant_id) + sc_j +
-                             block_idx * kTransposeBlockSize];
+                             sc_block_idx * kTransposeBlockSize];
       }
 
       // With either of AVX-512 or AVX2, load one cacheline =

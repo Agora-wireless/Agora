@@ -59,7 +59,7 @@ class PhyStats {
   void UpdateDlCsi(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
   void UpdateDlBeam(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
   void UpdateCalibMat(size_t frame_id, size_t sc_id,
-                      arma::cx_fvec& calib_buffer);
+                      const arma::cx_fvec& vec_in);
 
  private:
   Config const* const config_;
