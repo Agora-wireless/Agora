@@ -42,13 +42,17 @@ TEST(TestZF, Perf) {
                                    cfg->OfdmDataNum() * cfg->BsAntNum(),
                                    Agora_memory::Alignment_t::kAlign64);
 
+  Table<complex_float> calib_buffer;
+  calib_buffer.RandAllocCxFloat(kFrameWnd, cfg->OfdmDataNum() * cfg->BsAntNum(),
+                                Agora_memory::Alignment_t::kAlign64);
+
   auto phy_stats = std::make_unique<PhyStats>(cfg.get(), Direction::kUplink);
   auto stats = std::make_unique<Stats>(cfg.get());
 
   auto compute_zf = std::make_unique<DoBeamWeights>(
-      cfg.get(), tid, csi_buffers, calib_dl_msum_buffer, calib_ul_msum_buffer,
-      calib_dl_buffer, calib_ul_buffer, ul_zf_matrices, dl_zf_matrices,
-      phy_stats.get(), stats.get());
+      cfg.get(), tid, csi_buffers, calib_dl_buffer, calib_ul_buffer,
+      calib_dl_msum_buffer, calib_ul_msum_buffer, calib_buffer, ul_zf_matrices,
+      dl_zf_matrices, phy_stats.get(), stats.get());
 
   FastRand fast_rand;
   size_t start_tsc = GetTime::Rdtsc();
@@ -67,6 +71,7 @@ TEST(TestZF, Perf) {
   calib_ul_msum_buffer.Free();
   calib_dl_buffer.Free();
   calib_ul_buffer.Free();
+  calib_buffer.Free();
 }
 
 int main(int argc, char** argv) {

@@ -26,6 +26,7 @@ class DoBeamWeights : public Doer {
       Table<complex_float>& calib_ul_buffer,
       Table<complex_float>& calib_dl_msum_buffer,
       Table<complex_float>& calib_ul_msum_buffer,
+      Table<complex_float>& calib_buffer,
       PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_,
       PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_,
       PhyStats* in_phy_stats, Stats* stats_manager);
@@ -95,6 +96,7 @@ class DoBeamWeights : public Doer {
   //Shared by all doZf objects
   Table<complex_float>& calib_dl_msum_buffer_;
   Table<complex_float>& calib_ul_msum_buffer_;
+  Table<complex_float>& calib_buffer_;
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_;
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_;
   DurationStat* duration_stat_;

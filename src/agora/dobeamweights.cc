@@ -23,6 +23,7 @@ DoBeamWeights::DoBeamWeights(
     Table<complex_float>& calib_ul_buffer,
     Table<complex_float>& calib_dl_msum_buffer,
     Table<complex_float>& calib_ul_msum_buffer,
+    Table<complex_float>& calib_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices,
     PhyStats* in_phy_stats, Stats* stats_manager)
@@ -32,6 +33,7 @@ DoBeamWeights::DoBeamWeights(
       calib_ul_buffer_(calib_ul_buffer),
       calib_dl_msum_buffer_(calib_dl_msum_buffer),
       calib_ul_msum_buffer_(calib_ul_msum_buffer),
+      calib_buffer_(calib_buffer),
       ul_beam_matrices_(ul_beam_matrices),
       dl_beam_matrices_(dl_beam_matrices),
       phy_stats_(in_phy_stats) {
@@ -233,14 +235,26 @@ void DoBeamWeights::ComputeCalib(size_t frame_id, size_t sc_id,
     arma::cx_fmat cur_calib_dl_msum_mat(
         reinterpret_cast<arma::cx_float*>(
             calib_dl_msum_buffer_[cal_slot_complete]),
-        cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+        cfg_->BfAntNum(), cfg_->OfdmDataNum(), false);
     arma::cx_fmat cur_calib_ul_msum_mat(
         reinterpret_cast<arma::cx_float*>(
             calib_ul_msum_buffer_[cal_slot_complete]),
-        cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+        cfg_->BfAntNum(), cfg_->OfdmDataNum(), false);
+
+    arma::cx_fmat calib_mat(
+        reinterpret_cast<arma::cx_float*>(calib_buffer_[cal_slot_complete]),
+        cfg_->BfAntNum(), cfg_->OfdmDataNum(), false);
 
     // Update the moving sum
     if (frame_update) {
+      if (sc_id == 0) {
+        AGORA_LOG_TRACE(
+            "DoBeamWeights[%d]: (Frame %zu, sc_id %zu), ComputeCalib "
+            "updating "
+            "calib at slot %zu : prev %zu, old %zu\n",
+            tid_, frame_id, sc_id, cal_slot_complete, cal_slot_prev,
+            cal_slot_old);
+      }
       // Add the most recently completed value
       const arma::cx_fmat cur_calib_dl_mat(
           reinterpret_cast<arma::cx_float*>(
@@ -251,52 +265,47 @@ void DoBeamWeights::ComputeCalib(size_t frame_id, size_t sc_id,
               calib_ul_buffer_[cal_slot_complete]),
           cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
 
-      // oldest frame data in buffer but could be partially written with newest values
-      // using the second oldest....
-      const size_t cal_slot_old = cfg_->ModifyRecCalIndex(cal_slot_current, +1);
+      if (cfg_->SmoothCalib()) {
+        // oldest frame data in buffer but could be partially written with newest values
+        // using the second oldest....
+        const size_t cal_slot_old =
+            cfg_->ModifyRecCalIndex(cal_slot_current, +1);
 
-      const arma::cx_fmat old_calib_dl_mat(
-          reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[cal_slot_old]),
-          cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
-      const arma::cx_fmat old_calib_ul_mat(
-          reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[cal_slot_old]),
-          cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+        const arma::cx_fmat old_calib_dl_mat(
+            reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[cal_slot_old]),
+            cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+        const arma::cx_fmat old_calib_ul_mat(
+            reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[cal_slot_old]),
+            cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
 
-      const size_t cal_slot_prev =
-          cfg_->ModifyRecCalIndex(cal_slot_complete, -1);
-      const arma::cx_fmat prev_calib_dl_msum_mat(
-          reinterpret_cast<arma::cx_float*>(
-              calib_dl_msum_buffer_[cal_slot_prev]),
-          cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
-      const arma::cx_fmat prev_calib_ul_msum_mat(
-          reinterpret_cast<arma::cx_float*>(
-              calib_ul_msum_buffer_[cal_slot_prev]),
-          cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+        const size_t cal_slot_prev =
+            cfg_->ModifyRecCalIndex(cal_slot_complete, -1);
+        const arma::cx_fmat prev_calib_dl_msum_mat(
+            reinterpret_cast<arma::cx_float*>(
+                calib_dl_msum_buffer_[cal_slot_prev]),
+            cfg_->BfAntNum(), cfg_->OfdmDataNum(), false);
+        const arma::cx_fmat prev_calib_ul_msum_mat(
+            reinterpret_cast<arma::cx_float*>(
+                calib_ul_msum_buffer_[cal_slot_prev]),
+            cfg_->BfAntNum(), cfg_->OfdmDataNum(), false);
 
-      if (sc_id == 0) {
-        AGORA_LOG_TRACE(
-            "DoBeamWeights[%d]: (Frame %zu, sc_id %zu), ComputeCalib updating "
-            "calib at slot %zu : prev %zu, old %zu\n",
-            tid_, frame_id, sc_id, cal_slot_complete, cal_slot_prev,
-            cal_slot_old);
+        // Add new value to old rolling sum.  Then subtract out the oldest.
+
+        cur_calib_dl_msum_mat.col(sc_id) =
+            prev_calib_dl_msum_mat.col(sc_id) +
+            (cur_calib_dl_mat.row(sc_id) - old_calib_dl_mat.row(sc_id)).st();
+        cur_calib_ul_msum_mat.col(sc_id) =
+            prev_calib_ul_msum_mat.col(sc_id) +
+            (cur_calib_ul_mat.row(sc_id) - old_calib_ul_mat.row(sc_id)).st();
+        calib_mat.col(sc_id) =
+            cur_calib_ul_msum_mat.col(sc_id) / cur_calib_dl_msum_mat.col(sc_id);
+      } else {
+        calib_mat.col(sc_id) =
+            (cur_calib_ul_mat.row(sc_id) / cur_calib_dl_mat.row(sc_id)).st();
       }
-
-      // Add new value to old rolling sum.  Then subtract out the oldest.
-      cur_calib_dl_msum_mat.row(sc_id) =
-          (cur_calib_dl_mat.row(sc_id) + prev_calib_dl_msum_mat.row(sc_id)) -
-          old_calib_dl_mat.row(sc_id);
-      cur_calib_ul_msum_mat.row(sc_id) =
-          (cur_calib_ul_mat.row(sc_id) + prev_calib_ul_msum_mat.row(sc_id)) -
-          old_calib_ul_mat.row(sc_id);
+      phy_stats_->RecordCalibMat(frame_id, sc_id, calib_mat.col(sc_id));
     }
-
-    calib_sc_vec =
-        (cur_calib_ul_msum_mat.row(sc_id) / cur_calib_dl_msum_mat.row(sc_id))
-            .st();
-
-    if (frame_update) {
-      phy_stats_->RecordCalibMat(frame_id, sc_id, calib_sc_vec);
-    }
+    calib_sc_vec = calib_mat.col(sc_id);
   }
   // Otherwise calib_sc_vec = identity from init
 }
