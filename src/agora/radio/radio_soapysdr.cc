@@ -15,7 +15,7 @@
 #include "symbols.h"
 
 static constexpr size_t kSoapyMakeMaxAttempts = 3;
-static constexpr bool kPrintRadioSettings = true;
+static constexpr bool kPrintRadioSettings = false;
 static constexpr double kAttnMax = -18.0f;
 
 //Soapy sdr version

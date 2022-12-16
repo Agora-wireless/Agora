@@ -144,6 +144,17 @@ RadioSetCalibrate::~RadioSetCalibrate() {
   AGORA_LOG_INFO("RadioStop destructed\n");
 }
 
+void RadioSetCalibrate::Go() {
+  // TODO: For multi-cell trigger process needs modification
+  for (size_t i = 0; i < cfg_->NumCells(); i++) {
+    if (hubs_.at(i) == nullptr) {
+      radios_.at(i)->Trigger();
+    } else {
+      hubs_.at(i)->writeSetting("TRIGGER_GEN", "");
+    }
+  }
+}
+
 bool RadioSetCalibrate::DoReciprocityCalib() {
   bool good_calib = false;
   AllocBuffer1d(&init_calib_dl_processed_,

@@ -21,17 +21,6 @@ static constexpr bool kVerboseCalibration = false;
 static constexpr size_t kRefChannel = 0;
 static constexpr float kMaxSampleRxTimeSec = 1.0f;
 
-void RadioSetCalibrate::Go() {
-  // TODO: For multi-cell trigger process needs modification
-  for (size_t i = 0; i < cfg_->NumCells(); i++) {
-    if (hubs_.at(i) == nullptr) {
-      radios_.at(i)->Trigger();
-    } else {
-      hubs_.at(i)->writeSetting("TRIGGER_GEN", "");
-    }
-  }
-}
-
 auto RadioSetCalibrate::TxArrayToRef(
     const std::vector<std::complex<int16_t>>& tx_vec) {
   const size_t ref = cfg_->RefRadio(0);
