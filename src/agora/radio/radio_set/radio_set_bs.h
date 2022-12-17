@@ -31,16 +31,16 @@ class RadioSetBs : public RadioSet {
  private:
   // Thread functions
   void InitRadio(size_t radio_id);
-  void ConfigureRadio(size_t radio_id);
 
   long long SyncArrayTime();
 
-  void AdjustDelays(const std::vector<int>& ch0_offsets);
+  void AdjustDelays();
   Config* cfg_;
   std::vector<SoapySDR::Device*> hubs_;
   size_t radio_num_;
   size_t antenna_num_;
   bool calib_;
+  std::vector<int> trigger_offsets_;
 
   std::atomic<size_t> num_radios_initialized_;
   std::atomic<size_t> num_radios_configured_;

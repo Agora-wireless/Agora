@@ -510,3 +510,24 @@ void Utils::WriteVector(const std::string filename, const std::string desc,
   of << so.str();
   of.close();
 }
+
+std::vector<int> Utils::ReadVector(const std::string filename,
+                                   const bool skip_line) {
+  std::string line;
+  bool first_line = skip_line;
+  std::ifstream myfile(filename, std::ifstream::in);
+  std::vector<int> vec_data;
+  if (myfile.is_open()) {
+    while (getline(myfile, line)) {
+      // line.erase( std::remove (line.begin(), line.end(), ' '),
+      // line.end());
+      if (first_line) {
+        first_line = false;
+        continue;
+      }
+      vec_data.push_back(std::stoi(line));
+    }
+    myfile.close();
+  }
+  return vec_data;
+}

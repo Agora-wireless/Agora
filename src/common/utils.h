@@ -89,6 +89,8 @@ class Utils {
                       const std::string& ss, const bool append);
   static void WriteVector(const std::string filename, const std::string desc,
                           const std::vector<int> vec_data);
+  static std::vector<int> ReadVector(const std::string filename,
+                                     const bool skip_line);
 };
 
 /// roundup<N>(x) returns x rounded up to the next multiple of N. N must be
