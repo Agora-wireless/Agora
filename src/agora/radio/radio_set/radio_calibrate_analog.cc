@@ -189,17 +189,15 @@ void RadioSetCalibrate::SetIqBalance(Radio* dev, int direction, size_t channel,
   dynamic_cast<RadioSoapySdr*>(dev)->SetIQBalance(direction, channel, i_qcorr);
 }
 
-void RadioSetCalibrate::DciqMinimize(Radio* target_dev, Radio* ref_dev,
-                                     int direction, size_t channel,
-                                     double rx_center_tone,
-                                     double tx_center_tone) {
+std::complex<double> RadioSetCalibrate::FindArgMinDC(
+    Radio* target_dev, Radio* ref_dev, int direction, size_t channel,
+    double rx_center_tone, double tx_center_tone) {
   const size_t n = 1024;
   std::vector<float> win = CommsLib::HannWindowFunction(n);
   const auto window_gain = CommsLib::WindowFunctionPower(win);
   auto* target_radio = dynamic_cast<RadioSoapySdr*>(target_dev);
   auto* ref_radio = dynamic_cast<RadioSoapySdr*>(ref_dev);
 
-  target_radio->SetIQBalance(direction, channel, 0.0);
   target_radio->SetDcOffset(direction, channel, {0.0f, 0.0f});
 
   // match the internal fixed point representation for DC correction
@@ -275,11 +273,27 @@ void RadioSetCalibrate::DciqMinimize(Radio* target_dev, Radio* ref_dev,
     std::cout << "Optimized RX DC Offset: (" << dcoffi << "," << dcoffq
               << ")\n";
   }
+  return best_dc_corr;
+}
 
+std::pair<int, int> RadioSetCalibrate::FindArgMinIQ(
+    Radio* target_dev, Radio* ref_dev, int direction, size_t channel,
+    double rx_center_tone, double tx_center_tone) {
+  const size_t n = 1024;
+  std::vector<float> win = CommsLib::HannWindowFunction(n);
+  const auto window_gain = CommsLib::WindowFunctionPower(win);
+  auto* target_radio = dynamic_cast<RadioSoapySdr*>(target_dev);
+  auto* ref_radio = dynamic_cast<RadioSoapySdr*>(ref_dev);
+
+  target_radio->SetIQBalance(direction, channel, 0.0);
+  MeasureCorrection(ref_radio, channel, n, rx_center_tone, tx_center_tone, win,
+                    window_gain);
   // correct IQ imbalance
   float min_imbalance_level = 0.0f;
-  int bestgcorr = 0;
-  int bestiqcorr = 0;
+  //int bestgcorr = 0;
+  //int bestiqcorr = 0;
+  std::pair<int, int> best_corr{0, 0};
+  constexpr size_t kMaxIterations = 4;
   for (size_t iter = 0; iter < kMaxIterations; iter++) {
     int start = -512;
     int stop = 512;
@@ -289,7 +303,7 @@ void RadioSetCalibrate::DciqMinimize(Radio* target_dev, Radio* ref_dev,
       if (iter == 2) {
         min_imbalance_level = 0;  // restart with finer search
       }
-      const int center = ((iter % 2) == 0) ? bestgcorr : bestiqcorr;
+      const int center = ((iter % 2) == 0) ? best_corr.first : best_corr.second;
       start = std::max<int>(start, center - 8);
       stop = std::min<int>(stop, center + 8);
       step = 1;
@@ -297,8 +311,8 @@ void RadioSetCalibrate::DciqMinimize(Radio* target_dev, Radio* ref_dev,
     // SoapySDR::logf(debugLogLevel, "start=%d, stop=%d, step=%d", start,
     // stop, step);
     for (int i = start; i < stop; i += step) {
-      const int gcorr = ((iter % 2) == 0) ? i : bestgcorr;
-      const int iqcorr = ((iter % 2) == 1) ? i : bestiqcorr;
+      const int gcorr = ((iter % 2) == 0) ? i : best_corr.first;
+      const int iqcorr = ((iter % 2) == 1) ? i : best_corr.second;
       RadioSetCalibrate::SetIqBalance(target_dev, direction, channel, gcorr,
                                       iqcorr);
 
@@ -311,22 +325,24 @@ void RadioSetCalibrate::DciqMinimize(Radio* target_dev, Radio* ref_dev,
       // save desired results
       if (meas_imbalance_level < min_imbalance_level) {
         min_imbalance_level = meas_imbalance_level;
-        bestgcorr = gcorr;
-        bestiqcorr = iqcorr;
+        best_corr = {gcorr, iqcorr};
+        //bestgcorr = gcorr;
+        //bestiqcorr = iqcorr;
       }
     }
   }
 
   // apply the ideal correction
-  RadioSetCalibrate::SetIqBalance(target_dev, direction, channel, bestgcorr,
-                                  bestiqcorr);
-  auto gcorri = (bestgcorr < 0) ? 2047 - std::abs(bestgcorr) : 2047;
-  auto gcorrq = (bestgcorr > 0) ? 2047 - std::abs(bestgcorr) : 2047;
+  RadioSetCalibrate::SetIqBalance(target_dev, direction, channel,
+                                  best_corr.first, best_corr.second);
+  auto gcorri = (best_corr.first < 0) ? 2047 - std::abs(best_corr.first) : 2047;
+  auto gcorrq = (best_corr.first > 0) ? 2047 - std::abs(best_corr.first) : 2047;
   std::cout << "Optimized IQ Imbalance Setting: GCorr (" << gcorri << ","
-            << gcorrq << "), iqcorr=" << bestiqcorr << "\n";
+            << gcorrq << "), iqcorr=" << best_corr.second << "\n";
 
   MeasureCorrection(ref_radio, channel, n, rx_center_tone, tx_center_tone, win,
                     window_gain);
+  return best_corr;
 }
 
 void RadioSetCalibrate::DciqCalibrationProc(size_t channel) {
@@ -369,9 +385,12 @@ void RadioSetCalibrate::DciqCalibrationProc(size_t channel) {
   // Minimize Rx DC offset and IQ Imbalance on all receiving radios
   // TODO: Parallelize this loop
   for (size_t r = 0; r < total_radios - 1; r++) {
-    RadioSetCalibrate::DciqMinimize(all_but_ref_devs.at(r),
-                                    all_but_ref_devs.at(r), SOAPY_SDR_RX,
-                                    channel, 0.0, tone_bb_freq / sample_rate);
+    best_rx_dc_sets_[channel].push_back(RadioSetCalibrate::FindArgMinDC(
+        all_but_ref_devs.at(r), all_but_ref_devs.at(r), SOAPY_SDR_RX, channel,
+        0.0, tone_bb_freq / sample_rate));
+    best_rx_iq_sets_[channel].push_back(RadioSetCalibrate::FindArgMinIQ(
+        all_but_ref_devs.at(r), all_but_ref_devs.at(r), SOAPY_SDR_RX, channel,
+        0.0, tone_bb_freq / sample_rate));
   }
   ref_dev->StopRefTx(channel);
 
@@ -395,16 +414,49 @@ void RadioSetCalibrate::DciqCalibrationProc(size_t channel) {
   // Tune tx gain on neighboring radio to reference radio
   RadioSetCalibrate::AdjustCalibrationGains(
       ref_dev_container, ref_ref_dev, channel, tone_bb_freq / sample_rate);
-  RadioSetCalibrate::DciqMinimize(ref_dev, ref_dev, SOAPY_SDR_RX, channel, 0.0,
-                                  tone_bb_freq / sample_rate);
+  best_rx_dc_sets_[channel].push_back(
+      RadioSetCalibrate::FindArgMinDC(ref_dev, ref_dev, SOAPY_SDR_RX, channel,
+                                      0.0, tone_bb_freq / sample_rate));
+  best_rx_iq_sets_[channel].push_back(
+      RadioSetCalibrate::FindArgMinIQ(ref_dev, ref_dev, SOAPY_SDR_RX, channel,
+                                      0.0, tone_bb_freq / sample_rate));
 
   ref_ref_dev->StopRefTx(channel);
+
+  /*
+   * Now calibrate the tx paths on all other radios using the reference radio
+   */
+  std::cout << "Calibrating Tx Channel of the Reference Radio\n";
+  // ref_dev->setFrequency(SOAPY_SDR_RX, channel, "RF", centerRfFreq);
+  // Should this be nagative if we need
+  // centerRfFreq-toneBBFreq at true center?
+  const double tx_tone_bb_freq = sample_rate / 21;
+  ref_dev->SetFreqBb(channel, -tone_bb_freq);
+
+  for (size_t r = 0; r < total_radios - 1; r++) {
+    auto* radio = dynamic_cast<RadioSoapySdr*>(all_but_ref_devs.at(r));
+    radio->SetFreqRf(channel, center_rf_freq);
+    radio->SetFreqBb(channel, tx_tone_bb_freq);
+    radio->StartRefTx(channel);
+    // Tune tx gain for calibraion of the current radio
+    // Tune rx gain on the reference radio
+    RadioSetCalibrate::AdjustCalibrationGains(
+        ref_dev_container, radio, channel,
+        (tone_bb_freq + tx_tone_bb_freq) / sample_rate);
+    best_tx_dc_sets_[channel].push_back(RadioSetCalibrate::FindArgMinDC(
+        radio, ref_dev, SOAPY_SDR_TX, channel, tone_bb_freq / sample_rate,
+        tx_tone_bb_freq / sample_rate));
+    best_tx_iq_sets_[channel].push_back(RadioSetCalibrate::FindArgMinIQ(
+        radio, ref_dev, SOAPY_SDR_TX, channel, tone_bb_freq / sample_rate,
+        tx_tone_bb_freq / sample_rate));
+    radio->StopRefTx(channel);
+    radio->SetFreqBb(channel, 0.0);
+  }
 
   /*
    * Calibrate the tx path of the reference radio
    */
   std::cout << "Calibrating Tx Channels with Rx Reference Radio\n";
-  const double tx_tone_bb_freq = sample_rate / 21;
   std::vector<Radio*> ref_ref_dev_container;
   ref_ref_dev_container.push_back(ref_ref_dev);
 
@@ -423,41 +475,26 @@ void RadioSetCalibrate::DciqCalibrationProc(size_t channel) {
   RadioSetCalibrate::AdjustCalibrationGains(
       ref_ref_dev_container, ref_dev, channel,
       (tone_bb_freq + tx_tone_bb_freq) / sample_rate);
-  RadioSetCalibrate::DciqMinimize(ref_dev, ref_ref_dev, SOAPY_SDR_TX, channel,
-                                  tone_bb_freq / sample_rate,
-                                  tx_tone_bb_freq / sample_rate);
+  best_tx_dc_sets_[channel].push_back(RadioSetCalibrate::FindArgMinDC(
+      ref_dev, ref_ref_dev, SOAPY_SDR_TX, channel, tone_bb_freq / sample_rate,
+      tx_tone_bb_freq / sample_rate));
+  best_tx_iq_sets_[channel].push_back(RadioSetCalibrate::FindArgMinIQ(
+      ref_dev, ref_ref_dev, SOAPY_SDR_TX, channel, tone_bb_freq / sample_rate,
+      tx_tone_bb_freq / sample_rate));
 
   // kill TX on ref at the end
   ref_dev->StopRefTx(channel);
   ref_dev->SetFreqBb(channel, 0.0);
   ref_ref_dev->SetFreqBb(channel, 0.0);
 
-  /*
-   * Now calibrate the tx paths on all other radios using the reference radio
-   */
-  std::cout << "Calibrating Tx Channel of the Reference Radio\n";
-  // ref_dev->setFrequency(SOAPY_SDR_RX, channel, "RF", centerRfFreq);
-  // Should this be nagative if we need
-  // centerRfFreq-toneBBFreq at true center?
-  ref_dev->SetFreqBb(channel, -tone_bb_freq);
-
-  for (size_t r = 0; r < total_radios - 1; r++) {
-    auto* radio = dynamic_cast<RadioSoapySdr*>(all_but_ref_devs.at(r));
-    radio->SetFreqRf(channel, center_rf_freq);
-    radio->SetFreqBb(channel, tx_tone_bb_freq);
-    radio->StartRefTx(channel);
-    // Tune tx gain for calibraion of the current radio
-    // Tune rx gain on the reference radio
-    RadioSetCalibrate::AdjustCalibrationGains(
-        ref_dev_container, radio, channel,
-        (tone_bb_freq + tx_tone_bb_freq) / sample_rate);
-    RadioSetCalibrate::DciqMinimize(radio, ref_dev, SOAPY_SDR_TX, channel,
-                                    tone_bb_freq / sample_rate,
-                                    tx_tone_bb_freq / sample_rate);
-    radio->StopRefTx(channel);
-    radio->SetFreqBb(channel, 0.0);
-  }
   std::cout << "****************************************************\n";
   std::cout << "   Ending DC Offset and IQ Imbalance Calibration\n";
   std::cout << "****************************************************\n";
+}
+
+void RadioSetCalibrate::WriteAnalogCalibData() {
+  Utils::WriteVectorOfComplex("rx_dc.dat", "", best_rx_dc_sets_);
+  Utils::WriteVectorOfComplex("tx_dc.dat", "", best_tx_dc_sets_);
+  Utils::WriteVectorOfPairs("rx_iq.dat", "", best_rx_iq_sets_);
+  Utils::WriteVectorOfPairs("tx_iq.dat", "", best_tx_iq_sets_);
 }

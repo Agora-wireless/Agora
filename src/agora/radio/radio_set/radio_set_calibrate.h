@@ -24,6 +24,7 @@ class RadioSetCalibrate {
 
   void CalibrateSampleOffset();
   void DciqCalibrationProc(size_t channel);
+  void WriteAnalogCalibData();
   void ReciprocityCalib();
   virtual arma::cx_float* GetCalibUl() final {
     return init_calib_ul_processed_;
@@ -56,11 +57,18 @@ class RadioSetCalibrate {
   auto TxRefToArray(const std::vector<std::complex<int16_t>>& tx_vec);
 
   // analog
-  static void DciqMinimize(Radio* target_dev, Radio* ref_dev, int direction,
-                           size_t channel, double rx_center_tone,
-                           double tx_center_tone);
+  static std::complex<double> FindArgMinDC(Radio* target_dev, Radio* ref_dev,
+                                           int direction, size_t channel,
+                                           double rx_center_tone,
+                                           double tx_center_tone);
+  static std::pair<int, int> FindArgMinIQ(Radio* target_dev, Radio* ref_dev,
+                                          int direction, size_t channel,
+                                          double rx_center_tone,
+                                          double tx_center_tone);
   static void SetIqBalance(Radio* dev, int direction, size_t channel, int gcorr,
                            int iqcorr);
+  /* Increase tx gain and then rx gain until good signal received
+   */
   static void AdjustCalibrationGains(std::vector<Radio*>& rx_devs,
                                      Radio* tx_dev, size_t channel,
                                      double fft_bin, bool plot = false);
@@ -76,6 +84,10 @@ class RadioSetCalibrate {
   size_t antenna_num_;
   std::string calibration_type_;
   std::atomic<size_t> num_radios_initialized_;
+  std::array<std::vector<std::pair<int, int>>, kMaxChannels> best_rx_iq_sets_;
+  std::array<std::vector<std::complex<double>>, kMaxChannels> best_rx_dc_sets_;
+  std::array<std::vector<std::pair<int, int>>, kMaxChannels> best_tx_iq_sets_;
+  std::array<std::vector<std::complex<double>>, kMaxChannels> best_tx_dc_sets_;
   //CsvLog::CsvLogger logger_offset_;
  protected:
   std::vector<std::unique_ptr<Radio>> radios_;

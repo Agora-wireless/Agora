@@ -41,6 +41,7 @@ int main(int argc, char* argv[]) {
     if (cfg->Channel().find('B') != std::string::npos) {
       calib->DciqCalibrationProc(1);
     }
+    calib->WriteAnalogCalibData();
   }
   gflags::ShutDownCommandLineFlags();
   return 0;
