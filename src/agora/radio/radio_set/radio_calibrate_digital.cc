@@ -232,7 +232,6 @@ bool RadioSetCalibrate::FindTimeOffset(
           "channel %zu:%zu\n",
           std::abs(offset.at(i) - offset.at(i - cfg_->NumChannels())),
           kMaxArraySampleOffset, i, i - cfg_->NumChannels());
-      bad_data = true;
     }
   }
 
@@ -353,7 +352,8 @@ bool RadioSetCalibrate::CalibrateSampleOffsetUplink(size_t max_attempts) {
       const int diff_offset = max_offset - min_offset;
       AGORA_LOG_INFO("Uplink Offsets detected [min=%zu, max=%zu] diff=%zu\n",
                      min_offset, max_offset, diff_offset);
-      Utils::WriteVector("uplink_offsets.txt", "", ch0_offsets);
+      const std::string filename = "files/log/iris_samp_offsets.dat";
+      Utils::WriteVector(filename, "", ch0_offsets);
       uplink_cal_success = true;
     }
   }

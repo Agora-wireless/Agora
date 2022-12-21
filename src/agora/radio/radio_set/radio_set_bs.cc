@@ -77,7 +77,8 @@ RadioSetBs::RadioSetBs(Config* cfg, Radio::RadioType radio_type)
 
   std::vector<std::thread> init_bs_threads;
   // load digital and analog calibration results
-  trigger_offsets_ = Utils::ReadVector("uplink_offsets.txt", false);
+  const std::string filename = "files/log/iris_samp_offsets.dat";
+  trigger_offsets_ = Utils::ReadVector(filename, false);
 
   for (size_t i = 0; i < radio_num_; i++) {
 #ifdef THREADED_INIT
