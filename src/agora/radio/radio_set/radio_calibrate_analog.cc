@@ -276,7 +276,7 @@ std::complex<double> RadioSetCalibrate::FindArgMinDC(
   return best_dc_corr;
 }
 
-std::pair<int, int> RadioSetCalibrate::FindArgMinIQ(
+std::complex<double> RadioSetCalibrate::FindArgMinIQ(
     Radio* target_dev, Radio* ref_dev, int direction, size_t channel,
     double rx_center_tone, double tx_center_tone) {
   const size_t n = 1024;
@@ -290,9 +290,8 @@ std::pair<int, int> RadioSetCalibrate::FindArgMinIQ(
                     window_gain);
   // correct IQ imbalance
   float min_imbalance_level = 0.0f;
-  //int bestgcorr = 0;
-  //int bestiqcorr = 0;
-  std::pair<int, int> best_corr{0, 0};
+  int bestgcorr = 0;
+  int bestiqcorr = 0;
   constexpr size_t kMaxIterations = 4;
   for (size_t iter = 0; iter < kMaxIterations; iter++) {
     int start = -512;
@@ -303,7 +302,7 @@ std::pair<int, int> RadioSetCalibrate::FindArgMinIQ(
       if (iter == 2) {
         min_imbalance_level = 0;  // restart with finer search
       }
-      const int center = ((iter % 2) == 0) ? best_corr.first : best_corr.second;
+      const int center = ((iter % 2) == 0) ? bestgcorr : bestiqcorr;
       start = std::max<int>(start, center - 8);
       stop = std::min<int>(stop, center + 8);
       step = 1;
@@ -311,8 +310,8 @@ std::pair<int, int> RadioSetCalibrate::FindArgMinIQ(
     // SoapySDR::logf(debugLogLevel, "start=%d, stop=%d, step=%d", start,
     // stop, step);
     for (int i = start; i < stop; i += step) {
-      const int gcorr = ((iter % 2) == 0) ? i : best_corr.first;
-      const int iqcorr = ((iter % 2) == 1) ? i : best_corr.second;
+      const int gcorr = ((iter % 2) == 0) ? i : bestgcorr;
+      const int iqcorr = ((iter % 2) == 1) ? i : bestiqcorr;
       RadioSetCalibrate::SetIqBalance(target_dev, direction, channel, gcorr,
                                       iqcorr);
 
@@ -325,24 +324,23 @@ std::pair<int, int> RadioSetCalibrate::FindArgMinIQ(
       // save desired results
       if (meas_imbalance_level < min_imbalance_level) {
         min_imbalance_level = meas_imbalance_level;
-        best_corr = {gcorr, iqcorr};
-        //bestgcorr = gcorr;
-        //bestiqcorr = iqcorr;
+        bestgcorr = gcorr;
+        bestiqcorr = iqcorr;
       }
     }
   }
 
   // apply the ideal correction
-  RadioSetCalibrate::SetIqBalance(target_dev, direction, channel,
-                                  best_corr.first, best_corr.second);
-  auto gcorri = (best_corr.first < 0) ? 2047 - std::abs(best_corr.first) : 2047;
-  auto gcorrq = (best_corr.first > 0) ? 2047 - std::abs(best_corr.first) : 2047;
+  RadioSetCalibrate::SetIqBalance(target_dev, direction, channel, bestgcorr,
+                                  bestiqcorr);
+  auto gcorri = (bestgcorr < 0) ? 2047 - std::abs(bestgcorr) : 2047;
+  auto gcorrq = (bestgcorr > 0) ? 2047 - std::abs(bestgcorr) : 2047;
   std::cout << "Optimized IQ Imbalance Setting: GCorr (" << gcorri << ","
-            << gcorrq << "), iqcorr=" << best_corr.second << "\n";
+            << gcorrq << "), iqcorr=" << bestiqcorr << "\n";
 
-  MeasureCorrection(ref_radio, channel, n, rx_center_tone, tx_center_tone, win,
-                    window_gain);
-  return best_corr;
+  const double gain_iq = double(gcorrq) / double(gcorri);
+  const double phase_iq = 2 * std::atan(bestiqcorr / 2047.0);
+  return gain_iq * std::exp(std::complex<double>(0, phase_iq));
 }
 
 void RadioSetCalibrate::DciqCalibrationProc(size_t channel) {
@@ -493,8 +491,8 @@ void RadioSetCalibrate::DciqCalibrationProc(size_t channel) {
 }
 
 void RadioSetCalibrate::WriteAnalogCalibData() {
-  Utils::WriteVectorOfComplex("rx_dc.dat", "", best_rx_dc_sets_);
-  Utils::WriteVectorOfComplex("tx_dc.dat", "", best_tx_dc_sets_);
-  Utils::WriteVectorOfPairs("rx_iq.dat", "", best_rx_iq_sets_);
-  Utils::WriteVectorOfPairs("tx_iq.dat", "", best_tx_iq_sets_);
+  Utils::WriteVectorOfComplex("files/log/rx_dc.dat", "", best_rx_dc_sets_);
+  Utils::WriteVectorOfComplex("files/log/tx_dc.dat", "", best_tx_dc_sets_);
+  Utils::WriteVectorOfComplex("files/log/rx_iq.dat", "", best_rx_iq_sets_);
+  Utils::WriteVectorOfComplex("files/log/tx_iq.dat", "", best_tx_iq_sets_);
 }

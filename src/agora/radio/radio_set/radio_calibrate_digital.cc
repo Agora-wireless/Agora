@@ -320,10 +320,7 @@ static void CheckSnr(
 
 void RadioSetCalibrate::CalibrateSampleOffset() {
   const size_t max_retries = 10;
-  const bool uplink_success = CalibrateSampleOffsetUplink(max_retries);
-  /*if (uplink_success) {
-    CalibrateSampleOffsetDownlink(max_retries);
-  }*/
+  CalibrateSampleOffsetUplink(max_retries);
 }
 
 bool RadioSetCalibrate::CalibrateSampleOffsetUplink(size_t max_attempts) {

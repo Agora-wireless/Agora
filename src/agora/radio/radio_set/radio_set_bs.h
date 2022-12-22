@@ -35,6 +35,7 @@ class RadioSetBs : public RadioSet {
   long long SyncArrayTime();
 
   void AdjustDelays();
+  void ApplyCalib();
   Config* cfg_;
   std::vector<SoapySDR::Device*> hubs_;
   size_t radio_num_;

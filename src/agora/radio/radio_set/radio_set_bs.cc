@@ -9,6 +9,7 @@
 #include "SoapySDR/Formats.h"
 #include "SoapySDR/Logger.hpp"
 #include "logger.h"
+#include "radio_soapysdr.h"
 
 static constexpr bool kPrintCalibrationMats = false;
 static constexpr size_t kSoapyMakeMaxAttempts = 3;
@@ -76,9 +77,6 @@ RadioSetBs::RadioSetBs(Config* cfg, Radio::RadioType radio_type)
   }
 
   std::vector<std::thread> init_bs_threads;
-  // load digital and analog calibration results
-  const std::string filename = "files/log/iris_samp_offsets.dat";
-  trigger_offsets_ = Utils::ReadVector(filename, false);
 
   for (size_t i = 0; i < radio_num_; i++) {
 #ifdef THREADED_INIT
@@ -120,9 +118,8 @@ RadioSetBs::RadioSetBs(Config* cfg, Radio::RadioType radio_type)
       }
     }
   }
-  if (trigger_offsets_.size() == radio_num_ - 1) {
-    this->AdjustDelays();
-  }
+  // load digital and analog calibration results
+  this->ApplyCalib();
   AGORA_LOG_INFO("RadioSetBs init complete!\n");
 }
 
@@ -195,6 +192,48 @@ void RadioSetBs::AdjustDelays() {
         } else {
           radios_.at(i)->AdjustDelay("1");
         }
+      }
+    }
+  }
+}
+
+void RadioSetBs::ApplyCalib() {
+  auto channels = Utils::StrToChannels(cfg_->Channel());
+  if (cfg_->SampleCalEn()) {
+    const std::string filename = "files/log/iris_samp_offsets.dat";
+    trigger_offsets_ = Utils::ReadVector(filename, false);
+    if (trigger_offsets_.size() == radio_num_ - 1) {
+      this->AdjustDelays();
+    } else {
+      AGORA_LOG_WARN(
+          "The number of sample offsets in file does not match the number of "
+          "radios.\n");
+    }
+  }
+  if (cfg_->ImbalanceCalEn()) {
+    const std::string rx_dc_file = "files/log/rx_dc.dat";
+    const std::string tx_dc_file = "files/log/tx_dc.dat";
+    const std::string rx_iq_file = "files/log/rx_iq.dat";
+    const std::string tx_iq_file = "files/log/tx_iq.dat";
+    auto rx_dc = Utils::ReadVectorOfComplex(rx_dc_file, false, channels);
+    auto tx_dc = Utils::ReadVectorOfComplex(tx_dc_file, false, channels);
+    auto rx_iq = Utils::ReadVectorOfComplex(rx_iq_file, false, channels);
+    auto tx_iq = Utils::ReadVectorOfComplex(tx_iq_file, false, channels);
+    RtAssert(rx_dc.at(0).size() == radio_num_, "rx_dc size mismatch!");
+    RtAssert(tx_dc.at(0).size() == radio_num_, "tx_dc size mismatch!");
+    RtAssert(rx_iq.at(0).size() == radio_num_, "rx_iq size mismatch!");
+    RtAssert(tx_iq.at(0).size() == radio_num_, "tx_iq size mismatch!");
+    for (size_t i = 0; i < radio_num_; i++) {
+      auto* target_radio = dynamic_cast<RadioSoapySdr*>(radios_.at(i).get());
+      for (size_t c = 0; c < channels.size(); c++) {
+        target_radio->SetDcOffset(SOAPY_SDR_RX, channels.at(c),
+                                  rx_dc.at(c).at(i));
+        target_radio->SetDcOffset(SOAPY_SDR_TX, channels.at(c),
+                                  tx_dc.at(c).at(i));
+        target_radio->SetIQBalance(SOAPY_SDR_RX, channels.at(c),
+                                   rx_iq.at(c).at(i));
+        target_radio->SetIQBalance(SOAPY_SDR_TX, channels.at(c),
+                                   tx_iq.at(c).at(i));
       }
     }
   }

@@ -91,13 +91,6 @@ class Utils {
                           const std::vector<int> vec_data);
   static std::vector<int> ReadVector(const std::string filename,
                                      const bool skip_line);
-  static void WriteVectorOfPairs(
-      const std::string filename, const std::string desc,
-      const std::array<std::vector<std::pair<int, int>>, kMaxChannels>
-          vec_data);
-  static std::array<std::vector<std::pair<int, int>>, kMaxChannels>
-  ReadVectorOfPairs(const std::string filename, const bool skip_line,
-                    const std::vector<size_t> present_channels);
   static void WriteVectorOfComplex(
       const std::string filename, const std::string desc,
       const std::array<std::vector<std::complex<double>>, kMaxChannels>

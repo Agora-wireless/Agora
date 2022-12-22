@@ -61,10 +61,10 @@ class RadioSetCalibrate {
                                            int direction, size_t channel,
                                            double rx_center_tone,
                                            double tx_center_tone);
-  static std::pair<int, int> FindArgMinIQ(Radio* target_dev, Radio* ref_dev,
-                                          int direction, size_t channel,
-                                          double rx_center_tone,
-                                          double tx_center_tone);
+  static std::complex<double> FindArgMinIQ(Radio* target_dev, Radio* ref_dev,
+                                           int direction, size_t channel,
+                                           double rx_center_tone,
+                                           double tx_center_tone);
   static void SetIqBalance(Radio* dev, int direction, size_t channel, int gcorr,
                            int iqcorr);
   /* Increase tx gain and then rx gain until good signal received
@@ -84,9 +84,9 @@ class RadioSetCalibrate {
   size_t antenna_num_;
   std::string calibration_type_;
   std::atomic<size_t> num_radios_initialized_;
-  std::array<std::vector<std::pair<int, int>>, kMaxChannels> best_rx_iq_sets_;
+  std::array<std::vector<std::complex<double>>, kMaxChannels> best_rx_iq_sets_;
   std::array<std::vector<std::complex<double>>, kMaxChannels> best_rx_dc_sets_;
-  std::array<std::vector<std::pair<int, int>>, kMaxChannels> best_tx_iq_sets_;
+  std::array<std::vector<std::complex<double>>, kMaxChannels> best_tx_iq_sets_;
   std::array<std::vector<std::complex<double>>, kMaxChannels> best_tx_dc_sets_;
   //CsvLog::CsvLogger logger_offset_;
  protected:
