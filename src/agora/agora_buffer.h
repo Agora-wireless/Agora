@@ -28,6 +28,7 @@ class AgoraBuffer {
   inline PtrGrid<kFrameWnd, kMaxUEs, complex_float>& GetCsi() {
     return csi_buffer_;
   }
+  inline Table<int8_t>& GetUeSchedule() { return ue_schedule_buffer_; }
   inline PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& GetUlBeamMatrix() {
     return ul_beam_matrix_;
   }
@@ -85,6 +86,7 @@ class AgoraBuffer {
   Table<int8_t> dl_mod_bits_buffer_;
   Table<int8_t> dl_bits_buffer_;
   Table<int8_t> dl_bits_buffer_status_;
+  Table<int8_t> ue_schedule_buffer_;
 
   Table<char> ul_socket_buffer_;
   char* dl_socket_buffer_;

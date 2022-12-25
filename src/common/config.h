@@ -108,6 +108,7 @@ class Config {
   inline bool ImbalanceCalEn() const { return this->imbalance_cal_en_; }
   inline size_t BeamformingAlgo() const { return this->beamforming_algo_; }
   inline std::string Beamforming() const { return this->beamforming_str_; }
+  inline size_t SpatialStreamsNum() const { return this->num_spatial_streams_; }
   inline bool ExternalRefNode(size_t id) const {
     return this->external_ref_node_.at(id);
   }
@@ -729,6 +730,7 @@ class Config {
   bool sample_cal_en_;
   bool imbalance_cal_en_;
   size_t beamforming_algo_;
+  size_t num_spatial_streams_;
   std::string beamforming_str_;
   std::vector<bool> external_ref_node_;
   std::string channel_;

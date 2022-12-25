@@ -19,7 +19,7 @@ static constexpr bool kUseUlZfForDownlink = true;
 DoBeamWeights::DoBeamWeights(
     Config* config, int tid,
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
-    Table<complex_float>& calib_dl_buffer,
+    Table<int8_t>& ue_schedule_buffer, Table<complex_float>& calib_dl_buffer,
     Table<complex_float>& calib_ul_buffer,
     Table<complex_float>& calib_dl_msum_buffer,
     Table<complex_float>& calib_ul_msum_buffer,
@@ -29,6 +29,7 @@ DoBeamWeights::DoBeamWeights(
     PhyStats* in_phy_stats, Stats* stats_manager)
     : Doer(config, tid),
       csi_buffers_(csi_buffers),
+      ue_schedule_buffer_(ue_schedule_buffer),
       calib_dl_buffer_(calib_dl_buffer),
       calib_ul_buffer_(calib_ul_buffer),
       calib_dl_msum_buffer_(calib_dl_msum_buffer),
@@ -105,7 +106,7 @@ float DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     phy_stats_->UpdateUlCsi(frame_id, cur_sc_id, mat_csi);
   }
   arma::cx_fmat mat_ul_beam(reinterpret_cast<arma::cx_float*>(ul_beam_mem),
-                            cfg_->UeAntNum(), cfg_->BsAntNum(), false);
+                            cfg_->SpatialStreamsNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_beam_tmp;
   switch (cfg_->BeamformingAlgo()) {
     case CommsLib::BeamformingAlgorithm::kZF:
@@ -407,9 +408,19 @@ void DoBeamWeights::ComputeFullCsiBeams(size_t tag) {
     const size_t cur_sc_id = base_sc_id + i;
 
     // Gather CSI matrices of each pilot from partially-transposed CSIs.
+    size_t selected_ue_idx = 0;
+    size_t num_groups =
+        (cfg_->SpatialStreamsNum() == cfg_->UeAntNum()) ? 1 : cfg_->UeAntNum();
     for (size_t ue_idx = 0; ue_idx < cfg_->UeAntNum(); ue_idx++) {
-      auto* dst_csi_ptr = reinterpret_cast<float*>(csi_gather_buffer_ +
-                                                   cfg_->BsAntNum() * ue_idx);
+      size_t ue_group_slot = frame_id % num_groups;
+      if (ue_schedule_buffer_[ue_group_slot]
+                             [ue_idx * cfg_->OfdmDataNum() + base_sc_id] == 0) {
+        continue;
+      } else {
+        selected_ue_idx++;
+      }
+      auto* dst_csi_ptr = reinterpret_cast<float*>(
+          csi_gather_buffer_ + cfg_->BsAntNum() * (selected_ue_idx - 1));
       if (kUsePartialTrans) {
         PartialTransposeGather(cur_sc_id,
                                (float*)csi_buffers_[frame_slot][ue_idx],
@@ -424,7 +435,7 @@ void DoBeamWeights::ComputeFullCsiBeams(size_t tag) {
     duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
 
     arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer_, cfg_->BsAntNum(),
-                          cfg_->UeAntNum(), false);
+                          cfg_->SpatialStreamsNum(), false);
 
     if (cfg_->Frame().NumDLSyms() > 0) {
       ComputeCalib(frame_id, cur_sc_id, cal_sc_vec);

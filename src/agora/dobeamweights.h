@@ -22,7 +22,7 @@ class DoBeamWeights : public Doer {
   DoBeamWeights(
       Config* in_config, int tid,
       PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
-      Table<complex_float>& calib_dl_buffer,
+      Table<int8_t>& ue_schedule_buffer, Table<complex_float>& calib_dl_buffer,
       Table<complex_float>& calib_ul_buffer,
       Table<complex_float>& calib_dl_msum_buffer,
       Table<complex_float>& calib_ul_msum_buffer,
@@ -88,6 +88,7 @@ class DoBeamWeights : public Doer {
 
   PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
   complex_float* pred_csi_buffer_;
+  Table<int8_t> ue_schedule_buffer_;
 
   //Should be read only (Set by FFT and read by Zf)
   Table<complex_float>& calib_dl_buffer_;

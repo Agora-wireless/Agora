@@ -16,6 +16,10 @@ TEST(TestZF, Perf) {
 
   PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers;
   csi_buffers.RandAllocCxFloat(cfg->BsAntNum() * cfg->OfdmDataNum());
+  Table<int8_t> ue_schedule_buffer;
+  ue_schedule_buffer.AllocAndSet((size_t)1,
+                                 cfg->OfdmDataNum() * cfg->UeAntNum(),
+                                 Agora_memory::Alignment_t::kAlign64);
 
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(
       cfg->BsAntNum() * cfg->UeAntNum());
@@ -50,9 +54,9 @@ TEST(TestZF, Perf) {
   auto stats = std::make_unique<Stats>(cfg.get());
 
   auto compute_zf = std::make_unique<DoBeamWeights>(
-      cfg.get(), tid, csi_buffers, calib_dl_buffer, calib_ul_buffer,
-      calib_dl_msum_buffer, calib_ul_msum_buffer, calib_buffer, ul_zf_matrices,
-      dl_zf_matrices, phy_stats.get(), stats.get());
+      cfg.get(), tid, csi_buffers, ue_schedule_buffer, calib_dl_buffer,
+      calib_ul_buffer, calib_dl_msum_buffer, calib_ul_msum_buffer, calib_buffer,
+      ul_zf_matrices, dl_zf_matrices, phy_stats.get(), stats.get());
 
   FastRand fast_rand;
   size_t start_tsc = GetTime::Rdtsc();

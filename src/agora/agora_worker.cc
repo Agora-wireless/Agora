@@ -51,8 +51,8 @@ void AgoraWorker::WorkerThread(int tid) {
 
   /* Initialize operators */
   auto compute_beam = std::make_unique<DoBeamWeights>(
-      config_, tid, buffer_->GetCsi(), buffer_->GetCalibDl(),
-      buffer_->GetCalibUl(), buffer_->GetCalibDlMsum(),
+      config_, tid, buffer_->GetCsi(), buffer_->GetUeSchedule(),
+      buffer_->GetCalibDl(), buffer_->GetCalibUl(), buffer_->GetCalibDlMsum(),
       buffer_->GetCalibUlMsum(), buffer_->GetCalib(),
       buffer_->GetUlBeamMatrix(), buffer_->GetDlBeamMatrix(), phy_stats_,
       stats_);

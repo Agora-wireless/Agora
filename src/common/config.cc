@@ -259,6 +259,7 @@ Config::Config(std::string jsonfilename)
   smooth_calib_ = tdd_conf.value("smooth_calib", false);
   beamforming_str_ = tdd_conf.value("beamforming", "ZF");
   beamforming_algo_ = kBeamformingStr.at(beamforming_str_);
+  num_spatial_streams_ = tdd_conf.value("spatial_streams", ue_ant_num_);
 
   RtAssert(sample_cal_en_ == false,
            "Digital / Sample offset calibration is not supported at this time");
