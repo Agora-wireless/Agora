@@ -574,7 +574,7 @@ class Config {
   inline const std::string& ConfigFilename() const { return config_filename_; }
   inline const std::string& TraceFilename() const { return trace_file_; }
   inline const std::string& Timestamp() const { return timestamp_; }
-  inline const std::vector<std::string>& UlTxFreqDataFiles(void) const {
+  inline const std::vector<std::string>& UlTxFreqDataFiles() const {
     return ul_tx_f_data_files_;
   }
 
