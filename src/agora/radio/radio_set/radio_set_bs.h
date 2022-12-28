@@ -21,16 +21,16 @@
 class RadioSetBs : public RadioSet {
  public:
   RadioSetBs(Config* cfg, Radio::RadioType radio_type);
-  virtual ~RadioSetBs() final;
+  ~RadioSetBs() final;
 
-  virtual bool RadioStart() final;
-  virtual void Go() final;
+  bool RadioStart() final;
+  void Go() final;
 
-  virtual bool DoCalib() const final { return calib_; }
-  virtual arma::cx_float* GetCalibUl() final {
+  bool DoCalib() const final { return calib_; }
+  arma::cx_float* GetCalibUl() final {
     return init_calib_ul_processed_;
   }
-  virtual arma::cx_float* GetCalibDl() final {
+  arma::cx_float* GetCalibDl() final {
     return init_calib_dl_processed_;
   }
 
