@@ -43,6 +43,7 @@ Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
       ul_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
+      dl_bcast_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       frame_(""),
       config_filename_(std::move(jsonfilename)) {
   auto time = std::time(nullptr);
@@ -836,7 +837,7 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
   std::sort(zc_vec.begin(), zc_vec.end());
   // According to cyclic_shift.cc cyclic shifter for zc
   // larger than 256 has not been implemented, so we skip them here.
-  size_t max_zc_index =
+  const size_t max_zc_index =
       (std::find(zc_vec.begin(), zc_vec.end(), kMaxSupportedZc) -
        zc_vec.begin());
   size_t max_downlink_uncoded_bits =
@@ -878,9 +879,67 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
       this->frame_.NumDLSyms() == 0 || dl_ldpc_config_.NumBlocksInSymbol() > 0,
       "Downlink LDPC expansion factor is too large for number of OFDM data "
       "subcarriers.");
+
+  const size_t bcast_base_graph = 2;
+  const double dl_bcast_code_rate = 1.0 / 10;
+  const size_t dl_bcast_mod_order_bits_ = 2;
+  const size_t max_dl_bcast_uncoded_bits = size_t(
+      this->GetOFDMDataNum() * dl_bcast_code_rate * dl_bcast_mod_order_bits_);
+  size_t bcast_zc = SIZE_MAX;
+  i = 0;
+  for (; i < max_zc_index; i++) {
+    if ((zc_vec.at(i) * LdpcNumInputCols(bcast_base_graph) * kCbPerSymbol <
+         max_dl_bcast_uncoded_bits) &&
+        (zc_vec.at(i + 1) * LdpcNumInputCols(bcast_base_graph) * kCbPerSymbol >
+         max_dl_bcast_uncoded_bits)) {
+      bcast_zc = zc_vec.at(i);
+      break;
+    }
+  }
+  if (zc == SIZE_MAX) {
+    AGORA_LOG_WARN(
+        "Exceeded possible range of LDPC lifting Zc for downlink! Setting "
+        "lifting size to max possible value(%zu).\nThis may lead to too many "
+        "unused subcarriers. For better use of the PHY resources, you may "
+        "reduce your coding or modulation rate.",
+        kMaxSupportedZc);
+    bcast_zc = kMaxSupportedZc;
+  }
+  // Always positive since dl_code_rate is smaller than 1
+  size_t bcast_num_rows =
+      static_cast<size_t>(
+          std::round(LdpcNumInputCols(bcast_base_graph) / dl_bcast_code_rate)) -
+      (LdpcNumInputCols(bcast_base_graph) - 2);
+
+  uint32_t bcast_num_cb_len = LdpcNumInputBits(bcast_base_graph, bcast_zc);
+  uint32_t bcast_num_cb_codew_len =
+      LdpcNumEncodedBits(bcast_base_graph, bcast_zc, bcast_num_rows);
+  dl_bcast_ldpc_config_ =
+      LDPCconfig(bcast_base_graph, bcast_zc, max_decoder_iter, early_term,
+                 bcast_num_cb_len, bcast_num_cb_codew_len, bcast_num_rows, 0);
+
+  dl_bcast_ldpc_config_.NumBlocksInSymbol(
+      (GetOFDMDataNum() * dl_bcast_mod_order_bits_) /
+      dl_bcast_ldpc_config_.NumCbCodewLen());
+  RtAssert(
+      dl_bcast_ldpc_config_.NumBlocksInSymbol() > 0,
+      "Downlink LDPC expansion factor is too large for number of OFDM data "
+      "subcarriers.");
 }
 
 void Config::DumpMcsInfo() {
+  AGORA_LOG_INFO(
+      "Uplink MCS Info: LDPC: Zc: %d, %zu code blocks per symbol, %d "
+      "information "
+      "bits per encoding, %d bits per encoded code word, decoder "
+      "iterations: %d, code rate %.3f (nRows = %zu), modulation %s\n",
+      ul_ldpc_config_.ExpansionFactor(), ul_ldpc_config_.NumBlocksInSymbol(),
+      ul_ldpc_config_.NumCbLen(), ul_ldpc_config_.NumCbCodewLen(),
+      ul_ldpc_config_.MaxDecoderIter(),
+      1.f * LdpcNumInputCols(ul_ldpc_config_.BaseGraph()) /
+          (LdpcNumInputCols(ul_ldpc_config_.BaseGraph()) - 2 +
+           ul_ldpc_config_.NumRows()),
+      ul_ldpc_config_.NumRows(), ul_modulation_.c_str());
   AGORA_LOG_INFO(
       "Downlink MCS Info: LDPC: Zc: %d, %zu code blocks per symbol, %d "
       "information "
@@ -894,17 +953,19 @@ void Config::DumpMcsInfo() {
            dl_ldpc_config_.NumRows()),
       dl_ldpc_config_.NumRows(), dl_modulation_.c_str());
   AGORA_LOG_INFO(
-      "Uplink MCS Info: LDPC: Zc: %d, %zu code blocks per symbol, %d "
+      "Downlink Broadcast MCS Info: LDPC: Zc: %d, %zu code blocks per symbol, "
+      "%d "
       "information "
       "bits per encoding, %d bits per encoded code word, decoder "
-      "iterations: %d, code rate %.3f (nRows = %zu), modulation %s\n",
-      ul_ldpc_config_.ExpansionFactor(), ul_ldpc_config_.NumBlocksInSymbol(),
-      ul_ldpc_config_.NumCbLen(), ul_ldpc_config_.NumCbCodewLen(),
-      ul_ldpc_config_.MaxDecoderIter(),
-      1.f * LdpcNumInputCols(ul_ldpc_config_.BaseGraph()) /
-          (LdpcNumInputCols(ul_ldpc_config_.BaseGraph()) - 2 +
-           ul_ldpc_config_.NumRows()),
-      ul_ldpc_config_.NumRows(), ul_modulation_.c_str());
+      "iterations: %d, code rate %.3f (nRows = %zu), modulation QPSK\n",
+      dl_bcast_ldpc_config_.ExpansionFactor(),
+      dl_bcast_ldpc_config_.NumBlocksInSymbol(),
+      dl_bcast_ldpc_config_.NumCbLen(), dl_bcast_ldpc_config_.NumCbCodewLen(),
+      dl_bcast_ldpc_config_.MaxDecoderIter(),
+      1.f * LdpcNumInputCols(dl_bcast_ldpc_config_.BaseGraph()) /
+          (LdpcNumInputCols(dl_bcast_ldpc_config_.BaseGraph()) - 2 +
+           dl_bcast_ldpc_config_.NumRows()),
+      dl_bcast_ldpc_config_.NumRows());
 }
 
 void Config::GenData() {
@@ -1450,6 +1511,103 @@ void Config::GenData() {
   FreeBuffer1d(&pilot_ifft);
 }
 
+void Config::GenBroadcastSlots(Table<std::complex<int16_t>> bcast_iq_samps,
+                               size_t frame_id) {
+  int num_bcast_bytes = dl_bcast_ldpc_config_.NumCbLen() / 8;
+  int num_bcast_bytes_padded = Roundup<64>(num_bcast_bytes);
+  int num_padding_bytes = num_bcast_bytes_padded - num_bcast_bytes;
+  int8_t* bcast_bits_buffer =
+      static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
+          Agora_memory::Alignment_t::kAlign64, num_bcast_bytes));
+  std::memset(bcast_bits_buffer, 0u, num_bcast_bytes_padded);
+  const int8_t* tmp =
+      static_cast<const int8_t*>(static_cast<const void*>(&frame_id));
+  std::memcpy(bcast_bits_buffer, tmp, sizeof(size_t));
+
+  const size_t dl_bcast_encoded_bytes =
+      BitsToBytes(this->dl_bcast_ldpc_config_.NumCbCodewLen());
+
+  SimdAlignByteVector dl_bcast_scramble_buffer(num_bcast_bytes_padded,
+                                               std::byte(0));
+
+  Table<int8_t> dl_bcast_encoded_bits;
+  dl_bcast_encoded_bits.Malloc(this->frame_.NumDLBcastSyms(),
+                               dl_bcast_encoded_bytes,
+                               Agora_memory::Alignment_t::kAlign64);
+  Table<int8_t> dl_bcast_mod_bits;
+  dl_bcast_mod_bits.Calloc(this->frame_.NumDLBcastSyms(),
+                           this->GetOFDMDataNum(),
+                           Agora_memory::Alignment_t::kAlign32);
+  auto* dl_bcast_parity_buffer = new int8_t[LdpcEncodingParityBufSize(
+      this->dl_bcast_ldpc_config_.BaseGraph(),
+      this->dl_bcast_ldpc_config_.ExpansionFactor())];
+
+  const size_t dl_bcast_mod_order = 2;  // QPSK modulation for control channel
+  Table<complex_float> dl_bcast_mod_table;
+  InitModulationTable(dl_bcast_mod_table, dl_bcast_mod_order);
+  int8_t* ldpc_input = nullptr;
+  Table<complex_float> dl_bcast_iq_f;
+  dl_bcast_iq_f.Calloc(this->frame_.NumDLBcastSyms(), ofdm_data_num_,
+                       Agora_memory::Alignment_t::kAlign64);
+  Table<complex_float> dl_bcast_iq_ifft;
+  dl_bcast_iq_ifft.Calloc(this->frame_.NumDLBcastSyms(), ofdm_ca_num_,
+                          Agora_memory::Alignment_t::kAlign64);
+  /*dl_bcast_iq_t.Calloc(this->frame_.NumDLBcastSyms(), samps_per_symbol_,
+                      Agora_memory::Alignment_t::kAlign64);*/
+  assert(bcast_iq_samps.dim1() == this->frame_.NumDLBcastSyms() &&
+         bcast_iq_samps.dim2() == samps_per_symbol_);
+  auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
+  for (size_t i = 0; i < this->frame_.NumDLBcastSyms(); i++) {
+    int8_t* coded_bits_ptr = dl_bcast_encoded_bits[i];
+
+    if (scramble_enabled_) {
+      scrambler->Scramble(dl_bcast_scramble_buffer.data(), bcast_bits_buffer,
+                          num_bcast_bytes);
+      ldpc_input = reinterpret_cast<int8_t*>(dl_bcast_scramble_buffer.data());
+    } else {
+      ldpc_input = bcast_bits_buffer;
+    }
+    if (num_padding_bytes > 0) {
+      std::memset(&ldpc_input[num_bcast_bytes], 0u, num_padding_bytes);
+    }
+
+    LdpcEncodeHelper(dl_bcast_ldpc_config_.BaseGraph(),
+                     dl_bcast_ldpc_config_.ExpansionFactor(),
+                     dl_bcast_ldpc_config_.NumRows(), coded_bits_ptr,
+                     dl_bcast_parity_buffer, ldpc_input);
+    int8_t* mod_input_ptr = dl_bcast_mod_bits[i];
+    AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
+                    reinterpret_cast<uint8_t*>(mod_input_ptr),
+                    dl_bcast_encoded_bytes, dl_bcast_mod_order);
+    for (size_t j = 0; j < ofdm_data_num_; j++) {
+      size_t sc = j + ofdm_data_start_;
+      if (IsDataSubcarrier(j) == true) {
+        dl_bcast_iq_f[i][j] = ModSingleUint8(
+            mod_input_ptr[this->GetOFDMDataIndex(j)], dl_bcast_mod_table);
+      } else {
+        dl_bcast_iq_f[i][j] = ue_specific_pilot_[0][j];
+      }
+      // FFT Shift
+      const size_t k = sc >= ofdm_ca_num_ / 2 ? sc - ofdm_ca_num_ / 2
+                                              : sc + ofdm_ca_num_ / 2;
+      dl_bcast_iq_ifft[i][k] = dl_bcast_iq_f[i][j];
+    }
+    CommsLib::IFFT(dl_bcast_iq_ifft[i], ofdm_ca_num_, false);
+    // additional 2^2 (6dB) power backoff
+    float dl_bcast_scale =
+        2 * CommsLib::FindMaxAbs(dl_bcast_iq_ifft[i], this->ofdm_ca_num_);
+    CommsLib::Ifft2tx(dl_bcast_iq_ifft[i], bcast_iq_samps[i],
+                      this->ofdm_ca_num_, this->ofdm_tx_zero_prefix_,
+                      this->cp_len_, dl_bcast_scale);
+  }
+  FreeBuffer1d(&bcast_bits_buffer);
+  dl_bcast_iq_ifft.Free();
+  dl_bcast_iq_f.Free();
+  dl_bcast_mod_table.Free();
+  dl_bcast_mod_bits.Free();
+  dl_bcast_encoded_bits.Free();
+}
+
 Config::~Config() {
   if (pilots_ != nullptr) {
     std::free(pilots_);
@@ -1543,6 +1701,17 @@ bool Config::IsUplink(size_t /*frame_id*/, size_t symbol_id) const {
   std::printf("IsUplink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
   return (s == 'U');
+}
+
+bool Config::IsDownlinkBroadcast(size_t frame_id, size_t symbol_id) const {
+  assert(symbol_id < this->frame_.NumTotalSyms());
+  char s = frame_.FrameIdentifier().at(symbol_id);
+#ifdef DEBUG3
+  std::printf("IsDownlinkBroadcast(%zu, %zu) = %c\n", frame_id, symbol_id, s);
+#else
+  unused(frame_id);
+#endif
+  return (s == 'S');
 }
 
 bool Config::IsDownlink(size_t frame_id, size_t symbol_id) const {

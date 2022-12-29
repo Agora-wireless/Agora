@@ -283,6 +283,9 @@ class Config {
     return dir == Direction::kUplink ? this->ul_ldpc_config_
                                      : this->dl_ldpc_config_;
   }
+  inline const LDPCconfig& BcLdpcConfig() const {
+    return dl_bcast_ldpc_config_;
+  }
   inline Table<complex_float>& ModTable(Direction dir) {
     return dir == Direction::kUplink ? this->ul_mod_table_
                                      : this->dl_mod_table_;
@@ -394,6 +397,8 @@ class Config {
 
   // Public functions
   void GenData();
+  void GenBroadcastSlots(Table<std::complex<int16_t>> bcast_iq_samps,
+                         size_t frame_id);
   void UpdateUlMCS(const nlohmann::json& mcs);
   void UpdateDlMCS(const nlohmann::json& mcs);
 
@@ -406,6 +411,7 @@ class Config {
   bool IsCalDlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
   bool IsCalUlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
   bool IsDownlink(size_t /*frame_id*/, size_t /*symbol_id*/) const;
+  bool IsDownlinkBroadcast(size_t /*frame_id*/, size_t /*symbol_id*/) const;
   bool IsUplink(size_t /*unused*/, size_t /*symbol_id*/) const;
 
   /* Public functions that do not meet coding standard format */
@@ -641,10 +647,11 @@ class Config {
   Table<complex_float> ul_mod_table_;
   Table<complex_float> dl_mod_table_;
 
-  LDPCconfig ul_ldpc_config_;     // Uplink LDPC parameters
-  LDPCconfig dl_ldpc_config_;     // Downlink LDPC parameters
-  nlohmann::json ul_mcs_params_;  // Uplink Modulation and Coding (MCS)
-  nlohmann::json dl_mcs_params_;  // Downlink Modulation and Coding (MCS)
+  LDPCconfig ul_ldpc_config_;        // Uplink LDPC parameters
+  LDPCconfig dl_ldpc_config_;        // Downlink LDPC parameters
+  LDPCconfig dl_bcast_ldpc_config_;  // Downlink Broadcast LDPC parameters
+  nlohmann::json ul_mcs_params_;     // Uplink Modulation and Coding (MCS)
+  nlohmann::json dl_mcs_params_;     // Downlink Modulation and Coding (MCS)
   bool scramble_enabled_;
 
   // A class that holds the frame configuration the id contains letters

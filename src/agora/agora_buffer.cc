@@ -116,6 +116,8 @@ void AgoraBuffer::AllocateTables() {
         task_buffer_symbol_num,
         Roundup<64>(config_->GetOFDMDataNum()) * config_->SpatialStreamsNum(),
         Agora_memory::Alignment_t::kAlign64);
+    AllocBuffer1d(&dl_bcast_mod_buffer_, Roundup<64>(config_->GetOFDMDataNum()),
+                  Agora_memory::Alignment_t::kAlign64, 1);
   }
 }
 
@@ -137,6 +139,7 @@ void AgoraBuffer::FreeTables() {
     calib_ul_msum_buffer_.Free();
     calib_buffer_.Free();
     dl_mod_bits_buffer_.Free();
+    FreeBuffer1d(&dl_bcast_mod_buffer_);
     dl_bits_buffer_.Free();
     dl_bits_buffer_status_.Free();
   }
