@@ -17,6 +17,7 @@
 #include "agora_buffer.h"
 #include "agora_worker.h"
 #include "concurrentqueue.h"
+#include "mac_scheduler.h"
 #include "mac_thread_basestation.h"
 #include "message.h"
 #include "packet_txrx.h"
@@ -119,6 +120,7 @@ class Agora {
   // Handle for the MAC thread
   std::thread mac_std_thread_;
 
+  std::unique_ptr<MacScheduler> mac_sched_;
   std::unique_ptr<Stats> stats_;
   std::unique_ptr<PhyStats> phy_stats_;
   std::unique_ptr<AgoraWorker> worker_set_;

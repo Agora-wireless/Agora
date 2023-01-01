@@ -16,8 +16,7 @@ AgoraBuffer::AgoraBuffer(Config* const cfg)
                       cfg->SpatialStreamsNum() * cfg->BsAntNum()),
       demod_buffer_(kFrameWnd, cfg->Frame().NumULSyms(),
                     cfg->SpatialStreamsNum(), kMaxModType * cfg->OfdmDataNum()),
-      decoded_buffer_(kFrameWnd, cfg->Frame().NumULSyms(),
-                      cfg->SpatialStreamsNum(),
+      decoded_buffer_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),
                       cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
                           Roundup<64>(cfg->NumBytesPerCb(Direction::kUplink))) {
   AllocateTables();
@@ -46,22 +45,6 @@ void AgoraBuffer::AllocateTables() {
       config_->Frame().ClientUlPilotSymbols() * config_->SpatialStreamsNum(),
       Agora_memory::Alignment_t::kAlign64);
 
-  ue_schedule_buffer_.Calloc(kFrameWnd,
-                             config_->UeAntNum() * config_->OfdmDataNum(),
-                             Agora_memory::Alignment_t::kAlign64);
-  // Create round-robin schedule
-  size_t num_groups = (config_->SpatialStreamsNum() == config_->UeAntNum())
-                          ? 1
-                          : config_->UeAntNum();
-  for (size_t gp = 0u; gp < num_groups; gp++) {
-    for (size_t ue = gp; ue < gp + config_->SpatialStreamsNum(); ue++) {
-      for (size_t sc = 0; sc < config_->OfdmDataNum(); sc++) {
-        size_t cur_ue = ue % config_->UeAntNum();
-        ue_schedule_buffer_[gp][cur_ue * config_->OfdmDataNum() + sc] = 1;
-      }
-    }
-  }
-
   // Downlink
   if (config_->Frame().NumDLSyms() > 0) {
     const size_t task_buffer_symbol_num =
@@ -76,9 +59,9 @@ void AgoraBuffer::AllocateTables() {
 
     size_t dl_bits_buffer_size =
         kFrameWnd * config_->MacBytesNumPerframe(Direction::kDownlink);
-    dl_bits_buffer_.Calloc(config_->SpatialStreamsNum(), dl_bits_buffer_size,
+    dl_bits_buffer_.Calloc(config_->UeAntNum(), dl_bits_buffer_size,
                            Agora_memory::Alignment_t::kAlign64);
-    dl_bits_buffer_status_.Calloc(config_->SpatialStreamsNum(), kFrameWnd,
+    dl_bits_buffer_status_.Calloc(config_->UeAntNum(), kFrameWnd,
                                   Agora_memory::Alignment_t::kAlign64);
 
     dl_ifft_buffer_.Calloc(config_->BsAntNum() * task_buffer_symbol_num,
@@ -127,7 +110,6 @@ void AgoraBuffer::FreeTables() {
   fft_buffer_.Free();
   equal_buffer_.Free();
   ue_spec_pilot_buffer_.Free();
-  ue_schedule_buffer_.Free();
 
   // Downlink
   if (config_->Frame().NumDLSyms() > 0) {

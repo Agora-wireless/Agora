@@ -1554,8 +1554,8 @@ void Config::GenBroadcastSlots(Table<std::complex<int16_t>> bcast_iq_samps,
                           Agora_memory::Alignment_t::kAlign64);
   /*dl_bcast_iq_t.Calloc(this->frame_.NumDLBcastSyms(), samps_per_symbol_,
                       Agora_memory::Alignment_t::kAlign64);*/
-  assert(bcast_iq_samps.dim1() == this->frame_.NumDLBcastSyms() &&
-         bcast_iq_samps.dim2() == samps_per_symbol_);
+  assert(bcast_iq_samps.Dim1() == this->frame_.NumDLBcastSyms() &&
+         bcast_iq_samps.Dim2() == samps_per_symbol_);
   auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
   for (size_t i = 0; i < this->frame_.NumDLBcastSyms(); i++) {
     int8_t* coded_bits_ptr = dl_bcast_encoded_bits[i];

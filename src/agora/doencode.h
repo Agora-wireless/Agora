@@ -12,6 +12,7 @@
 
 #include "config.h"
 #include "doer.h"
+#include "mac_scheduler.h"
 #include "memory_manage.h"
 #include "message.h"
 #include "scrambler.h"
@@ -21,13 +22,15 @@ class DoEncode : public Doer {
  public:
   DoEncode(Config* in_config, int in_tid, Direction dir,
            Table<int8_t>& in_raw_data_buffer, size_t in_buffer_rollover,
-           Table<int8_t>& in_mod_bits_buffer, Stats* in_stats_manager);
+           Table<int8_t>& in_mod_bits_buffer, MacScheduler* mac_sched,
+           Stats* in_stats_manager);
   ~DoEncode() override;
 
   EventData Launch(size_t tag) override;
 
  private:
   Direction dir_;
+  MacScheduler* mac_sched_;
 
   // References to buffers allocated pre-construction
   Table<int8_t>& raw_data_buffer_;

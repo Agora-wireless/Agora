@@ -415,6 +415,7 @@ set(COMMON_SOURCES
   src/agora/radio/radio_data_plane_soapy.cc
   src/agora/radio/radio_data_plane_socket.cc
   src/agora/radio/radio_set/radio_set.cc
+  src/mac/mac_scheduler.cc
   src/common/ipc/udp_comm.cc
   src/common/ipc/network_utils.cc
   src/common/loggers/csv_logger.cc

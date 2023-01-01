@@ -19,17 +19,16 @@ static constexpr bool kUseUlZfForDownlink = true;
 DoBeamWeights::DoBeamWeights(
     Config* config, int tid,
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
-    Table<int8_t>& ue_schedule_buffer, Table<complex_float>& calib_dl_buffer,
+    Table<complex_float>& calib_dl_buffer,
     Table<complex_float>& calib_ul_buffer,
     Table<complex_float>& calib_dl_msum_buffer,
     Table<complex_float>& calib_ul_msum_buffer,
     Table<complex_float>& calib_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices,
-    PhyStats* in_phy_stats, Stats* stats_manager)
+    MacScheduler* mac_sched, PhyStats* in_phy_stats, Stats* stats_manager)
     : Doer(config, tid),
       csi_buffers_(csi_buffers),
-      ue_schedule_buffer_(ue_schedule_buffer),
       calib_dl_buffer_(calib_dl_buffer),
       calib_ul_buffer_(calib_ul_buffer),
       calib_dl_msum_buffer_(calib_dl_msum_buffer),
@@ -37,6 +36,7 @@ DoBeamWeights::DoBeamWeights(
       calib_buffer_(calib_buffer),
       ul_beam_matrices_(ul_beam_matrices),
       dl_beam_matrices_(dl_beam_matrices),
+      mac_sched_(mac_sched),
       phy_stats_(in_phy_stats) {
   duration_stat_ = stats_manager->GetDurationStat(DoerType::kBeam, tid);
   pred_csi_buffer_ =
@@ -409,12 +409,8 @@ void DoBeamWeights::ComputeFullCsiBeams(size_t tag) {
 
     // Gather CSI matrices of each pilot from partially-transposed CSIs.
     size_t selected_ue_idx = 0;
-    size_t num_groups =
-        (cfg_->SpatialStreamsNum() == cfg_->UeAntNum()) ? 1 : cfg_->UeAntNum();
     for (size_t ue_idx = 0; ue_idx < cfg_->UeAntNum(); ue_idx++) {
-      size_t ue_group_slot = frame_id % num_groups;
-      if (ue_schedule_buffer_[ue_group_slot]
-                             [ue_idx * cfg_->OfdmDataNum() + base_sc_id] == 0) {
+      if (!mac_sched_->IsUeScheduled(frame_id, cur_sc_id, ue_idx)) {
         continue;
       } else {
         selected_ue_idx++;

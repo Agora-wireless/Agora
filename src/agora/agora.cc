@@ -49,6 +49,7 @@ static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
 Agora::Agora(Config* const cfg)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
       config_(cfg),
+      mac_sched_(std::make_unique<MacScheduler>(cfg)),
       stats_(std::make_unique<Stats>(cfg)),
       phy_stats_(std::make_unique<PhyStats>(cfg, Direction::kUplink)),
       agora_memory_(std::make_unique<AgoraBuffer>(cfg)) {
@@ -1132,7 +1133,7 @@ void Agora::InitializeThreads() {
   // Create workers
   ///\todo convert unique ptr to shared
   worker_set_ = std::make_unique<AgoraWorker>(
-      config_, stats_.get(), phy_stats_.get(), message_.get(),
+      config_, mac_sched_.get(), stats_.get(), phy_stats_.get(), message_.get(),
       agora_memory_.get(), &frame_tracking_);
 
   AGORA_LOG_INFO(

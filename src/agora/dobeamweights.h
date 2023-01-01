@@ -11,6 +11,7 @@
 #include "common_typedef_sdk.h"
 #include "config.h"
 #include "doer.h"
+#include "mac_scheduler.h"
 #include "mat_logger.h"
 #include "memory_manage.h"
 #include "message.h"
@@ -22,14 +23,14 @@ class DoBeamWeights : public Doer {
   DoBeamWeights(
       Config* in_config, int tid,
       PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
-      Table<int8_t>& ue_schedule_buffer, Table<complex_float>& calib_dl_buffer,
+      Table<complex_float>& calib_dl_buffer,
       Table<complex_float>& calib_ul_buffer,
       Table<complex_float>& calib_dl_msum_buffer,
       Table<complex_float>& calib_ul_msum_buffer,
       Table<complex_float>& calib_buffer,
       PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_,
       PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_,
-      PhyStats* in_phy_stats, Stats* stats_manager);
+      MacScheduler* mac_sched, PhyStats* in_phy_stats, Stats* stats_manager);
   ~DoBeamWeights() override;
 
   /**
@@ -88,7 +89,6 @@ class DoBeamWeights : public Doer {
 
   PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
   complex_float* pred_csi_buffer_;
-  Table<int8_t> ue_schedule_buffer_;
 
   //Should be read only (Set by FFT and read by Zf)
   Table<complex_float>& calib_dl_buffer_;
@@ -107,6 +107,7 @@ class DoBeamWeights : public Doer {
   complex_float* calib_gather_buffer_;
   std::unique_ptr<arma::cx_fvec> calib_sc_vec_ptr_;
 
+  MacScheduler* mac_sched_;
   PhyStats* phy_stats_;
   arma::uvec ext_ref_id_;
   size_t num_ext_ref_;

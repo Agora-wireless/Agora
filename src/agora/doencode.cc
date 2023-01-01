@@ -16,12 +16,14 @@ static constexpr bool kPrintRawMacData = false;
 
 DoEncode::DoEncode(Config* in_config, int in_tid, Direction dir,
                    Table<int8_t>& in_raw_data_buffer, size_t in_buffer_rollover,
-                   Table<int8_t>& in_mod_bits_buffer, Stats* in_stats_manager)
+                   Table<int8_t>& in_mod_bits_buffer, MacScheduler* mac_sched,
+                   Stats* in_stats_manager)
     : Doer(in_config, in_tid),
       dir_(dir),
       raw_data_buffer_(in_raw_data_buffer),
       raw_buffer_rollover_(in_buffer_rollover),
       mod_bits_buffer_(in_mod_bits_buffer),
+      mac_sched_(mac_sched),
       scrambler_(std::make_unique<AgoraScrambler::Scrambler>()) {
   duration_stat_ = in_stats_manager->GetDurationStat(DoerType::kEncode, in_tid);
   parity_buffer_ = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
@@ -57,7 +59,8 @@ EventData DoEncode::Launch(size_t tag) {
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
   size_t cb_id = gen_tag_t(tag).cb_id_;
   size_t cur_cb_id = cb_id % ldpc_config.NumBlocksInSymbol();
-  size_t ue_id = cb_id / ldpc_config.NumBlocksInSymbol();
+  size_t sched_ue_id = cb_id / ldpc_config.NumBlocksInSymbol();
+  size_t ue_id = mac_sched_->ScheduledUeIndex(frame_id, 0, sched_ue_id);
 
   size_t start_tsc = GetTime::WorkerRdtsc();
 
@@ -147,8 +150,8 @@ EventData DoEncode::Launch(size_t tag) {
     AGORA_LOG_INFO("ldpc output (%zu %zu %zu): %s\n", frame_id, symbol_idx,
                    ue_id, dataprint.str().c_str());
   }
-  int8_t* mod_buffer_ptr = cfg_->GetModBitsBuf(mod_bits_buffer_, dir_, frame_id,
-                                               symbol_idx, ue_id, cur_cb_id);
+  int8_t* mod_buffer_ptr = cfg_->GetModBitsBuf(
+      mod_bits_buffer_, dir_, frame_id, symbol_idx, sched_ue_id, cur_cb_id);
 
   if (kPrintRawMacData && dir_ == Direction::kUplink) {
     std::printf("Encoded data - placed at location (%zu %zu %zu) %zu\n",

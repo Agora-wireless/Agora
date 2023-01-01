@@ -16,11 +16,12 @@
 #include "doprecode.h"
 #include "logger.h"
 
-AgoraWorker::AgoraWorker(Config* cfg, Stats* stats, PhyStats* phy_stats,
-                         MessageInfo* message, AgoraBuffer* buffer,
-                         FrameInfo* frame)
+AgoraWorker::AgoraWorker(Config* cfg, MacScheduler* mac_sched, Stats* stats,
+                         PhyStats* phy_stats, MessageInfo* message,
+                         AgoraBuffer* buffer, FrameInfo* frame)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
       config_(cfg),
+      mac_sched_(mac_sched),
       stats_(stats),
       phy_stats_(phy_stats),
       message_(message),
@@ -51,11 +52,11 @@ void AgoraWorker::WorkerThread(int tid) {
 
   /* Initialize operators */
   auto compute_beam = std::make_unique<DoBeamWeights>(
-      config_, tid, buffer_->GetCsi(), buffer_->GetUeSchedule(),
-      buffer_->GetCalibDl(), buffer_->GetCalibUl(), buffer_->GetCalibDlMsum(),
+      config_, tid, buffer_->GetCsi(), buffer_->GetCalibDl(),
+      buffer_->GetCalibUl(), buffer_->GetCalibDlMsum(),
       buffer_->GetCalibUlMsum(), buffer_->GetCalib(),
-      buffer_->GetUlBeamMatrix(), buffer_->GetDlBeamMatrix(), phy_stats_,
-      stats_);
+      buffer_->GetUlBeamMatrix(), buffer_->GetDlBeamMatrix(), mac_sched_,
+      phy_stats_, stats_);
 
   auto compute_fft = std::make_unique<DoFFT>(
       config_, tid, buffer_->GetFft(), buffer_->GetCsi(), buffer_->GetCalibDl(),
@@ -72,17 +73,18 @@ void AgoraWorker::WorkerThread(int tid) {
   auto compute_encoding = std::make_unique<DoEncode>(
       config_, tid, Direction::kDownlink,
       (kEnableMac == true) ? buffer_->GetDlBits() : config_->DlBits(),
-      (kEnableMac == true) ? kFrameWnd : 1, buffer_->GetDlModBits(), stats_);
+      (kEnableMac == true) ? kFrameWnd : 1, buffer_->GetDlModBits(), mac_sched_,
+      stats_);
 
   // Uplink workers
-  auto compute_decoding =
-      std::make_unique<DoDecode>(config_, tid, buffer_->GetDemod(),
-                                 buffer_->GetDecod(), phy_stats_, stats_);
+  auto compute_decoding = std::make_unique<DoDecode>(
+      config_, tid, buffer_->GetDemod(), buffer_->GetDecod(), mac_sched_,
+      phy_stats_, stats_);
 
   auto compute_demul = std::make_unique<DoDemul>(
       config_, tid, buffer_->GetFft(), buffer_->GetUlBeamMatrix(),
       buffer_->GetUeSpecPilot(), buffer_->GetEqual(), buffer_->GetDemod(),
-      phy_stats_, stats_);
+      mac_sched_, phy_stats_, stats_);
 
   std::vector<Doer*> computers_vec;
   std::vector<EventType> events_vec;
