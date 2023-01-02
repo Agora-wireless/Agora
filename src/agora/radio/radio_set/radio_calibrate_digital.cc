@@ -9,8 +9,8 @@
 #include "datatype_conversion.h"
 #include "logger.h"
 #include "matplotlibcpp.h"
+#include "radio_set_calibrate.h"
 #include "simd_types.h"
-#include "radio_set_bs.h"
 
 namespace plt = matplotlibcpp;
 
@@ -21,7 +21,7 @@ static constexpr bool kVerboseCalibration = false;
 static constexpr size_t kRefChannel = 0;
 static constexpr float kMaxSampleRxTimeSec = 1.0f;
 
-auto RadioSetBs::TxArrayToRef(
+auto RadioSetCalibrate::TxArrayToRef(
     const std::vector<std::complex<int16_t>>& tx_vec) {
   const size_t ref = cfg_->RefRadio(0);
   const size_t tx_antennas = cfg_->BfAntNum();
@@ -115,7 +115,7 @@ auto RadioSetBs::TxArrayToRef(
   return dl_buff;
 }
 
-auto RadioSetBs::TxRefToArray(
+auto RadioSetCalibrate::TxRefToArray(
     const std::vector<std::complex<int16_t>>& tx_vec) {
   const size_t num_radios = cfg_->NumRadios();
   // minus ref. node (last in radio list assumed)
@@ -207,7 +207,7 @@ auto RadioSetBs::TxRefToArray(
   return ul_buff;
 }
 
-bool RadioSetBs::FindTimeOffset(
+bool RadioSetCalibrate::FindTimeOffset(
     const std::vector<std::vector<std::complex<int16_t>>>& rx_mat,
     std::vector<int>& offset) {
   bool bad_data = false;
@@ -232,7 +232,6 @@ bool RadioSetBs::FindTimeOffset(
           "channel %zu:%zu\n",
           std::abs(offset.at(i) - offset.at(i - cfg_->NumChannels())),
           kMaxArraySampleOffset, i, i - cfg_->NumChannels());
-      bad_data = true;
     }
   }
 
@@ -246,25 +245,6 @@ bool RadioSetBs::FindTimeOffset(
     AGORA_LOG_WARN("All offsets:%s\n", print_offsets.str().c_str());
   }
   return bad_data;
-}
-
-void RadioSetBs::AdjustDelays(const std::vector<int>& ch0_offsets) {
-  // adjust all trigger delay fwith respect to the max offset
-  const size_t ref_offset =
-      *std::max_element(ch0_offsets.begin(), ch0_offsets.end());
-  for (size_t i = 0; i < ch0_offsets.size(); i++) {
-    const int delta = ref_offset - ch0_offsets.at(i);
-    AGORA_LOG_INFO("Sample adjusting delay of node %zu (offset %d) by %d\n", i,
-                   ch0_offsets.at(i), delta);
-    const int iter = delta < 0 ? -delta : delta;
-    for (int j = 0; j < iter; j++) {
-      if (delta < 0) {
-        radios_.at(i)->AdjustDelay("-1");
-      } else {
-        radios_.at(i)->AdjustDelay("1");
-      }
-    }
-  }
 }
 
 //Returns the min and max offset values for channel 0 accross all radios
@@ -338,15 +318,12 @@ static void CheckSnr(
   AGORA_LOG_INFO("%s", snr_printout.str().c_str())
 }
 
-void RadioSetBs::CalibrateSampleOffset() {
+void RadioSetCalibrate::CalibrateSampleOffset() {
   const size_t max_retries = 10;
-  const bool uplink_success = CalibrateSampleOffsetUplink(max_retries);
-  if (uplink_success) {
-    CalibrateSampleOffsetDownlink(max_retries);
-  }
+  CalibrateSampleOffsetUplink(max_retries);
 }
 
-bool RadioSetBs::CalibrateSampleOffsetUplink(size_t max_attempts) {
+bool RadioSetCalibrate::CalibrateSampleOffsetUplink(size_t max_attempts) {
   bool uplink_cal_success = false;
   AGORA_LOG_INFO("Calibrating with uplink\n");
   const size_t num_channels = cfg_->NumChannels();
@@ -372,15 +349,9 @@ bool RadioSetBs::CalibrateSampleOffsetUplink(size_t max_attempts) {
       const int diff_offset = max_offset - min_offset;
       AGORA_LOG_INFO("Uplink Offsets detected [min=%zu, max=%zu] diff=%zu\n",
                      min_offset, max_offset, diff_offset);
-      if (diff_offset > 0) {
-        AGORA_LOG_INFO(
-            "Uplink pilot offsets not synced. Adjusting trigger offset...\n")
-        AdjustDelays(ch0_offsets);
-      } else {
-        CheckSnr(min_offset, ul_buff, cfg_);
-        cfg_->OfdmRxZeroPrefixCalUl(min_offset - (min_offset % 4));
-        uplink_cal_success = true;
-      }
+      const std::string filename = "files/log/iris_samp_offsets.dat";
+      Utils::WriteVector(filename, "", ch0_offsets);
+      uplink_cal_success = true;
     }
   }
 
@@ -392,7 +363,7 @@ bool RadioSetBs::CalibrateSampleOffsetUplink(size_t max_attempts) {
 }
 
 static constexpr size_t kDownlinkMaxDiffOffset = 4;
-bool RadioSetBs::CalibrateSampleOffsetDownlink(size_t max_attempts) {
+bool RadioSetCalibrate::CalibrateSampleOffsetDownlink(size_t max_attempts) {
   bool downlink_cal_success = false;
   const size_t num_channels = cfg_->NumChannels();
   const size_t num_radios = cfg_->BfAntNum() / num_channels;
@@ -418,13 +389,9 @@ bool RadioSetBs::CalibrateSampleOffsetDownlink(size_t max_attempts) {
       AGORA_LOG_INFO("Downlink Offsets detected [min=%zu, max=%zu] diff=%zu\n",
                      min_offset, max_offset, diff_offset);
 
-      if (diff_offset > kDownlinkMaxDiffOffset) {
-        AGORA_LOG_WARN("Downlink offsets mismatch: Attempt %zu\n", attempt);
-      } else {
-        CheckSnr(min_offset, dl_buff, cfg_);
-        cfg_->OfdmRxZeroPrefixCalDl(min_offset - (min_offset % 4));
-        downlink_cal_success = true;
-      }
+      Utils::WriteVector("downlink_offsets.txt", "", ch0_offsets);
+      downlink_cal_success = true;
+      CheckSnr(min_offset, dl_buff, cfg_);
     }
   }
 
@@ -435,7 +402,7 @@ bool RadioSetBs::CalibrateSampleOffsetDownlink(size_t max_attempts) {
   return downlink_cal_success;
 }
 
-bool RadioSetBs::InitialCalib() {
+bool RadioSetCalibrate::InitialCalib() {
   // excludes zero padding
   const size_t seq_len = cfg_->PilotCf32().size();
   const size_t read_len = cfg_->PilotCi16().size();
