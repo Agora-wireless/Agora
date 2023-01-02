@@ -330,14 +330,12 @@ void Utils::LoadDevices(std::string filename, std::vector<std::string>& data) {
   filename = cur_directory + "/" + filename;
   std::ifstream myfile(filename, std::ifstream::in);
   if (myfile.is_open()) {
-    while (getline(myfile, line)) {
-      // line.erase( std::remove (line.begin(), line.end(), ' '),
-      // line.end());
+    while (std::getline(myfile, line)) {
       if (line.at(0) == '#') {
-        continue;
+      } else {
+        data.push_back(line);
+        std::cout << line << '\n';
       }
-      data.push_back(line);
-      std::cout << line << '\n';
     }
     myfile.close();
   }
@@ -518,14 +516,12 @@ std::vector<int> Utils::ReadVector(const std::string filename,
   std::ifstream myfile(filename, std::ifstream::in);
   std::vector<int> vec_data;
   if (myfile.is_open()) {
-    while (getline(myfile, line)) {
-      // line.erase( std::remove (line.begin(), line.end(), ' '),
-      // line.end());
+    while (std::getline(myfile, line)) {
       if (first_line) {
         first_line = false;
-        continue;
+      } else {
+        vec_data.push_back(std::stoi(line));
       }
-      vec_data.push_back(std::stoi(line));
     }
     myfile.close();
   }
@@ -574,26 +570,24 @@ Utils::ReadVectorOfComplex(const std::string filename, const bool skip_line,
   std::array<std::vector<std::complex<double>>, kMaxChannels> vec_data;
   //std::cout << filename << ":" << std::endl;
   if (myfile.is_open()) {
-    while (getline(myfile, cur_line)) {
+    while (std::getline(myfile, cur_line)) {
       if (first_line) {
         first_line = false;
-        continue;
-      }
-      //std::cout << " " << cur_line << std::endl;
-      std::string token;
-      std::istringstream line(cur_line);
-      size_t item_count = 0;
-      while (std::getline(line, token, ',')) {
-        std::string::size_type pos = 0;
-        pos = token.find('+', pos);
-        //assert(pos != std::string::npos);
-        double first_p = std::stod(token.substr(0, pos));
-        double second_p = std::stod(token.substr(pos + 1, token.size() - pos));
-        //std::cout << "   " << first_p << std::endl;
-        //std::cout << "   " << second_p << std::endl;
-        std::complex<double> cur_val(first_p, second_p);
-        size_t chan = present_channels.at(item_count);
-        vec_data.at(chan).push_back(cur_val);
+      } else {
+        std::string token;
+        std::istringstream line(cur_line);
+        size_t item_count = 0;
+        while (std::getline(line, token, ',')) {
+          std::string::size_type pos = 0;
+          pos = token.find('+', pos);
+          // what if position is not found?
+          double first_p = std::stod(token.substr(0, pos));
+          double second_p =
+              std::stod(token.substr(pos + 1, token.size() - pos));
+          std::complex<double> cur_val(first_p, second_p);
+          size_t chan = present_channels.at(item_count);
+          vec_data.at(chan).push_back(cur_val);
+        }
       }
     }
     myfile.close();
