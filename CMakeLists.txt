@@ -26,6 +26,7 @@ endif()
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -no-pie")
 
 set(CMAKE_CXX_STANDARD 17)
+
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   message(STATUS "Using GNU compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   set(CMAKE_C_FLAGS "-std=gnu11 -Wall -g -march=native -m64")
@@ -42,6 +43,9 @@ elseif(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
   message(STATUS "Using Clang compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
 endif()
+
+#Set to ON For clang tidy
+set(CMAKE_EXPORT_COMPILE_COMMANDS OFF)
 
 option(DEBUG "Enable debugging" OFF)
 
