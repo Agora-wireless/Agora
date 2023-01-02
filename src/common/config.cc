@@ -260,11 +260,6 @@ Config::Config(std::string jsonfilename)
   beamforming_str_ = tdd_conf.value("beamforming", "ZF");
   beamforming_algo_ = kBeamformingStr.at(beamforming_str_);
 
-  RtAssert(sample_cal_en_ == false,
-           "Digital / Sample offset calibration is not supported at this time");
-  RtAssert(imbalance_cal_en_ == false,
-           "Analog / imbalance calibration is not supported at this time");
-
   bs_server_addr_ = tdd_conf.value("bs_server_addr", "127.0.0.1");
   bs_rru_addr_ = tdd_conf.value("bs_rru_addr", "127.0.0.1");
   ue_server_addr_ = tdd_conf.value("ue_server_addr", "127.0.0.1");
