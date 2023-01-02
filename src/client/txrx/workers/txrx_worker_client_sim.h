@@ -39,7 +39,6 @@ class TxRxWorkerClientSim : public TxRxWorker {
   std::vector<std::unique_ptr<UDPComm>> udp_comm_;
 
   //Helper tx vectors
-  std::vector<uint8_t> tx_pkt_zeros_;
-  std::vector<std::vector<uint8_t>> tx_pkt_pilot_;
+  std::vector<std::vector<std::vector<uint8_t>>> tx_pkt_pilot_;
 };
 #endif  // TXRX_WORKER_CLIENT_SIM_H_

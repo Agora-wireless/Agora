@@ -1416,29 +1416,35 @@ void Config::GenData() {
   this->pilot_ue_sc_.resize(ue_ant_num_);
   this->pilot_ue_ci16_.resize(ue_ant_num_);
   for (size_t ue_id = 0; ue_id < this->ue_ant_num_; ue_id++) {
-    std::vector<arma::uword> pilot_sc_list;
-    for (size_t sc_id = 0; sc_id < ofdm_data_num_; sc_id++) {
-      const size_t org_sc = sc_id + ofdm_data_start_;
-      const size_t center_sc = ofdm_ca_num_ / 2;
-      // FFT Shift
-      const size_t shifted_sc =
-          (org_sc >= center_sc) ? (org_sc - center_sc) : (org_sc + center_sc);
-      if (this->freq_orthogonal_pilot_ == false ||
-          sc_id % kTransposeBlockSize == ue_id) {
-        pilot_ifft[shifted_sc] = this->pilots_[sc_id];
-        pilot_sc_list.push_back(org_sc);
-      } else {
-        pilot_ifft[shifted_sc].re = 0.0f;
-        pilot_ifft[shifted_sc].im = 0.0f;
+    this->pilot_ue_ci16_.at(ue_id).resize(this->frame_.NumPilotSyms());
+    for (size_t pilot_idx = 0; pilot_idx < this->frame_.NumPilotSyms();
+         pilot_idx++) {
+      this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).resize(samps_per_symbol_, 0);
+      if (this->freq_orthogonal_pilot_ || ue_id == pilot_idx) {
+        std::vector<arma::uword> pilot_sc_list;
+        for (size_t sc_id = 0; sc_id < ofdm_data_num_; sc_id++) {
+          const size_t org_sc = sc_id + ofdm_data_start_;
+          const size_t center_sc = ofdm_ca_num_ / 2;
+          // FFT Shift
+          const size_t shifted_sc = (org_sc >= center_sc)
+                                        ? (org_sc - center_sc)
+                                        : (org_sc + center_sc);
+          if (this->freq_orthogonal_pilot_ == false ||
+              sc_id % kTransposeBlockSize == ue_id) {
+            pilot_ifft[shifted_sc] = this->pilots_[sc_id];
+            pilot_sc_list.push_back(org_sc);
+          } else {
+            pilot_ifft[shifted_sc].re = 0.0f;
+            pilot_ifft[shifted_sc].im = 0.0f;
+          }
+        }
+        pilot_ue_sc_.at(ue_id) = arma::uvec(pilot_sc_list);
+        CommsLib::IFFT(pilot_ifft, this->ofdm_ca_num_, false);
+        CommsLib::Ifft2tx(pilot_ifft,
+                          this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).data(),
+                          ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
       }
     }
-    pilot_ue_sc_.at(ue_id) = arma::uvec(pilot_sc_list);
-    CommsLib::IFFT(pilot_ifft, this->ofdm_ca_num_, false);
-    this->pilot_ue_ci16_.at(ue_id).resize(samps_per_symbol_, 0);
-    CommsLib::Ifft2tx(pilot_ifft,
-                      reinterpret_cast<std::complex<int16_t>*>(
-                          this->pilot_ue_ci16_.at(ue_id).data()),
-                      ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
   }
 
   if (kDebugPrintPilot) {

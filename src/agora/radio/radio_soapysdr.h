@@ -19,30 +19,26 @@ class RadioSoapySdr : public Radio {
   ~RadioSoapySdr() final;
 
   void Init(const Config* cfg, size_t id, const std::string& serial,
-                    const std::vector<size_t>& enabled_channels,
-                    bool hw_framer) final;
+            const std::vector<size_t>& enabled_channels, bool hw_framer) final;
   void Setup(const std::vector<double>& tx_gains,
-                     const std::vector<double>& rx_gains) final;
-  void Activate(
-      Radio::ActivationTypes type = Radio::ActivationTypes::kActivate,
-      long long act_time_ns = 0, size_t samples = 0) final;
+             const std::vector<double>& rx_gains) final;
+  void Activate(Radio::ActivationTypes type = Radio::ActivationTypes::kActivate,
+                long long act_time_ns = 0, size_t samples = 0) final;
   void Deactivate() final;
   void Close() final;
   void Flush() final;
 
-  int Tx(const void* const* tx_buffs, size_t tx_size,
-                 Radio::TxFlags tx_flags, long long& tx_time_ns) final;
+  int Tx(const void* const* tx_buffs, size_t tx_size, Radio::TxFlags tx_flags,
+         long long& tx_time_ns) final;
 
   int Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-                 size_t rx_size, RxFlags& out_flags,
-                 long long& rx_time_ns) final;
+         size_t rx_size, RxFlags& out_flags, long long& rx_time_ns) final;
 
   int Rx(std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
-                 size_t rx_size, RxFlags& out_flags,
-                 long long& rx_time_ns) final;
+         size_t rx_size, RxFlags& out_flags, long long& rx_time_ns) final;
 
-  int Rx(std::vector<void*>& rx_locs, size_t rx_size,
-                 RxFlags& out_flags, long long& rx_time_ns) final;
+  int Rx(std::vector<void*>& rx_locs, size_t rx_size, RxFlags& out_flags,
+         long long& rx_time_ns) final;
 
   void SetTimeAtTrigger(long long time_ns = 0) final;
   long long GetTimeNs() final;
