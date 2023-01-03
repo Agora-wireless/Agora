@@ -85,8 +85,71 @@ DoBeamWeights::~DoBeamWeights() {
   std::free(calib_gather_buffer_);
 }
 
-EventData DoBeamWeights::Launch(size_t tag) {
-  ComputeFullCsiBeams(tag);
+EventData DoBeamWeights::Launch(size_t tag) {  // Compute Full-CSI Beams
+  const size_t frame_id = gen_tag_t(tag).frame_id_;
+  const size_t base_sc_id = gen_tag_t(tag).sc_id_;
+  const size_t frame_slot = frame_id % kFrameWnd;
+  if (kDebugPrintInTask) {
+    std::printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid_,
+                frame_id, base_sc_id);
+  }
+  const size_t num_subcarriers =
+      cfg_->FreqOrthogonalPilot()
+          ? 1
+          : std::min(cfg_->BeamBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
+
+  // Handle each subcarrier one by one
+  for (size_t i = 0; i < num_subcarriers; i++) {
+    arma::cx_fvec& cal_sc_vec = *calib_sc_vec_ptr_;
+    const size_t start_tsc1 = GetTime::WorkerRdtsc();
+    const size_t cur_sc_id = base_sc_id + i;
+
+    // Gather CSI matrices of each pilot from partially-transposed CSIs.
+    for (size_t ue_idx = 0; ue_idx < cfg_->UeAntNum(); ue_idx++) {
+      auto* dst_csi_ptr = reinterpret_cast<float*>(csi_gather_buffer_ +
+                                                   cfg_->BsAntNum() * ue_idx);
+      if (kUsePartialTrans) {
+        PartialTransposeGather(cur_sc_id,
+                               (float*)csi_buffers_[frame_slot][ue_idx],
+                               dst_csi_ptr, cfg_->BsAntNum());
+      } else {
+        TransposeGather(cur_sc_id, (float*)csi_buffers_[frame_slot][ue_idx],
+                        dst_csi_ptr, cfg_->BsAntNum(), cfg_->OfdmDataNum());
+      }
+    }
+
+    size_t start_tsc2 = GetTime::WorkerRdtsc();
+    duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
+
+    arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer_, cfg_->BsAntNum(),
+                          cfg_->UeAntNum(), false);
+
+    if (cfg_->Frame().NumDLSyms() > 0) {
+      ComputeCalib(frame_id, cur_sc_id, cal_sc_vec);
+    }
+    if (num_ext_ref_ > 0) {
+      mat_csi.shed_rows(ext_ref_id_);
+    }
+
+    double start_tsc3 = GetTime::WorkerRdtsc();
+    duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
+
+    float noise = 0;
+    if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
+      noise = phy_stats_->GetNoise(frame_id);
+    }
+    float rcond = ComputePrecoder(
+        frame_id, cur_sc_id, mat_csi, cal_sc_vec, noise,
+        ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)],
+        dl_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
+    if (kPrintBeamStats) {
+      phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
+    }
+
+    duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
+    duration_stat_->task_count_++;
+    duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;
+  }
   return EventData(EventType::kBeam, tag);
 }
 
@@ -309,8 +372,9 @@ void DoBeamWeights::ComputeCalib(size_t frame_id, size_t sc_id,
 
 // Gather data of one symbol from partially-transposed buffer
 // produced by dofft
-static inline void PartialTransposeGather(size_t cur_sc_id, float* src,
-                                          float*& dst, size_t bs_ant_num) {
+inline void DoBeamWeights::PartialTransposeGather(size_t cur_sc_id, float* src,
+                                                  float*& dst,
+                                                  size_t bs_ant_num) {
   // The SIMD and non-SIMD methods are equivalent.
 
 #ifdef __AVX512F__
@@ -376,170 +440,15 @@ static inline void PartialTransposeGather(size_t cur_sc_id, float* src,
 
 // Gather data of one symbol from partially-transposed buffer
 // produced by dofft
-static inline void TransposeGather(size_t cur_sc_id, float* src, float*& dst,
-                                   size_t bs_ant_num, size_t ofdm_data_num) {
+inline void DoBeamWeights::TransposeGather(size_t cur_sc_id, float* src,
+                                           float*& dst, size_t bs_ant_num,
+                                           size_t ofdm_data_num) {
   auto* cx_src = reinterpret_cast<complex_float*>(src);
   auto* cx_dst = reinterpret_cast<complex_float*>(dst);
   for (size_t ant_i = 0; ant_i < bs_ant_num; ant_i++) {
     *cx_dst = cx_src[ant_i * ofdm_data_num + cur_sc_id];
     cx_dst++;
   }
-}
-
-void DoBeamWeights::ComputeFullCsiBeams(size_t tag) {
-  const size_t frame_id = gen_tag_t(tag).frame_id_;
-  const size_t base_sc_id = gen_tag_t(tag).sc_id_;
-  const size_t frame_slot = frame_id % kFrameWnd;
-  if (kDebugPrintInTask) {
-    std::printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid_,
-                frame_id, base_sc_id);
-  }
-  const size_t num_subcarriers =
-      cfg_->FreqOrthogonalPilot()
-          ? 1
-          : std::min(cfg_->BeamBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
-
-  // Handle each subcarrier one by one
-  for (size_t i = 0; i < num_subcarriers; i++) {
-    arma::cx_fvec& cal_sc_vec = *calib_sc_vec_ptr_;
-    const size_t start_tsc1 = GetTime::WorkerRdtsc();
-    const size_t cur_sc_id = base_sc_id + i;
-
-    // Gather CSI matrices of each pilot from partially-transposed CSIs.
-    for (size_t ue_idx = 0; ue_idx < cfg_->UeAntNum(); ue_idx++) {
-      auto* dst_csi_ptr = reinterpret_cast<float*>(csi_gather_buffer_ +
-                                                   cfg_->BsAntNum() * ue_idx);
-      if (kUsePartialTrans) {
-        PartialTransposeGather(cur_sc_id,
-                               (float*)csi_buffers_[frame_slot][ue_idx],
-                               dst_csi_ptr, cfg_->BsAntNum());
-      } else {
-        TransposeGather(cur_sc_id, (float*)csi_buffers_[frame_slot][ue_idx],
-                        dst_csi_ptr, cfg_->BsAntNum(), cfg_->OfdmDataNum());
-      }
-    }
-
-    size_t start_tsc2 = GetTime::WorkerRdtsc();
-    duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
-
-    arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer_, cfg_->BsAntNum(),
-                          cfg_->UeAntNum(), false);
-
-    if (cfg_->Frame().NumDLSyms() > 0) {
-      ComputeCalib(frame_id, cur_sc_id, cal_sc_vec);
-    }
-    if (num_ext_ref_ > 0) {
-      mat_csi.shed_rows(ext_ref_id_);
-    }
-
-    double start_tsc3 = GetTime::WorkerRdtsc();
-    duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
-
-    float noise = 0;
-    if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
-      noise = phy_stats_->GetNoise(frame_id);
-    }
-    float rcond = ComputePrecoder(
-        frame_id, cur_sc_id, mat_csi, cal_sc_vec, noise,
-        ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)],
-        dl_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
-    if (kPrintBeamStats) {
-      phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
-    }
-
-    duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
-    duration_stat_->task_count_++;
-    duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;
-    // if (duration > 500) {
-    //     std::printf("Thread %d ZF takes %.2f\n", tid, duration);
-    // }
-  }
-}
-
-void DoBeamWeights::ComputePartialCsiBeams(size_t tag) {
-  const size_t frame_id = gen_tag_t(tag).frame_id_;
-  const size_t base_sc_id = gen_tag_t(tag).sc_id_;
-  const size_t frame_slot = frame_id % kFrameWnd;
-  arma::cx_fvec& cal_sc_vec = *calib_sc_vec_ptr_;
-  if (kDebugPrintInTask) {
-    std::printf(
-        "In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu, "
-        "Basestation ant number: %zu\n",
-        tid_, frame_id, base_sc_id, base_sc_id / cfg_->UeAntNum(),
-        cfg_->BsAntNum());
-  }
-
-  double start_tsc1 = GetTime::WorkerRdtsc();
-
-  // Gather CSIs from partially-transposed CSIs
-  for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
-    const size_t cur_sc_id = base_sc_id + i;
-    auto* dst_csi_ptr =
-        reinterpret_cast<float*>(csi_gather_buffer_ + cfg_->BsAntNum() * i);
-    PartialTransposeGather(cur_sc_id, (float*)csi_buffers_[frame_slot][0],
-                           dst_csi_ptr, cfg_->BsAntNum());
-  }
-
-  size_t start_tsc2 = GetTime::WorkerRdtsc();
-  duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
-
-  if (cfg_->Frame().NumDLSyms() > 0) {
-    size_t cal_slot_current;
-    if (cfg_->Frame().IsRecCalEnabled()) {
-      cal_slot_current = cfg_->RecipCalIndex(frame_id);
-    } else {
-      cal_slot_current = frame_id;
-    }
-
-    // use the previous window which has a full set of calibration results
-    const size_t cal_slot_complete =
-        cfg_->ModifyRecCalIndex(cal_slot_current, -1);
-    const size_t cal_slot_prev = cfg_->ModifyRecCalIndex(cal_slot_current, -2);
-
-    const arma::cx_fmat calib_dl_mat(
-        reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[cal_slot_complete]),
-        cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
-    const arma::cx_fmat calib_ul_mat(
-        reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[cal_slot_complete]),
-        cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
-    const arma::cx_fmat calib_dl_mat_prev(
-        reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[cal_slot_prev]),
-        cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
-    const arma::cx_fmat calib_ul_mat_prev(
-        reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[cal_slot_prev]),
-        cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
-    arma::cx_fvec calib_dl_vec =
-        (calib_dl_mat.row(base_sc_id) + calib_dl_mat_prev.row(base_sc_id)).st();
-    arma::cx_fvec calib_ul_vec =
-        (calib_ul_mat.row(base_sc_id) + calib_ul_mat_prev.row(base_sc_id)).st();
-    cal_sc_vec = calib_dl_vec / calib_ul_vec;
-  }
-
-  double start_tsc3 = GetTime::WorkerRdtsc();
-  duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
-
-  arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer_),
-                        cfg_->BsAntNum(), cfg_->UeAntNum(), false);
-
-  if (num_ext_ref_ > 0) {
-    mat_csi.shed_rows(ext_ref_id_);
-  }
-
-  float noise = 0;
-  if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
-    noise = phy_stats_->GetNoise(frame_id);
-  }
-  ComputePrecoder(frame_id, base_sc_id, mat_csi, cal_sc_vec, noise,
-                  ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(base_sc_id)],
-                  dl_beam_matrices_[frame_slot][cfg_->GetBeamScId(base_sc_id)]);
-
-  duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
-  duration_stat_->task_count_++;
-  duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;
-
-  // if (duration > 500) {
-  //     std::printf("Thread %d ZF takes %.2f\n", tid, duration);
-  // }
 }
 
 // Currently unused

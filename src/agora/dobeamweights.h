@@ -51,7 +51,10 @@ class DoBeamWeights : public Doer {
   EventData Launch(size_t tag) override;
 
  private:
-  void ComputePartialCsiBeams(size_t tag);
+  static inline void PartialTransposeGather(size_t cur_sc_id, float* src,
+                                            float*& dst, size_t bs_ant_num);
+  static inline void TransposeGather(size_t cur_sc_id, float* src, float*& dst,
+                                     size_t bs_ant_num, size_t ofdm_data_num);
 
   /// Compute the uplink mMIMO detector matrix and/or the downlink
   /// mMIMO precoder using this CSI matrix and calibration buffer
@@ -60,7 +63,6 @@ class DoBeamWeights : public Doer {
                         const arma::cx_fvec& calib_sc_vec, const float noise,
                         complex_float* ul_beam_mem, complex_float* dl_beam_mem);
   void ComputeCalib(size_t frame_id, size_t sc_id, arma::cx_fvec& calib_sc_vec);
-  void ComputeFullCsiBeams(size_t tag);
 
   /**
    * Do prediction task for one subcarrier
