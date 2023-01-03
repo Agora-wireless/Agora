@@ -29,6 +29,9 @@ static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
 
+/// Print the I/Q samples in the pilots
+static constexpr bool kDebugPrintPilot = false;
+
 static const std::string kLogFilepath =
     TOSTRING(PROJECT_DIRECTORY) "/files/log/";
 static const std::string kExperimentFilepath =
@@ -353,7 +356,7 @@ Config::Config(std::string jsonfilename)
         tdd_conf.value("symbol_num_perframe", kDefaultSymbolNumPerFrame);
     size_t pilot_symbol_num_perframe = tdd_conf.value(
         "pilot_num",
-        freq_orthogonal_pilot_ ? kDefaultPilotSymPerFrame : ue_ant_num_);
+        freq_orthogonal_pilot_ ? kDefaultFreqOrthPilotSymbolNum : ue_ant_num_);
 
     size_t beacon_symbol_position = tdd_conf.value("beacon_position", SIZE_MAX);
 

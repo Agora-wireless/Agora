@@ -208,9 +208,6 @@ static constexpr bool kDebugPrintInTask = false;
 static constexpr bool kDebugMulticell = false;
 static constexpr bool kRecordCalibrationMats = false;
 
-/// Print the I/Q samples in the pilots
-static constexpr bool kDebugPrintPilot = false;
-
 static constexpr bool kDebugRadioTX = false;
 static constexpr bool kDebugRadioRX = false;
 

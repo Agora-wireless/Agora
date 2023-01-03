@@ -587,7 +587,7 @@ class Config {
 
   /* Class constants */
   inline static const size_t kDefaultSymbolNumPerFrame = 70;
-  inline static const size_t kDefaultPilotSymPerFrame = 1;
+  inline static const size_t kDefaultFreqOrthPilotSymbolNum = 1;
   inline static const size_t kDefaultULSymPerFrame = 30;
   inline static const size_t kDefaultULSymStart = 9;
   inline static const size_t kDefaultDLSymPerFrame = 30;
@@ -679,10 +679,18 @@ class Config {
   std::vector<std::complex<float>> gold_cf32_;
   std::vector<std::complex<int16_t>> beacon_ci16_;
   std::vector<uint32_t> coeffs_;
+
+  /// I/Q samples of common pilot
   std::vector<std::complex<int16_t>> pilot_ci16_;
+
   std::vector<std::complex<float>> pilot_cf32_;
+
+  /// I/Q samples of pilots per UE antenna per pilot symbol
   std::vector<std::vector<std::vector<std::complex<int16_t>>>> pilot_ue_ci16_;
+
+  /// List of subcarriers used per UE to transmit pilot
   std::vector<arma::uvec> pilot_ue_sc_;
+
   std::vector<uint32_t> pilot_;
   std::vector<uint32_t> beacon_;
   complex_float* pilots_;
