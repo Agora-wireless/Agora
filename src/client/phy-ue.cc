@@ -23,9 +23,6 @@ static constexpr bool kDebugPrintPacketsFromMac = false;
 static constexpr bool kDebugPrintPacketsToMac = false;
 static constexpr size_t kDefaultQueueSize = 36;
 
-//set the number of subcarriers to record DL CSI
-static constexpr size_t kNumRecSc = 4;
-
 //Recording parameters
 static constexpr size_t kRecordFrameInterval = 1;
 #if defined(ENABLE_HDF5)
@@ -477,7 +474,7 @@ void PhyUe::Start() {
               if (kPrintPhyStats) {
                 this->phy_stats_->PrintDlSnrStats(frame_id);
               }
-              this->phy_stats_->RecordDlCsi(frame_id, kNumRecSc, csi_buffer_);
+              this->phy_stats_->RecordDlCsi(frame_id, csi_buffer_);
               this->phy_stats_->RecordDlPilotSnr(frame_id);
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
               PrintPerFrameDone(PrintType::kFFTPilots, frame_id);

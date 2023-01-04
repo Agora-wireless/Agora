@@ -48,8 +48,7 @@ class PhyStats {
   void PrintDlSnrStats(size_t frame_id);
   void RecordPilotSnr(size_t frame_id);
   void RecordDlPilotSnr(size_t frame_id);
-  void RecordDlCsi(size_t frame_id, size_t num_rec_sc,
-                   const Table<complex_float>& csi_buffer);
+  void RecordDlCsi(size_t frame_id, const Table<complex_float>& csi_buffer);
   void UpdateCalibPilotSnr(size_t frame_id, size_t calib_sym_id, size_t ant_id,
                            complex_float* fft_data);
   void PrintCalibSnrStats(size_t frame_id);
