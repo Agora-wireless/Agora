@@ -24,6 +24,7 @@ PhyStats::PhyStats(Config* const cfg, Direction dir)
       logger_calib_(CsvLog::kCalib, cfg, dir),
       logger_ul_csi_(CsvLog::kULCSI, cfg, dir),
       logger_dl_csi_(CsvLog::kDLCSI, cfg, dir),
+      logger_ul_beam_(CsvLog::kUlBeam, cfg, dir),
       logger_dl_beam_(CsvLog::kDlBeam, cfg, dir) {
   if (dir_ == Direction::kDownlink) {
     num_rx_symbols_ = cfg->Frame().NumDLSyms();
@@ -589,6 +590,11 @@ void PhyStats::UpdateUlCsi(size_t frame_id, size_t sc_id,
 void PhyStats::UpdateDlCsi(size_t frame_id, size_t sc_id,
                            const arma::cx_fmat& mat_in) {
   logger_dl_csi_.UpdateMatBuf(frame_id, sc_id, mat_in);
+}
+
+void PhyStats::UpdateUlBeam(size_t frame_id, size_t sc_id,
+                            const arma::cx_fmat& mat_in) {
+  logger_ul_beam_.UpdateMatBuf(frame_id, sc_id, mat_in);
 }
 
 void PhyStats::UpdateDlBeam(size_t frame_id, size_t sc_id,

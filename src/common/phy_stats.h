@@ -57,6 +57,7 @@ class PhyStats {
   void PrintBeamStats(size_t frame_id);
   void UpdateUlCsi(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
   void UpdateDlCsi(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
+  void UpdateUlBeam(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
   void UpdateDlBeam(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
   void UpdateCalibMat(size_t frame_id, size_t sc_id,
                       const arma::cx_fvec& vec_in);
@@ -102,6 +103,7 @@ class PhyStats {
   CsvLog::MatLogger logger_calib_;
   CsvLog::MatLogger logger_ul_csi_;
   CsvLog::MatLogger logger_dl_csi_;
+  CsvLog::MatLogger logger_ul_beam_;
   CsvLog::MatLogger logger_dl_beam_;
 };
 

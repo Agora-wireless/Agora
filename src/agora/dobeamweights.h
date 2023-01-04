@@ -58,10 +58,10 @@ class DoBeamWeights : public Doer {
 
   /// Compute the uplink mMIMO detector matrix and/or the downlink
   /// mMIMO precoder using this CSI matrix and calibration buffer
-  float ComputePrecoder(size_t frame_id, size_t cur_sc_id,
-                        const arma::cx_fmat& mat_csi,
-                        const arma::cx_fvec& calib_sc_vec, const float noise,
-                        complex_float* ul_beam_mem, complex_float* dl_beam_mem);
+  void ComputePrecoder(size_t frame_id, size_t cur_sc_id,
+                       const arma::cx_fmat& mat_csi,
+                       const arma::cx_fvec& calib_sc_vec, const float noise,
+                       complex_float* ul_beam_mem, complex_float* dl_beam_mem);
   void ComputeCalib(size_t frame_id, size_t sc_id, arma::cx_fvec& calib_sc_vec);
 
   /**

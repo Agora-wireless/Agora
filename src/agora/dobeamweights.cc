@@ -138,13 +138,10 @@ EventData DoBeamWeights::Launch(size_t tag) {  // Compute Full-CSI Beams
     if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
       noise = phy_stats_->GetNoise(frame_id);
     }
-    float rcond = ComputePrecoder(
+    ComputePrecoder(
         frame_id, cur_sc_id, mat_csi, cal_sc_vec, noise,
         ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)],
         dl_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
-    if (kPrintBeamStats) {
-      phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
-    }
 
     duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
     duration_stat_->task_count_++;
@@ -153,12 +150,12 @@ EventData DoBeamWeights::Launch(size_t tag) {  // Compute Full-CSI Beams
   return EventData(EventType::kBeam, tag);
 }
 
-float DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
-                                     const arma::cx_fmat& mat_csi,
-                                     const arma::cx_fvec& calib_sc_vec,
-                                     const float noise,
-                                     complex_float* ul_beam_mem,
-                                     complex_float* dl_beam_mem) {
+void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
+                                    const arma::cx_fmat& mat_csi,
+                                    const arma::cx_fvec& calib_sc_vec,
+                                    const float noise,
+                                    complex_float* ul_beam_mem,
+                                    complex_float* dl_beam_mem) {
   if (kEnableMatLog) {
     phy_stats_->UpdateUlCsi(frame_id, cur_sc_id, mat_csi);
   }
@@ -269,11 +266,14 @@ float DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     }
   }
   mat_ul_beam = mat_ul_beam_tmp;
+  if (kEnableMatLog) {
+    phy_stats_->UpdateUlBeam(frame_id, cur_sc_id, mat_ul_beam.st());
+  }
   float rcond = -1;
   if (kPrintBeamStats) {
     rcond = arma::rcond(mat_csi.t() * mat_csi);
+    phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
   }
-  return rcond;
 }
 
 // Called for each frame_id / sc_id
