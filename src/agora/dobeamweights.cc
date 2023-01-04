@@ -85,68 +85,8 @@ DoBeamWeights::~DoBeamWeights() {
   std::free(calib_gather_buffer_);
 }
 
-EventData DoBeamWeights::Launch(size_t tag) {  // Compute Full-CSI Beams
-  const size_t frame_id = gen_tag_t(tag).frame_id_;
-  const size_t base_sc_id = gen_tag_t(tag).sc_id_;
-  const size_t frame_slot = frame_id % kFrameWnd;
-  if (kDebugPrintInTask) {
-    std::printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid_,
-                frame_id, base_sc_id);
-  }
-  const size_t num_subcarriers =
-      cfg_->FreqOrthogonalPilot()
-          ? 1
-          : std::min(cfg_->BeamBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
-
-  // Handle each subcarrier one by one
-  for (size_t i = 0; i < num_subcarriers; i++) {
-    arma::cx_fvec& cal_sc_vec = *calib_sc_vec_ptr_;
-    const size_t start_tsc1 = GetTime::WorkerRdtsc();
-    const size_t cur_sc_id = base_sc_id + i;
-
-    // Gather CSI matrices of each pilot from partially-transposed CSIs.
-    for (size_t ue_idx = 0; ue_idx < cfg_->UeAntNum(); ue_idx++) {
-      auto* dst_csi_ptr = reinterpret_cast<float*>(csi_gather_buffer_ +
-                                                   cfg_->BsAntNum() * ue_idx);
-      if (kUsePartialTrans) {
-        PartialTransposeGather(cur_sc_id,
-                               (float*)csi_buffers_[frame_slot][ue_idx],
-                               dst_csi_ptr, cfg_->BsAntNum());
-      } else {
-        TransposeGather(cur_sc_id, (float*)csi_buffers_[frame_slot][ue_idx],
-                        dst_csi_ptr, cfg_->BsAntNum(), cfg_->OfdmDataNum());
-      }
-    }
-
-    size_t start_tsc2 = GetTime::WorkerRdtsc();
-    duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
-
-    arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer_, cfg_->BsAntNum(),
-                          cfg_->UeAntNum(), false);
-
-    if (cfg_->Frame().NumDLSyms() > 0) {
-      ComputeCalib(frame_id, cur_sc_id, cal_sc_vec);
-    }
-    if (num_ext_ref_ > 0) {
-      mat_csi.shed_rows(ext_ref_id_);
-    }
-
-    double start_tsc3 = GetTime::WorkerRdtsc();
-    duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
-
-    float noise = 0;
-    if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
-      noise = phy_stats_->GetNoise(frame_id);
-    }
-    ComputePrecoder(
-        frame_id, cur_sc_id, mat_csi, cal_sc_vec, noise,
-        ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)],
-        dl_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
-
-    duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
-    duration_stat_->task_count_++;
-    duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;
-  }
+EventData DoBeamWeights::Launch(size_t tag) {
+  ComputeBeams(tag);
   return EventData(EventType::kBeam, tag);
 }
 
@@ -372,9 +312,8 @@ void DoBeamWeights::ComputeCalib(size_t frame_id, size_t sc_id,
 
 // Gather data of one symbol from partially-transposed buffer
 // produced by dofft
-inline void DoBeamWeights::PartialTransposeGather(size_t cur_sc_id, float* src,
-                                                  float*& dst,
-                                                  size_t bs_ant_num) {
+static inline void PartialTransposeGather(size_t cur_sc_id, float* src,
+                                          float*& dst, size_t bs_ant_num) {
   // The SIMD and non-SIMD methods are equivalent.
 
 #ifdef __AVX512F__
@@ -440,14 +379,75 @@ inline void DoBeamWeights::PartialTransposeGather(size_t cur_sc_id, float* src,
 
 // Gather data of one symbol from partially-transposed buffer
 // produced by dofft
-inline void DoBeamWeights::TransposeGather(size_t cur_sc_id, float* src,
-                                           float*& dst, size_t bs_ant_num,
-                                           size_t ofdm_data_num) {
+static inline void TransposeGather(size_t cur_sc_id, float* src, float*& dst,
+                                   size_t bs_ant_num, size_t ofdm_data_num) {
   auto* cx_src = reinterpret_cast<complex_float*>(src);
   auto* cx_dst = reinterpret_cast<complex_float*>(dst);
   for (size_t ant_i = 0; ant_i < bs_ant_num; ant_i++) {
     *cx_dst = cx_src[ant_i * ofdm_data_num + cur_sc_id];
     cx_dst++;
+  }
+}
+
+void DoBeamWeights::ComputeBeams(size_t tag) {
+  const size_t frame_id = gen_tag_t(tag).frame_id_;
+  const size_t base_sc_id = gen_tag_t(tag).sc_id_;
+  const size_t frame_slot = frame_id % kFrameWnd;
+  if (kDebugPrintInTask) {
+    std::printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid_,
+                frame_id, base_sc_id);
+  }
+  const size_t num_subcarriers =
+      std::min(cfg_->BeamBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
+
+  // Handle each subcarrier one by one
+  for (size_t i = 0; i < num_subcarriers; i++) {
+    arma::cx_fvec& cal_sc_vec = *calib_sc_vec_ptr_;
+    const size_t start_tsc1 = GetTime::WorkerRdtsc();
+    const size_t cur_sc_id = base_sc_id + i;
+
+    // Gather CSI matrices of each pilot from partially-transposed CSIs.
+    for (size_t ue_idx = 0; ue_idx < cfg_->UeAntNum(); ue_idx++) {
+      auto* dst_csi_ptr = reinterpret_cast<float*>(csi_gather_buffer_ +
+                                                   cfg_->BsAntNum() * ue_idx);
+      if (kUsePartialTrans) {
+        PartialTransposeGather(cur_sc_id,
+                               (float*)csi_buffers_[frame_slot][ue_idx],
+                               dst_csi_ptr, cfg_->BsAntNum());
+      } else {
+        TransposeGather(cur_sc_id, (float*)csi_buffers_[frame_slot][ue_idx],
+                        dst_csi_ptr, cfg_->BsAntNum(), cfg_->OfdmDataNum());
+      }
+    }
+
+    size_t start_tsc2 = GetTime::WorkerRdtsc();
+    duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
+
+    arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer_, cfg_->BsAntNum(),
+                          cfg_->UeAntNum(), false);
+
+    if (cfg_->Frame().NumDLSyms() > 0) {
+      ComputeCalib(frame_id, cur_sc_id, cal_sc_vec);
+    }
+    if (num_ext_ref_ > 0) {
+      mat_csi.shed_rows(ext_ref_id_);
+    }
+
+    double start_tsc3 = GetTime::WorkerRdtsc();
+    duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
+
+    float noise = 0;
+    if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
+      noise = phy_stats_->GetNoise(frame_id);
+    }
+    ComputePrecoder(
+        frame_id, cur_sc_id, mat_csi, cal_sc_vec, noise,
+        ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)],
+        dl_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
+
+    duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
+    duration_stat_->task_count_++;
+    duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;
   }
 }
 
