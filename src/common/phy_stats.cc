@@ -530,7 +530,7 @@ void PhyStats::UpdateCsiCond(size_t frame_id, size_t sc_id, float cond) {
 
 void PhyStats::UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t sc_id,
                          const arma::cx_fvec& eq_vec) {
-  arma::fvec evm_vec = arma::square(
+  const arma::fvec evm_vec = arma::square(
       arma::abs(eq_vec - gt_cube_.slice(data_symbol_id).col(sc_id)));
   for (size_t ue_id = 0; ue_id < config_->UeAntNum(); ue_id++) {
     evm_sc_buffer_[frame_id % kFrameWnd]
@@ -543,7 +543,8 @@ void PhyStats::UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t sc_id,
 
 void PhyStats::UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t sc_id,
                          size_t tx_ue_id, size_t rx_ue_id, arma::cx_float eq) {
-  float evm = std::norm(eq - gt_cube_.slice(data_symbol_id)(tx_ue_id, sc_id));
+  const float evm =
+      std::norm(eq - gt_cube_.slice(data_symbol_id)(tx_ue_id, sc_id));
   evm_buffer_[frame_id % kFrameWnd][rx_ue_id] += evm;
   evm_sc_buffer_[frame_id % kFrameWnd]
                 [rx_ue_id * config_->OfdmDataNum() + sc_id] = evm;
