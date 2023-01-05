@@ -209,9 +209,8 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
   if (kEnableMatLog) {
     phy_stats_->UpdateUlBeam(frame_id, cur_sc_id, mat_ul_beam.st());
   }
-  float rcond = -1;
   if (kPrintBeamStats) {
-    rcond = arma::rcond(mat_csi.t() * mat_csi);
+    const float rcond = arma::rcond(mat_csi.t() * mat_csi);
     phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
   }
 }

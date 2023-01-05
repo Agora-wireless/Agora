@@ -9,9 +9,6 @@
 
 #include "logger.h"
 
-//set the number of recorded subcarrier data samples
-static constexpr size_t kNumRecSc = 4;
-
 PhyStats::PhyStats(Config* const cfg, Direction dir)
     : config_(cfg),
       dir_(dir),
@@ -314,13 +311,13 @@ void PhyStats::RecordPilotSnr(size_t frame_id) {
   }
 }
 
-void PhyStats::RecordCsiCond(size_t frame_id) {
+void PhyStats::RecordCsiCond(size_t frame_id, size_t num_rec_sc) {
   if (kEnableCsvLog) {
     std::stringstream ss;
     ss << frame_id;
-    const size_t sc_step = config_->OfdmDataNum() / kNumRecSc;
+    const size_t sc_step = config_->OfdmDataNum() / num_rec_sc;
     const size_t sc_offset = sc_step / 2;
-    for (size_t sc_rec = 0; sc_rec < kNumRecSc; sc_rec++) {
+    for (size_t sc_rec = 0; sc_rec < num_rec_sc; sc_rec++) {
       const size_t sc_id = sc_rec * sc_step + sc_offset;
       ss << "," << (csi_cond_[frame_id % kFrameWnd][sc_id]);
     }
@@ -328,7 +325,7 @@ void PhyStats::RecordCsiCond(size_t frame_id) {
   }
 }
 
-void PhyStats::RecordEvm(size_t frame_id) {
+void PhyStats::RecordEvm(size_t frame_id, size_t num_rec_sc) {
   if (kEnableCsvLog) {
     std::stringstream ss_evm;
     std::stringstream ss_evm_sc;
@@ -340,14 +337,15 @@ void PhyStats::RecordEvm(size_t frame_id) {
              << ((evm_buffer_[frame_id % kFrameWnd][ue_id] / num_frame_data) *
                  100.0f);
     }
-    const size_t sc_step = config_->OfdmDataNum() / kNumRecSc;
+    const size_t sc_step = config_->OfdmDataNum() / num_rec_sc;
     const size_t sc_offset = sc_step / 2;
     for (size_t ue_id = 0; ue_id < config_->UeAntNum(); ue_id++) {
-      for (size_t sc_rec = 0; sc_rec < kNumRecSc; sc_rec++) {
+      for (size_t sc_rec = 0; sc_rec < num_rec_sc; sc_rec++) {
         const size_t sc_id = sc_rec * sc_step + sc_offset;
         const size_t ue_offset = ue_id * config_->OfdmDataNum();
         ss_evm_sc << ","
-                  << (evm_sc_buffer_[frame_id % kFrameWnd][ue_offset + sc_id]);
+                  << (evm_sc_buffer_[frame_id % kFrameWnd][ue_offset + sc_id] *
+                      100.0f);
       }
     }
     logger_evm_.Write(ss_evm.str());
@@ -395,7 +393,7 @@ void PhyStats::RecordDlPilotSnr(size_t frame_id) {
   }
 }
 
-void PhyStats::RecordDlCsi(size_t frame_id,
+void PhyStats::RecordDlCsi(size_t frame_id, size_t num_rec_sc,
                            const Table<complex_float>& csi_buffer) {
   if (kEnableCsvLog) {
     const size_t csi_offset_base = (frame_id % kFrameWnd) * config_->UeAntNum();
@@ -404,9 +402,9 @@ void PhyStats::RecordDlCsi(size_t frame_id,
     for (size_t ue_id = 0; ue_id < config_->UeAntNum(); ue_id++) {
       const auto* csi_buffer_ptr = reinterpret_cast<const arma::cx_float*>(
           csi_buffer.At(csi_offset_base + ue_id));
-      const size_t sc_step = config_->OfdmDataNum() / kNumRecSc;
+      const size_t sc_step = config_->OfdmDataNum() / num_rec_sc;
       const size_t sc_offset = sc_step / 2;
-      for (size_t sc_rec = 0; sc_rec < kNumRecSc; sc_rec++) {
+      for (size_t sc_rec = 0; sc_rec < num_rec_sc; sc_rec++) {
         const size_t sc_id = sc_rec * sc_step + sc_offset;
         ss << "," << std::abs(csi_buffer_ptr[sc_id]);
       }

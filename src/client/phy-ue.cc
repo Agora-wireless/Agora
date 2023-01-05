@@ -474,7 +474,8 @@ void PhyUe::Start() {
               if (kPrintPhyStats) {
                 this->phy_stats_->PrintDlSnrStats(frame_id);
               }
-              this->phy_stats_->RecordDlCsi(frame_id, csi_buffer_);
+              this->phy_stats_->RecordDlCsi(frame_id, config_->LogScNum(),
+                                            csi_buffer_);
               this->phy_stats_->RecordDlPilotSnr(frame_id);
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
               PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
@@ -530,7 +531,7 @@ void PhyUe::Start() {
               PrintPerFrameDone(PrintType::kDemul, frame_id);
               demul_counters_.Reset(frame_id);
 
-              this->phy_stats_->RecordEvm(frame_id);
+              this->phy_stats_->RecordEvm(frame_id, config_->LogScNum());
               this->phy_stats_->RecordEvmSnr(frame_id);
               if (kDownlinkHardDemod) {
                 this->phy_stats_->RecordBer(frame_id);

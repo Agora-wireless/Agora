@@ -467,8 +467,8 @@ void Agora::Start() {
               if (kPrintPhyStats) {
                 this->phy_stats_->PrintEvmStats(frame_id);
               }
-              this->phy_stats_->RecordCsiCond(frame_id);
-              this->phy_stats_->RecordEvm(frame_id);
+              this->phy_stats_->RecordCsiCond(frame_id, config_->LogScNum());
+              this->phy_stats_->RecordEvm(frame_id, config_->LogScNum());
               this->phy_stats_->RecordEvmSnr(frame_id);
               if (kUplinkHardDemod) {
                 this->phy_stats_->RecordBer(frame_id);

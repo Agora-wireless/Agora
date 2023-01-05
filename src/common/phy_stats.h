@@ -34,8 +34,8 @@ class PhyStats {
   void UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t sc_id,
                  size_t tx_ue_id, size_t rx_ue_id, arma::cx_float eq);
   void PrintEvmStats(size_t frame_id);
-  void RecordCsiCond(size_t frame_id);
-  void RecordEvm(size_t frame_id);
+  void RecordCsiCond(size_t frame_id, size_t num_rec_sc);
+  void RecordEvm(size_t frame_id, size_t num_rec_sc);
   void RecordEvmSnr(size_t frame_id);
   float GetEvmSnr(size_t frame_id, size_t ue_id);
   float GetNoise(size_t frame_id);
@@ -48,7 +48,8 @@ class PhyStats {
   void PrintDlSnrStats(size_t frame_id);
   void RecordPilotSnr(size_t frame_id);
   void RecordDlPilotSnr(size_t frame_id);
-  void RecordDlCsi(size_t frame_id, const Table<complex_float>& csi_buffer);
+  void RecordDlCsi(size_t frame_id, size_t num_rec_sc,
+                   const Table<complex_float>& csi_buffer);
   void UpdateCalibPilotSnr(size_t frame_id, size_t calib_sym_id, size_t ant_id,
                            complex_float* fft_data);
   void PrintCalibSnrStats(size_t frame_id);

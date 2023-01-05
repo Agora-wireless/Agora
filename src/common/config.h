@@ -331,6 +331,8 @@ class Config {
 
   inline size_t LogListenerPort() const { return this->log_listener_port_; }
 
+  inline size_t LogScNum() const { return this->log_sc_num_; }
+
   /* Inline accessors (complex types) */
   inline const std::vector<int>& ClTxAdvance() const {
     return this->cl_tx_advance_;
@@ -911,6 +913,9 @@ class Config {
 
   // Port ID at log listening server
   size_t log_listener_port_;
+
+  // Number of logged subcarrier data samples
+  size_t log_sc_num_;
 
   // Number of frames_ sent by sender during testing = number of frames_
   // processed by Agora before exiting.

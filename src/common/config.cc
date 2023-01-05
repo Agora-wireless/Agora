@@ -285,6 +285,8 @@ Config::Config(std::string jsonfilename)
   log_listener_addr_ = tdd_conf.value("log_listener_addr", "");
   log_listener_port_ = tdd_conf.value("log_listener_port", 33300);
 
+  log_sc_num_ = tdd_conf.value("log_sc_num", 4);
+
   /* frame configurations */
   cp_len_ = tdd_conf.value("cp_size", 0);
   ofdm_ca_num_ = tdd_conf.value("fft_size", 2048);
