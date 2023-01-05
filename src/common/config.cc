@@ -1392,10 +1392,8 @@ void Config::GenData() {
   }
 
   this->pilot_ci16_.resize(samps_per_symbol_, 0);
-  CommsLib::Ifft2tx(
-      pilot_ifft,
-      reinterpret_cast<std::complex<int16_t>*>(this->pilot_ci16_.data()),
-      ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
+  CommsLib::Ifft2tx(pilot_ifft, this->pilot_ci16_.data(), ofdm_ca_num_,
+                    ofdm_tx_zero_prefix_, cp_len_, scale_);
 
   for (size_t i = 0; i < ofdm_ca_num_; i++) {
     this->pilot_cf32_.emplace_back(pilot_ifft[i].re / scale_,
@@ -1471,8 +1469,8 @@ void Config::GenData() {
     }
   }
 
-  delete[](ul_temp_parity_buffer);
-  delete[](dl_temp_parity_buffer);
+  delete[] (ul_temp_parity_buffer);
+  delete[] (dl_temp_parity_buffer);
   ul_iq_ifft.Free();
   dl_iq_ifft.Free();
   ue_pilot_ifft.Free();
