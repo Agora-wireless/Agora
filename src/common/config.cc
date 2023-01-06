@@ -1506,7 +1506,7 @@ void Config::GenData() {
   FreeBuffer1d(&pilot_ifft);
 }
 
-void Config::GenBroadcastSlots(Table<std::complex<int16_t>> bcast_iq_samps,
+void Config::GenBroadcastSlots(Table<std::complex<int16_t>>& bcast_iq_samps,
                                size_t frame_id) {
   int num_bcast_bytes = dl_bcast_ldpc_config_.NumCbLen() / 8;
   int num_bcast_bytes_padded = Roundup<64>(num_bcast_bytes);

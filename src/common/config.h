@@ -397,7 +397,7 @@ class Config {
 
   // Public functions
   void GenData();
-  void GenBroadcastSlots(Table<std::complex<int16_t>> bcast_iq_samps,
+  void GenBroadcastSlots(Table<std::complex<int16_t>>& bcast_iq_samps,
                          size_t frame_id);
   void UpdateUlMCS(const nlohmann::json& mcs);
   void UpdateDlMCS(const nlohmann::json& mcs);
