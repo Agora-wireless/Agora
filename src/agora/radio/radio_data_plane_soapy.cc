@@ -172,7 +172,7 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
       if (rx_status == static_cast<int>(rx_size)) {
         AGORA_LOG_INFO("Radio %s(%zu) received %d:%zu flags: %d MTU %zu\n",
                        radio_->SerialNumber().c_str(), radio_->Id(), rx_status,
-                       Configuration()->SampsPerSymbol(), (int)out_flags,
+                       Configuration()->SampsPerSymbol(), static_cast<int>(out_flags),
                        device->getStreamMTU(remote_stream_));
       } else {
         if ((rx_status != SOAPY_SDR_TIMEOUT) &&
@@ -181,7 +181,7 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
               "Unexpected RadioRx return value %d from radio %s(%zu) flags: "
               "%d\n",
               rx_status, radio_->SerialNumber().c_str(), radio_->Id(),
-              out_flags);
+              static_cast<int>(out_flags));
         }
       }
     }
