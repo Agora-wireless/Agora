@@ -43,8 +43,7 @@ EventData DoDecodeClient::Launch(size_t tag) {
   const size_t symbol_offset =
       cfg_->GetTotalDataSymbolIdxDl(frame_id, symbol_idx_dl);
   const size_t cur_cb_id = (cb_id % ldpc_config.NumBlocksInSymbol());
-  const size_t sched_ue_id = (cb_id / ldpc_config.NumBlocksInSymbol());
-  const size_t ue_id = mac_sched_->ScheduledUeIndex(frame_id, 0, sched_ue_id);
+  const size_t ue_id = (cb_id / ldpc_config.NumBlocksInSymbol());
   const size_t frame_slot = (frame_id % kFrameWnd);
 
   if (kDebugPrintInTask == true) {
@@ -76,10 +75,9 @@ EventData DoDecodeClient::Launch(size_t tag) {
   ldpc_decoder_5gnr_response.numMsgBits = num_msg_bits;
   ldpc_decoder_5gnr_response.varNodes = resp_var_nodes_;
 
-  int8_t* llr_buffer_ptr =
-      demod_buffers_[frame_slot][symbol_idx_dl][sched_ue_id] +
-      (cfg_->ModOrderBits(Direction::kDownlink) *
-       (ldpc_config.NumCbCodewLen() * cur_cb_id));
+  int8_t* llr_buffer_ptr = demod_buffers_[frame_slot][symbol_idx_dl][ue_id] +
+                           (cfg_->ModOrderBits(Direction::kDownlink) *
+                            (ldpc_config.NumCbCodewLen() * cur_cb_id));
 
   uint8_t* decoded_buffer_ptr =
       (uint8_t*)decoded_buffers_[frame_slot][symbol_idx_dl][ue_id] +

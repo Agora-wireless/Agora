@@ -160,6 +160,7 @@ void UeWorker::DoFftPilot(size_t tag) {
   const size_t symbol_id = pkt->symbol_id_;
   const size_t ant_id = pkt->ant_id_;
   const size_t frame_slot = frame_id % kFrameWnd;
+  const size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
 
   if (mac_sched_.IsUeScheduled(frame_id, 0u, ant_id)) {
     if (kDebugPrintInTask || kDebugPrintFft) {
@@ -168,7 +169,6 @@ void UeWorker::DoFftPilot(size_t tag) {
           frame_id, symbol_id, ant_id);
     }
 
-    const size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
     const size_t sig_offset = config_.OfdmRxZeroPrefixClient();
 
     if (kPrintDownlinkPilotStats) {

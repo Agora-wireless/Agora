@@ -30,7 +30,6 @@ class DoEncode : public Doer {
 
  private:
   Direction dir_;
-  MacScheduler* mac_sched_;
 
   // References to buffers allocated pre-construction
   Table<int8_t>& raw_data_buffer_;
@@ -46,6 +45,7 @@ class DoEncode : public Doer {
   // Intermediate buffer to hold pre/post scrambled data
   int8_t* scrambler_buffer_;
 
+  MacScheduler* mac_sched_;
   DurationStat* duration_stat_;
   std::unique_ptr<AgoraScrambler::Scrambler> scrambler_;
 };

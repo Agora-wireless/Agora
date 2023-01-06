@@ -475,11 +475,14 @@ void PhyUe::Start() {
             const bool pilot_fft_complete =
                 fft_dlpilot_counters_.CompleteSymbol(frame_id);
             if (pilot_fft_complete) {
+              auto ue_map = mac_sched_->ScheduledUeMap(frame_id, 0u);
+              auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
               if (kPrintPhyStats) {
-                this->phy_stats_->PrintDlSnrStats(frame_id);
+                this->phy_stats_->PrintDlSnrStats(frame_id, ue_list);
               }
-              this->phy_stats_->RecordDlCsi(frame_id, kNumRecSc, csi_buffer_);
-              this->phy_stats_->RecordDlPilotSnr(frame_id);
+              this->phy_stats_->RecordDlCsi(frame_id, kNumRecSc, csi_buffer_,
+                                            ue_list);
+              this->phy_stats_->RecordDlPilotSnr(frame_id, ue_map);
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
               PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
               ScheduleDefferedDownlinkSymbols(frame_id);
@@ -534,11 +537,13 @@ void PhyUe::Start() {
               PrintPerFrameDone(PrintType::kDemul, frame_id);
               demul_counters_.Reset(frame_id);
 
-              this->phy_stats_->RecordEvm(frame_id);
-              this->phy_stats_->RecordEvmSnr(frame_id);
+              auto ue_map = mac_sched_->ScheduledUeMap(frame_id, 0u);
+              auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+              this->phy_stats_->RecordEvm(frame_id, ue_map);
+              this->phy_stats_->RecordEvmSnr(frame_id, ue_map);
               if (kDownlinkHardDemod) {
-                this->phy_stats_->RecordBer(frame_id);
-                this->phy_stats_->RecordSer(frame_id);
+                this->phy_stats_->RecordBer(frame_id, ue_map);
+                this->phy_stats_->RecordSer(frame_id, ue_map);
               }
               this->phy_stats_->ClearEvmBuffer(frame_id);
 
@@ -585,8 +590,10 @@ void PhyUe::Start() {
               this->stats_->MasterSetTsc(TsType::kDecodeDone, frame_id);
               PrintPerFrameDone(PrintType::kDecode, frame_id);
               decode_counters_.Reset(frame_id);
-              this->phy_stats_->RecordBer(frame_id);
-              this->phy_stats_->RecordSer(frame_id);
+              auto ue_map = mac_sched_->ScheduledUeMap(frame_id, 0u);
+              auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+              this->phy_stats_->RecordBer(frame_id, ue_map);
+              this->phy_stats_->RecordSer(frame_id, ue_map);
               bool finished =
                   FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
               if (finished == true) {

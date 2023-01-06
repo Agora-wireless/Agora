@@ -68,7 +68,7 @@ void AgoraWorker::WorkerThread(int tid) {
 
   auto compute_precode = std::make_unique<DoPrecode>(
       config_, tid, buffer_->GetDlBeamMatrix(), buffer_->GetIfft(),
-      buffer_->GetDlModBits(), stats_);
+      buffer_->GetDlModBits(), mac_sched_, stats_);
 
   auto compute_encoding = std::make_unique<DoEncode>(
       config_, tid, Direction::kDownlink,

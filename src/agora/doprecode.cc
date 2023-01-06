@@ -14,11 +14,12 @@ DoPrecode::DoPrecode(
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices,
     Table<complex_float>& in_dl_ifft_buffer,
     Table<int8_t>& dl_encoded_or_raw_data /* Encoded if LDPC is enabled */,
-    Stats* in_stats_manager)
+    MacScheduler* mac_sched, Stats* in_stats_manager)
     : Doer(in_config, in_tid),
       dl_beam_matrices_(dl_beam_matrices),
       dl_ifft_buffer_(in_dl_ifft_buffer),
-      dl_raw_data_(dl_encoded_or_raw_data) {
+      dl_raw_data_(dl_encoded_or_raw_data),
+      mac_sched_(mac_sched) {
   duration_stat_ =
       in_stats_manager->GetDurationStat(DoerType::kPrecode, in_tid);
 
@@ -100,13 +101,14 @@ EventData DoPrecode::Launch(size_t tag) {
   size_t max_sc_ite =
       std::min(cfg_->DemulBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
 
+  auto ue_list = mac_sched_->ScheduledUeList(frame_id, base_sc_id);
   if (kUseSpatialLocality) {
     for (size_t i = 0; i < max_sc_ite; i = i + kSCsPerCacheline) {
       size_t start_tsc1 = GetTime::WorkerRdtsc();
-      for (size_t user_id = 0; user_id < cfg_->SpatialStreamsNum(); user_id++) {
+      for (size_t sp_id = 0; sp_id < cfg_->SpatialStreamsNum(); sp_id++) {
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
-          LoadInputData(symbol_idx_dl, total_data_symbol_idx, user_id,
-                        base_sc_id + i + j, j);
+          LoadInputData(symbol_idx_dl, total_data_symbol_idx, sp_id,
+                        ue_list.at(sp_id), base_sc_id + i + j, j);
         }
       }
 
@@ -123,9 +125,9 @@ EventData DoPrecode::Launch(size_t tag) {
     for (size_t i = 0; i < max_sc_ite; i++) {
       size_t start_tsc1 = GetTime::WorkerRdtsc();
       int cur_sc_id = base_sc_id + i;
-      for (size_t user_id = 0; user_id < cfg_->SpatialStreamsNum(); user_id++) {
-        LoadInputData(symbol_idx_dl, total_data_symbol_idx, user_id, cur_sc_id,
-                      0);
+      for (size_t sp_id = 0; sp_id < cfg_->SpatialStreamsNum(); sp_id++) {
+        LoadInputData(symbol_idx_dl, total_data_symbol_idx, sp_id,
+                      ue_list.at(sp_id), cur_sc_id, 0);
       }
       size_t start_tsc2 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
@@ -166,20 +168,21 @@ EventData DoPrecode::Launch(size_t tag) {
 }
 
 void DoPrecode::LoadInputData(size_t symbol_idx_dl,
-                              size_t total_data_symbol_idx, size_t user_id,
-                              size_t sc_id, size_t sc_id_in_block) {
+                              size_t total_data_symbol_idx, size_t sp_id,
+                              size_t user_id, size_t sc_id,
+                              size_t sc_id_in_block) {
   complex_float* data_ptr =
       modulated_buffer_temp_ + sc_id_in_block * cfg_->SpatialStreamsNum();
   if ((symbol_idx_dl < cfg_->Frame().ClientDlPilotSymbols()) ||
       (cfg_->IsDataSubcarrier(sc_id) == false)) {
-    data_ptr[user_id] = cfg_->UeSpecificPilot()[user_id][sc_id];
+    data_ptr[sp_id] = cfg_->UeSpecificPilot()[user_id][sc_id];
   } else {
     int8_t* raw_data_ptr =
         &dl_raw_data_[total_data_symbol_idx]
                      [cfg_->GetOFDMDataIndex(sc_id) +
-                      Roundup<64>(cfg_->GetOFDMDataNum()) * user_id];
-    data_ptr[user_id] = ModSingleUint8((uint8_t)(*raw_data_ptr),
-                                       cfg_->ModTable(Direction::kDownlink));
+                      Roundup<64>(cfg_->GetOFDMDataNum()) * sp_id];
+    data_ptr[sp_id] = ModSingleUint8((uint8_t)(*raw_data_ptr),
+                                     cfg_->ModTable(Direction::kDownlink));
   }
 }
 

@@ -60,20 +60,22 @@ EventData DoEncode::Launch(size_t tag) {
   size_t cb_id = gen_tag_t(tag).cb_id_;
   size_t cur_cb_id = cb_id % ldpc_config.NumBlocksInSymbol();
   size_t sched_ue_id = cb_id / ldpc_config.NumBlocksInSymbol();
-  size_t ue_id = mac_sched_->ScheduledUeIndex(frame_id, 0, sched_ue_id);
 
   size_t start_tsc = GetTime::WorkerRdtsc();
 
   size_t symbol_idx;
   size_t symbol_idx_data;
+  size_t ue_id;
   if (dir_ == Direction::kDownlink) {
     symbol_idx = cfg_->Frame().GetDLSymbolIdx(symbol_id);
     assert(symbol_idx >= cfg_->Frame().ClientDlPilotSymbols());
     symbol_idx_data = symbol_idx - cfg_->Frame().ClientDlPilotSymbols();
+    ue_id = mac_sched_->ScheduledUeIndex(frame_id, 0u, sched_ue_id);
   } else {
     symbol_idx = cfg_->Frame().GetULSymbolIdx(symbol_id);
     assert(symbol_idx >= cfg_->Frame().ClientUlPilotSymbols());
     symbol_idx_data = symbol_idx - cfg_->Frame().ClientUlPilotSymbols();
+    ue_id = sched_ue_id;
   }
 
   if (kDebugPrintInTask) {

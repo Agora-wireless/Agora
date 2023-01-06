@@ -125,9 +125,10 @@ float DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
       break;
     case CommsLib::BeamformingAlgorithm::kMMSE:
       mat_ul_beam_tmp =
-          arma::inv_sympd(mat_csi.t() * mat_csi +
-                          noise * arma::eye<arma::cx_fmat>(cfg_->UeAntNum(),
-                                                           cfg_->UeAntNum())) *
+          arma::inv_sympd(
+              mat_csi.t() * mat_csi +
+              noise * arma::eye<arma::cx_fmat>(cfg_->SpatialStreamsNum(),
+                                               cfg_->SpatialStreamsNum())) *
           mat_csi.t();
       break;
     case CommsLib::BeamformingAlgorithm::kMRC:
@@ -169,9 +170,10 @@ float DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
           break;
         case CommsLib::BeamformingAlgorithm::kMMSE:
           mat_dl_beam_tmp =
-              arma::inv_sympd(mat_dl_csi.t() * mat_dl_csi +
-                              noise * arma::eye<arma::cx_fmat>(
-                                          cfg_->UeAntNum(), cfg_->UeAntNum())) *
+              arma::inv_sympd(
+                  mat_dl_csi.t() * mat_dl_csi +
+                  noise * arma::eye<arma::cx_fmat>(cfg_->SpatialStreamsNum(),
+                                                   cfg_->SpatialStreamsNum())) *
               mat_dl_csi.t();
           break;
         case CommsLib::BeamformingAlgorithm::kMRC:
@@ -192,12 +194,13 @@ float DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
         // Zero out all antennas on the reference radio
         mat_dl_beam_tmp.insert_cols(
             (cfg_->RefRadio(i) * cfg_->NumChannels()),
-            arma::cx_fmat(cfg_->UeAntNum(), cfg_->NumChannels(),
+            arma::cx_fmat(cfg_->SpatialStreamsNum(), cfg_->NumChannels(),
                           arma::fill::zeros));
       }
     }
     arma::cx_fmat mat_dl_beam(reinterpret_cast<arma::cx_float*>(dl_beam_mem),
-                              cfg_->BsAntNum(), cfg_->UeAntNum(), false);
+                              cfg_->BsAntNum(), cfg_->SpatialStreamsNum(),
+                              false);
     mat_dl_beam = mat_dl_beam_tmp.st();
     if (kEnableMatLog) {
       phy_stats_->UpdateDlBeam(frame_id, cur_sc_id, mat_dl_beam);
@@ -207,7 +210,7 @@ float DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     if (cfg_->ExternalRefNode(i) == true) {
       mat_ul_beam_tmp.insert_cols(
           (cfg_->RefRadio(i) * cfg_->NumChannels()),
-          arma::cx_fmat(cfg_->UeAntNum(), cfg_->NumChannels(),
+          arma::cx_fmat(cfg_->SpatialStreamsNum(), cfg_->NumChannels(),
                         arma::fill::zeros));
     }
   }
@@ -408,15 +411,12 @@ void DoBeamWeights::ComputeFullCsiBeams(size_t tag) {
     const size_t cur_sc_id = base_sc_id + i;
 
     // Gather CSI matrices of each pilot from partially-transposed CSIs.
-    size_t selected_ue_idx = 0;
-    for (size_t ue_idx = 0; ue_idx < cfg_->UeAntNum(); ue_idx++) {
-      if (!mac_sched_->IsUeScheduled(frame_id, cur_sc_id, ue_idx)) {
-        continue;
-      } else {
-        selected_ue_idx++;
-      }
+    arma::uvec ue_list = mac_sched_->ScheduledUeList(frame_id, cur_sc_id);
+    for (size_t selected_ue_idx = 0;
+         selected_ue_idx < cfg_->SpatialStreamsNum(); selected_ue_idx++) {
+      size_t ue_idx = ue_list.at(selected_ue_idx);
       auto* dst_csi_ptr = reinterpret_cast<float*>(
-          csi_gather_buffer_ + cfg_->BsAntNum() * (selected_ue_idx - 1));
+          csi_gather_buffer_ + cfg_->BsAntNum() * selected_ue_idx);
       if (kUsePartialTrans) {
         PartialTransposeGather(cur_sc_id,
                                (float*)csi_buffers_[frame_slot][ue_idx],
@@ -445,7 +445,7 @@ void DoBeamWeights::ComputeFullCsiBeams(size_t tag) {
 
     float noise = 0;
     if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
-      noise = phy_stats_->GetNoise(frame_id);
+      noise = phy_stats_->GetNoise(frame_id, ue_list);
     }
     auto rcond =
         ComputePrecoder(frame_id, cur_sc_id, mat_csi, cal_sc_vec, noise,
@@ -530,8 +530,9 @@ void DoBeamWeights::ComputePartialCsiBeams(size_t tag) {
                         cfg_->BsAntNum(), cfg_->UeAntNum(), false);
 
   float noise = 0;
+  arma::uvec ue_list = mac_sched_->ScheduledUeList(frame_id, base_sc_id);
   if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
-    noise = phy_stats_->GetNoise(frame_id);
+    noise = phy_stats_->GetNoise(frame_id, ue_list);
   }
   ComputePrecoder(frame_id, base_sc_id, mat_csi, cal_sc_vec, noise,
                   ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(base_sc_id)],

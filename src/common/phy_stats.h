@@ -17,6 +17,7 @@ class PhyStats {
   explicit PhyStats(Config* const cfg, Direction dir);
   ~PhyStats();
   void PrintPhyStats();
+  void PrintEvmStats(size_t frame_id, const arma::uvec& ue_list);
   void UpdateBitErrors(size_t ue_id, size_t offset, size_t frame_slot,
                        uint8_t tx_byte, uint8_t rx_byte);
   void UpdateDecodedBits(size_t ue_id, size_t offset, size_t frame_slot,
@@ -24,8 +25,6 @@ class PhyStats {
   void UpdateBlockErrors(size_t ue_id, size_t offset, size_t frame_slot,
                          size_t block_error_count);
   void IncrementDecodedBlocks(size_t ue_id, size_t offset, size_t frame_slot);
-  void RecordBer(size_t frame_id);
-  void RecordSer(size_t frame_id);
   void UpdateUncodedBitErrors(size_t ue_id, size_t offset, size_t mod_bit_size,
                               uint8_t tx_byte, uint8_t rx_byte);
   void UpdateUncodedBits(size_t ue_id, size_t offset, size_t new_bits_num);
@@ -33,23 +32,27 @@ class PhyStats {
                  const arma::cx_fvec& eq_vec, const arma::uvec& ue_list);
   void UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t sc_id,
                  size_t tx_ue_id, size_t rx_ue_id, arma::cx_float eq);
-  void PrintEvmStats(size_t frame_id);
   void RecordCsiCond(size_t frame_id);
-  void RecordEvm(size_t frame_id);
-  void RecordEvmSnr(size_t frame_id);
+  void RecordEvm(size_t frame_id, const arma::uvec& ue_map);
+  void RecordEvmSnr(size_t frame_id, const arma::uvec& ue_map);
+  void RecordDlPilotSnr(size_t frame_id, const arma::uvec& ue_map);
+  void RecordDlCsi(size_t frame_id, size_t num_rec_sc,
+                   const Table<complex_float>& csi_buffer,
+                   const arma::uvec& ue_list);
+  void RecordUlPilotSnr(size_t frame_id);
+  void RecordCalibMat(size_t frame_id, size_t sc_id,
+                      const arma::cx_fvec& calib_buffer);
+  void RecordBer(size_t frame_id, const arma::uvec& ue_map);
+  void RecordSer(size_t frame_id, const arma::uvec& ue_map);
   float GetEvmSnr(size_t frame_id, size_t ue_id);
-  float GetNoise(size_t frame_id);
+  float GetNoise(size_t frame_id, const arma::uvec& ue_list);
   void ClearEvmBuffer(size_t frame_id);
   void UpdateUlPilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
                         complex_float* fft_data);
   void UpdateDlPilotSnr(size_t frame_id, size_t symbol_id, size_t ant_id,
                         complex_float* fft_data);
   void PrintUlSnrStats(size_t frame_id);
-  void RecordUlPilotSnr(size_t frame_id);
-  void PrintDlSnrStats(size_t frame_id);
-  void RecordDlPilotSnr(size_t frame_id);
-  void RecordDlCsi(size_t frame_id, size_t num_rec_sc,
-                   const Table<complex_float>& csi_buffer);
+  void PrintDlSnrStats(size_t frame_id, const arma::uvec& ue_list);
   void UpdateCalibPilotSnr(size_t frame_id, size_t calib_sym_id, size_t ant_id,
                            complex_float* fft_data);
   void PrintCalibSnrStats(size_t frame_id);
@@ -58,8 +61,6 @@ class PhyStats {
   void UpdateUlCsi(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
   void UpdateDlCsi(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
   void UpdateDlBeam(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
-  void RecordCalibMat(size_t frame_id, size_t sc_id,
-                      const arma::cx_fvec& calib_buffer);
 
  private:
   Config const* const config_;
@@ -97,7 +98,7 @@ class PhyStats {
   CsvLog::CsvLogger logger_evm_snr_;
   CsvLog::CsvLogger logger_ber_;
   CsvLog::CsvLogger logger_ser_;
-  CsvLog::CsvLogger logger_csi_;
+  CsvLog::CsvLogger logger_csi_cond_;
   CsvLog::CsvLogger logger_calib_;
   CsvLog::MatLogger logger_ul_csi_;
   CsvLog::MatLogger logger_dl_csi_;

@@ -465,15 +465,17 @@ void Agora::Start() {
               max_equaled_frame_ = frame_id;
               this->stats_->MasterSetTsc(TsType::kDemulDone, frame_id);
               stats_->PrintPerFrameDone(PrintType::kDemul, frame_id);
+              auto ue_map = mac_sched_->ScheduledUeMap(frame_id, 0u);
+              auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
               if (kPrintPhyStats) {
-                this->phy_stats_->PrintEvmStats(frame_id);
+                this->phy_stats_->PrintEvmStats(frame_id, ue_list);
               }
               this->phy_stats_->RecordCsiCond(frame_id);
-              this->phy_stats_->RecordEvm(frame_id);
-              this->phy_stats_->RecordEvmSnr(frame_id);
+              this->phy_stats_->RecordEvm(frame_id, ue_map);
+              this->phy_stats_->RecordEvmSnr(frame_id, ue_map);
               if (kUplinkHardDemod) {
-                this->phy_stats_->RecordBer(frame_id);
-                this->phy_stats_->RecordSer(frame_id);
+                this->phy_stats_->RecordBer(frame_id, ue_map);
+                this->phy_stats_->RecordSer(frame_id, ue_map);
               }
               this->phy_stats_->ClearEvmBuffer(frame_id);
 
@@ -517,8 +519,9 @@ void Agora::Start() {
             if (last_decode_symbol == true) {
               this->stats_->MasterSetTsc(TsType::kDecodeDone, frame_id);
               stats_->PrintPerFrameDone(PrintType::kDecode, frame_id);
-              this->phy_stats_->RecordBer(frame_id);
-              this->phy_stats_->RecordSer(frame_id);
+              auto ue_map = mac_sched_->ScheduledUeMap(frame_id, 0u);
+              this->phy_stats_->RecordBer(frame_id, ue_map);
+              this->phy_stats_->RecordSer(frame_id, ue_map);
               if (kEnableMac == false) {
                 assert(frame_tracking_.cur_proc_frame_id_ == frame_id);
                 const bool work_finished = this->CheckFrameComplete(frame_id);

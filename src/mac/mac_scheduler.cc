@@ -33,15 +33,20 @@ bool MacScheduler::IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id) {
 
 size_t MacScheduler::ScheduledUeIndex(size_t frame_id, size_t sc_id,
                                       size_t sched_ue_id) {
+  return (size_t)this->ScheduledUeList(frame_id, sc_id)[sched_ue_id];
+}
+
+arma::uvec MacScheduler::ScheduledUeMap(size_t frame_id, size_t sc_id) {
   size_t gp = frame_id % num_groups_;
-  return schedule_buffer_index_[gp][sched_ue_id +
-                                    cfg_->SpatialStreamsNum() * sc_id];
+  return arma::uvec(reinterpret_cast<unsigned long long*>(
+                        &schedule_buffer_[gp][cfg_->UeAntNum() * sc_id]),
+                    cfg_->UeAntNum(), false);
 }
 
 arma::uvec MacScheduler::ScheduledUeList(size_t frame_id, size_t sc_id) {
   size_t gp = frame_id % num_groups_;
-  return arma::uvec(
+  return sort(arma::uvec(
       reinterpret_cast<unsigned long long*>(
           &schedule_buffer_index_[gp][cfg_->SpatialStreamsNum() * sc_id]),
-      cfg_->SpatialStreamsNum(), false);
+      cfg_->SpatialStreamsNum(), false));
 }
