@@ -200,9 +200,12 @@ class Config {
     return this->demul_events_per_symbol_;
   }
   inline size_t BeamBlockSize() const { return this->beam_block_size_; }
+  inline size_t BeamBlockActiveSc() const {
+    return this->beam_block_active_sc_;
+  }
   inline size_t BeamBatchSize() const { return this->beam_batch_size_; }
-  inline size_t BeamEventsPerSymbol() const {
-    return this->beam_events_per_symbol_;
+  inline size_t BeamCallsPerSymbol() const {
+    return this->beam_calls_per_symbol_;
   }
   inline size_t FftBlockSize() const { return this->fft_block_size_; }
 
@@ -210,6 +213,7 @@ class Config {
   inline bool FreqOrthogonalPilot() const {
     return this->freq_orthogonal_pilot_;
   }
+  inline size_t PilotScGroupSize() const { return this->pilot_sc_group_size_; }
   inline size_t OfdmTxZeroPrefix() const { return this->ofdm_tx_zero_prefix_; }
   inline size_t OfdmTxZeroPostfix() const {
     return this->ofdm_tx_zero_postfix_;
@@ -487,11 +491,12 @@ class Config {
     return data_buffers[symbol_offset];
   }
 
-  /// Return the subcarrier ID to which we should refer to for the zeroforcing
+  /// Return the subcarrier ID which we should refer to for the beamweight
   /// matrices of subcarrier [sc_id].
   inline size_t GetBeamScId(size_t sc_id) const {
-    return this->freq_orthogonal_pilot_ ? sc_id - (sc_id % kTransposeBlockSize)
-                                        : sc_id;
+    return this->freq_orthogonal_pilot_
+               ? sc_id - (sc_id % this->pilot_sc_group_size_)
+               : sc_id;
   }
 
   /// Get the calibration buffer for this frame and subcarrier ID
@@ -771,12 +776,18 @@ class Config {
   size_t demul_block_size_;
   size_t demul_events_per_symbol_;  // Derived from demul_block_size
 
-  // Number of OFDM data subcarriers handled in one doZF function call
+  /// Number of OFDM data subcarriers moved on per ComputeBeams function call
   size_t beam_block_size_;
 
-  // Number of doZF function call handled in on event
+  /// Number of OFDM data subcarriers handled in one ComputeBeams function call
+  size_t beam_block_active_sc_;
+
+  /// Number of ComputeBeams function calls handled in one event
   size_t beam_batch_size_;
-  size_t beam_events_per_symbol_;  // Derived from beam_block_size
+
+  /// Number of ComputeBeams function calls per ODFM symbol
+  /// == RoundUp(ofdm_data_num / beam_block_size)
+  size_t beam_calls_per_symbol_;
 
   // Number of antennas handled in one FFT event
   size_t fft_block_size_;
@@ -784,7 +795,11 @@ class Config {
   // Number of code blocks handled in one encode event
   size_t encode_block_size_;
 
+  // Whether to enable frequency orthogonal pilot
   bool freq_orthogonal_pilot_;
+
+  // Frequency orthogonal pilot subcarrier group size
+  size_t pilot_sc_group_size_;
 
   // The number of zero IQ samples prepended to a time-domain symbol (i.e.,
   // before the cyclic prefix) before transmission. Its value depends on

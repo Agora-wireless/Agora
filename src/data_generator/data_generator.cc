@@ -322,12 +322,13 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
                              this->cfg_->UeAntNum() * this->cfg_->OfdmCaNum(),
                              Agora_memory::Alignment_t::kAlign64);
 
-  if (this->cfg_->FreqOrthogonalPilot() == true) {
+  if (this->cfg_->FreqOrthogonalPilot()) {
     for (size_t i = 0; i < this->cfg_->UeAntNum(); i++) {
       std::vector<complex_float> pilots_f_ue(
           this->cfg_->OfdmCaNum());  // Zeroed
       for (size_t j = this->cfg_->OfdmDataStart();
-           j < this->cfg_->OfdmDataStop(); j += kTransposeBlockSize) {
+           j < this->cfg_->OfdmDataStop();
+           j += this->cfg_->PilotScGroupSize()) {
         pilots_f_ue.at(i + j) = pilot_fd.at(i + j);
       }
       // Load pilots

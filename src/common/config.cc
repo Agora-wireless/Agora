@@ -329,6 +329,20 @@ Config::Config(std::string jsonfilename)
 
   bigstation_mode_ = tdd_conf.value("bigstation_mode", false);
   freq_orthogonal_pilot_ = tdd_conf.value("freq_orthogonal_pilot", false);
+  pilot_sc_group_size_ =
+      tdd_conf.value("pilot_sc_group_size", kTransposeBlockSize);
+  if (freq_orthogonal_pilot_) {
+    RtAssert(pilot_sc_group_size_ == kTransposeBlockSize,
+             "In this version, pilot_sc_group_size must be equal to Transpose "
+             "Block Size " +
+                 std::to_string(kTransposeBlockSize));
+    RtAssert(ofdm_data_num_ % pilot_sc_group_size_ == 0,
+             "ofdm_data_num must be evenly divided by pilot_sc_group_size " +
+                 std::to_string(pilot_sc_group_size_));
+    RtAssert(ue_ant_num_ <= pilot_sc_group_size_,
+             "user antennas must be no more than pilot_sc_group_size " +
+                 std::to_string(pilot_sc_group_size_));
+  }
   correct_phase_shift_ = tdd_conf.value("correct_phase_shift", false);
 
   hw_framer_ = tdd_conf.value("hw_framer", true);
@@ -588,9 +602,12 @@ Config::Config(std::string jsonfilename)
 
   beam_batch_size_ = tdd_conf.value("beam_batch_size", 1);
   beam_block_size_ = freq_orthogonal_pilot_
-                         ? kTransposeBlockSize
+                         ? pilot_sc_group_size_
                          : tdd_conf.value("beam_block_size", 1);
-  beam_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / beam_block_size_;
+  beam_block_active_sc_ = freq_orthogonal_pilot_
+                              ? 1  // only compute one sc per call
+                              : beam_block_size_;
+  beam_calls_per_symbol_ = 1 + (ofdm_data_num_ - 1) / beam_block_size_;
 
   fft_block_size_ = tdd_conf.value("fft_block_size", 1);
   fft_block_size_ = std::max(fft_block_size_, num_channels_);
@@ -1430,7 +1447,7 @@ void Config::GenData() {
                                         ? (org_sc - center_sc)
                                         : (org_sc + center_sc);
           if (this->freq_orthogonal_pilot_ == false ||
-              sc_id % kTransposeBlockSize == ue_id) {
+              sc_id % this->pilot_sc_group_size_ == ue_id) {
             pilot_ifft[shifted_sc] = this->pilots_[sc_id];
             pilot_sc_list.push_back(org_sc);
           } else {

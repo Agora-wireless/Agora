@@ -216,7 +216,7 @@ void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
       block_size = config_->DemulBlockSize();
       break;
     case EventType::kBeam:
-      num_events = config_->BeamEventsPerSymbol();
+      num_events = config_->BeamCallsPerSymbol() / config_->BeamBatchSize();
       block_size = config_->BeamBlockSize();
       break;
     default:
@@ -228,14 +228,13 @@ void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
     EventData event;
     event.event_type_ = event_type;
     event.num_tags_ = config_->BeamBatchSize();
-    size_t num_blocks = num_events / event.num_tags_;
-    size_t num_remainder = num_events % event.num_tags_;
-    if (num_remainder > 0) {
-      num_blocks++;
+    size_t rem_calls = config_->BeamCallsPerSymbol() % config_->BeamBatchSize();
+    if (rem_calls > 0) {
+      num_events++;
     }
-    for (size_t i = 0; i < num_blocks; i++) {
-      if ((i == num_blocks - 1) && num_remainder > 0) {
-        event.num_tags_ = num_remainder;
+    for (size_t i = 0; i < num_events; i++) {
+      if ((i == num_events - 1) && (rem_calls > 0)) {
+        event.num_tags_ = rem_calls;
       }
       for (size_t j = 0; j < event.num_tags_; j++) {
         event.tags_[j] =
@@ -1055,7 +1054,7 @@ void Agora::InitializeCounters() {
 
   rc_counters_.Init(cfg->BsAntNum());
 
-  beam_counters_.Init(cfg->BeamEventsPerSymbol());
+  beam_counters_.Init(cfg->BeamCallsPerSymbol());
 
   demul_counters_.Init(cfg->Frame().NumULSyms(), cfg->DemulEventsPerSymbol());
 

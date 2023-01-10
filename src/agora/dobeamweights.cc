@@ -397,7 +397,7 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
                 frame_id, base_sc_id);
   }
   const size_t num_subcarriers =
-      std::min(cfg_->BeamBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
+      std::min(cfg_->BeamBlockActiveSc(), cfg_->OfdmDataNum() - base_sc_id);
 
   // Handle each subcarrier one by one
   for (size_t i = 0; i < num_subcarriers; i++) {

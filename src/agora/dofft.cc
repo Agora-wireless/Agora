@@ -212,8 +212,12 @@ EventData DoFFT::Launch(size_t tag) {
     PartialTranspose(csi_buffers_[frame_slot][pilot_symbol_id], ant_id,
                      SymbolType::kPilot);
 
-    // Expand partial CSI to full CSI per UE
-    if (cfg_->FreqOrthogonalPilot() && pilot_symbol_id == 0) {
+    // Expand partial CSI from freq-orth pilot to full CSI per UE
+    // TODO 1. allow pilot sc group size different than kTransposeBlockSize
+    // TODO 2. potential use of multiple pilot symbols
+    // TODO 3. interpolation of CSI in gap subcarriers
+    if (cfg_->FreqOrthogonalPilot() &&
+        pilot_symbol_id == cfg_->Frame().NumPilotSyms() - 1) {
       const size_t num_blocks = cfg_->OfdmDataNum() / kTransposeBlockSize;
       for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
         const size_t block_base_offset =
