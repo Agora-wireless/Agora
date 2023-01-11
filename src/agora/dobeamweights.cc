@@ -449,29 +449,3 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
     duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;
   }
 }
-
-// Currently unused
-/*
-void DoBeamWeights::Predict(size_t tag)
-{
-    size_t frame_id = gen_tag_t(tag).frame_id;
-    size_t base_sc_id = gen_tag_t(tag).sc_id;
-
-    // Use stale CSI as predicted CSI
-    // TODO: add prediction algorithm
-    const size_t offset_in_buffer
-        = ((frame_id % kFrameWnd) * cfg_->OfdmDataNum())
-        + base_sc_id;
-    auto* ptr_in = (arma::cx_float*)pred_csi_buffer;
-    std::memcpy(ptr_in, (arma::cx_float*)csi_buffer_[offset_in_buffer],
-        sizeof(arma::cx_float) * cfg->BsAntNum() * cfg->UE_NUM);
-    arma::cx_fmat mat_input(ptr_in, cfg->BsAntNum(), cfg->UE_NUM, false);
-
-    // Input matrix and calibration are for current frame, output precoders are
-    // for the next frame
-    compute_precoder(mat_input,
-        cfg_->GetCalibBuffer(calib_buffer_, frame_id, base_sc_id),
-        cfg_->get_ul_beam_mat(ul_beam_buffer_, frame_id + 1, base_sc_id),
-        cfg_->get_dl_beam_mat(dl_beam_buffer_, frame_id + 1, base_sc_id));
-}
-*/

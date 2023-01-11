@@ -204,8 +204,8 @@ class Config {
     return this->beam_block_active_sc_;
   }
   inline size_t BeamBatchSize() const { return this->beam_batch_size_; }
-  inline size_t BeamCallsPerSymbol() const {
-    return this->beam_calls_per_symbol_;
+  inline size_t BeamEventsPerSymbol() const {
+    return this->beam_events_per_symbol_;
   }
   inline size_t FftBlockSize() const { return this->fft_block_size_; }
 
@@ -787,7 +787,7 @@ class Config {
 
   /// Number of ComputeBeams function calls per ODFM symbol
   /// == RoundUp(ofdm_data_num / beam_block_size)
-  size_t beam_calls_per_symbol_;
+  size_t beam_events_per_symbol_;
 
   // Number of antennas handled in one FFT event
   size_t fft_block_size_;

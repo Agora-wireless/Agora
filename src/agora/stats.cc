@@ -364,7 +364,7 @@ void Stats::PrintSummary() {
         (this->config_->BsAntNum() * this->config_->Frame().NumPilotSyms());
     double beam_frames = (static_cast<double>(num_tasks.at(
                              static_cast<size_t>(DoerType::kBeam)))) /
-                         this->config_->BeamCallsPerSymbol();
+                         this->config_->BeamEventsPerSymbol();
 
     if (config_->Frame().NumDLSyms() > 0) {
       double precode_frames =

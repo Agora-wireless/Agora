@@ -607,7 +607,7 @@ Config::Config(std::string jsonfilename)
   beam_block_active_sc_ = freq_orthogonal_pilot_
                               ? 1  // only compute one sc per call
                               : beam_block_size_;
-  beam_calls_per_symbol_ = 1 + (ofdm_data_num_ - 1) / beam_block_size_;
+  beam_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / beam_block_size_;
 
   fft_block_size_ = tdd_conf.value("fft_block_size", 1);
   fft_block_size_ = std::max(fft_block_size_, num_channels_);
