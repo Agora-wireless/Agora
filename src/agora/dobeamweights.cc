@@ -389,6 +389,7 @@ static inline void TransposeGather(size_t cur_sc_id, float* src, float*& dst,
 }
 
 void DoBeamWeights::ComputeBeams(size_t tag) {
+  //Request was generated from gen_tag_t::FrmSc
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t base_sc_id = gen_tag_t(tag).sc_id_;
   const size_t frame_slot = frame_id % kFrameWnd;
@@ -396,11 +397,24 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
     std::printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid_,
                 frame_id, base_sc_id);
   }
-  const size_t num_subcarriers =
-      std::min(cfg_->BeamBlockActiveSc(), cfg_->OfdmDataNum() - base_sc_id);
+
+  //Process BeamBlockSize (or less) number of carriers
+  //cfg_->OfdmDataNum() is the total number of usable subcarriers
+  size_t num_subcarriers =
+      std::min(cfg_->BeamBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
 
   // Handle each subcarrier one by one
-  for (size_t i = 0; i < num_subcarriers; i++) {
+  size_t sc_inc = 1;
+  size_t start_sc = 0;
+  if (cfg_->FreqOrthogonalPilot()) {
+    //For FreqOrthogonalPilot only process the first sc in each group
+    sc_inc = cfg_->PilotScGroupSize();
+    //Start at the 1st multiple of sc_inc
+    start_sc = sc_inc - (base_sc_id % sc_inc);
+  }
+
+  // Handle each subcarrier in the block
+  for (size_t i = start_sc; i < num_subcarriers; i = i + sc_inc) {
     arma::cx_fvec& cal_sc_vec = *calib_sc_vec_ptr_;
     const size_t start_tsc1 = GetTime::WorkerRdtsc();
     const size_t cur_sc_id = base_sc_id + i;
@@ -439,10 +453,9 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
     if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
       noise = phy_stats_->GetNoise(frame_id);
     }
-    ComputePrecoder(
-        frame_id, cur_sc_id, mat_csi, cal_sc_vec, noise,
-        ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)],
-        dl_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
+    ComputePrecoder(frame_id, cur_sc_id, mat_csi, cal_sc_vec, noise,
+                    ul_beam_matrices_[frame_slot][cur_sc_id],
+                    dl_beam_matrices_[frame_slot][cur_sc_id]);
 
     duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
     duration_stat_->task_count_++;

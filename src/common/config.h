@@ -200,10 +200,6 @@ class Config {
     return this->demul_events_per_symbol_;
   }
   inline size_t BeamBlockSize() const { return this->beam_block_size_; }
-  inline size_t BeamBlockActiveSc() const {
-    return this->beam_block_active_sc_;
-  }
-  inline size_t BeamBatchSize() const { return this->beam_batch_size_; }
   inline size_t BeamEventsPerSymbol() const {
     return this->beam_events_per_symbol_;
   }
@@ -774,19 +770,12 @@ class Config {
 
   // Number of OFDM data subcarriers handled in one demodulation event
   size_t demul_block_size_;
-  size_t demul_events_per_symbol_;  // Derived from demul_block_size
+  // Derived from demul_block_size
+  size_t demul_events_per_symbol_;
 
-  /// Number of OFDM data subcarriers moved on per ComputeBeams function call
+  /// Number of OFDM data subcarriers handled in 1 kBeam event
   size_t beam_block_size_;
-
-  /// Number of OFDM data subcarriers handled in one ComputeBeams function call
-  size_t beam_block_active_sc_;
-
-  /// Number of ComputeBeams function calls handled in one event
-  size_t beam_batch_size_;
-
-  /// Number of ComputeBeams function calls per ODFM symbol
-  /// == RoundUp(ofdm_data_num / beam_block_size)
+  /// Beam Events generated per Frame.  Derived from beam_block_size
   size_t beam_events_per_symbol_;
 
   // Number of antennas handled in one FFT event

@@ -205,54 +205,35 @@ void Agora::ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
 
 void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
                                 size_t symbol_id) {
-  auto base_tag = gen_tag_t::FrmSymSc(frame_id, symbol_id, 0);
-  size_t num_events = SIZE_MAX;
-  size_t block_size = SIZE_MAX;
+  gen_tag_t base_tag(0);
+  size_t num_events;
+  size_t block_size;
 
   switch (event_type) {
     case EventType::kDemul:
-    case EventType::kPrecode:
+    case EventType::kPrecode: {
+      base_tag = gen_tag_t::FrmSymSc(frame_id, symbol_id, 0);
       num_events = config_->DemulEventsPerSymbol();
       block_size = config_->DemulBlockSize();
       break;
-    case EventType::kBeam:
-      num_events = config_->BeamEventsPerSymbol() / config_->BeamBatchSize();
+    }
+    case EventType::kBeam: {
+      base_tag = gen_tag_t::FrmSc(frame_id, 0);
+      num_events = config_->BeamEventsPerSymbol();
       block_size = config_->BeamBlockSize();
       break;
-    default:
-      assert(false);
+    }
+    default: {
+      RtAssert(false, "Invalid event type in ScheduleSubcarriers");
+    }
   }
 
-  size_t qid = (frame_id & 0x1);
-  if (event_type == EventType::kBeam) {
-    EventData event;
-    event.event_type_ = event_type;
-    event.num_tags_ = config_->BeamBatchSize();
-    size_t rem_calls =
-        config_->BeamEventsPerSymbol() % config_->BeamBatchSize();
-    if (rem_calls > 0) {
-      num_events++;
-    }
-    for (size_t i = 0; i < num_events; i++) {
-      if ((i == num_events - 1) && (rem_calls > 0)) {
-        event.num_tags_ = rem_calls;
-      }
-      for (size_t j = 0; j < event.num_tags_; j++) {
-        event.tags_[j] =
-            gen_tag_t::FrmSymSc(frame_id, symbol_id,
-                                block_size * (i * event.num_tags_ + j))
-                .tag_;
-      }
-      TryEnqueueFallback(message_->GetConq(event_type, qid),
-                         message_->GetPtok(event_type, qid), event);
-    }
-  } else {
-    for (size_t i = 0; i < num_events; i++) {
-      TryEnqueueFallback(message_->GetConq(event_type, qid),
-                         message_->GetPtok(event_type, qid),
-                         EventData(event_type, base_tag.tag_));
-      base_tag.sc_id_ += block_size;
-    }
+  const size_t qid = (frame_id & 0x1);
+  for (size_t i = 0; i < num_events; i++) {
+    TryEnqueueFallback(message_->GetConq(event_type, qid),
+                       message_->GetPtok(event_type, qid),
+                       EventData(event_type, base_tag.tag_));
+    base_tag.sc_id_ += block_size;
   }
 }
 
