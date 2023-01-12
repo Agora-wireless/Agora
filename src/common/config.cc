@@ -602,7 +602,7 @@ Config::Config(std::string jsonfilename)
 
   beam_block_size_ = tdd_conf.value("beam_block_size", 1);
   if (freq_orthogonal_pilot_) {
-    if (beam_block_size == 1) {
+    if (beam_block_size_ == 1) {
       AGORA_LOG_INFO("Setting beam_block_size to pilot_sc_group_size %zu\n",
                      pilot_sc_group_size_);
       beam_block_size_ = pilot_sc_group_size_;
