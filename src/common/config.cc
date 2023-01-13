@@ -376,21 +376,31 @@ Config::Config(std::string jsonfilename)
 
     size_t beacon_symbol_position = tdd_conf.value("beacon_position", SIZE_MAX);
 
-    // Start position of the first UL symbol
-    ul_data_symbol_start =
-        tdd_conf.value("ul_data_symbol_start", ul_data_symbol_start);
     ul_data_symbol_num_perframe =
         tdd_conf.value("ul_symbol_num_perframe", ul_data_symbol_num_perframe);
 
-    // Start position of the first DL symbol
-    dl_data_symbol_start =
-        tdd_conf.value("dl_data_symbol_start", dl_data_symbol_start);
+    if (ul_data_symbol_num_perframe == 0) {
+      ul_data_symbol_start = 0;
+    } else {
+      // Start position of the first UL symbol
+      ul_data_symbol_start =
+          tdd_conf.value("ul_data_symbol_start", ul_data_symbol_start);
+    }
+    const size_t ul_data_symbol_stop =
+        ul_data_symbol_start + ul_data_symbol_num_perframe;
+
+    //Dl symbols
     dl_data_symbol_num_perframe =
         tdd_conf.value("dl_symbol_num_perframe", dl_data_symbol_num_perframe);
 
-    size_t ul_data_symbol_stop =
-        ul_data_symbol_start + ul_data_symbol_num_perframe;
-    size_t dl_data_symbol_stop =
+    if (dl_data_symbol_num_perframe == 0) {
+      dl_data_symbol_start = 0;
+    } else {
+      // Start position of the first DL symbol
+      dl_data_symbol_start =
+          tdd_conf.value("dl_data_symbol_start", dl_data_symbol_start);
+    }
+    const size_t dl_data_symbol_stop =
         dl_data_symbol_start + dl_data_symbol_num_perframe;
 
     if ((ul_data_symbol_num_perframe + dl_data_symbol_num_perframe +
@@ -426,7 +436,8 @@ Config::Config(std::string jsonfilename)
     size_t first_sym_count;
     size_t second_sym_start;
     size_t second_sym_count;
-    if (dl_data_symbol_start <= ul_data_symbol_start) {
+    if ((dl_data_symbol_num_perframe > 0) &&
+        (dl_data_symbol_start <= ul_data_symbol_start)) {
       first_sym = 'D';
       first_sym_start = dl_data_symbol_start;
       first_sym_count = dl_data_symbol_num_perframe;
@@ -453,25 +464,29 @@ Config::Config(std::string jsonfilename)
       sched = "G";
     }
     sched.append(pilot_symbol_num_perframe, 'P');
-    // Could roll this up into a loop but will leave like this for readability
-    int add_symbols = 0;
     // ( )PGGGG1111111111GGGG2222222222GGGG
     if (first_sym_start > 0) {
-      add_symbols = first_sym_start - sched.length();
-      assert(add_symbols >= 0);
-      sched.append(first_sym_start - sched.length(), 'G');
-      sched.append(first_sym_count, first_sym);
+      const int guard_symbols = first_sym_start - sched.length();
+      if (guard_symbols > 0) {
+        sched.append(guard_symbols, 'G');
+      }
+      if (first_sym_count > 0) {
+        sched.append(first_sym_count, first_sym);
+      }
     }
-
     if (second_sym_start > 0) {
-      add_symbols = second_sym_start - sched.length();
-      assert(add_symbols >= 0);
-      sched.append(add_symbols, 'G');
-      sched.append(second_sym_count, second_sym);
+      const int guard_symbols = second_sym_start - sched.length();
+      if (guard_symbols > 0) {
+        sched.append(guard_symbols, 'G');
+      }
+      if (second_sym_count > 0) {
+        sched.append(second_sym_count, second_sym);
+      }
     }
-    add_symbols = symbol_num_perframe - sched.length();
-    assert(add_symbols >= 0);
-    sched.append(add_symbols, 'G');
+    const int guard_symbols = symbol_num_perframe - sched.length();
+    if (guard_symbols > 0) {
+      sched.append(guard_symbols, 'G');
+    }
 
     // Add the beacon
     if (beacon_symbol_position < sched.length()) {
@@ -483,7 +498,6 @@ Config::Config(std::string jsonfilename)
       }
       sched.replace(beacon_symbol_position, 1, "B");
     }
-
     frame_ = FrameStats(sched);
   } else {
     json jframes = tdd_conf.value("frame_schedule", json::array());
@@ -1496,8 +1510,8 @@ void Config::GenData() {
     }
   }
 
-  delete[](ul_temp_parity_buffer);
-  delete[](dl_temp_parity_buffer);
+  delete[] (ul_temp_parity_buffer);
+  delete[] (dl_temp_parity_buffer);
   ul_iq_ifft.Free();
   dl_iq_ifft.Free();
   ue_pilot_ifft.Free();
