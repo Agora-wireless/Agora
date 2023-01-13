@@ -600,14 +600,24 @@ Config::Config(std::string jsonfilename)
       "Demodulation block size must be a multiple of transpose block size");
   demul_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / demul_block_size_;
 
-  beam_batch_size_ = tdd_conf.value("beam_batch_size", 1);
-  beam_block_size_ = freq_orthogonal_pilot_
-                         ? pilot_sc_group_size_
-                         : tdd_conf.value("beam_block_size", 1);
-  beam_block_active_sc_ = freq_orthogonal_pilot_
-                              ? 1  // only compute one sc per call
-                              : beam_block_size_;
-  beam_calls_per_symbol_ = 1 + (ofdm_data_num_ - 1) / beam_block_size_;
+  beam_block_size_ = tdd_conf.value("beam_block_size", 1);
+  if (freq_orthogonal_pilot_) {
+    if (beam_block_size_ == 1) {
+      AGORA_LOG_INFO("Setting beam_block_size to pilot_sc_group_size %zu\n",
+                     pilot_sc_group_size_);
+      beam_block_size_ = pilot_sc_group_size_;
+    }
+
+    //Set beam block size to the pilot sc group size so events arn't generated for the redundant sc
+    if ((beam_block_size_ % pilot_sc_group_size_) != 0) {
+      AGORA_LOG_WARN(
+          "beam_block_size is not a multiple of pilot_sc_group_size. "
+          "Efficiency will be decreased.  Please consider updating your "
+          "settings\n",
+          pilot_sc_group_size_, beam_block_size_);
+    }
+  }
+  beam_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / beam_block_size_;
 
   fft_block_size_ = tdd_conf.value("fft_block_size", 1);
   fft_block_size_ = std::max(fft_block_size_, num_channels_);

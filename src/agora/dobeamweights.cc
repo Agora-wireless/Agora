@@ -389,6 +389,7 @@ static inline void TransposeGather(size_t cur_sc_id, float* src, float*& dst,
 }
 
 void DoBeamWeights::ComputeBeams(size_t tag) {
+  //Request was generated from gen_tag_t::FrmSc
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t base_sc_id = gen_tag_t(tag).sc_id_;
   const size_t frame_slot = frame_id % kFrameWnd;
@@ -396,30 +397,52 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
     std::printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid_,
                 frame_id, base_sc_id);
   }
-  const size_t num_subcarriers =
-      std::min(cfg_->BeamBlockActiveSc(), cfg_->OfdmDataNum() - base_sc_id);
 
-  // Handle each subcarrier one by one
-  for (size_t i = 0; i < num_subcarriers; i++) {
+  // Process BeamBlockSize (or less) number of carriers
+  // cfg_->OfdmDataNum() is the total number of usable subcarriers
+  // First sc in the next block
+  const size_t last_sc_id =
+      base_sc_id +
+      std::min(cfg_->BeamBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
+
+  // Default: Handle each subcarrier one by one
+  size_t sc_inc = 1;
+  size_t start_sc = base_sc_id;
+  // For freqOrthPilot we can skip all sc except sc % PilotScGroupSize == 0
+  if (cfg_->FreqOrthogonalPilot()) {
+    //For FreqOrthogonalPilot only process the first sc in each group
+    sc_inc = cfg_->PilotScGroupSize();
+    const size_t rem = start_sc % cfg_->PilotScGroupSize();
+    if (rem != 0) {
+      //Start at the next multiple of PilotScGroupSize
+      start_sc += (cfg_->PilotScGroupSize() - rem);
+    }
+  }
+
+  // Handle each subcarrier in the block (base_sc_id : last_sc_id -1)
+  for (size_t cur_sc_id = start_sc; cur_sc_id < last_sc_id;
+       cur_sc_id = cur_sc_id + sc_inc) {
     arma::cx_fvec& cal_sc_vec = *calib_sc_vec_ptr_;
     const size_t start_tsc1 = GetTime::WorkerRdtsc();
-    const size_t cur_sc_id = base_sc_id + i;
 
     // Gather CSI matrices of each pilot from partially-transposed CSIs.
     for (size_t ue_idx = 0; ue_idx < cfg_->UeAntNum(); ue_idx++) {
       auto* dst_csi_ptr = reinterpret_cast<float*>(csi_gather_buffer_ +
                                                    cfg_->BsAntNum() * ue_idx);
       if (kUsePartialTrans) {
-        PartialTransposeGather(cur_sc_id,
-                               (float*)csi_buffers_[frame_slot][ue_idx],
-                               dst_csi_ptr, cfg_->BsAntNum());
+        PartialTransposeGather(
+            cur_sc_id,
+            reinterpret_cast<float*>(csi_buffers_[frame_slot][ue_idx]),
+            dst_csi_ptr, cfg_->BsAntNum());
       } else {
-        TransposeGather(cur_sc_id, (float*)csi_buffers_[frame_slot][ue_idx],
-                        dst_csi_ptr, cfg_->BsAntNum(), cfg_->OfdmDataNum());
+        TransposeGather(
+            cur_sc_id,
+            reinterpret_cast<float*>(csi_buffers_[frame_slot][ue_idx]),
+            dst_csi_ptr, cfg_->BsAntNum(), cfg_->OfdmDataNum());
       }
     }
 
-    size_t start_tsc2 = GetTime::WorkerRdtsc();
+    const size_t start_tsc2 = GetTime::WorkerRdtsc();
     duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
 
     arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer_, cfg_->BsAntNum(),
@@ -432,46 +455,19 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
       mat_csi.shed_rows(ext_ref_id_);
     }
 
-    double start_tsc3 = GetTime::WorkerRdtsc();
-    duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
+    const double start_tsc3 = GetTime::WorkerRdtsc();
+    duration_stat_->task_duration_[2u] += start_tsc3 - start_tsc2;
 
     float noise = 0;
     if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
       noise = phy_stats_->GetNoise(frame_id);
     }
-    ComputePrecoder(
-        frame_id, cur_sc_id, mat_csi, cal_sc_vec, noise,
-        ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)],
-        dl_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
+    ComputePrecoder(frame_id, cur_sc_id, mat_csi, cal_sc_vec, noise,
+                    ul_beam_matrices_[frame_slot][cur_sc_id],
+                    dl_beam_matrices_[frame_slot][cur_sc_id]);
 
     duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
     duration_stat_->task_count_++;
     duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;
   }
 }
-
-// Currently unused
-/*
-void DoBeamWeights::Predict(size_t tag)
-{
-    size_t frame_id = gen_tag_t(tag).frame_id;
-    size_t base_sc_id = gen_tag_t(tag).sc_id;
-
-    // Use stale CSI as predicted CSI
-    // TODO: add prediction algorithm
-    const size_t offset_in_buffer
-        = ((frame_id % kFrameWnd) * cfg_->OfdmDataNum())
-        + base_sc_id;
-    auto* ptr_in = (arma::cx_float*)pred_csi_buffer;
-    std::memcpy(ptr_in, (arma::cx_float*)csi_buffer_[offset_in_buffer],
-        sizeof(arma::cx_float) * cfg->BsAntNum() * cfg->UE_NUM);
-    arma::cx_fmat mat_input(ptr_in, cfg->BsAntNum(), cfg->UE_NUM, false);
-
-    // Input matrix and calibration are for current frame, output precoders are
-    // for the next frame
-    compute_precoder(mat_input,
-        cfg_->GetCalibBuffer(calib_buffer_, frame_id, base_sc_id),
-        cfg_->get_ul_beam_mat(ul_beam_buffer_, frame_id + 1, base_sc_id),
-        cfg_->get_dl_beam_mat(dl_beam_buffer_, frame_id + 1, base_sc_id));
-}
-*/

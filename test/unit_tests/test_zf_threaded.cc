@@ -30,9 +30,9 @@ void MasterToWorkerDynamicMaster(
     cfg->BsAntNum(kBsAntNums[bs_ant_idx]);
     for (size_t i = 0; i < kMaxTestNum; i++) {
       uint32_t frame_id =
-          i / cfg->BeamCallsPerSymbol() + kFrameOffsets[bs_ant_idx];
+          i / cfg->BeamEventsPerSymbol() + kFrameOffsets[bs_ant_idx];
       size_t base_sc_id =
-          (i % cfg->BeamCallsPerSymbol()) * cfg->BeamBlockSize();
+          (i % cfg->BeamEventsPerSymbol()) * cfg->BeamBlockSize();
       event_queue.enqueue(EventData(
           EventType::kBeam, gen_tag_t::FrmSc(frame_id, base_sc_id).tag_));
     }
