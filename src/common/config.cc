@@ -1510,8 +1510,8 @@ void Config::GenData() {
     }
   }
 
-  delete[] (ul_temp_parity_buffer);
-  delete[] (dl_temp_parity_buffer);
+  delete[](ul_temp_parity_buffer);
+  delete[](dl_temp_parity_buffer);
   ul_iq_ifft.Free();
   dl_iq_ifft.Free();
   ue_pilot_ifft.Free();
