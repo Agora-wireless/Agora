@@ -91,9 +91,12 @@ class PhyStats {
   size_t num_rx_symbols_;
   size_t num_rxdata_symbols_;
 
-  CsvLog::CsvLogger logger_snr_;
-  CsvLog::CsvLogger logger_rssi_;
-  CsvLog::CsvLogger logger_noise_;
+  CsvLog::CsvLogger logger_plt_snr_;
+  CsvLog::CsvLogger logger_plt_rssi_;
+  CsvLog::CsvLogger logger_plt_noise_;
+  CsvLog::CsvLogger logger_bf_snr_;
+  CsvLog::CsvLogger logger_bf_rssi_;
+  CsvLog::CsvLogger logger_bf_noise_;
   CsvLog::CsvLogger logger_evm_;
   CsvLog::CsvLogger logger_evm_sc_;
   CsvLog::CsvLogger logger_evm_snr_;

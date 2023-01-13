@@ -12,18 +12,21 @@
 PhyStats::PhyStats(Config* const cfg, Direction dir)
     : config_(cfg),
       dir_(dir),
-      logger_snr_(CsvLog::kSNR, cfg, dir),
-      logger_rssi_(CsvLog::kRSSI, cfg, dir),
-      logger_noise_(CsvLog::kNOISE, cfg, dir),
-      logger_evm_(CsvLog::kEVM, cfg, dir),
-      logger_evm_sc_(CsvLog::kEVMSC, cfg, dir),
-      logger_evm_snr_(CsvLog::kEVMSNR, cfg, dir),
-      logger_ber_(CsvLog::kBER, cfg, dir),
-      logger_ser_(CsvLog::kSER, cfg, dir),
-      logger_csi_(CsvLog::kCSI, cfg, dir),
+      logger_plt_snr_(CsvLog::kPltSnr, cfg, dir, true),
+      logger_plt_rssi_(CsvLog::kPltRssi, cfg, dir, true),
+      logger_plt_noise_(CsvLog::kPltNoise, cfg, dir, true),
+      logger_bf_snr_(CsvLog::kBfSnr, cfg, dir),
+      logger_bf_rssi_(CsvLog::kBfRssi, cfg, dir),
+      logger_bf_noise_(CsvLog::kBfNoise, cfg, dir),
+      logger_evm_(CsvLog::kEvm, cfg, dir),
+      logger_evm_sc_(CsvLog::kEvmSc, cfg, dir),
+      logger_evm_snr_(CsvLog::kEvmSnr, cfg, dir),
+      logger_ber_(CsvLog::kBer, cfg, dir),
+      logger_ser_(CsvLog::kSer, cfg, dir),
+      logger_csi_(CsvLog::kCsi, cfg, dir),
       logger_calib_(CsvLog::kCalib, cfg, dir),
-      logger_ul_csi_(CsvLog::kULCSI, cfg, dir),
-      logger_dl_csi_(CsvLog::kDLCSI, cfg, dir),
+      logger_ul_csi_(CsvLog::kUlCsi, cfg, dir),
+      logger_dl_csi_(CsvLog::kDlCsi, cfg, dir),
       logger_ul_beam_(CsvLog::kUlBeam, cfg, dir),
       logger_dl_beam_(CsvLog::kDlBeam, cfg, dir) {
   if (dir_ == Direction::kDownlink) {
@@ -305,9 +308,9 @@ void PhyStats::RecordPilotSnr(size_t frame_id) {
         ss_noise << "," << pilot_noise_[frame_slot][idx_offset];
       }
     }
-    logger_snr_.Write(ss_snr.str());
-    logger_rssi_.Write(ss_rssi.str());
-    logger_noise_.Write(ss_noise.str());
+    logger_plt_snr_.Write(ss_snr.str());
+    logger_plt_rssi_.Write(ss_rssi.str());
+    logger_plt_noise_.Write(ss_noise.str());
   }
 }
 
@@ -386,9 +389,9 @@ void PhyStats::RecordDlPilotSnr(size_t frame_id) {
           ss_noise << "," << dl_pilot_noise_[frame_slot][idx_offset];
         }
       }
-      logger_snr_.Write(ss_snr.str());
-      logger_rssi_.Write(ss_rssi.str());
-      logger_noise_.Write(ss_noise.str());
+      logger_bf_snr_.Write(ss_snr.str());
+      logger_bf_rssi_.Write(ss_rssi.str());
+      logger_bf_noise_.Write(ss_noise.str());
     }
   }
 }

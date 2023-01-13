@@ -611,10 +611,10 @@ Config::Config(std::string jsonfilename)
     //Set beam block size to the pilot sc group size so events arn't generated for the redundant sc
     if ((beam_block_size_ % pilot_sc_group_size_) != 0) {
       AGORA_LOG_WARN(
-          "beam_block_size is not a multiple of pilot_sc_group_size. "
+          "beam_block_size(%zu) is not a multiple of pilot_sc_group_size(%zu). "
           "Efficiency will be decreased.  Please consider updating your "
           "settings\n",
-          pilot_sc_group_size_, beam_block_size_);
+          beam_block_size_, pilot_sc_group_size_);
     }
   }
   beam_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / beam_block_size_;
@@ -1496,8 +1496,8 @@ void Config::GenData() {
     }
   }
 
-  delete[] (ul_temp_parity_buffer);
-  delete[] (dl_temp_parity_buffer);
+  delete[](ul_temp_parity_buffer);
+  delete[](dl_temp_parity_buffer);
   ul_iq_ifft.Free();
   dl_iq_ifft.Free();
   ue_pilot_ifft.Free();
