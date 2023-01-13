@@ -416,11 +416,9 @@ void PhyUe::Start() {
             // (Only when in Downlink Only mode, otherwise the pilots
             // will be transmitted with the uplink data)
             if (ul_symbol_perframe_ == 0) {
-              EventData do_tx_pilot_task(
+              const EventData do_tx_pilot_task(
                   EventType::kPacketPilotTX,
-                  gen_tag_t::FrmSymUe(
-                      frame_id, config_->Frame().GetPilotSymbol(ant_id), ant_id)
-                      .tag_);
+                  gen_tag_t::FrmUe(frame_id, ant_id).tag_);
               ScheduleTask(do_tx_pilot_task, &tx_queue_,
                            *tx_ptoks_ptr_[ru_->AntNumToWorkerId(ant_id)]);
             } else {
@@ -775,10 +773,9 @@ void PhyUe::Start() {
                   for (size_t ch = 0; ch < config_->NumUeChannels(); ch++) {
                     const size_t ue_tx_antenna =
                         (ue_interface * config_->NumUeChannels()) + ch;
-                    EventData do_tx_task(
+                    const EventData do_tx_task(
                         EventType::kPacketTX,
-                        gen_tag_t::FrmSymUe(ue.tx_pending_frame_, 0,
-                                            ue_tx_antenna)
+                        gen_tag_t::FrmUe(ue.tx_pending_frame_, ue_tx_antenna)
                             .tag_);
                     ScheduleTask(
                         do_tx_task, &tx_queue_,
