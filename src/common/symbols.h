@@ -180,6 +180,16 @@ static constexpr bool kEnableMatLog = true;
 static constexpr bool kEnableMatLog = false;
 #endif
 
+#if defined(ENABLE_LDPC)
+static constexpr bool kDownlinkHardDemod = false;
+static constexpr bool kUplinkHardDemod = false;
+#else
+// Enable hard demodulation and disable LDPC decoding
+// Useful for evaluating constellation quality
+static constexpr bool kDownlinkHardDemod = true;
+static constexpr bool kUplinkHardDemod = true;
+#endif
+
 // Use 12-bit IQ sample to reduce network throughput
 static constexpr bool kUse12BitIQ = false;
 static constexpr bool kDebug12BitIQ = false;
@@ -187,11 +197,6 @@ static constexpr bool kDebugDownlink = false;
 static constexpr bool kDebugUplink = false;
 
 static constexpr bool kUsePartialTrans = true;
-
-// Enable hard demodulation and disable LDPC decoding
-// Useful for evaluating constellation quality
-static constexpr bool kDownlinkHardDemod = false;
-static constexpr bool kUplinkHardDemod = false;
 
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = true;

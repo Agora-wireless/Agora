@@ -286,6 +286,7 @@ Config::Config(std::string jsonfilename)
   log_listener_port_ = tdd_conf.value("log_listener_port", 33300);
 
   log_sc_num_ = tdd_conf.value("log_sc_num", 4);
+  log_timestamp_ = tdd_conf.value("log_timestamp", false);
 
   /* frame configurations */
   cp_len_ = tdd_conf.value("cp_size", 0);
