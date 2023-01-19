@@ -38,20 +38,19 @@ for line in sys.stdin:
     for j_col in range(1, num_cols):
       leg.append(leg_name + ' ' + str(j_col))
     ax1.legend(leg)
-  if i_row < xaxis_max:
-    j_col = 0
-    for elem in line.split(','):
-      if j_col < num_cols:
-        arr[i_row, j_col] = float(elem)
-        j_col += 1
-    i_row += 1
-    if i_row % refresh_rate == 0:
-      for j_col in range(1, num_cols):
-        curves[j_col - 1].set_xdata(arr[:,0])
-        curves[j_col - 1].set_ydata(arr[:,j_col])
-      fig1.canvas.draw()
-      fig1.canvas.flush_events()
-  else:
+  j_col = 0
+  for elem in line.split(','):
+    if j_col < num_cols:
+      arr[i_row, j_col] = float(elem)
+      j_col += 1
+  i_row += 1
+  if i_row % refresh_rate == 0:
+    for j_col in range(1, num_cols):
+      curves[j_col - 1].set_xdata(arr[:,0])
+      curves[j_col - 1].set_ydata(arr[:,j_col])
+    fig1.canvas.draw()
+    fig1.canvas.flush_events()
+  if arr[i_row - 1, 0] >= xaxis_max - 1:
     break
 num_rows = i_row
 plt.ioff()
