@@ -18,6 +18,8 @@
 
 namespace CsvLog {
 
+static constexpr size_t kPortOffsetDL = 100;
+
 CsvLogger::CsvLogger([[maybe_unused]] size_t log_id,
                      [[maybe_unused]] Config* const cfg,
                      [[maybe_unused]] Direction dir,
@@ -44,9 +46,11 @@ CsvLogger::CsvLogger([[maybe_unused]] size_t log_id,
       file_sink->set_level(spdlog::level::info);
       std::shared_ptr<spdlog::sinks::udp_sink_mt> udp_sink = {};
       if (cfg->LogListenerAddr().empty() == false) {
+        const size_t port_offset =
+            (dir == Direction::kUplink) ? log_id : log_id + kPortOffsetDL;
         udp_sink = std::make_shared<spdlog::sinks::udp_sink_mt>(
-            spdlog::sinks::udp_sink_config(cfg->LogListenerAddr(),
-                                           cfg->LogListenerPort() + log_id));
+            spdlog::sinks::udp_sink_config(
+                cfg->LogListenerAddr(), cfg->LogListenerPort() + port_offset));
         udp_sink->set_level(spdlog::level::info);
       }
       const spdlog::sinks_init_list sink_file = {file_sink};

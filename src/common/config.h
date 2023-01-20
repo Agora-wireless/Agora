@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 
+#include "armadillo"
 #include "common_typedef_sdk.h"
 #include "framestats.h"
 #include "ldpc_config.h"
@@ -199,7 +200,6 @@ class Config {
     return this->demul_events_per_symbol_;
   }
   inline size_t BeamBlockSize() const { return this->beam_block_size_; }
-  inline size_t BeamBatchSize() const { return this->beam_batch_size_; }
   inline size_t BeamEventsPerSymbol() const {
     return this->beam_events_per_symbol_;
   }
@@ -209,6 +209,7 @@ class Config {
   inline bool FreqOrthogonalPilot() const {
     return this->freq_orthogonal_pilot_;
   }
+  inline size_t PilotScGroupSize() const { return this->pilot_sc_group_size_; }
   inline size_t OfdmTxZeroPrefix() const { return this->ofdm_tx_zero_prefix_; }
   inline size_t OfdmTxZeroPostfix() const {
     return this->ofdm_tx_zero_postfix_;
@@ -330,6 +331,8 @@ class Config {
 
   inline size_t LogListenerPort() const { return this->log_listener_port_; }
 
+  inline size_t LogScNum() const { return this->log_sc_num_; }
+
   /* Inline accessors (complex types) */
   inline const std::vector<int>& ClTxAdvance() const {
     return this->cl_tx_advance_;
@@ -377,6 +380,13 @@ class Config {
   };
   inline std::vector<std::complex<int16_t>>& PilotCi16() {
     return this->pilot_ci16_;
+  };
+  inline std::vector<std::complex<int16_t>>& PilotUeCi16(size_t ue_id,
+                                                         size_t pilot_idx) {
+    return this->pilot_ue_ci16_.at(ue_id).at(pilot_idx);
+  };
+  inline const arma::uvec& PilotUeSc(size_t ue_id) const {
+    return this->pilot_ue_sc_.at(ue_id);
   };
   inline std::vector<std::complex<int16_t>>& BeaconCi16() {
     return this->beacon_ci16_;
@@ -477,10 +487,12 @@ class Config {
     return data_buffers[symbol_offset];
   }
 
-  /// Return the subcarrier ID to which we should refer to for the zeroforcing
+  /// Return the subcarrier ID which we should refer to for the beamweight
   /// matrices of subcarrier [sc_id].
   inline size_t GetBeamScId(size_t sc_id) const {
-    return this->freq_orthogonal_pilot_ ? sc_id - (sc_id % ue_num_) : sc_id;
+    return this->freq_orthogonal_pilot_
+               ? sc_id - (sc_id % this->pilot_sc_group_size_)
+               : sc_id;
   }
 
   /// Get the calibration buffer for this frame and subcarrier ID
@@ -566,7 +578,7 @@ class Config {
   inline const std::string& ConfigFilename() const { return config_filename_; }
   inline const std::string& TraceFilename() const { return trace_file_; }
   inline const std::string& Timestamp() const { return timestamp_; }
-  inline const std::vector<std::string>& UlTxFreqDataFiles(void) const {
+  inline const std::vector<std::string>& UlTxFreqDataFiles() const {
     return ul_tx_f_data_files_;
   }
 
@@ -578,7 +590,7 @@ class Config {
 
   /* Class constants */
   inline static const size_t kDefaultSymbolNumPerFrame = 70;
-  inline static const size_t kDefaultPilotSymPerFrame = 8;
+  inline static const size_t kDefaultFreqOrthPilotSymbolNum = 1;
   inline static const size_t kDefaultULSymPerFrame = 30;
   inline static const size_t kDefaultULSymStart = 9;
   inline static const size_t kDefaultDLSymPerFrame = 30;
@@ -670,8 +682,18 @@ class Config {
   std::vector<std::complex<float>> gold_cf32_;
   std::vector<std::complex<int16_t>> beacon_ci16_;
   std::vector<uint32_t> coeffs_;
+
+  /// I/Q samples of common pilot
   std::vector<std::complex<int16_t>> pilot_ci16_;
+
   std::vector<std::complex<float>> pilot_cf32_;
+
+  /// I/Q samples of pilots per UE antenna per pilot symbol
+  std::vector<std::vector<std::vector<std::complex<int16_t>>>> pilot_ue_ci16_;
+
+  /// List of subcarriers used per UE to transmit pilot
+  std::vector<arma::uvec> pilot_ue_sc_;
+
   std::vector<uint32_t> pilot_;
   std::vector<uint32_t> beacon_;
   complex_float* pilots_;
@@ -748,14 +770,13 @@ class Config {
 
   // Number of OFDM data subcarriers handled in one demodulation event
   size_t demul_block_size_;
-  size_t demul_events_per_symbol_;  // Derived from demul_block_size
+  // Derived from demul_block_size
+  size_t demul_events_per_symbol_;
 
-  // Number of OFDM data subcarriers handled in one doZF function call
+  /// Number of OFDM data subcarriers handled in 1 kBeam event
   size_t beam_block_size_;
-
-  // Number of doZF function call handled in on event
-  size_t beam_batch_size_;
-  size_t beam_events_per_symbol_;  // Derived from beam_block_size
+  /// Beam Events generated per Frame.  Derived from beam_block_size
+  size_t beam_events_per_symbol_;
 
   // Number of antennas handled in one FFT event
   size_t fft_block_size_;
@@ -763,7 +784,11 @@ class Config {
   // Number of code blocks handled in one encode event
   size_t encode_block_size_;
 
+  // Whether to enable frequency orthogonal pilot
   bool freq_orthogonal_pilot_;
+
+  // Frequency orthogonal pilot subcarrier group size
+  size_t pilot_sc_group_size_;
 
   // The number of zero IQ samples prepended to a time-domain symbol (i.e.,
   // before the cyclic prefix) before transmission. Its value depends on
@@ -892,6 +917,9 @@ class Config {
 
   // Port ID at log listening server
   size_t log_listener_port_;
+
+  // Number of logged subcarrier data samples
+  size_t log_sc_num_;
 
   // Number of frames_ sent by sender during testing = number of frames_
   // processed by Agora before exiting.

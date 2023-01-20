@@ -29,8 +29,10 @@ TxRxWorkerClientSim::TxRxWorkerClientSim(
                  config->NumUeChannels(), config, rx_frame_start,
                  event_notify_q, tx_pending_q, tx_producer, notify_producer,
                  rx_memory, tx_memory, sync_mutex, sync_cond, can_proceed),
-      tx_pkt_zeros_(config->PacketLength(), 0u),
-      tx_pkt_pilot_(config->PacketLength(), 0u) {
+      tx_pkt_pilot_(config->UeAntNum(),
+                    std::vector<std::vector<uint8_t>>(
+                        config->Frame().NumPilotSyms(),
+                        std::vector<uint8_t>(config->PacketLength(), 0u))) {
   for (size_t interface = 0; interface < num_interfaces_; interface++) {
     const uint16_t local_port_id =
         config->UeServerPort() + interface + interface_offset_;
@@ -47,9 +49,16 @@ TxRxWorkerClientSim::TxRxWorkerClientSim(
         config->UeRruAddr(), rem_port_id);
   }
 
-  auto* pilot_pkt = reinterpret_cast<Packet*>(tx_pkt_pilot_.data());
-  std::memcpy(pilot_pkt->data_, config->PilotCi16().data(),
-              config->PacketLength() - Packet::kOffsetOfData);
+  for (size_t ue_id = 0; ue_id < config->UeAntNum(); ue_id++) {
+    for (size_t pilot_idx = 0; pilot_idx < config->Frame().NumPilotSyms();
+         pilot_idx++) {
+      auto* pilot_pkt = reinterpret_cast<Packet*>(
+          tx_pkt_pilot_.at(ue_id).at(pilot_idx).data());
+      std::memcpy(pilot_pkt->data_,
+                  config->PilotUeCi16(ue_id, pilot_idx).data(),
+                  config->PacketLength() - Packet::kOffsetOfData);
+    }
+  }
 }
 
 TxRxWorkerClientSim::~TxRxWorkerClientSim() = default;
@@ -154,26 +163,8 @@ size_t TxRxWorkerClientSim::DequeueSend() {
       const size_t symbol_id =
           Configuration()->Frame().GetPilotSymbol(pilot_symbol_idx);
 
-      Packet* tx_packet = nullptr;
-      if (pilot_symbol_idx == ue_ant) {
-        tx_packet = reinterpret_cast<Packet*>(tx_pkt_pilot_.data());
-      } else {
-        tx_packet = reinterpret_cast<Packet*>(tx_pkt_zeros_.data());
-      }
-
-      if (kDebugPrintInTask) {
-        if (pilot_symbol_idx == ue_ant) {
-          AGORA_LOG_INFO(
-              "TxRxWorkerClientSim[%zu]: Transmitted pilot frame %zu, symbol "
-              "%zu, ant %zu\n",
-              tid_, frame_id, symbol_id, ue_ant);
-        } else {
-          AGORA_LOG_INFO(
-              "TxRxWorkerClientSim[%zu]: Transmitted zeros frame \"%zu, "
-              "symbol %zu, ant %zu\n",
-              tid_, frame_id, symbol_id, ue_ant);
-        }
-      }
+      Packet* tx_packet = reinterpret_cast<Packet*>(
+          tx_pkt_pilot_.at(ue_ant).at(pilot_symbol_idx).data());
 
       //Fill out the frame / symbol / cell / ant
       new (tx_packet) Packet(frame_id, symbol_id, 0 /* cell_id */, ue_ant);
@@ -181,6 +172,11 @@ size_t TxRxWorkerClientSim::DequeueSend() {
       udp_comm_.at(local_interface)
           ->Send(reinterpret_cast<std::byte*>(tx_packet),
                  Configuration()->PacketLength());
+    }
+    if (kDebugPrintInTask) {
+      AGORA_LOG_INFO(
+          "TxRxWorkerClientSim[%zu]: Transmitted pilot frame %zu, ant %zu\n",
+          tid_, frame_id, ue_ant);
     }
 
     if (current_event.event_type_ == EventType::kPacketTX) {
