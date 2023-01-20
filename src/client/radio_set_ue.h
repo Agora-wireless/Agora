@@ -16,14 +16,14 @@
 class RadioSetUe : public RadioSet {
  public:
   RadioSetUe(const Config* const cfg, Radio::RadioType radio_type);
-  virtual ~RadioSetUe() final = default;
+  ~RadioSetUe() final = default;
 
-  virtual bool RadioStart() final;
-  virtual void Go() final;
+  bool RadioStart() final;
+  void Go() final;
 
-  virtual bool DoCalib() const final { return false; }
-  virtual arma::cx_float* GetCalibUl() final { return nullptr; }
-  virtual arma::cx_float* GetCalibDl() final { return nullptr; }
+  bool DoCalib() const final { return false; }
+  arma::cx_float* GetCalibUl() final { return nullptr; }
+  arma::cx_float* GetCalibDl() final { return nullptr; }
 
  private:
   // Thread functions used in constructor

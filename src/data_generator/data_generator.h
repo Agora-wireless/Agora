@@ -175,8 +175,8 @@ class DataGenerator {
     return pre_ifft_symbol;
   }
 
-  /// Return the time-domain pilot symbol with OfdmCaNum complex floats
-  std::vector<complex_float> GetCommonPilotTimeDomain() const {
+  /// Return the frequency-domain pilot symbol with OfdmCaNum complex floats
+  std::vector<complex_float> GetCommonPilotFreqDomain() const {
     const std::vector<std::complex<float>> zc_seq = Utils::DoubleToCfloat(
         CommsLib::GetSequence(cfg_->OfdmDataNum(), CommsLib::kLteZadoffChu));
 
