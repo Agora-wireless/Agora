@@ -415,7 +415,7 @@ void UeWorker::DoDemul(size_t tag) {
       kDownlinkHardDemod
           ? DemodQpskHardLoop(equal_ptr, reinterpret_cast<uint8_t*>(demod_ptr),
                               config_.GetOFDMDataNum())
-          : DemodQpskSoftSse(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
+          : DemodQpskSoftLoop(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
       break;
     case (CommsLib::kQaM16):
       kDownlinkHardDemod

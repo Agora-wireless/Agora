@@ -242,6 +242,16 @@ void Demod64qamSoftSse(float* vec_in, int8_t* llr, int num) {
   }
 }
 
+void DemodQpskSoftLoop(const float* vec_in, int8_t* llr, int num) {
+  for (int i = 0; i < num; i++) {
+    auto yre = static_cast<int8_t>(SCALE_BYTE_CONV_QPSK * (vec_in[2 * i]));
+    auto yim = static_cast<int8_t>(SCALE_BYTE_CONV_QPSK * (vec_in[2 * i + 1]));
+
+    llr[2 * i + 0] = -yre;
+    llr[2 * i + 1] = -yim;
+  }
+}
+
 void DemodQpskSoftSse(float* x, int8_t* z, int len) {
   int i = 0;
 

@@ -67,6 +67,7 @@ void ModSimd(uint8_t* in, complex_float*& out, size_t len,
              Table<complex_float>& mod_table);
 
 void DemodQpskHardLoop(const float* vec_in, uint8_t* vec_out, int num);
+void DemodQpskSoftLoop(const float* vec_in, int8_t* llr, int num);
 void DemodQpskSoftSse(float* x, int8_t* z, int len);
 
 void Demod16qamHardLoop(const float* vec_in, uint8_t* vec_out, int num);

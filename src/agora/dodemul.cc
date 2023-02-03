@@ -315,7 +315,7 @@ EventData DoDemul::Launch(size_t tag) {
             ? DemodQpskHardLoop(equal_t_ptr,
                                 reinterpret_cast<uint8_t*>(demod_ptr),
                                 max_sc_ite)
-            : DemodQpskSoftSse(equal_t_ptr, demod_ptr, max_sc_ite);
+            : DemodQpskSoftLoop(equal_t_ptr, demod_ptr, max_sc_ite);
         break;
       case (CommsLib::kQaM16):
         kUplinkHardDemod
