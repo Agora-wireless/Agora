@@ -277,7 +277,7 @@ struct MacPacketHeaderPacked {
   uint16_t ue_id_;
   uint16_t datalen_;  // length of payload in bytes or array data[]
   uint16_t crc_;      // 16 bits CRC over calculated for the data[] array
-#if defined(ENABLE_RB_IND)
+#if ENABLE_RB_IND
   RBIndicator rb_indicator_;  // RAN scheduling details for PHY
 #endif
 };
