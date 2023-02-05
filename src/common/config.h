@@ -250,6 +250,10 @@ class Config {
     return dir == Direction::kUplink ? this->ul_mod_order_bits_
                                      : this->dl_mod_order_bits_;
   }
+  inline bool HardDemod(Direction dir) const {
+    return dir == Direction::kUplink ? this->ul_hard_demod_
+                                     : this->dl_hard_demod_;
+  }
   inline size_t NumBytesPerCb(Direction dir) const {
     return dir == Direction::kUplink ? this->ul_num_bytes_per_cb_
                                      : this->dl_num_bytes_per_cb_;
@@ -648,6 +652,11 @@ class Config {
   std::string dl_modulation_;
   size_t dl_mod_order_;
   size_t dl_mod_order_bits_;
+
+  // Enable hard demodulation and disable LDPC decoding
+  // Useful for evaluating constellation quality
+  bool ul_hard_demod_;
+  bool dl_hard_demod_;
 
   // Modulation lookup table for mapping binary bits to constellation points
   Table<complex_float> ul_mod_table_;

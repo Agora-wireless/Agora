@@ -108,8 +108,6 @@ set(USE_SPDLOG True CACHE BOOL "USE_SPDLOG set to true to use the spdlog library
 message(STATUS "USE_SPDLOG:       ${USE_SPDLOG}")
 set(ENABLE_MAC False CACHE BOOL "ENABLE_MAC set to true to enable mac support")
 message(STATUS "ENABLE_MAC:       ${ENABLE_MAC}")
-set(ENABLE_LDPC True CACHE BOOL "ENABLE_LDPC set to true to enable LCPC decoding")
-message(STATUS "ENABLE_LDPC:      ${ENABLE_LDPC}")
 set(ENABLE_CSV_LOG False CACHE BOOL "ENABLE_CSV_LOG set to enable csv log output")
 message(STATUS "ENABLE_CSV_LOG:   ${ENABLE_CSV_LOG}")
 set(ENABLE_MAT_LOG False CACHE BOOL "ENABLE_MAT_LOG set to enable matrix log output")
@@ -251,13 +249,6 @@ if(USE_SPDLOG AND ENABLE_CSV_LOG)
   endif()
 else()
   message(STATUS "Disabled Csv/Mat Logger")
-endif()
-
-if(ENABLE_LDPC)
-  add_definitions(-DENABLE_LDPC=true)
-  message(STATUS "Enabled LDPC decoding")
-else()
-  message(STATUS "Disabled LDPC decoding")
 endif()
 
 # Console logging level
