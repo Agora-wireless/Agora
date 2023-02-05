@@ -793,6 +793,8 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
   ul_mod_order_ = static_cast<size_t>(pow(2, ul_mod_order_bits_));
   InitModulationTable(this->ul_mod_table_, ul_mod_order_);
 
+  ul_hard_demod_ = ul_mcs.value("hard_demod", false);
+
   double ul_code_rate = ul_mcs.value("code_rate", 0.333);
   RtAssert(
       ul_code_rate <= 8.0 / 9.0 && ul_code_rate >= 0.1,
@@ -859,6 +861,8 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
   dl_mod_order_bits_ = kModulStringMap.at(dl_modulation_);
   dl_mod_order_ = static_cast<size_t>(pow(2, dl_mod_order_bits_));
   InitModulationTable(this->dl_mod_table_, dl_mod_order_);
+
+  dl_hard_demod_ = dl_mcs.value("hard_demod", false);
 
   double dl_code_rate = dl_mcs.value("code_rate", 0.333);
   RtAssert(
