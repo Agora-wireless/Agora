@@ -286,6 +286,7 @@ Config::Config(std::string jsonfilename)
   log_listener_port_ = tdd_conf.value("log_listener_port", 33300);
 
   log_sc_num_ = tdd_conf.value("log_sc_num", 4);
+  log_timestamp_ = tdd_conf.value("log_timestamp", false);
 
   /* frame configurations */
   cp_len_ = tdd_conf.value("cp_size", 0);
@@ -677,6 +678,8 @@ Config::Config(std::string jsonfilename)
       ul_num_bytes_per_cb_ * ul_ldpc_config_.NumBlocksInSymbol();
   ul_mac_packet_length_ = ul_data_bytes_num_persymbol_;
   // Smallest over the air packet structure
+  RtAssert(ul_mac_packet_length_ > sizeof(MacPacketHeaderPacked),
+           "MAC Packet size must be larger than MAC header size");
   ul_mac_data_length_max_ =
       ul_mac_packet_length_ - sizeof(MacPacketHeaderPacked);
 
@@ -692,6 +695,8 @@ Config::Config(std::string jsonfilename)
       dl_num_bytes_per_cb_ * dl_ldpc_config_.NumBlocksInSymbol();
   dl_mac_packet_length_ = dl_data_bytes_num_persymbol_;
   // Smallest over the air packet structure
+  RtAssert(dl_mac_packet_length_ > sizeof(MacPacketHeaderPacked),
+           "MAC Packet size must be larger than MAC header size");
   dl_mac_data_length_max_ =
       dl_mac_packet_length_ - sizeof(MacPacketHeaderPacked);
 

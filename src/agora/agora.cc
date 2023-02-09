@@ -458,7 +458,7 @@ void Agora::Start() {
               this->phy_stats_->ClearEvmBuffer(frame_id);
 
               // skip Decode when hard demod is enabled
-              if (kUplinkHardDemod == true) {
+              if (kUplinkHardDemod) {
                 assert(frame_tracking_.cur_proc_frame_id_ == frame_id);
                 CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
                 const bool work_finished = this->CheckFrameComplete(frame_id);
@@ -1192,6 +1192,7 @@ void Agora::GetEqualData(float** ptr, int* size) {
   *ptr = (float*)&agora_memory_->GetEqual()[offset][0];
   *size = cfg->UeAntNum() * cfg->OfdmDataNum() * 2;
 }
+
 void Agora::CheckIncrementScheduleFrame(size_t frame_id,
                                         ScheduleProcessingFlags completed) {
   this->schedule_process_flags_ += completed;

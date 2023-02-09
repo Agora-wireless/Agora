@@ -38,7 +38,8 @@ CsvLogger::CsvLogger([[maybe_unused]] size_t log_id,
       data_avail = (bs_only == false && cfg->Frame().NumDLSyms() > 0);
     }
     if (data_avail) {
-      const std::string filename = "files/log/" + cfg->Timestamp() + "/log-" +
+      const std::string subdir = cfg->LogTimestamp() ? cfg->Timestamp() : "csv";
+      const std::string filename = "files/log/" + subdir + "/log-" +
                                    kCsvName.at(log_id) + "-" + radio_name +
                                    ".csv";
       auto file_sink =

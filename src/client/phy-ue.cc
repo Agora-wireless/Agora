@@ -531,14 +531,12 @@ void PhyUe::Start() {
 
               this->phy_stats_->RecordEvm(frame_id, config_->LogScNum());
               this->phy_stats_->RecordEvmSnr(frame_id);
+              this->phy_stats_->ClearEvmBuffer(frame_id);
+
               if (kDownlinkHardDemod) {
                 this->phy_stats_->RecordBer(frame_id);
                 this->phy_stats_->RecordSer(frame_id);
-              }
-              this->phy_stats_->ClearEvmBuffer(frame_id);
-
-              if (kDownlinkHardDemod == true) {
-                bool finished =
+                const bool finished =
                     FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
                 if (finished == true) {
                   if ((cur_frame_id + 1) >= config_->FramesToTest()) {
@@ -660,11 +658,11 @@ void PhyUe::Start() {
           if (current_frame_user_num_ == 0) {
             expected_frame_id_from_mac_++;
           }
-#if ENABLE_RB_IND
+#if defined(ENABLE_RB_IND)
           config_->UpdateModCfgs(pkt->rb_indicator_.mod_order_bits_);
 #endif
           if (kDebugPrintPacketsFromMac) {
-#if ENABLE_RB_IND
+#if defined(ENABLE_RB_IND)
             AGORA_LOG_INFO(
                 "PhyUe: received packet for frame %u with modulation %zu\n",
                 pkt->frame_id_, pkt->rb_indicator_.mod_order_bits_);
