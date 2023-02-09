@@ -512,7 +512,7 @@ void PhyUe::Start() {
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
           const size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
 
-          if (kDownlinkHardDemod == false) {
+          if (config_->HardDemod(Direction::kDownlink) == false) {
             EventData do_decode_task(EventType::kDecode, event.tags_[0]);
             ScheduleWork(do_decode_task);
           }
@@ -533,10 +533,10 @@ void PhyUe::Start() {
               this->phy_stats_->RecordEvmSnr(frame_id);
               this->phy_stats_->ClearEvmBuffer(frame_id);
 
-              if (kDownlinkHardDemod) {
+              if (config_->HardDemod(Direction::kDownlink)) {
                 this->phy_stats_->RecordBer(frame_id);
                 this->phy_stats_->RecordSer(frame_id);
-                const bool finished =
+                bool finished =
                     FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
                 if (finished == true) {
                   if ((cur_frame_id + 1) >= config_->FramesToTest()) {
