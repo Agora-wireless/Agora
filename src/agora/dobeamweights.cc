@@ -14,7 +14,9 @@ static constexpr bool kUseSIMDGather = true;
 // Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.
 // This is faster but less accurate than using an SVD-based pseudoinverse.
 static constexpr bool kUseInverseForZF = true;
-static constexpr bool kUseUlZfForDownlink = true;
+static constexpr bool kUseUlBeamForDownlink = true;
+
+enum DlDirModMethods { FASM, M2VADM, M2VADM_lc };
 
 DoBeamWeights::DoBeamWeights(
     Config* config, int tid,
@@ -90,6 +92,39 @@ EventData DoBeamWeights::Launch(size_t tag) {
   return EventData(EventType::kBeam, tag);
 }
 
+void DoBeamWeights::DlDirModPreNormalize(arma::cx_fmat& mat_dl_beam_tmp) {
+  if (cfg_->DlDirModMethod() == M2VADM_lc) {
+    // Local Normalization: inject more energy on weaker signal paths
+    mat_dl_beam_tmp /= arma::conv_to<arma::cx_fmat>::from(
+        arma::square(arma::abs(mat_dl_beam_tmp)));
+  }
+}
+
+void DoBeamWeights::DlDirModChangeBeams(arma::cx_fcube& cube_dl_beam,
+                                        const arma::cx_fmat& mat_dl_csi) {
+  arma::fvec vec_eff_gain(cube_dl_beam.n_slices);
+  constexpr arma::cx_float kCxZero(0.0f, 0.0f);
+  for (size_t i = 0; i < cube_dl_beam.n_slices; i++) {
+    arma::uvec offidx =
+        arma::randperm(cfg_->BfAntNum(), cfg_->DlDirModOffAntNum());
+    for (size_t j = 0; j < offidx.n_rows; j++) {
+      cube_dl_beam.slice(i)(offidx(j), 0) = kCxZero;  // update for UE0 only
+    }
+    if (cfg_->DlDirModMethod() == M2VADM) {
+      arma::fmat eff_gain =
+          arma::abs(mat_dl_csi.st() *
+                    cube_dl_beam.slice(i).rows(0, cfg_->BfAntNum() - 1));
+      vec_eff_gain(i) = eff_gain(0, 0);
+    }
+  }
+  if (cfg_->DlDirModMethod() == M2VADM) {
+    const float min_eff_gain = arma::min(vec_eff_gain);
+    for (size_t i = 0; i < cube_dl_beam.n_slices; i++) {
+      cube_dl_beam.slice(i).col(0) *= min_eff_gain / vec_eff_gain(i);
+    }
+  }
+}
+
 void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
                                     const arma::cx_fmat& mat_csi,
                                     const arma::cx_fvec& calib_sc_vec,
@@ -132,8 +167,9 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
   }
 
   if (cfg_->Frame().NumDLSyms() > 0) {
+    arma::cx_fmat mat_dl_csi;
     arma::cx_fmat mat_dl_beam_tmp;
-    if (kUseUlZfForDownlink == true) {
+    if (kUseUlBeamForDownlink && (cfg_->DlDirModEnabled() == false)) {
       // With orthonormal calib matrix:
       // pinv(calib * csi) = pinv(csi)*inv(calib)
       // This probably causes a performance hit since we are throwing
@@ -142,7 +178,7 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
       arma::cx_fmat inv_calib_mat = arma::diagmat(arma::sign(calib_sc_vec));
       mat_dl_beam_tmp = mat_ul_beam_tmp * inv_calib_mat;
     } else {
-      arma::cx_fmat mat_dl_csi = inv(arma::diagmat(calib_sc_vec)) * mat_csi;
+      mat_dl_csi = inv(arma::diagmat(calib_sc_vec)) * mat_csi;
       if (kEnableMatLog) {
         phy_stats_->UpdateDlCsi(frame_id, cur_sc_id, mat_dl_csi);
       }
@@ -175,6 +211,9 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
           AGORA_LOG_ERROR("Beamforming algorithm is not implemented!");
       }
     }
+    if (cfg_->DlDirModEnabled()) {
+      DlDirModPreNormalize(mat_dl_beam_tmp);
+    }
     // We should be scaling the beamforming matrix, so the IFFT
     // output can be scaled with OfdmCaNum() across all antennas.
     // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
@@ -190,11 +229,18 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
                           arma::fill::zeros));
       }
     }
-    arma::cx_fmat mat_dl_beam(reinterpret_cast<arma::cx_float*>(dl_beam_mem),
-                              cfg_->BsAntNum(), cfg_->UeAntNum(), false);
-    mat_dl_beam = mat_dl_beam_tmp.st();
+    arma::cx_fcube cube_dl_beam(reinterpret_cast<arma::cx_float*>(dl_beam_mem),
+                                cfg_->BsAntNum(), cfg_->UeAntNum(),
+                                cfg_->Frame().NumDLSyms(), false);
+    cube_dl_beam.slice(0) = mat_dl_beam_tmp.st();
+    for (size_t i = 1; i < cube_dl_beam.n_slices; i++) {
+      cube_dl_beam.slice(i) = cube_dl_beam.slice(0);
+    }
+    if (cfg_->DlDirModEnabled()) {
+      DlDirModChangeBeams(cube_dl_beam, mat_dl_csi);
+    }
     if (kEnableMatLog) {
-      phy_stats_->UpdateDlBeam(frame_id, cur_sc_id, mat_dl_beam);
+      phy_stats_->UpdateDlBeam(frame_id, cur_sc_id, cube_dl_beam.slice(0));
     }
   }
   for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {

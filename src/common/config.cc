@@ -657,6 +657,15 @@ Config::Config(std::string jsonfilename)
 
   this->DumpMcsInfo();
 
+  // Downlink Directional Modulation configurations
+  auto dl_dir_mod_params = this->Parse(tdd_conf, "dl_dir_mod");
+  dl_dir_mod_enabled_ = dl_dir_mod_params.value("enabled", false);
+  dl_dir_mod_method_ = dl_dir_mod_params.value("method", 0);
+  dl_dir_mod_off_ant_num_ = dl_dir_mod_params.value("off_ant_num", 0);
+  if (dl_dir_mod_enabled_) {
+    arma::arma_rng::set_seed_random();
+  }
+
   fft_in_rru_ = tdd_conf.value("fft_in_rru", false);
 
   samps_per_symbol_ =
