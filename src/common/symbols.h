@@ -28,7 +28,8 @@ static constexpr size_t kFrameWnd = 40;
 #undef USE_MKL_JIT
 #endif
 
-#define ENABLE_RB_IND (0)
+//Define to allow mac addition of RB IND to allow dynamic change of mcs
+//#define ENABLE_RB_IND (1)
 
 /// Return true at compile time iff a constant is a power of two
 template <typename T>

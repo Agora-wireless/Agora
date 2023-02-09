@@ -432,7 +432,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
     return;
   }
 
-#if ENABLE_RB_IND
+#if defined(ENABLE_RB_IND)
   RBIndicator ri;
   ri.ue_id_ = next_radio_id_;
   ri.mod_order_bits_ = CommsLib::kQaM16;
