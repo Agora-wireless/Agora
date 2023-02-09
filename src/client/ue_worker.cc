@@ -412,25 +412,25 @@ void UeWorker::DoDemul(size_t tag) {
 
   switch (config_.ModOrderBits(Direction::kDownlink)) {
     case (CommsLib::kQpsk):
-      config_.HardDemod(Direction::kDownlink)
+      kDownlinkHardDemod
           ? DemodQpskHardLoop(equal_ptr, reinterpret_cast<uint8_t*>(demod_ptr),
                               config_.GetOFDMDataNum())
           : DemodQpskSoftSse(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
       break;
     case (CommsLib::kQaM16):
-      config_.HardDemod(Direction::kDownlink)
+      kDownlinkHardDemod
           ? Demod16qamHardAvx2(equal_ptr, reinterpret_cast<uint8_t*>(demod_ptr),
                                config_.GetOFDMDataNum())
           : Demod16qamSoftAvx2(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
       break;
     case (CommsLib::kQaM64):
-      config_.HardDemod(Direction::kDownlink)
+      kDownlinkHardDemod
           ? Demod64qamHardAvx2(equal_ptr, reinterpret_cast<uint8_t*>(demod_ptr),
                                config_.GetOFDMDataNum())
           : Demod64qamSoftAvx2(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
       break;
     case (CommsLib::kQaM256):
-      config_.HardDemod(Direction::kDownlink)
+      kDownlinkHardDemod
           ? Demod256qamHardAvx2(equal_ptr,
                                 reinterpret_cast<uint8_t*>(demod_ptr),
                                 config_.GetOFDMDataNum())
@@ -442,8 +442,7 @@ void UeWorker::DoDemul(size_t tag) {
           config_.Modulation(Direction::kDownlink).c_str());
   }
 
-  if ((kPrintPhyStats || kEnableCsvLog) &&
-      config_.HardDemod(Direction::kDownlink) &&
+  if (kDownlinkHardDemod && (kPrintPhyStats || kEnableCsvLog) &&
       (dl_symbol_id >= config_.Frame().ClientDlPilotSymbols())) {
     phy_stats_.UpdateDecodedBits(
         ant_id, total_dl_symbol_id, frame_slot,

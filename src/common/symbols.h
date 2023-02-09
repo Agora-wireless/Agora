@@ -189,6 +189,11 @@ static constexpr bool kDebugUplink = false;
 
 static constexpr bool kUsePartialTrans = true;
 
+// Enable hard demodulation and disable LDPC decoding
+// Useful for evaluating constellation quality
+static constexpr bool kDownlinkHardDemod = false;
+static constexpr bool kUplinkHardDemod = false;
+
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = true;
 static constexpr bool kCollectPhyStats = true;

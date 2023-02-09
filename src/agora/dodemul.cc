@@ -311,28 +311,28 @@ EventData DoDemul::Launch(size_t tag) {
 
     switch (cfg_->ModOrderBits(Direction::kUplink)) {
       case (CommsLib::kQpsk):
-        cfg_->HardDemod(Direction::kUplink)
+        kUplinkHardDemod
             ? DemodQpskHardLoop(equal_t_ptr,
                                 reinterpret_cast<uint8_t*>(demod_ptr),
                                 max_sc_ite)
             : DemodQpskSoftSse(equal_t_ptr, demod_ptr, max_sc_ite);
         break;
       case (CommsLib::kQaM16):
-        cfg_->HardDemod(Direction::kUplink)
+        kUplinkHardDemod
             ? Demod16qamHardAvx2(equal_t_ptr,
                                  reinterpret_cast<uint8_t*>(demod_ptr),
                                  max_sc_ite)
             : Demod16qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
         break;
       case (CommsLib::kQaM64):
-        cfg_->HardDemod(Direction::kUplink)
+        kUplinkHardDemod
             ? Demod64qamHardAvx2(equal_t_ptr,
                                  reinterpret_cast<uint8_t*>(demod_ptr),
                                  max_sc_ite)
             : Demod64qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
         break;
       case (CommsLib::kQaM256):
-        cfg_->HardDemod(Direction::kUplink)
+        kUplinkHardDemod
             ? Demod256qamHardAvx2(equal_t_ptr,
                                   reinterpret_cast<uint8_t*>(demod_ptr),
                                   max_sc_ite)
@@ -344,7 +344,7 @@ EventData DoDemul::Launch(size_t tag) {
     }
     // if hard demod is enabled calculate BER with modulated bits
     if ((kPrintPhyStats || kEnableCsvLog) &&
-        cfg_->HardDemod(Direction::kUplink) &&
+        kUplinkHardDemod) &&
         (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols())) {
       phy_stats_->UpdateDecodedBits(
           ue_id, total_data_symbol_idx_ul, frame_slot,

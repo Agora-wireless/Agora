@@ -432,7 +432,7 @@ void Agora::Start() {
               this->demul_counters_.CompleteTask(frame_id, symbol_id);
 
           if (last_demul_task == true) {
-            if (cfg->HardDemod(Direction::kUplink) == false) {
+            if (kUplinkHardDemod == false) {
               ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
                                  frame_id, symbol_id);
             }
@@ -451,14 +451,14 @@ void Agora::Start() {
               this->phy_stats_->RecordCsiCond(frame_id, config_->LogScNum());
               this->phy_stats_->RecordEvm(frame_id, config_->LogScNum());
               this->phy_stats_->RecordEvmSnr(frame_id);
-              if (cfg->HardDemod(Direction::kUplink)) {
+              if (kUplinkHardDemod) {
                 this->phy_stats_->RecordBer(frame_id);
                 this->phy_stats_->RecordSer(frame_id);
               }
               this->phy_stats_->ClearEvmBuffer(frame_id);
 
               // skip Decode when hard demod is enabled
-              if (cfg->HardDemod(Direction::kUplink)) {
+              if (kUplinkHardDemod) {
                 assert(frame_tracking_.cur_proc_frame_id_ == frame_id);
                 CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
                 const bool work_finished = this->CheckFrameComplete(frame_id);
@@ -1226,16 +1226,17 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
       static_cast<int>(this->tx_counters_.IsLastSymbol(frame_id)));
 
   // Complete if last frame and ifft / decode complete
-  if (this->ifft_counters_.IsLastSymbol(frame_id) &&
-      this->tx_counters_.IsLastSymbol(frame_id) &&
-      (((kEnableMac == false) &&
-        this->decode_counters_.IsLastSymbol(frame_id)) ||
-       (config_->HardDemod(Direction::kUplink) &&
-        this->demul_counters_.IsLastSymbol(frame_id)) ||
-       (kEnableMac && this->tomac_counters_.IsLastSymbol(frame_id)))) {
+  if ((true == this->ifft_counters_.IsLastSymbol(frame_id)) &&
+      (true == this->tx_counters_.IsLastSymbol(frame_id)) &&
+      (((false == kEnableMac) &&
+        (true == this->decode_counters_.IsLastSymbol(frame_id))) ||
+       ((true == kUplinkHardDemod) &&
+        (true == this->demul_counters_.IsLastSymbol(frame_id))) ||
+       ((true == kEnableMac) &&
+        (true == this->tomac_counters_.IsLastSymbol(frame_id))))) {
     this->stats_->UpdateStats(frame_id);
     assert(frame_id == frame_tracking_.cur_proc_frame_id_);
-    if (config_->HardDemod(Direction::kUplink)) {
+    if (true == kUplinkHardDemod) {
       this->demul_counters_.Reset(frame_id);
     }
     this->decode_counters_.Reset(frame_id);

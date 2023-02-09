@@ -70,8 +70,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       this->cfg_->MacBytesNumPerframe(Direction::kUplink);
   if (num_ul_mac_bytes > 0) {
     std::vector<std::vector<int8_t>> ul_mac_info(cfg_->UeAntNum());
-    AGORA_LOG_SYMBOL("Total number of uplink MAC bytes: %zu\n",
-                     num_ul_mac_bytes);
+    AGORA_LOG_INFO("Total number of uplink MAC bytes: %zu\n", num_ul_mac_bytes);
     for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
       ul_mac_info.at(ue_id).resize(num_ul_mac_bytes);
       for (size_t pkt_id = 0;
@@ -133,8 +132,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         ul_ldpc_config.NumBlocksInSymbol() * this->cfg_->UeAntNum();
     const size_t num_ul_codeblocks =
         this->cfg_->Frame().NumUlDataSyms() * symbol_blocks;
-    AGORA_LOG_SYMBOL("Total number of uplink data blocks: %zu\n",
-                     num_ul_codeblocks);
+    AGORA_LOG_SYMBOL("Total number of ul blocks: %zu\n", num_ul_codeblocks);
 
     std::vector<std::vector<int8_t>> ul_information(num_ul_codeblocks);
     std::vector<std::vector<int8_t>> ul_encoded_codewords(num_ul_codeblocks);
@@ -545,7 +543,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         dl_ldpc_config.NumBlocksInSymbol() * this->cfg_->UeAntNum();
     const size_t num_dl_codeblocks =
         this->cfg_->Frame().NumDlDataSyms() * symbol_blocks;
-    AGORA_LOG_SYMBOL("Total number of downlink data blocks: %zu\n",
+    AGORA_LOG_SYMBOL("Total number of dl data blocks: %zu\n",
                      num_dl_codeblocks);
 
     std::vector<std::vector<int8_t>> dl_information(num_dl_codeblocks);
