@@ -301,6 +301,10 @@ class Config {
 
   inline bool ScrambleEnabled() const { return this->scramble_enabled_; }
 
+  inline bool DlDirModEnabled() const { return dl_dir_mod_enabled_; }
+  inline size_t DlDirModMethod() const { return dl_dir_mod_method_; }
+  inline size_t DlDirModOffAntNum() const { return dl_dir_mod_off_ant_num_; }
+
   inline std::string UeServerAddr() const { return this->ue_server_addr_; }
   inline std::string BsServerAddr() const { return this->bs_server_addr_; }
 
@@ -657,6 +661,11 @@ class Config {
   // Useful for evaluating constellation quality
   bool ul_hard_demod_;
   bool dl_hard_demod_;
+
+  // Downlink Directional Modulation that prevents eavesdropping
+  bool dl_dir_mod_enabled_;
+  size_t dl_dir_mod_method_;
+  size_t dl_dir_mod_off_ant_num_;
 
   // Modulation lookup table for mapping binary bits to constellation points
   Table<complex_float> ul_mod_table_;

@@ -112,7 +112,7 @@ EventData DoPrecode::Launch(size_t tag) {
       size_t start_tsc2 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
       for (size_t j = 0; j < kSCsPerCacheline; j++) {
-        PrecodingPerSc(frame_slot, base_sc_id + i + j, i + j);
+        PrecodingPerSc(frame_slot, symbol_idx_dl, base_sc_id + i + j, i + j);
       }
       duration_stat_->task_count_ =
           duration_stat_->task_count_ + kSCsPerCacheline;
@@ -129,7 +129,7 @@ EventData DoPrecode::Launch(size_t tag) {
       size_t start_tsc2 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
 
-      PrecodingPerSc(frame_slot, cur_sc_id, i);
+      PrecodingPerSc(frame_slot, symbol_idx_dl, cur_sc_id, i);
       duration_stat_->task_count_++;
       duration_stat_->task_duration_[2] += GetTime::WorkerRdtsc() - start_tsc2;
     }
@@ -182,8 +182,8 @@ void DoPrecode::LoadInputData(size_t symbol_idx_dl,
   }
 }
 
-void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
-                               size_t sc_id_in_block) {
+void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t symbol_idx_dl,
+                               size_t sc_id, size_t sc_id_in_block) {
   arma::cx_float* precoder_ptr = reinterpret_cast<arma::cx_float*>(
       dl_beam_matrices_[frame_slot][cfg_->GetBeamScId(sc_id)]);
   arma::cx_float* data_ptr = reinterpret_cast<arma::cx_float*>(
@@ -193,13 +193,15 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
            : 0));
   arma::cx_float* precoded_ptr = reinterpret_cast<arma::cx_float*>(
       precoded_buffer_temp_ + sc_id_in_block * cfg_->BsAntNum());
+  const arma::cx_fcube cube_precoder(precoder_ptr, cfg_->BsAntNum(),
+                                     cfg_->UeAntNum(),
+                                     cfg_->Frame().NumDLSyms(), false);
+  const arma::cx_fmat& mat_precoder = cube_precoder.slice(symbol_idx_dl);
 #if defined(USE_MKL_JIT)
-  my_cgemm_(jitter_, (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
-            (MKL_Complex8*)precoded_ptr);
+  my_cgemm_(jitter_, (MKL_Complex8*)mat_precoder.memptr(),
+            (MKL_Complex8*)data_ptr, (MKL_Complex8*)precoded_ptr);
 #else
-  arma::cx_fmat mat_precoder(precoder_ptr, cfg_->BsAntNum(), cfg_->UeAntNum(),
-                             false);
-  arma::cx_fmat mat_data(data_ptr, cfg_->UeAntNum(), 1, false);
+  const arma::cx_fmat mat_data(data_ptr, cfg_->UeAntNum(), 1, false);
   arma::cx_fmat mat_precoded(precoded_ptr, cfg_->BsAntNum(), 1, false);
   mat_precoded = mat_precoder * mat_data;
   // cout << "Precoder: \n" << mat_precoder << endl;

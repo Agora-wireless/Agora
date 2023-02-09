@@ -12,8 +12,9 @@ AgoraBuffer::AgoraBuffer(Config* const cfg)
                   cfg->BsAntNum() * cfg->OfdmDataNum()),
       ul_beam_matrix_(kFrameWnd, cfg->OfdmDataNum(),
                       cfg->BsAntNum() * cfg->UeAntNum()),
-      dl_beam_matrix_(kFrameWnd, cfg->OfdmDataNum(),
-                      cfg->UeAntNum() * cfg->BsAntNum()),
+      dl_beam_matrix_(
+          kFrameWnd, cfg->OfdmDataNum(),
+          cfg->UeAntNum() * cfg->BsAntNum() * cfg->Frame().NumDLSyms()),
       demod_buffer_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),
                     kMaxModType * cfg->OfdmDataNum()),
       decoded_buffer_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),

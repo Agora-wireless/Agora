@@ -57,7 +57,8 @@ class DoPrecode : public Doer {
   // Load input data for a single UE and a single subcarrier
   void LoadInputData(size_t symbol_idx_dl, size_t total_data_symbol_idx,
                      size_t user_id, size_t sc_id, size_t sc_id_in_block);
-  void PrecodingPerSc(size_t frame_slot, size_t sc_id, size_t sc_id_in_block);
+  void PrecodingPerSc(size_t frame_slot, size_t symbol_idx_dl, size_t sc_id,
+                      size_t sc_id_in_block);
 
  private:
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_;
