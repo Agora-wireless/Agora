@@ -3,7 +3,7 @@ include(CheckCSourceRuns)
 cmake_policy(SET CMP0054 NEW)
 #Allow project version
 cmake_policy(SET CMP0048 NEW)
-project(Agora VERSION 1.2.1)
+project(Agora VERSION 1.2.2)
 
 if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
   #Flags is enabled by default for c++17
@@ -26,6 +26,7 @@ endif()
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -no-pie")
 
 set(CMAKE_CXX_STANDARD 17)
+
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   message(STATUS "Using GNU compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   set(CMAKE_C_FLAGS "-std=gnu11 -Wall -g -march=native -m64")
@@ -42,6 +43,9 @@ elseif(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
   message(STATUS "Using Clang compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
 endif()
+
+#Set to ON For clang tidy
+set(CMAKE_EXPORT_COMPILE_COMMANDS OFF)
 
 option(DEBUG "Enable debugging" OFF)
 
@@ -449,8 +453,6 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/doprecode.cc
   src/agora/dodecode.cc
   src/agora/radio/radio_set/radio_set_bs.cc
-  src/agora/radio/radio_set/radio_calibrate_digital.cc
-  src/agora/radio/radio_set/radio_calibrate_analog.cc
   src/mac/mac_thread_basestation.cc
   src/agora/txrx/packet_txrx_sim.cc
   src/agora/txrx/packet_txrx_radio.cc
@@ -487,6 +489,15 @@ add_executable(agora
   $<TARGET_OBJECTS:shared_txrx_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(agora ${COMMON_LIBS})
+
+add_executable(calibrate
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/calibrate_main.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/radio_set_calibrate.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/radio_calibrate_digital.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/radio_calibrate_analog.cc
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(calibrate ${COMMON_LIBS})
+target_compile_definitions(calibrate PRIVATE CALIBRATE)
 
 add_executable(data_generator
   ${CMAKE_CURRENT_SOURCE_DIR}/src/data_generator/data_generator_main.cc

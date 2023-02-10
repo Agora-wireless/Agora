@@ -63,7 +63,6 @@ class TxRxWorkerClientHw : public TxRxWorker {
   RadioSet& radio_;
   size_t program_start_ticks_;
 
-  std::vector<std::vector<std::complex<int16_t>>> frame_zeros_;
   std::vector<std::vector<std::complex<int16_t>>> frame_storage_;
   std::vector<RxPacket> rx_frame_pkts_;
   std::vector<RxPacket*> rx_pkts_ptrs_;

@@ -58,11 +58,11 @@ bool PacketTxRxRadio::StartTxRx(Table<complex_float>& calib_dl_buffer,
 
   //RadioStart creates the following: radio_config_->GetCalibDl() and radio_config_->GetCalibUl();
   if (cfg_->Frame().NumDLSyms() > 0) {
-    std::memcpy(
-        calib_dl_buffer[kFrameWnd - 1], radio_config_->GetCalibDl(),
+    std::memset(
+        calib_dl_buffer[kFrameWnd - 1], 0,
         cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float));
-    std::memcpy(
-        calib_ul_buffer[kFrameWnd - 1], radio_config_->GetCalibUl(),
+    std::memset(
+        calib_ul_buffer[kFrameWnd - 1], 0,
         cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float));
   }
 

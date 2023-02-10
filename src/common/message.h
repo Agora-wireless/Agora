@@ -90,6 +90,17 @@ union gen_tag_t {
     return ret;
   }
 
+  // Generate a tag with user ID, frame ID, and invalid symbol id
+  // other fields blank
+  static gen_tag_t FrmUe(size_t frame_id, size_t ue_id) {
+    gen_tag_t ret(0);
+    ret.frame_id_ = frame_id;
+    ret.symbol_id_ = kInvalidSymbolId;
+    ret.tag_type_ = TagType::kUsers;
+    ret.ue_id_ = ue_id;
+    return ret;
+  }
+
   // Generate a tag with frame ID, symbol ID, and subcarrier ID bits set and
   // other fields blank
   static gen_tag_t FrmSymSc(size_t frame_id, size_t symbol_id, size_t sc_id) {

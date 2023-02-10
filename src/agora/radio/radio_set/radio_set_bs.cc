@@ -9,6 +9,7 @@
 #include "SoapySDR/Formats.h"
 #include "SoapySDR/Logger.hpp"
 #include "logger.h"
+#include "radio_soapysdr.h"
 
 static constexpr bool kPrintCalibrationMats = false;
 static constexpr size_t kSoapyMakeMaxAttempts = 3;
@@ -103,43 +104,6 @@ RadioSetBs::RadioSetBs(Config* cfg, Radio::RadioType radio_type)
     join_thread.join();
   }
 
-  // Perform DC Offset & IQ Imbalance Calibration
-  if (cfg_->ImbalanceCalEn()) {
-    if (cfg_->Channel().find('A') != std::string::npos) {
-      DciqCalibrationProc(0);
-    }
-    if (cfg_->Channel().find('B') != std::string::npos) {
-      DciqCalibrationProc(1);
-    }
-  }
-
-  std::vector<std::thread> config_bs_threads;
-  for (size_t i = 0; i < radio_num_; i++) {
-#ifdef THREADED_INIT
-    config_bs_threads.emplace_back(&RadioSetBs::ConfigureRadio, this, i);
-#else
-    ConfigureRadio(i);
-#endif
-  }
-
-  num_checks = 0;
-  // Block until all radios are configured
-  size_t num_radios_config = num_radios_configured_.load();
-  while (num_radios_config != radio_num_) {
-    num_checks++;
-    if (num_checks > 1e9) {
-      AGORA_LOG_WARN(
-          "RadioSetBs: Waiting for radio initialization, %zu of %zu ready\n",
-          num_radios_config, radio_num_);
-      num_checks = 0;
-    }
-    num_radios_config = num_radios_configured_.load();
-  }
-
-  for (auto& join_thread : config_bs_threads) {
-    join_thread.join();
-  }
-
   for (const auto& radio : radios_) {
     radio->PrintSettings();
   }
@@ -154,6 +118,8 @@ RadioSetBs::RadioSetBs(Config* cfg, Radio::RadioType radio_type)
       }
     }
   }
+  // load digital and analog calibration results
+  this->ApplyCalib();
   AGORA_LOG_INFO("RadioSetBs init complete!\n");
 }
 
@@ -161,21 +127,6 @@ void RadioSetBs::InitRadio(size_t radio_id) {
   radios_.at(radio_id)->Init(cfg_, radio_id, cfg_->RadioId().at(radio_id),
                              Utils::StrToChannels(cfg_->Channel()),
                              cfg_->HwFramer(), false);
-  num_radios_initialized_.fetch_add(1);
-}
-
-RadioSetBs::~RadioSetBs() {
-  FreeBuffer1d(&init_calib_dl_processed_);
-  FreeBuffer1d(&init_calib_ul_processed_);
-
-  for (auto* hub : hubs_) {
-    SoapySDR::Device::unmake(hub);
-  }
-  hubs_.clear();
-  AGORA_LOG_INFO("RadioStop destructed\n");
-}
-
-void RadioSetBs::ConfigureRadio(size_t radio_id) {
   std::vector<double> tx_gains;
   tx_gains.emplace_back(cfg_->TxGainA());
   tx_gains.emplace_back(cfg_->TxGainB());
@@ -185,103 +136,18 @@ void RadioSetBs::ConfigureRadio(size_t radio_id) {
   rx_gains.emplace_back(cfg_->RxGainB());
 
   radios_.at(radio_id)->Setup(tx_gains, rx_gains);
-  num_radios_configured_.fetch_add(1);
+  num_radios_initialized_.fetch_add(1);
+}
+
+RadioSetBs::~RadioSetBs() {
+  for (auto* hub : hubs_) {
+    SoapySDR::Device::unmake(hub);
+  }
+  hubs_.clear();
+  AGORA_LOG_INFO("RadioStop destructed\n");
 }
 
 bool RadioSetBs::RadioStart() {
-  if (cfg_->SampleCalEn()) {
-    CalibrateSampleOffset();
-  }
-  bool good_calib = false;
-  AllocBuffer1d(&init_calib_dl_processed_,
-                cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
-                Agora_memory::Alignment_t::kAlign64, 1);
-  AllocBuffer1d(&init_calib_ul_processed_,
-                cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
-                Agora_memory::Alignment_t::kAlign64, 1);
-  // initialize init_calib to a matrix of zeros
-  for (size_t i = 0; i < (cfg_->OfdmDataNum() * cfg_->BfAntNum()); i++) {
-    init_calib_dl_processed_[i] = 0;
-    init_calib_ul_processed_[i] = 0;
-  }
-
-  calib_meas_num_ = cfg_->InitCalibRepeat();
-  if (calib_meas_num_ != 0u) {
-    init_calib_ul_.Calloc(calib_meas_num_,
-                          cfg_->OfdmDataNum() * cfg_->BfAntNum(),
-                          Agora_memory::Alignment_t::kAlign64);
-    init_calib_dl_.Calloc(calib_meas_num_,
-                          cfg_->OfdmDataNum() * cfg_->BfAntNum(),
-                          Agora_memory::Alignment_t::kAlign64);
-    if (cfg_->Frame().NumDLSyms() > 0) {
-      int iter = 0;
-      int max_iter = 1;
-      std::cout << "Start initial reciprocity calibration..." << std::endl;
-      while (good_calib == false) {
-        good_calib = InitialCalib();
-        iter++;
-        if ((iter == max_iter) && (good_calib == false)) {
-          std::cout << "attempted " << max_iter
-                    << " unsucessful calibration, stopping ..." << std::endl;
-          break;
-        }
-      }
-      if (good_calib == false) {
-        return good_calib;
-      } else {
-        std::cout << "initial calibration successful!" << std::endl;
-      }
-      // process initial measurements
-      arma::cx_fcube calib_dl_cube(cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                   calib_meas_num_, arma::fill::zeros);
-      arma::cx_fcube calib_ul_cube(cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                   calib_meas_num_, arma::fill::zeros);
-      for (size_t i = 0; i < calib_meas_num_; i++) {
-        arma::cx_fmat calib_dl_mat(init_calib_dl_[i], cfg_->OfdmDataNum(),
-                                   cfg_->BfAntNum(), false);
-        arma::cx_fmat calib_ul_mat(init_calib_ul_[i], cfg_->OfdmDataNum(),
-                                   cfg_->BfAntNum(), false);
-        calib_dl_cube.slice(i) = calib_dl_mat;
-        calib_ul_cube.slice(i) = calib_ul_mat;
-        if (kPrintCalibrationMats) {
-          Utils::PrintMat(calib_dl_mat, "calib_dl_mat" + std::to_string(i));
-          Utils::PrintMat(calib_ul_mat, "calib_ul_mat" + std::to_string(i));
-          Utils::PrintMat(calib_dl_mat / calib_ul_mat,
-                          "calib_mat" + std::to_string(i));
-        }
-        if (kRecordCalibrationMats == true) {
-          Utils::SaveMat(calib_dl_mat, "calib_dl_mat.m",
-                         "init_calib_dl_mat" + std::to_string(i),
-                         i > 0 /*append*/);
-          Utils::SaveMat(calib_ul_mat, "calib_ul_mat.m",
-                         "init_calib_ul_mat" + std::to_string(i),
-                         i > 0 /*append*/);
-        }
-      }
-      arma::cx_fmat calib_dl_mean_mat(init_calib_dl_processed_,
-                                      cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                      false);
-      arma::cx_fmat calib_ul_mean_mat(init_calib_ul_processed_,
-                                      cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                      false);
-      calib_dl_mean_mat = arma::mean(calib_dl_cube, 2);  // mean along dim 2
-      calib_ul_mean_mat = arma::mean(calib_ul_cube, 2);  // mean along dim 2
-      if (kPrintCalibrationMats) {
-        Utils::PrintMat(calib_dl_mean_mat, "calib_dl_mat");
-        Utils::PrintMat(calib_ul_mean_mat, "calib_ul_mat");
-        Utils::PrintMat(calib_dl_mean_mat / calib_ul_mean_mat, "calib_mat");
-      }
-      if (kRecordCalibrationMats == true) {
-        Utils::SaveMat(calib_dl_mean_mat, "calib_dl_mat.m",
-                       "init_calib_dl_mat_mean", true /*append*/);
-        Utils::SaveMat(calib_ul_mean_mat, "calib_ul_mat.m",
-                       "init_calib_ul_mat_mean", true /*append*/);
-      }
-    }
-    init_calib_dl_.Free();
-    init_calib_ul_.Free();
-  }
-
   for (size_t i = 0; i < radio_num_; i++) {
     if (cfg_->HwFramer()) {
       const size_t cell_id = cfg_->CellId().at(i);
@@ -302,6 +168,72 @@ void RadioSetBs::Go() {
         radios_.at(i)->Trigger();
       } else {
         hubs_.at(i)->writeSetting("TRIGGER_GEN", "");
+      }
+    }
+  }
+}
+
+void RadioSetBs::AdjustDelays() {
+  // adjust all trigger delay fwith respect to the max offset
+  const auto min_max_offset =
+      std::minmax_element(trigger_offsets_.begin(), trigger_offsets_.end());
+  const int min_offset = *min_max_offset.first;
+  const int ref_offset = *min_max_offset.second;
+  const size_t diff_offset = ref_offset - min_offset;
+  if (diff_offset >= cfg_->CpLen()) {
+    for (size_t i = 0; i < trigger_offsets_.size(); i++) {
+      const int delta = ref_offset - trigger_offsets_.at(i);
+      AGORA_LOG_INFO("Sample adjusting delay of node %zu (offset %d) by %d\n",
+                     i, trigger_offsets_.at(i), delta);
+      const int iter = delta < 0 ? -delta : delta;
+      for (int j = 0; j < iter; j++) {
+        if (delta < 0) {
+          radios_.at(i)->AdjustDelay("-1");
+        } else {
+          radios_.at(i)->AdjustDelay("1");
+        }
+      }
+    }
+  }
+}
+
+void RadioSetBs::ApplyCalib() {
+  auto channels = Utils::StrToChannels(cfg_->Channel());
+  if (cfg_->SampleCalEn()) {
+    const std::string filename = "files/log/iris_samp_offsets.dat";
+    trigger_offsets_ = Utils::ReadVector(filename, false);
+    if (trigger_offsets_.size() == radio_num_ - 1) {
+      this->AdjustDelays();
+    } else {
+      AGORA_LOG_WARN(
+          "The number of sample offsets in file does not match the number of "
+          "radios.\n");
+    }
+  }
+  if (cfg_->ImbalanceCalEn()) {
+    const std::string rx_dc_file = "files/log/rx_dc.dat";
+    const std::string tx_dc_file = "files/log/tx_dc.dat";
+    const std::string rx_iq_file = "files/log/rx_iq.dat";
+    const std::string tx_iq_file = "files/log/tx_iq.dat";
+    auto rx_dc = Utils::ReadVectorOfComplex(rx_dc_file, false, channels);
+    auto tx_dc = Utils::ReadVectorOfComplex(tx_dc_file, false, channels);
+    auto rx_iq = Utils::ReadVectorOfComplex(rx_iq_file, false, channels);
+    auto tx_iq = Utils::ReadVectorOfComplex(tx_iq_file, false, channels);
+    RtAssert(rx_dc.at(0).size() == radio_num_, "rx_dc size mismatch!");
+    RtAssert(tx_dc.at(0).size() == radio_num_, "tx_dc size mismatch!");
+    RtAssert(rx_iq.at(0).size() == radio_num_, "rx_iq size mismatch!");
+    RtAssert(tx_iq.at(0).size() == radio_num_, "tx_iq size mismatch!");
+    for (size_t i = 0; i < radio_num_; i++) {
+      auto* target_radio = dynamic_cast<RadioSoapySdr*>(radios_.at(i).get());
+      for (size_t c = 0; c < channels.size(); c++) {
+        target_radio->SetDcOffset(SOAPY_SDR_RX, channels.at(c),
+                                  rx_dc.at(c).at(i));
+        target_radio->SetDcOffset(SOAPY_SDR_TX, channels.at(c),
+                                  tx_dc.at(c).at(i));
+        target_radio->SetIQBalance(SOAPY_SDR_RX, channels.at(c),
+                                   rx_iq.at(c).at(i));
+        target_radio->SetIQBalance(SOAPY_SDR_TX, channels.at(c),
+                                   tx_iq.at(c).at(i));
       }
     }
   }

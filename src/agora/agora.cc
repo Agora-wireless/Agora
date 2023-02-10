@@ -205,54 +205,35 @@ void Agora::ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
 
 void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
                                 size_t symbol_id) {
-  auto base_tag = gen_tag_t::FrmSymSc(frame_id, symbol_id, 0);
-  size_t num_events = SIZE_MAX;
-  size_t block_size = SIZE_MAX;
+  gen_tag_t base_tag(0);
+  size_t num_events;
+  size_t block_size;
 
   switch (event_type) {
     case EventType::kDemul:
-    case EventType::kPrecode:
+    case EventType::kPrecode: {
+      base_tag = gen_tag_t::FrmSymSc(frame_id, symbol_id, 0);
       num_events = config_->DemulEventsPerSymbol();
       block_size = config_->DemulBlockSize();
       break;
-    case EventType::kBeam:
+    }
+    case EventType::kBeam: {
+      base_tag = gen_tag_t::FrmSc(frame_id, 0);
       num_events = config_->BeamEventsPerSymbol();
       block_size = config_->BeamBlockSize();
       break;
-    default:
-      assert(false);
+    }
+    default: {
+      RtAssert(false, "Invalid event type in ScheduleSubcarriers");
+    }
   }
 
-  size_t qid = (frame_id & 0x1);
-  if (event_type == EventType::kBeam) {
-    EventData event;
-    event.event_type_ = event_type;
-    event.num_tags_ = config_->BeamBatchSize();
-    size_t num_blocks = num_events / event.num_tags_;
-    size_t num_remainder = num_events % event.num_tags_;
-    if (num_remainder > 0) {
-      num_blocks++;
-    }
-    for (size_t i = 0; i < num_blocks; i++) {
-      if ((i == num_blocks - 1) && num_remainder > 0) {
-        event.num_tags_ = num_remainder;
-      }
-      for (size_t j = 0; j < event.num_tags_; j++) {
-        event.tags_[j] =
-            gen_tag_t::FrmSymSc(frame_id, symbol_id,
-                                block_size * (i * event.num_tags_ + j))
-                .tag_;
-      }
-      TryEnqueueFallback(message_->GetConq(event_type, qid),
-                         message_->GetPtok(event_type, qid), event);
-    }
-  } else {
-    for (size_t i = 0; i < num_events; i++) {
-      TryEnqueueFallback(message_->GetConq(event_type, qid),
-                         message_->GetPtok(event_type, qid),
-                         EventData(event_type, base_tag.tag_));
-      base_tag.sc_id_ += block_size;
-    }
+  const size_t qid = (frame_id & 0x1);
+  for (size_t i = 0; i < num_events; i++) {
+    TryEnqueueFallback(message_->GetConq(event_type, qid),
+                       message_->GetPtok(event_type, qid),
+                       EventData(event_type, base_tag.tag_));
+    base_tag.sc_id_ += block_size;
   }
 }
 
@@ -467,8 +448,8 @@ void Agora::Start() {
               if (kPrintPhyStats) {
                 this->phy_stats_->PrintEvmStats(frame_id);
               }
-              this->phy_stats_->RecordCsiCond(frame_id);
-              this->phy_stats_->RecordEvm(frame_id);
+              this->phy_stats_->RecordCsiCond(frame_id, config_->LogScNum());
+              this->phy_stats_->RecordEvm(frame_id, config_->LogScNum());
               this->phy_stats_->RecordEvmSnr(frame_id);
               if (kUplinkHardDemod) {
                 this->phy_stats_->RecordBer(frame_id);
@@ -477,7 +458,7 @@ void Agora::Start() {
               this->phy_stats_->ClearEvmBuffer(frame_id);
 
               // skip Decode when hard demod is enabled
-              if (kUplinkHardDemod == true) {
+              if (kUplinkHardDemod) {
                 assert(frame_tracking_.cur_proc_frame_id_ == frame_id);
                 CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
                 const bool work_finished = this->CheckFrameComplete(frame_id);
@@ -872,7 +853,7 @@ void Agora::HandleEventFft(size_t tag) {
           if (kPrintPhyStats == true) {
             this->phy_stats_->PrintUlSnrStats(frame_id);
           }
-          this->phy_stats_->RecordUlPilotSnr(frame_id);
+          this->phy_stats_->RecordPilotSnr(frame_id);
           this->phy_stats_->RecordUlSnr(frame_id);
           if (kEnableMac == true) {
             SendSnrReport(EventType::kSNRReport, frame_id, symbol_id);
@@ -1212,6 +1193,7 @@ void Agora::GetEqualData(float** ptr, int* size) {
   *ptr = (float*)&agora_memory_->GetEqual()[offset][0];
   *size = cfg->UeAntNum() * cfg->OfdmDataNum() * 2;
 }
+
 void Agora::CheckIncrementScheduleFrame(size_t frame_id,
                                         ScheduleProcessingFlags completed) {
   this->schedule_process_flags_ += completed;

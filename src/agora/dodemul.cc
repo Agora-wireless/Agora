@@ -343,7 +343,8 @@ EventData DoDemul::Launch(size_t tag) {
                     cfg_->Modulation(Direction::kUplink).c_str());
     }
     // if hard demod is enabled calculate BER with modulated bits
-    if ((kUplinkHardDemod == true) && (kPrintPhyStats == true) &&
+    if (((kPrintPhyStats || kEnableCsvLog) &&
+        kUplinkHardDemod) &&
         (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols())) {
       phy_stats_->UpdateDecodedBits(
           ue_id, total_data_symbol_idx_ul, frame_slot,
