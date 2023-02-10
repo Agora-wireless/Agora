@@ -3,7 +3,7 @@ include(CheckCSourceRuns)
 cmake_policy(SET CMP0054 NEW)
 #Allow project version
 cmake_policy(SET CMP0048 NEW)
-project(Agora VERSION 1.2.1)
+project(Agora VERSION 1.2.2)
 
 if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
   #Flags is enabled by default for c++17
