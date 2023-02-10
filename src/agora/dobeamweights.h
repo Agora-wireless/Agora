@@ -26,6 +26,7 @@ class DoBeamWeights : public Doer {
       Table<complex_float>& calib_ul_buffer,
       Table<complex_float>& calib_dl_msum_buffer,
       Table<complex_float>& calib_ul_msum_buffer,
+      Table<complex_float>& calib_buffer,
       PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_,
       PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_,
       PhyStats* in_phy_stats, Stats* stats_manager);
@@ -33,8 +34,7 @@ class DoBeamWeights : public Doer {
 
   /**
    * Do Beamweight Computation task for one subcarrier with all pilots in a frame
-   * @param tid: task thread index, used for selecting task ptok
-   * @param offset: offset of the subcarrier in csi_buffer_
+   * @param tag: task description with sc_id
    * Buffers: csi_buffer_, precoder_buffer_
    *     Input buffer: csi_buffer_
    *     Output buffer: precoder_buffer_
@@ -50,40 +50,14 @@ class DoBeamWeights : public Doer {
   EventData Launch(size_t tag) override;
 
  private:
-  void ComputePartialCsiBeams(size_t tag);
-
   /// Compute the uplink mMIMO detector matrix and/or the downlink
   /// mMIMO precoder using this CSI matrix and calibration buffer
-  float ComputePrecoder(size_t frame_id, size_t cur_sc_id,
-                        const arma::cx_fmat& mat_csi,
-                        const arma::cx_fvec& calib_sc_vec, const float noise,
-                        complex_float* ul_beam_mem, complex_float* dl_beam_mem);
+  void ComputePrecoder(size_t frame_id, size_t cur_sc_id,
+                       const arma::cx_fmat& mat_csi,
+                       const arma::cx_fvec& calib_sc_vec, const float noise,
+                       complex_float* ul_beam_mem, complex_float* dl_beam_mem);
   void ComputeCalib(size_t frame_id, size_t sc_id, arma::cx_fvec& calib_sc_vec);
-  void ComputeFullCsiBeams(size_t tag);
-
-  /**
-   * Do prediction task for one subcarrier
-   * @param tid: task thread index, used for selecting task ptok
-   * @param offset: offset of the subcarrier in csi_buffer_
-   * Buffers: csi_buffer_, pred_csi_buffer_, precoder_buffer_
-   *     Input buffer: csi_buffer_
-   *     Output buffer: precoder_buffer_
-   *     Intermediate buffer: pred_csi_buffer_
-   * Offsets:
-   *     csi_buffer_:
-   *         dim1: frame index * FFT size + subcarrier index in the current
-   * frame pred_csi_buffer: dim1: subcarrier index in the current frame
-   *     precoder_buffer_:
-   *         dim1: (frame index + 1) * FFT size + subcarrier index in the
-   * current frame Event offset: offset Description:
-   *     1. predict CSI (copy CSI from the current frame if prediction is
-   * based on stale CSI)
-   *     2. perform pseudo-inverse (pinv) on pred_csi_buffer_ and store
-   * results in precoder_buffer_
-   *     3. add an event to the message queue to infrom main thread the
-   * completion of this task
-   */
-  void Predict(size_t offset);
+  void ComputeBeams(size_t tag);
 
   PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
   complex_float* pred_csi_buffer_;
@@ -95,6 +69,7 @@ class DoBeamWeights : public Doer {
   //Shared by all doZf objects
   Table<complex_float>& calib_dl_msum_buffer_;
   Table<complex_float>& calib_ul_msum_buffer_;
+  Table<complex_float>& calib_buffer_;
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_;
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_;
   DurationStat* duration_stat_;

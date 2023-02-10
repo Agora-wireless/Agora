@@ -61,6 +61,7 @@ class AgoraBuffer {
   inline char* GetDlSocket() { return dl_socket_buffer_; }
   inline Table<complex_float>& GetCalibUl() { return calib_ul_buffer_; }
   inline Table<complex_float>& GetCalibDl() { return calib_dl_buffer_; }
+  inline Table<complex_float>& GetCalib() { return calib_buffer_; }
 
  private:
   void AllocateTables();
@@ -80,6 +81,7 @@ class AgoraBuffer {
   Table<complex_float> dl_ifft_buffer_;
   Table<complex_float> calib_ul_msum_buffer_;
   Table<complex_float> calib_dl_msum_buffer_;
+  Table<complex_float> calib_buffer_;
   Table<int8_t> dl_mod_bits_buffer_;
   Table<int8_t> dl_bits_buffer_;
   Table<int8_t> dl_bits_buffer_status_;

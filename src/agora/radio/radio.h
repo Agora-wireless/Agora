@@ -14,14 +14,20 @@
 
 class Radio {
  public:
-  enum RadioType { kSoapySdrStream, kSoapySdrSocket };
+  enum RadioType { kSoapySdrStream, kSoapySdrSocket, kUhdNative };
   //EndReceive is set when the samples returned are the last of a contiguous set
   enum RxFlags { kRxFlagNone = 0, kEndReceive = 1 };
-  enum TxFlags { kTxFlagNone = 0, kEndTransmit = 1, kTxWaitTrigger = 2 };
+  enum TxFlags {
+    kTxFlagNone = 0,
+    kStartTransmit = 1,
+    kEndTransmit = 2,
+    kStartEndTransmit = 4,
+    kTxWaitTrigger = 8
+  };
   static std::unique_ptr<Radio> Create(RadioType type);
 
   enum ActivationTypes { kActivate, kActivateWaitTrigger };
-  virtual ~Radio();
+  virtual ~Radio() = 0;
 
   //Accessors
   inline size_t Id() const { return id_; }

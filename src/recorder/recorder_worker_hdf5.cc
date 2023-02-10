@@ -425,11 +425,10 @@ int RecorderWorkerHDF5::Record(const Packet* pkt) {
                     frame_id, cfg_->FramesToTest());
   } else if ((frame_id % interval_) == 0) {
     if (kDebugPrint) {
-      const size_t ant_id = pkt->ant_id_;
-      AGORA_LOG_INFO(
+      AGORA_LOG_TRACE(
           "RecorderWorkerHDF5::record [frame %zu, symbol %zu, cell %d, "
           "ant %zu] samples: %d %d %d %d %d %d %d %d ....\n",
-          frame_id, symbol_id, pkt->cell_id_, ant_id, pkt->data_[0u],
+          frame_id, symbol_id, pkt->cell_id_, pkt->ant_id_, pkt->data_[0u],
           pkt->data_[1u], pkt->data_[2u], pkt->data_[3u], pkt->data_[4u],
           pkt->data_[5u], pkt->data_[6u], pkt->data_[7u]);
     }

@@ -468,14 +468,15 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
     pkt->Set(next_tx_frame_id_, src_packet->Symbol(), src_packet->Ue(),
              src_packet->PayloadLength());
 
-#if ENABLE_RB_IND
+#if defined(ENABLE_RB_IND)
     pkt->rb_indicator_ = ri;
 #endif
 
     pkt->LoadData(src_packet->Data());
     // Insert CRC
-    pkt->Crc((uint16_t)(
-        crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) & 0xFFFF));
+    pkt->Crc(
+        static_cast<uint16_t>((crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) &
+                   0xFFFF)));
 
     if (kLogMacPackets) {
       std::stringstream ss;

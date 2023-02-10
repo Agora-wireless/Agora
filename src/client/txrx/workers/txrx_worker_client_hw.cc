@@ -1,5 +1,5 @@
 /**
- * @file txrx_worker_hw.cc
+ * @file txrx_worker_client_hw.cc
  * @brief Implementation of PacketTxRx datapath functions for communicating
  * with real iris / faros hardware
  */
@@ -34,18 +34,13 @@ TxRxWorkerClientHw::TxRxWorkerClientHw(
     moodycamel::ProducerToken& notify_producer,
     std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
     std::mutex& sync_mutex, std::condition_variable& sync_cond,
-    std::atomic<bool>& can_proceed, ClientRadioConfig& radio_config)
+    std::atomic<bool>& can_proceed, RadioSet& radio_config)
     : TxRxWorker(core_offset, tid, interface_count, interface_offset,
                  config->NumUeChannels(), config, rx_frame_start,
                  event_notify_q, tx_pending_q, tx_producer, notify_producer,
                  rx_memory, tx_memory, sync_mutex, sync_cond, can_proceed),
       radio_(radio_config),
       program_start_ticks_(0),
-      frame_zeros_(
-          config->NumUeChannels(),
-          std::vector<std::complex<int16_t>>(
-              (config->SampsPerSymbol() * config->Frame().NumTotalSyms()),
-              std::complex<int16_t>(0, 0))),
       //kOffsetOfData to allocate space for the Packet * header.
       frame_storage_(
           config->NumUeChannels(),
@@ -327,43 +322,30 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
              "TxRxWorkerClientHw::DoTx - Ue id was not the expected values");
 
     //For Tx we need all channels_per_interface_ antennas before we can transmit
-    //we will assume that if you get the last antenna, you have already received all
-    //other antennas (enforced in the passing utility)
+    //we will assume that if you get the last antenna, you have already received
+    //all other antennas (enforced in the passing utility)
     if ((ant_offset + 1) == channels_per_interface_) {
-      // Transmit pilot(s)
       if (Configuration()->UeHwFramer() == false) {
-        for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-          const size_t pilot_ant = (radio_id * channels_per_interface_) + ch;
-          //Each pilot will be in a different tx slot (called for each pilot)
-          TxPilot(pilot_ant, frame_id, time0);
-
-          //Pilot transmit complete for pilot ue
-          if (current_event.event_type_ == EventType::kPacketPilotTX) {
-            const auto complete_event =
-                EventData(EventType::kPacketPilotTX,
-                          gen_tag_t::FrmSymUe(frame_id, 0, pilot_ant).tag_);
-            NotifyComplete(complete_event);
-          }
-        }  //For each channel
+        // Transmit all pilot symbols
+        TxPilot(radio_id, frame_id, time0);
       }
-
       if (current_event.event_type_ == EventType::kPacketTX) {
         // Transmit data for all symbols (each cannel transmits for each symbol)
         TxUplinkSymbols(radio_id, frame_id, time0);
-        //Notify the tx is complete for all antennas on the interface
-        for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-          const size_t tx_ant = (radio_id * channels_per_interface_) + ch;
-          //Frame transmit complete
-          const auto complete_event =
-              EventData(EventType::kPacketTX,
-                        gen_tag_t::FrmSymUe(frame_id, 0, tx_ant).tag_);
-          NotifyComplete(complete_event);
-        }
-        AGORA_LOG_TRACE(
-            "TxRxWorkerClientHw::DoTx[%zu]: Frame %zu Transmit Complete for Ue "
-            "%zu\n",
-            tid_, frame_id, radio_id);
       }
+      //Notify the tx is complete for all antennas on the interface
+      for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+        const size_t tx_ant = (radio_id * channels_per_interface_) + ch;
+        //Frame transmit complete
+        const auto complete_event =
+            EventData(current_event.event_type_,
+                      gen_tag_t::FrmSymUe(frame_id, 0, tx_ant).tag_);
+        NotifyComplete(complete_event);
+      }
+      AGORA_LOG_TRACE(
+          "TxRxWorkerClientHw::DoTx[%zu]: Frame %zu Transmit Complete for Ue "
+          "%zu\n",
+          tid_, frame_id, radio_id);
     }
   }  // End all events
   return tx_events.size();
@@ -448,7 +430,7 @@ ssize_t TxRxWorkerClientHw::SyncBeacon(size_t local_interface,
           sync_index = FindSyncBeacon(
               reinterpret_cast<std::complex<int16_t>*>(
                   rx_pkts_ptrs_.at(kSyncDetectChannel)->RawPacket()->data_),
-              sample_window);
+              sample_window, Configuration()->ClCorrScale().at(tid_));
           //Throw out samples until we detect the beacon
           request_samples = sample_window;
           rx_tracker.Reset(rx_pkts_ptrs_);
@@ -596,56 +578,53 @@ void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
   }
 }
 
-void TxRxWorkerClientHw::TxPilot(size_t pilot_ant, size_t frame_id,
+void TxRxWorkerClientHw::TxPilot(size_t pilot_radio, size_t frame_id,
                                  long long time0) {
   const size_t tx_frame_id = frame_id + TX_FRAME_DELTA;
-  //[0..channel-1]
-  const size_t pilot_channel = (pilot_ant % channels_per_interface_);
-  const size_t pilot_radio = pilot_ant / channels_per_interface_;
   const size_t samples_per_symbol = Configuration()->SampsPerSymbol();
   const size_t samples_per_frame =
       samples_per_symbol * Configuration()->Frame().NumTotalSyms();
   long long tx_time;
 
   std::vector<void*> tx_data(channels_per_interface_);
-  for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-    if (ch == pilot_channel) {
-      tx_data.at(ch) = Configuration()->PilotCi16().data();
-    } else {
-      tx_data.at(ch) = frame_zeros_.at(ch).data();
+  for (size_t pilot_idx = 0;
+       pilot_idx < Configuration()->Frame().NumPilotSyms(); pilot_idx++) {
+    const size_t pilot_symbol_id =
+        Configuration()->Frame().GetPilotSymbol(pilot_idx);
+
+    for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+      const size_t pilot_ant = (pilot_radio * channels_per_interface_) + ch;
+      tx_data.at(ch) = reinterpret_cast<void*>(
+          Configuration()->PilotUeCi16(pilot_ant, pilot_idx).data());
     }
-  }
 
-  const size_t pilot_symbol_id =
-      Configuration()->Frame().GetPilotSymbol(pilot_ant);
+    if (Configuration()->UeHwFramer()) {
+      tx_time = ((long long)tx_frame_id << 32) | (pilot_symbol_id << 16);
+    } else {
+      tx_time = time0 + (tx_frame_id * samples_per_frame) +
+                (pilot_symbol_id * samples_per_symbol) -
+                Configuration()->ClTxAdvance().at(pilot_radio);
+    }
 
-  if (Configuration()->UeHwFramer()) {
-    tx_time = ((long long)tx_frame_id << 32) | (pilot_symbol_id << 16);
-  } else {
-    tx_time = time0 + (tx_frame_id * samples_per_frame) +
-              (pilot_symbol_id * samples_per_symbol) -
-              Configuration()->ClTxAdvance().at(pilot_radio);
-  }
+    Radio::TxFlags flags_tx = GetTxFlags(pilot_radio, pilot_symbol_id);
+    const int tx_status = radio_.RadioTx(pilot_radio, tx_data.data(),
+                                         samples_per_symbol, flags_tx, tx_time);
 
-  Radio::TxFlags flags_tx = GetTxFlags(pilot_radio, pilot_symbol_id);
-  const int tx_status = radio_.RadioTx(pilot_radio, tx_data.data(),
-                                       samples_per_symbol, flags_tx, tx_time);
+    if (tx_status < static_cast<int>(samples_per_symbol)) {
+      AGORA_LOG_ERROR(
+          "TxRxWorkerClientHw[%zu]: RadioTx (Pilot) status failed with code: "
+          "%d For Ue radio %zu for %zu bytes and flags %d\n",
+          tid_, tx_status, pilot_radio, samples_per_symbol,
+          static_cast<int>(flags_tx));
+    }
 
-  if (tx_status < static_cast<int>(samples_per_symbol)) {
-    AGORA_LOG_ERROR(
-        "TxRxWorkerClientHw[%zu]: RadioTx (Pilot) status failed with code: %d "
-        "For Ue radio %zu for %zu bytes and flags %d\n",
-        tid_, tx_status, pilot_radio, samples_per_symbol,
-        static_cast<int>(flags_tx));
-  }
-
-  if (kDebugPrintInTask) {
-    AGORA_LOG_INFO(
-        "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Pilot  (Frame "
-        "%zu:%zu, Symbol %zu, Ue %zu, Ant %zu:%zu) at time %lld flags "
-        "%d\n",
-        tid_, frame_id, tx_frame_id, pilot_symbol_id, pilot_radio,
-        pilot_channel, pilot_ant, tx_time, static_cast<int>(flags_tx));
+    if (kDebugPrintInTask) {
+      AGORA_LOG_INFO(
+          "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Pilot  (Frame "
+          "%zu:%zu, Symbol %zu, Ue %zu) at time %lld flags %d\n",
+          tid_, frame_id, tx_frame_id, pilot_symbol_id, pilot_radio, tx_time,
+          static_cast<int>(flags_tx));
+    }
   }
 }
 
