@@ -21,19 +21,22 @@ class Doer {
       moodycamel::ConcurrentQueue<EventData>& complete_task_queue,
       moodycamel::ProducerToken* worker_ptok) {
     EventData req_event;
+
+    ///Each event is handled by 1 Doer(Thread) and each tag is processed sequentually
     if (task_queue.try_dequeue(req_event)) {
       // We will enqueue one response event containing results for all
       // request tags in the request event
       EventData resp_event;
       resp_event.num_tags_ = req_event.num_tags_;
+      resp_event.event_type_ = req_event.event_type_;
 
       for (size_t i = 0; i < req_event.num_tags_; i++) {
-        EventData resp_i = Launch(req_event.tags_[i]);
-        RtAssert(resp_i.num_tags_ == 1, "Invalid num_tags in resp");
-        resp_event.tags_[i] = resp_i.tags_[0];
-        resp_event.event_type_ = resp_i.event_type_;
+        EventData doer_comp = Launch(req_event.tags_.at(i));
+        RtAssert(doer_comp.num_tags_ == 1, "Invalid num_tags in resp");
+        resp_event.tags_.at(i) = doer_comp.tags_.at(0);
+        RtAssert(resp_event.event_type_ == doer_comp.event_type_,
+                 "Invalid event type in resp");
       }
-
       TryEnqueueFallback(&complete_task_queue, worker_ptok, resp_event);
       return true;
     }

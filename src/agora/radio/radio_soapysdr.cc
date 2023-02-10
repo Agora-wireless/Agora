@@ -98,7 +98,10 @@ void RadioSoapySdr::Close() {
       dev_->closeStream(txs_);
       txs_ = nullptr;
     }
-    dev_->writeSetting("RESET_DATA_LOGIC", "");
+
+    if (kUseUHD == false) {
+      dev_->writeSetting("RESET_DATA_LOGIC", "");
+    }
     SoapySDR::Device::unmake(dev_);
     dev_ = nullptr;
     Radio::Close();
@@ -116,17 +119,12 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
     SoapySDR::Kwargs args;
     SoapySDR::Kwargs sargs;
     args["timeout"] = "1000000";
-    if (kUseUHD == false) {
-      args["driver"] = "iris";
-      args["serial"] = SerialNumber();
-      // remote::type = iris for non hub controlled radios
-      // remote::type = faros for hub controlled radios
-      args["remote:mtu"] = "1500";
-      args["remote:ipver"] = "6";
-    } else {
-      args["driver"] = "uhd";
-      args["addr"] = SerialNumber();
-    }
+    args["driver"] = "iris";
+    args["serial"] = SerialNumber();
+    // remote::type = iris for non hub controlled radios
+    // remote::type = faros for hub controlled radios
+    args["remote:mtu"] = "1500";
+    args["remote:ipver"] = "6";
 
     for (size_t tries = 0; tries < kSoapyMakeMaxAttempts; tries++) {
       try {
@@ -207,7 +205,7 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
     }
 
     if (ip_address_.empty()) {
-      AGORA_LOG_ERROR("Iris Device IP address not found");
+      AGORA_LOG_ERROR("Device IP address not found");
       throw std::runtime_error("Device IP address not found");
     }
 
@@ -310,104 +308,94 @@ void RadioSoapySdr::Setup(const std::vector<double>& tx_gains,
   SoapySDR::Kwargs hw_info = dev_->getHardwareInfo();
   for (const auto& ch : EnabledChannels()) {
     ///\todo Check to see if this is correct for kUseUhd == false (BwFilter)
-    if (kUseUHD == false) {
-      dev_->setBandwidth(SOAPY_SDR_RX, ch, cfg_->BwFilter());
-      dev_->setBandwidth(SOAPY_SDR_TX, ch, cfg_->BwFilter());
-    }
+    dev_->setBandwidth(SOAPY_SDR_RX, ch, cfg_->BwFilter());
+    dev_->setBandwidth(SOAPY_SDR_TX, ch, cfg_->BwFilter());
 
     dev_->setFrequency(SOAPY_SDR_RX, ch, "RF", cfg_->RadioRfFreq());
     dev_->setFrequency(SOAPY_SDR_RX, ch, "BB", kUseUHD ? 0 : cfg_->Nco());
     dev_->setFrequency(SOAPY_SDR_TX, ch, "RF", cfg_->RadioRfFreq());
     dev_->setFrequency(SOAPY_SDR_TX, ch, "BB", kUseUHD ? 0 : cfg_->Nco());
 
-    if (kUseUHD == false) {
-      std::string sdr_label = hw_info["revision"];
-      std::string sdr_fe = "";
-      if (hw_info.find("frontend") != hw_info.end()) {
-        sdr_fe = hw_info["frontend"];
-      }
-      const bool is_cbrs = (sdr_fe.find("CBRS") != std::string::npos);
-      const bool is_uhf = (sdr_fe.find("UHF") != std::string::npos);
-      const bool is_dev = (sdr_fe.find("DEV") != std::string::npos);
-      const bool is_iris = (sdr_label.find("Iris") != std::string::npos);
-      const bool is_villager = (sdr_label.find("VGER") != std::string::npos);
+    std::string sdr_label = hw_info["revision"];
+    std::string sdr_fe = "";
+    if (hw_info.find("frontend") != hw_info.end()) {
+      sdr_fe = hw_info["frontend"];
+    }
+    const bool is_cbrs = (sdr_fe.find("CBRS") != std::string::npos);
+    const bool is_uhf = (sdr_fe.find("UHF") != std::string::npos);
+    const bool is_dev = (sdr_fe.find("DEV") != std::string::npos);
+    const bool is_iris = (sdr_label.find("Iris") != std::string::npos);
+    const bool is_villager = (sdr_label.find("VGER") != std::string::npos);
 
-      if (is_iris) {
-        // Unified gains are only available for CBRS FE for now
-        if (is_cbrs && cfg_->SingleGain()) {
-          // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:108]
-          dev_->setGain(SOAPY_SDR_RX, ch, rx_gains.at(ch));
-          // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:105]
-          dev_->setGain(SOAPY_SDR_TX, ch, tx_gains.at(ch));
-        } else {
-          if (is_cbrs) {
-            if (cfg_->Freq() > 3e9) {
-              //[-18,0]
-              dev_->setGain(SOAPY_SDR_RX, ch, "ATTN", -6);
-            } else if ((cfg_->Freq() > 2e9) && (cfg_->Freq() < 3e9)) {
-              //[-18,0]
-              dev_->setGain(SOAPY_SDR_RX, ch, "ATTN", -18);
-            } else {
-              //[-18,0]
-              dev_->setGain(SOAPY_SDR_RX, ch, "ATTN", -12);
-            }
-            //[0,17]
-            dev_->setGain(SOAPY_SDR_RX, ch, "LNA2", 17);
-          } else if (is_uhf) {
-            //[-18,0]
-            dev_->setGain(SOAPY_SDR_RX, ch, "ATTN1", -6);
-            //[-18,0]
-            dev_->setGain(SOAPY_SDR_RX, ch, "ATTN2", -6);
-          }
-
-          //[0,30]
-          dev_->setGain(SOAPY_SDR_RX, ch, "LNA", rx_gains.at(ch));
-          //[0,12]
-          dev_->setGain(SOAPY_SDR_RX, ch, "TIA", 0);
-          //[-12,19]
-          dev_->setGain(SOAPY_SDR_RX, ch, "PGA", 0);
-
-          if (is_cbrs) {
-            //[-18,0] by 3
-            dev_->setGain(SOAPY_SDR_TX, ch, "ATTN", -6);
-            //[0|15]
-            dev_->setGain(SOAPY_SDR_TX, ch, "PA2", 0);
-          }
-          if (is_dev) {
-            //[-12,12]
-            dev_->setGain(
-                SOAPY_SDR_TX, ch, "IAMP",
-                (tx_gains.at(ch) > 52.0 ? std::max(12.0, tx_gains.at(ch) - 52.0)
-                                        : 0.0));
-          } else {
-            //[-12,12]
-            dev_->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);
-          }
-          //[0,30]
-          dev_->setGain(SOAPY_SDR_TX, ch, "PAD", tx_gains.at(ch));
-        }  // end single gain
-      } else if (is_villager) {
-        dev_->setGain(SOAPY_SDR_RX, ch, "LNA",
-                      std::min(30.0, rx_gains.at(ch)));  //[0,30]
-        dev_->setGain(SOAPY_SDR_TX, ch, "PAD",
-                      std::min(30.0, tx_gains.at(ch)));  //[0,52]
+    if (is_iris) {
+      // Unified gains are only available for CBRS FE for now
+      if (is_cbrs && cfg_->SingleGain()) {
+        // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:108]
+        dev_->setGain(SOAPY_SDR_RX, ch, rx_gains.at(ch));
+        // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:105]
+        dev_->setGain(SOAPY_SDR_TX, ch, tx_gains.at(ch));
       } else {
-        AGORA_LOG_ERROR("SDR Type %s is not supported!\n", sdr_label.c_str());
-      }
+        if (is_cbrs) {
+          if (cfg_->Freq() > 3e9) {
+            //[-18,0]
+            dev_->setGain(SOAPY_SDR_RX, ch, "ATTN", -6);
+          } else if ((cfg_->Freq() > 2e9) && (cfg_->Freq() < 3e9)) {
+            //[-18,0]
+            dev_->setGain(SOAPY_SDR_RX, ch, "ATTN", -18);
+          } else {
+            //[-18,0]
+            dev_->setGain(SOAPY_SDR_RX, ch, "ATTN", -12);
+          }
+          //[0,17]
+          dev_->setGain(SOAPY_SDR_RX, ch, "LNA2", 17);
+        } else if (is_uhf) {
+          //[-18,0]
+          dev_->setGain(SOAPY_SDR_RX, ch, "ATTN1", -6);
+          //[-18,0]
+          dev_->setGain(SOAPY_SDR_RX, ch, "ATTN2", -6);
+        }
+
+        //[0,30]
+        dev_->setGain(SOAPY_SDR_RX, ch, "LNA", rx_gains.at(ch));
+        //[0,12]
+        dev_->setGain(SOAPY_SDR_RX, ch, "TIA", 0);
+        //[-12,19]
+        dev_->setGain(SOAPY_SDR_RX, ch, "PGA", 0);
+
+        if (is_cbrs) {
+          //[-18,0] by 3
+          dev_->setGain(SOAPY_SDR_TX, ch, "ATTN", -6);
+          //[0|15]
+          dev_->setGain(SOAPY_SDR_TX, ch, "PA2", 0);
+        }
+        if (is_dev) {
+          //[-12,12]
+          dev_->setGain(
+              SOAPY_SDR_TX, ch, "IAMP",
+              (tx_gains.at(ch) > 52.0 ? std::max(12.0, tx_gains.at(ch) - 52.0)
+                                      : 0.0));
+        } else {
+          //[-12,12]
+          dev_->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);
+        }
+        //[0,30]
+        dev_->setGain(SOAPY_SDR_TX, ch, "PAD", tx_gains.at(ch));
+      }  // end single gain
+    } else if (is_villager) {
+      dev_->setGain(SOAPY_SDR_RX, ch, "LNA",
+                    std::min(30.0, rx_gains.at(ch)));  //[0,30]
+      dev_->setGain(SOAPY_SDR_TX, ch, "PAD",
+                    std::min(30.0, tx_gains.at(ch)));  //[0,52]
     } else {
-      // kUseUHD
-      dev_->setGain(SOAPY_SDR_RX, ch, "PGA0", rx_gains.at(ch));
-      dev_->setGain(SOAPY_SDR_TX, ch, "PGA0", tx_gains.at(ch));
-    }  // end kUseUHD == false
-  }    // end for (const auto& ch : EnabledChannels())
+      AGORA_LOG_ERROR("SDR Type %s is not supported!\n", sdr_label.c_str());
+    }
+  }  // end for (const auto& ch : EnabledChannels())
 
   for (auto ch : EnabledChannels()) {
     // Clients??
     // dev_->writeSetting(SOAPY_SDR_RX, ch, "CALIBRATE", "SKLK");
     // dev_->writeSetting(SOAPY_SDR_TX, ch, "CALIBRATE", "");
-    if (kUseUHD == false) {
-      dev_->setDCOffsetMode(SOAPY_SDR_RX, ch, true);
-    }
+    dev_->setDCOffsetMode(SOAPY_SDR_RX, ch, true);
   }
 
   auto clk_status = dev_->readSensor("CLKBUFF_LOCKED");
@@ -423,46 +411,23 @@ void RadioSoapySdr::Activate(Radio::ActivationTypes type, long long act_time_ns,
       "%d\n",
       SerialNumber().c_str(), Id(), act_time_ns, samples,
       static_cast<int>(type));
-  if (kUseUHD == false) {
-    rxp_->Activate(type, act_time_ns, samples);
-    int soapy_flags = 0;
-    if (type == Radio::ActivationTypes::kActivateWaitTrigger) {
-      soapy_flags = SOAPY_SDR_WAIT_TRIGGER;
-    } else if (act_time_ns != 0) {
-      soapy_flags |= SOAPY_SDR_HAS_TIME;
-    }
+  rxp_->Activate(type, act_time_ns, samples);
+  int soapy_flags = 0;
+  if (type == Radio::ActivationTypes::kActivateWaitTrigger) {
+    soapy_flags = SOAPY_SDR_WAIT_TRIGGER;
+  } else if (act_time_ns != 0) {
+    soapy_flags |= SOAPY_SDR_HAS_TIME;
+  }
 
-    if (samples > 0) {
-      soapy_flags |= SOAPY_SDR_END_BURST;
-    }
+  if (samples > 0) {
+    soapy_flags |= SOAPY_SDR_END_BURST;
+  }
 
-    const auto status =
-        dev_->activateStream(txs_, soapy_flags, act_time_ns, samples);
-    if (status != 0) {
-      AGORA_LOG_WARN("Activate soapy tx stream with status %d %s\n", status,
-                     SoapySDR_errToStr(status));
-    }
-  } else {
-    const bool is_ue = false;
-    if (is_ue) {
-      dev_->setTimeSource("internal");
-      dev_->setClockSource("internal");
-      dev_->setHardwareTime(0, "UNKNOWN_PPS");
-    } else {
-      dev_->setClockSource("external");
-      dev_->setTimeSource("external");
-      dev_->setHardwareTime(0, "PPS");
-    }
-    // Wait for pps sync pulse ??
-    //std::this_thread::sleep_for(std::chrono::seconds(kUhdInitTimeSec -1));
-    //dev_->activateStream(rxs_, SOAPY_SDR_HAS_TIME, kUhdInitTimeSec * 1e9, 0);
-    rxp_->Activate(type);
-    const auto status = dev_->activateStream(txs_, SOAPY_SDR_HAS_TIME,
-                                             kUhdInitTimeSec * 1e9, 0);
-    if (status < 0) {
-      AGORA_LOG_WARN("Activate soapy tx stream with status % d %s\n", status,
-                     SoapySDR_errToStr(status));
-    }
+  const auto status =
+      dev_->activateStream(txs_, soapy_flags, act_time_ns, samples);
+  if (status != 0) {
+    AGORA_LOG_WARN("Activate soapy tx stream with status %d %s\n", status,
+                   SoapySDR_errToStr(status));
   }
 }
 
@@ -586,6 +551,7 @@ void RadioSoapySdr::SetTimeAtTrigger(long long time_ns) {
         "not the expected value %lld : %lld\n",
         Id(), time_dev, time_ns);
   }
+
   auto clk_status = dev_->readSensor("CLKBUFF_LOCKED");
   if (clk_status.compare("false") == 0) {
     AGORA_LOG_WARN("RadioSoapySdr::Activate[%zu] clk_status %s\n", Id(),
@@ -599,7 +565,6 @@ long long RadioSoapySdr::GetTimeNs() {
     AGORA_LOG_WARN("RadioSoapySdr::Activate[%zu] clk_status %s\n", Id(),
                    clk_status.c_str());
   }
-
   auto time_dev = dev_->getHardwareTime();
   AGORA_LOG_TRACE("RadioSoapySdr::GetTimeNs[%zu] the hardware time is %lld\n",
                   Id(), time_dev);

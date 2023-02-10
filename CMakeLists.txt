@@ -3,7 +3,7 @@ include(CheckCSourceRuns)
 cmake_policy(SET CMP0054 NEW)
 #Allow project version
 cmake_policy(SET CMP0048 NEW)
-project(Agora VERSION 1.2.0)
+project(Agora VERSION 1.2.1)
 
 if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
   #Flags is enabled by default for c++17
@@ -26,6 +26,7 @@ endif()
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -no-pie")
 
 set(CMAKE_CXX_STANDARD 17)
+
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   message(STATUS "Using GNU compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   set(CMAKE_C_FLAGS "-std=gnu11 -Wall -g -march=native -m64")
@@ -42,6 +43,9 @@ elseif(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
   message(STATUS "Using Clang compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
 endif()
+
+#Set to ON For clang tidy
+set(CMAKE_EXPORT_COMPILE_COMMANDS OFF)
 
 option(DEBUG "Enable debugging" OFF)
 
@@ -96,7 +100,7 @@ endif()
 #Settable values
 message(STATUS "\n-- ----- Configuration values -----")
 message(STATUS "DEBUG:            ${DEBUG}")
-set(RADIO_TYPE SIMULATION CACHE STRING "RADIO_TYPE defaulting to 'SIMULATION', valid types are SIMULATION / SOAPY_IRIS / SOAPY_UHD")
+set(RADIO_TYPE SIMULATION CACHE STRING "RADIO_TYPE defaulting to 'SIMULATION', valid types are SIMULATION / SOAPY_IRIS / SOAPY_UHD / PURE_UHD")
 message(STATUS "RADIO_TYPE:       ${RADIO_TYPE}")
 set(LOG_LEVEL "info" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 message(STATUS "LOG_LEVEL:        ${LOG_LEVEL}")
@@ -122,6 +126,9 @@ if(RADIO_TYPE STREQUAL SOAPY_IRIS)
 elseif(RADIO_TYPE STREQUAL SOAPY_UHD)
   message(STATUS "Enabled SOAPY UHD radio type")
   add_definitions(-DUSE_UHD)
+elseif(RADIO_TYPE STREQUAL PURE_UHD)
+  message(STATUS "Enabled Pure UHD radio type")
+  add_definitions(-DUSE_PURE_UHD)
 else()
   message(STATUS "Enabled SIMULATION radio type")
 endif()
@@ -298,6 +305,48 @@ set(GTEST_LIBRARIES ${GTEST_LIBRARIES} -lpthread)
 include_directories(third_party third_party/spdlog/include third_party/nlohmann/single_include)
 
 add_definitions(-DTHREADED_INIT)
+
+if(RADIO_TYPE STREQUAL PURE_UHD)
+  message(STATUS "Enabled PURE_UHD radio")
+  add_definitions(-DUSE_UHD)
+  # Adding dependency of UHD and boost external libraries
+  find_package(UHD "3.15.0" REQUIRED)
+  message(STATUS "Using UHD Version: ${UHD_VERSION}")
+
+  ########################################################################
+  # PURE UHD dependencies
+  ########################################################################
+  # Adding dependency of Boost to souder
+  set(BOOST_REQUIRED_COMPONENTS
+      program_options
+      system
+      thread)
+
+  if(MSVC)
+      set(BOOST_ALL_DYN_LINK "${BOOST_ALL_DYN_LINK}" CACHE BOOL "boost enable dynamic linking")
+      if(BOOST_ALL_DYN_LINK)
+          add_definitions(-DBOOST_ALL_DYN_LINK) #setup boost auto-linking in msvc
+      else(BOOST_ALL_DYN_LINK)
+          set(BOOST_REQUIRED_COMPONENTS) #empty components list for static link
+      endif(BOOST_ALL_DYN_LINK)
+  endif(MSVC)
+  find_package(Boost "1.65" REQUIRED ${BOOST_REQUIRED_COMPONENTS})
+  message(STATUS "Using Boost Version: ${Boost_VERSION}")
+
+  set(PUREUHD_SOURCES
+      src/agora/radio/radio_set/radio_set_uhd.cc
+      src/agora/radio/radio_uhdsdr.cc
+      )
+  set(PUREUHD_SOURCES_AGORA
+      src/agora/txrx/workers/txrx_worker_usrp.cc
+      )
+
+  set(PUREUHD_SOURCES_CLIENT
+      src/client/txrx/workers/txrx_worker_client_uhd.cc
+      )
+  message(STATUS "pure_uhd_lib library initialized")
+endif()
+
 # MAC
 if(${ENABLE_MAC})
   add_definitions(-DENABLE_MAC)
@@ -309,6 +358,7 @@ set(MAC_CLIENT_SOURCES
   src/mac/video_receiver.cc
   src/mac/file_receiver.cc
   src/mac/mac_client.cc)
+
 set(MAC_BS_SOURCES
   src/mac/mac_sender.cc
   src/mac/mac_receiver.cc
@@ -324,6 +374,7 @@ include_directories(
   src/mac/
   src/agora/
   src/agora/radio
+  src/agora/radio/radio_set
   src/agora/txrx
   src/agora/txrx/workers
   src/client
@@ -345,6 +396,7 @@ endif()
 add_library(recorder_sources_lib OBJECT ${RECORDER_SOURCES})
 
 set(COMMON_SOURCES
+  ${PUREUHD_SOURCES}
   src/agora/stats.cc
   src/common/phy_stats.cc
   src/common/framestats.cc
@@ -366,6 +418,7 @@ set(COMMON_SOURCES
   src/agora/radio/radio_socket.cc
   src/agora/radio/radio_data_plane_soapy.cc
   src/agora/radio/radio_data_plane_socket.cc
+  src/agora/radio/radio_set/radio_set.cc
   src/common/ipc/udp_comm.cc
   src/common/ipc/network_utils.cc
   src/common/loggers/csv_logger.cc
@@ -389,6 +442,7 @@ if(${USE_DPDK})
 endif()
 
 set(AGORA_SOURCES ${AGORA_SOURCES}
+  ${PUREUHD_SOURCES_AGORA}
   src/agora/agora.cc
   src/agora/agora_buffer.cc
   src/agora/agora_worker.cc
@@ -398,22 +452,20 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/dodemul.cc
   src/agora/doprecode.cc
   src/agora/dodecode.cc
-  src/agora/radio/radio_lib.cc
-  src/agora/radio/radio_calibrate_digital.cc
-  src/agora/radio/radio_calibrate_analog.cc
+  src/agora/radio/radio_set/radio_set_bs.cc
   src/mac/mac_thread_basestation.cc
   src/agora/txrx/packet_txrx_sim.cc
   src/agora/txrx/packet_txrx_radio.cc
   src/agora/txrx/workers/txrx_worker_sim.cc
-  src/agora/txrx/workers/txrx_worker_hw.cc
-  src/agora/txrx/workers/txrx_worker_usrp.cc)
+  src/agora/txrx/workers/txrx_worker_hw.cc)
 
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
 set(CLIENT_SOURCES
+  ${PUREUHD_SOURCES_CLIENT}
   src/client/doifft_client.cc
   src/client/dodecode_client.cc
-  src/client/client_radio.cc
+  src/client/radio_set_ue.cc
   src/client/ue_worker.cc
   src/client/phy-ue.cc
   src/client/txrx/packet_txrx_client_sim.cc
@@ -424,7 +476,7 @@ set(CLIENT_SOURCES
 add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
 
 set(COMMON_LIBS -Wl,--start-group ${MKL_LIBS} ${BLAS_LIBRARIES} -Wl,--end-group ${NUMA_LIBRARIES} ${FLEXRAN_LDPC_LIBS} ${HDF5_LIBRARIES} ${DPDK_LIBRARIES} ${ARMADILLO_LIBRARIES} ${SOAPY_LIB}
-    ${PYTHON_LIB} ${GFLAGS_LIBRARIES} ${COMMON_LIBS})
+    ${PYTHON_LIB} ${Boost_LIBRARIES} ${GFLAGS_LIBRARIES} ${UHD_LIBRARIES} ${COMMON_LIBS})
 message(VERBOSE "Common libs: ${COMMON_LIBS}")
 
 # TODO: The main agora executable is performance-critical, so we need to
@@ -437,6 +489,15 @@ add_executable(agora
   $<TARGET_OBJECTS:shared_txrx_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(agora ${COMMON_LIBS})
+
+add_executable(calibrate
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/calibrate_main.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/radio_set_calibrate.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/radio_calibrate_digital.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/radio_calibrate_analog.cc
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(calibrate ${COMMON_LIBS})
+target_compile_definitions(calibrate PRIVATE CALIBRATE)
 
 add_executable(data_generator
   ${CMAKE_CURRENT_SOURCE_DIR}/src/data_generator/data_generator_main.cc

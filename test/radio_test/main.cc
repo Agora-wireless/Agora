@@ -2,12 +2,12 @@
  * @file main.cc
  * @brief Main file for the radio test program
  */
-#include "client_radio.h"
 #include "comms-lib.h"
 #include "gflags/gflags.h"
 #include "logger.h"
 #include "network_utils.h"
-#include "radio_lib.h"
+#include "radio_set_bs.h"
+#include "radio_set_ue.h"
 #include "rx_status_tracker.h"
 #include "signal_handler.h"
 #include "version_config.h"
@@ -123,7 +123,7 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
 
   if (kUseArgos) {
     // Makes the soapy remote "HUB" / InitBsRadio / ConfigureBsRadio
-    auto radioconfig = std::make_unique<RadioConfig>(cfg, type);
+    auto radioconfig = std::make_unique<RadioSetBs>(cfg, type);
     radioconfig->RadioStart();
 
     //std::this_thread::sleep_for(std::chrono::seconds(2));
@@ -279,7 +279,7 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
 
   if (kUseArgos) {
     // Makes the soapy remote "HUB" / InitBsRadio / ConfigureBsRadio
-    auto radioconfig = std::make_unique<ClientRadioConfig>(cfg, type);
+    auto radioconfig = std::make_unique<RadioSetUe>(cfg, type);
     radioconfig->RadioStart();
 
     //std::this_thread::sleep_for(std::chrono::seconds(2));
@@ -378,7 +378,8 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
 ssize_t SyncBeacon(const std::complex<int16_t>* samples, size_t detect_window,
                    const Config* cfg) {
   ssize_t sync_index = 0;
-  sync_index = CommsLib::FindBeaconAvx(samples, cfg->GoldCf32(), detect_window);
+  sync_index =
+      CommsLib::FindBeaconAvx(samples, cfg->GoldCf32(), detect_window, 1.0f);
 
   if (sync_index >= 0) {
     auto rx_adjust_samples =

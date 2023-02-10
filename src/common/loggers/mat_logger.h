@@ -15,11 +15,12 @@
 
 namespace CsvLog {
 
-constexpr size_t kFrames = 10;
-constexpr size_t kFrameStart = 100;
+constexpr size_t kFrames = 100;
+constexpr size_t kFrameStart = 0;
 constexpr size_t kSCs = 304;
 constexpr size_t kBSAnts = 8;
 constexpr size_t kUEAnts = 1;
+constexpr bool kWriteZeroVals = false;
 
 class MatLogger : public CsvLogger {
  public:

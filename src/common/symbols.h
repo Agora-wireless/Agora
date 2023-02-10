@@ -28,7 +28,8 @@ static constexpr size_t kFrameWnd = 40;
 #undef USE_MKL_JIT
 #endif
 
-#define ENABLE_RB_IND (0)
+//Define to allow mac addition of RB IND to allow dynamic change of mcs
+//#define ENABLE_RB_IND (1)
 
 /// Return true at compile time iff a constant is a power of two
 template <typename T>
@@ -162,6 +163,12 @@ static constexpr bool kUseUHD = true;
 static constexpr bool kUseUHD = false;
 #endif
 
+#if defined(USE_PURE_UHD)
+static constexpr bool kUsePureUHD = true;
+#else
+static constexpr bool kUsePureUHD = false;
+#endif
+
 #if defined(ENABLE_CSV_LOG)
 static constexpr bool kEnableCsvLog = true;
 #else
@@ -201,9 +208,6 @@ static constexpr bool kDebugPrintStatsPerThread = false;
 static constexpr bool kDebugPrintInTask = false;
 static constexpr bool kDebugMulticell = false;
 static constexpr bool kRecordCalibrationMats = false;
-
-/// Print the I/Q samples in the pilots
-static constexpr bool kDebugPrintPilot = false;
 
 static constexpr bool kDebugRadioTX = false;
 static constexpr bool kDebugRadioRX = false;
