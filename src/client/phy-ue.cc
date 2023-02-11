@@ -23,9 +23,6 @@ static constexpr bool kDebugPrintPacketsFromMac = false;
 static constexpr bool kDebugPrintPacketsToMac = false;
 static constexpr size_t kDefaultQueueSize = 36;
 
-//set the number of subcarriers to record DL CSI
-static constexpr size_t kNumRecSc = 4;
-
 //Recording parameters
 static constexpr size_t kRecordFrameInterval = 1;
 #if defined(ENABLE_HDF5)
@@ -420,11 +417,9 @@ void PhyUe::Start() {
             // (Only when in Downlink Only mode, otherwise the pilots
             // will be transmitted with the uplink data)
             if (ul_symbol_perframe_ == 0) {
-              EventData do_tx_pilot_task(
+              const EventData do_tx_pilot_task(
                   EventType::kPacketPilotTX,
-                  gen_tag_t::FrmSymUe(
-                      frame_id, config_->Frame().GetPilotSymbol(ant_id), ant_id)
-                      .tag_);
+                  gen_tag_t::FrmUe(frame_id, ant_id).tag_);
               ScheduleTask(do_tx_pilot_task, &tx_queue_,
                            *tx_ptoks_ptr_[ru_->AntNumToWorkerId(ant_id)]);
             } else {
@@ -480,8 +475,8 @@ void PhyUe::Start() {
               if (kPrintPhyStats) {
                 this->phy_stats_->PrintDlSnrStats(frame_id, ue_list);
               }
-              this->phy_stats_->RecordDlCsi(frame_id, kNumRecSc, csi_buffer_,
-                                            ue_list);
+              this->phy_stats_->RecordDlCsi(frame_id, config_->LogScNum(),
+                                            csi_buffer_, ue_list);
               this->phy_stats_->RecordDlPilotSnr(frame_id, ue_map);
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
               PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
@@ -539,16 +534,16 @@ void PhyUe::Start() {
 
               auto ue_map = mac_sched_->ScheduledUeMap(frame_id, 0u);
               auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
-              this->phy_stats_->RecordEvm(frame_id, ue_map);
+
+              this->phy_stats_->RecordEvm(frame_id, config_->LogScNum(),
+                                          ue_map);
               this->phy_stats_->RecordEvmSnr(frame_id, ue_map);
+              this->phy_stats_->ClearEvmBuffer(frame_id);
+
               if (kDownlinkHardDemod) {
                 this->phy_stats_->RecordBer(frame_id, ue_map);
                 this->phy_stats_->RecordSer(frame_id, ue_map);
-              }
-              this->phy_stats_->ClearEvmBuffer(frame_id);
-
-              if (kDownlinkHardDemod == true) {
-                bool finished =
+                const bool finished =
                     FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
                 if (finished == true) {
                   if ((cur_frame_id + 1) >= config_->FramesToTest()) {
@@ -672,11 +667,11 @@ void PhyUe::Start() {
           if (current_frame_user_num_ == 0) {
             expected_frame_id_from_mac_++;
           }
-#if ENABLE_RB_IND
+#if defined(ENABLE_RB_IND)
           config_->UpdateModCfgs(pkt->rb_indicator_.mod_order_bits_);
 #endif
           if (kDebugPrintPacketsFromMac) {
-#if ENABLE_RB_IND
+#if defined(ENABLE_RB_IND)
             AGORA_LOG_INFO(
                 "PhyUe: received packet for frame %u with modulation %zu\n",
                 pkt->frame_id_, pkt->rb_indicator_.mod_order_bits_);
@@ -785,10 +780,9 @@ void PhyUe::Start() {
                   for (size_t ch = 0; ch < config_->NumUeChannels(); ch++) {
                     const size_t ue_tx_antenna =
                         (ue_interface * config_->NumUeChannels()) + ch;
-                    EventData do_tx_task(
+                    const EventData do_tx_task(
                         EventType::kPacketTX,
-                        gen_tag_t::FrmSymUe(ue.tx_pending_frame_, 0,
-                                            ue_tx_antenna)
+                        gen_tag_t::FrmUe(ue.tx_pending_frame_, ue_tx_antenna)
                             .tag_);
                     ScheduleTask(
                         do_tx_task, &tx_queue_,

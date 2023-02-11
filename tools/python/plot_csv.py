@@ -24,7 +24,7 @@ if len(sys.argv) > 3:
   plt.ylabel(sys.argv[3])
 if len(sys.argv) > 4:
   leg = []
-  for i in range(n_cols):
+  for i in range(1, n_cols):
     leg.append(sys.argv[4] + ' ' + str(i))
   plt.legend(leg)
 

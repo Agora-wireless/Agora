@@ -21,13 +21,12 @@
 class RadioSetBs : public RadioSet {
  public:
   RadioSetBs(Config* cfg, Radio::RadioType radio_type);
-  virtual ~RadioSetBs() final;
+  ~RadioSetBs() final;
 
-  virtual bool RadioStart() final;
-  virtual void Go() final;
+  bool RadioStart() final;
+  void Go() final;
 
-  virtual bool DoCalib() const final { return calib_; }
-
+  bool DoCalib() const final { return calib_; }
  private:
   // Thread functions
   void InitRadio(size_t radio_id);

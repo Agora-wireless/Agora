@@ -1,7 +1,7 @@
 
 function readability_autofix() {
   echo "Checking code readability standards"
-  run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
+  run-clang-tidy-12.py -header-filter="(src|test|microbench|simulator|data).*" \
     -checks='-*,modernize-deprecated-headers,readability-identifier-naming, readability-braces-around-statements, readability-const-return-type, readability-container-size-empty, readability-implicit-bool-conversion, readability-inconsistent-declaration-parameter-name, readability-isolate-declaration, readability-make-member-function-const, readability-misplaced-array-index, readability-named-parameter, readability-non-const-parameter, readability-qualified-auto, readability-redundant-access-specifiers, readability-redundant-control-flow, readability-redundant-declaration, readability-redundant-function-ptr-dereference,readability-static-accessed-through-instance,readability-redundant-member-init' \
     -config="{CheckOptions: [ {key: readability-identifier-naming.ClassCase, value: CamelCase},
                               {key: readability-identifier-naming.ClassMethodCase, value: CamelCase},
@@ -34,14 +34,14 @@ function readability_autofix() {
 
 function keychecks_autofix() {
   echo "Key Checks autofix"
-  run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
+  run-clang-tidy-12.py -header-filter="(src|test|microbench|simulator|data).*" \
     -checks='-*,bugprone-argument-comment, bugprone-bool-pointer-implicit-conversion, bugprone-copy-constructor-init, bugprone-inaccurate-erase, bugprone-macro-parentheses, bugprone-misplaced-operator-in-strlen-in-alloc, bugprone-misplaced-pointer-arithmetic-in-alloc, bugprone-move-forwarding-reference, bugprone-not-null-terminated-result, bugprone-parent-virtual-call, bugprone-posix-return, bugprone-redundant-branch-condition, bugprone-reserved-identifier, bugprone-string-constructor, bugprone-string-integer-assignment, bugprone-suspicious-memset-usage, bugprone-suspicious-semicolon, bugprone-suspicious-string-compare, bugprone-swapped-arguments, bugprone-terminating-continue, bugprone-unused-raii, bugprone-virtual-near-miss, cppcoreguidelines-pro-type-static-cast-downcast, google-explicit-constructor, google-upgrade-googletest-case, misc-definitions-in-headers, misc-redundant-expression, misc-static-assert, misc-uniqueptr-reset-release, misc-unused-alias-decls, misc-unused-parameters, misc-unused-using-decls' \
     -fix 
 }
 
 function check_bugprone() {
   echo "Checking Bugprone behaviors"
-  run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
+  run-clang-tidy-12.py -header-filter="(src|test|microbench|simulator|data).*" \
     -checks='-*,bugprone-*' 2>/dev/null
 }
 
@@ -49,7 +49,7 @@ function check_bugprone() {
 
 function bugprone_autofix() {
   echo "Bugprone autofix"
-  run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
+  run-clang-tidy-12.py -header-filter="(src|test|microbench|simulator|data).*" \
     -checks='-*,bugprone-argument-comment, bugprone-bool-pointer-implicit-conversion, bugprone-copy-constructor-init, bugprone-inaccurate-erase, bugprone-macro-parentheses, bugprone-misplaced-operator-in-strlen-in-alloc, bugprone-misplaced-pointer-arithmetic-in-alloc, bugprone-move-forwarding-reference, bugprone-not-null-terminated-result, bugprone-parent-virtual-call, bugprone-posix-return, bugprone-redundant-branch-condition, bugprone-reserved-identifier, bugprone-string-constructor, bugprone-string-integer-assignment, bugprone-suspicious-memset-usage, bugprone-suspicious-semicolon, bugprone-suspicious-string-compare, bugprone-swapped-arguments, bugprone-terminating-continue, bugprone-unused-raii, bugprone-virtual-near-miss' \
     -fix 
 }
@@ -59,7 +59,7 @@ function bugprone_autofix() {
 
 function cppcore_autofix() {
   echo "Cppcore autofix"
-  run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
+  run-clang-tidy-12.py -header-filter="(src|test|microbench|simulator|data).*" \
     -checks='-*,cppcoreguidelines-pro-type-static-cast-downcast' \
     -fix 
 }
@@ -71,7 +71,7 @@ function cppcore_autofix() {
 
 function google_autofix() {
   echo "Google checks with autofix"
-  run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
+  run-clang-tidy-12.py -header-filter="(src|test|microbench|simulator|data).*" \
     -checks='-*,google-explicit-constructor, google-upgrade-googletest-case' \
     -fix 
 }
@@ -82,7 +82,7 @@ function google_autofix() {
 
 function misc_autofix() {
   echo "Misc checks with autofix"
-  run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
+  run-clang-tidy-12.py -header-filter="(src|test|microbench|simulator|data).*" \
     -checks='-*,misc-definitions-in-headers, misc-redundant-expression, misc-static-assert, misc-uniqueptr-reset-release, misc-unused-alias-decls, misc-unused-parameters, misc-unused-using-decls' \
     -fix 
 }
@@ -92,7 +92,7 @@ function misc_autofix() {
 
 function modernize_autofix() {
   echo "Modernize checks with autofix"
-  run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
+  run-clang-tidy-12.py -header-filter="(src|test|microbench|simulator|data).*" \
     -checks='-*,modernize-avoid-bind, modernize-concat-nested-namespaces, modernize-deprecated-headers, modernize-deprecated-ios-base-aliases,modernize-loop-convert,modernize-make-shared,modernize-make-unique,modernize-pass-by-value,modernize-raw-string-literal,modernize-redundant-void-arg,modernize-replace-auto-ptr,modernize-replace-disallow-copy-and-assign-macro,modernize-replace-random-shuffle,modernize-return-braced-init-list,modernize-shrink-to-fit,modernize-unary-static-assert,modernize-use-bool-literals,modernize-use-default-member-init,modernize-use-emplace,modernize-use-equals-default,modernize-use-equals-delete,modernize-use-noexcept,modernize-use-nullptr,modernize-use-override,modernize-use-transparent-functors,modernize-use-uncaught-exceptions,modernize-use-using' \
     -fix 
 }
@@ -103,7 +103,7 @@ function modernize_autofix() {
 
 function performance_autofix() {
   echo "Perf checks with autofix"
-  run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
+  run-clang-tidy-12.py -header-filter="(src|test|microbench|simulator|data).*" \
     -checks='-*,performance-faster-string-find,performance-for-range-copy,performance-inefficient-algorithm,performance-inefficient-vector-operation,performance-trivially-destructible,performance-type-promotion-in-math-fn,performance-unnecessary-value-param,performance-move-const-arg,performance-move-constructor-init,performance-noexcept-move-constructor' \
     -fix 
 }
@@ -112,7 +112,9 @@ function performance_autofix() {
 #removed performance-move-const-arg,performance-move-constructor-init,performance-noexcept-move-constructor
 #performance-faster-string-find,performance-for-range-copy,performance-inefficient-algorithm,performance-inefficient-vector-operation,performance-move-const-arg,performance-move-constructor-init,performance-noexcept-move-constructor,performance-trivially-destructible,performance-type-promotion-in-math-fn,performance-unnecessary-value-param
 
-
+#Must export the compile commands for clang-tidy
+#comment out the following line in the cmakelists because it is causing issues.
+#add_definitions(-DARMA_DONT_USE_WRAPPER -DARMA_DONT_USE_FORTRAN_HIDDEN_ARGS)
 #cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DDEBUG=true ..
 
 
@@ -138,8 +140,8 @@ function performance_autofix() {
 #result_naming=$?
 
 keychecks_autofix
-modernize_autofix
-performance_autofix
+#modernize_autofix
+#performance_autofix
 
 
 echo "Result: " $result_naming

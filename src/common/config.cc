@@ -29,6 +29,9 @@ static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
 
+/// Print the I/Q samples in the pilots
+static constexpr bool kDebugPrintPilot = false;
+
 static const std::string kLogFilepath =
     TOSTRING(PROJECT_DIRECTORY) "/files/log/";
 static const std::string kExperimentFilepath =
@@ -284,6 +287,9 @@ Config::Config(std::string jsonfilename)
   log_listener_addr_ = tdd_conf.value("log_listener_addr", "");
   log_listener_port_ = tdd_conf.value("log_listener_port", 33300);
 
+  log_sc_num_ = tdd_conf.value("log_sc_num", 4);
+  log_timestamp_ = tdd_conf.value("log_timestamp", false);
+
   /* frame configurations */
   cp_len_ = tdd_conf.value("cp_size", 0);
   ofdm_ca_num_ = tdd_conf.value("fft_size", 2048);
@@ -326,6 +332,20 @@ Config::Config(std::string jsonfilename)
 
   bigstation_mode_ = tdd_conf.value("bigstation_mode", false);
   freq_orthogonal_pilot_ = tdd_conf.value("freq_orthogonal_pilot", false);
+  pilot_sc_group_size_ =
+      tdd_conf.value("pilot_sc_group_size", kTransposeBlockSize);
+  if (freq_orthogonal_pilot_) {
+    RtAssert(pilot_sc_group_size_ == kTransposeBlockSize,
+             "In this version, pilot_sc_group_size must be equal to Transpose "
+             "Block Size " +
+                 std::to_string(kTransposeBlockSize));
+    RtAssert(ofdm_data_num_ % pilot_sc_group_size_ == 0,
+             "ofdm_data_num must be evenly divided by pilot_sc_group_size " +
+                 std::to_string(pilot_sc_group_size_));
+    RtAssert(ue_ant_num_ <= pilot_sc_group_size_,
+             "user antennas must be no more than pilot_sc_group_size " +
+                 std::to_string(pilot_sc_group_size_));
+  }
   correct_phase_shift_ = tdd_conf.value("correct_phase_shift", false);
 
   hw_framer_ = tdd_conf.value("hw_framer", true);
@@ -355,25 +375,35 @@ Config::Config(std::string jsonfilename)
         tdd_conf.value("symbol_num_perframe", kDefaultSymbolNumPerFrame);
     size_t pilot_symbol_num_perframe = tdd_conf.value(
         "pilot_num",
-        freq_orthogonal_pilot_ ? kDefaultPilotSymPerFrame : ue_ant_num_);
+        freq_orthogonal_pilot_ ? kDefaultFreqOrthPilotSymbolNum : ue_ant_num_);
 
     size_t beacon_symbol_position = tdd_conf.value("beacon_position", SIZE_MAX);
 
-    // Start position of the first UL symbol
-    ul_data_symbol_start =
-        tdd_conf.value("ul_data_symbol_start", ul_data_symbol_start);
     ul_data_symbol_num_perframe =
         tdd_conf.value("ul_symbol_num_perframe", ul_data_symbol_num_perframe);
 
-    // Start position of the first DL symbol
-    dl_data_symbol_start =
-        tdd_conf.value("dl_data_symbol_start", dl_data_symbol_start);
+    if (ul_data_symbol_num_perframe == 0) {
+      ul_data_symbol_start = 0;
+    } else {
+      // Start position of the first UL symbol
+      ul_data_symbol_start =
+          tdd_conf.value("ul_data_symbol_start", ul_data_symbol_start);
+    }
+    const size_t ul_data_symbol_stop =
+        ul_data_symbol_start + ul_data_symbol_num_perframe;
+
+    //Dl symbols
     dl_data_symbol_num_perframe =
         tdd_conf.value("dl_symbol_num_perframe", dl_data_symbol_num_perframe);
 
-    size_t ul_data_symbol_stop =
-        ul_data_symbol_start + ul_data_symbol_num_perframe;
-    size_t dl_data_symbol_stop =
+    if (dl_data_symbol_num_perframe == 0) {
+      dl_data_symbol_start = 0;
+    } else {
+      // Start position of the first DL symbol
+      dl_data_symbol_start =
+          tdd_conf.value("dl_data_symbol_start", dl_data_symbol_start);
+    }
+    const size_t dl_data_symbol_stop =
         dl_data_symbol_start + dl_data_symbol_num_perframe;
 
     if ((ul_data_symbol_num_perframe + dl_data_symbol_num_perframe +
@@ -409,7 +439,8 @@ Config::Config(std::string jsonfilename)
     size_t first_sym_count;
     size_t second_sym_start;
     size_t second_sym_count;
-    if (dl_data_symbol_start <= ul_data_symbol_start) {
+    if ((dl_data_symbol_num_perframe > 0) &&
+        (dl_data_symbol_start <= ul_data_symbol_start)) {
       first_sym = 'D';
       first_sym_start = dl_data_symbol_start;
       first_sym_count = dl_data_symbol_num_perframe;
@@ -436,25 +467,29 @@ Config::Config(std::string jsonfilename)
       sched = "G";
     }
     sched.append(pilot_symbol_num_perframe, 'P');
-    // Could roll this up into a loop but will leave like this for readability
-    int add_symbols = 0;
     // ( )PGGGG1111111111GGGG2222222222GGGG
     if (first_sym_start > 0) {
-      add_symbols = first_sym_start - sched.length();
-      assert(add_symbols >= 0);
-      sched.append(first_sym_start - sched.length(), 'G');
-      sched.append(first_sym_count, first_sym);
+      const int guard_symbols = first_sym_start - sched.length();
+      if (guard_symbols > 0) {
+        sched.append(guard_symbols, 'G');
+      }
+      if (first_sym_count > 0) {
+        sched.append(first_sym_count, first_sym);
+      }
     }
-
     if (second_sym_start > 0) {
-      add_symbols = second_sym_start - sched.length();
-      assert(add_symbols >= 0);
-      sched.append(add_symbols, 'G');
-      sched.append(second_sym_count, second_sym);
+      const int guard_symbols = second_sym_start - sched.length();
+      if (guard_symbols > 0) {
+        sched.append(guard_symbols, 'G');
+      }
+      if (second_sym_count > 0) {
+        sched.append(second_sym_count, second_sym);
+      }
     }
-    add_symbols = symbol_num_perframe - sched.length();
-    assert(add_symbols >= 0);
-    sched.append(add_symbols, 'G');
+    const int guard_symbols = symbol_num_perframe - sched.length();
+    if (guard_symbols > 0) {
+      sched.append(guard_symbols, 'G');
+    }
 
     // Add the beacon
     if (beacon_symbol_position < sched.length()) {
@@ -466,7 +501,6 @@ Config::Config(std::string jsonfilename)
       }
       sched.replace(beacon_symbol_position, 1, "B");
     }
-
     frame_ = FrameStats(sched);
   } else {
     json jframes = tdd_conf.value("frame_schedule", json::array());
@@ -583,10 +617,23 @@ Config::Config(std::string jsonfilename)
       "Demodulation block size must be a multiple of transpose block size");
   demul_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / demul_block_size_;
 
-  beam_batch_size_ = tdd_conf.value("beam_batch_size", 1);
-  beam_block_size_ = freq_orthogonal_pilot_
-                         ? ue_ant_num_
-                         : tdd_conf.value("beam_block_size", 1);
+  beam_block_size_ = tdd_conf.value("beam_block_size", 1);
+  if (freq_orthogonal_pilot_) {
+    if (beam_block_size_ == 1) {
+      AGORA_LOG_INFO("Setting beam_block_size to pilot_sc_group_size %zu\n",
+                     pilot_sc_group_size_);
+      beam_block_size_ = pilot_sc_group_size_;
+    }
+
+    //Set beam block size to the pilot sc group size so events arn't generated for the redundant sc
+    if ((beam_block_size_ % pilot_sc_group_size_) != 0) {
+      AGORA_LOG_WARN(
+          "beam_block_size(%zu) is not a multiple of pilot_sc_group_size(%zu). "
+          "Efficiency will be decreased.  Please consider updating your "
+          "settings\n",
+          beam_block_size_, pilot_sc_group_size_);
+    }
+  }
   beam_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / beam_block_size_;
 
   fft_block_size_ = tdd_conf.value("fft_block_size", 1);
@@ -633,6 +680,8 @@ Config::Config(std::string jsonfilename)
       ul_num_bytes_per_cb_ * ul_ldpc_config_.NumBlocksInSymbol();
   ul_mac_packet_length_ = ul_data_bytes_num_persymbol_;
   // Smallest over the air packet structure
+  RtAssert(ul_mac_packet_length_ > sizeof(MacPacketHeaderPacked),
+           "MAC Packet size must be larger than MAC header size");
   ul_mac_data_length_max_ =
       ul_mac_packet_length_ - sizeof(MacPacketHeaderPacked);
 
@@ -648,6 +697,8 @@ Config::Config(std::string jsonfilename)
       dl_num_bytes_per_cb_ * dl_ldpc_config_.NumBlocksInSymbol();
   dl_mac_packet_length_ = dl_data_bytes_num_persymbol_;
   // Smallest over the air packet structure
+  RtAssert(dl_mac_packet_length_ > sizeof(MacPacketHeaderPacked),
+           "MAC Packet size must be larger than MAC header size");
   dl_mac_data_length_max_ =
       dl_mac_packet_length_ - sizeof(MacPacketHeaderPacked);
 
@@ -1446,20 +1497,11 @@ void Config::GenData() {
     CommsLib::Ifft2tx(ue_pilot_ifft[i], this->ue_specific_pilot_t_[i],
                       this->ofdm_ca_num_, this->ofdm_tx_zero_prefix_,
                       this->cp_len_, kDebugDownlink ? 1 : this->scale_);
-    if (kDebugPrintPilot == true) {
-      std::printf("ue_specific_pilot_t%zu=[", i);
-      for (size_t j = 0; j < this->ofdm_ca_num_; j++) {
-        std::printf("%2.4f+%2.4fi ", ue_pilot_ifft[i][j].re,
-                    ue_pilot_ifft[i][j].im);
-      }
-      std::printf("]\n");
-    }
   }
 
   this->pilot_ci16_.resize(samps_per_symbol_, 0);
-  CommsLib::Ifft2tx(pilot_ifft,
-                    (std::complex<int16_t>*)this->pilot_ci16_.data(),
-                    ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
+  CommsLib::Ifft2tx(pilot_ifft, this->pilot_ci16_.data(), ofdm_ca_num_,
+                    ofdm_tx_zero_prefix_, cp_len_, scale_);
 
   for (size_t i = 0; i < ofdm_ca_num_; i++) {
     this->pilot_cf32_.emplace_back(pilot_ifft[i].re / scale_,
@@ -1477,22 +1519,61 @@ void Config::GenData() {
                       pre_uint32.end());
   this->pilot_.resize(this->samps_per_symbol_);
 
-  if (kDebugPrintPilot == true) {
-    std::cout << "Pilot data: " << std::endl;
-    for (size_t i = 0; i < this->ofdm_data_num_; i++) {
-      std::cout << this->pilots_[i].re << "+1i*" << this->pilots_[i].im << ",";
+  this->pilot_ue_sc_.resize(ue_ant_num_);
+  this->pilot_ue_ci16_.resize(ue_ant_num_);
+  for (size_t ue_id = 0; ue_id < this->ue_ant_num_; ue_id++) {
+    this->pilot_ue_ci16_.at(ue_id).resize(this->frame_.NumPilotSyms());
+    for (size_t pilot_idx = 0; pilot_idx < this->frame_.NumPilotSyms();
+         pilot_idx++) {
+      this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).resize(samps_per_symbol_, 0);
+      if (this->freq_orthogonal_pilot_ || ue_id == pilot_idx) {
+        std::vector<arma::uword> pilot_sc_list;
+        for (size_t sc_id = 0; sc_id < ofdm_data_num_; sc_id++) {
+          const size_t org_sc = sc_id + ofdm_data_start_;
+          const size_t center_sc = ofdm_ca_num_ / 2;
+          // FFT Shift
+          const size_t shifted_sc = (org_sc >= center_sc)
+                                        ? (org_sc - center_sc)
+                                        : (org_sc + center_sc);
+          if (this->freq_orthogonal_pilot_ == false ||
+              sc_id % this->pilot_sc_group_size_ == ue_id) {
+            pilot_ifft[shifted_sc] = this->pilots_[sc_id];
+            pilot_sc_list.push_back(org_sc);
+          } else {
+            pilot_ifft[shifted_sc].re = 0.0f;
+            pilot_ifft[shifted_sc].im = 0.0f;
+          }
+        }
+        pilot_ue_sc_.at(ue_id) = arma::uvec(pilot_sc_list);
+        CommsLib::IFFT(pilot_ifft, this->ofdm_ca_num_, false);
+        CommsLib::Ifft2tx(pilot_ifft,
+                          this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).data(),
+                          ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
+      }
     }
-    std::cout << std::endl;
   }
 
   if (kDebugPrintPilot) {
+    std::cout << "Pilot data = [" << std::endl;
+    for (size_t sc_id = 0; sc_id < ofdm_data_num_; sc_id++) {
+      std::cout << pilots_[sc_id].re << "+1i*" << pilots_[sc_id].im << " ";
+    }
+    std::cout << std::endl << "];" << std::endl;
     for (size_t ue_id = 0; ue_id < ue_ant_num_; ue_id++) {
-      std::cout << "UE" << ue_id << "_pilot_data =[" << std::endl;
-      for (size_t i = 0; i < ofdm_data_num_; i++) {
-        std::cout << ue_specific_pilot_[ue_id][i].re << "+1i*"
-                  << ue_specific_pilot_[ue_id][i].im << " ";
+      std::cout << "pilot_ue_sc_[" << ue_id << "] = [" << std::endl
+                << pilot_ue_sc_.at(ue_id).as_row() << "];" << std::endl;
+      std::cout << "ue_specific_pilot_[" << ue_id << "] = [" << std::endl;
+      for (size_t sc_id = 0; sc_id < ofdm_data_num_; sc_id++) {
+        std::cout << ue_specific_pilot_[ue_id][sc_id].re << "+1i*"
+                  << ue_specific_pilot_[ue_id][sc_id].im << " ";
       }
-      std::cout << "];" << std::endl;
+      std::cout << std::endl << "];" << std::endl;
+      std::cout << "ue_pilot_ifft[" << ue_id << "] = [" << std::endl;
+      for (size_t ifft_idx = 0; ifft_idx < ofdm_ca_num_; ifft_idx++) {
+        std::cout << ue_pilot_ifft[ue_id][ifft_idx].re << "+1i*"
+                  << ue_pilot_ifft[ue_id][ifft_idx].im << " ";
+      }
+      std::cout << std::endl << "];" << std::endl;
     }
   }
 

@@ -144,8 +144,8 @@ int main(int argc, char* argv[]) {
       pre_ifft_data_syms[i] = data_generator.BinForIfft(modulated_codewords[i]);
     }
 
-    std::vector<complex_float> pilot_td =
-        data_generator.GetCommonPilotTimeDomain();
+    std::vector<complex_float> pilot_fd =
+        data_generator.GetCommonPilotFreqDomain();
 
     // Put pilot and data symbols together
     Table<complex_float> tx_data_all_symbols;
@@ -159,7 +159,7 @@ int main(int argc, char* argv[]) {
         for (size_t j = cfg->OfdmDataStart();
              j < cfg->OfdmDataStart() + cfg->OfdmDataNum();
              j += cfg->UeAntNum()) {
-          pilots_t_ue[i + j] = pilot_td[i + j];
+          pilots_t_ue[i + j] = pilot_fd[i + j];
         }
         // Load pilot
         std::memcpy(tx_data_all_symbols[cfg->Frame().NumBeaconSyms()] +
@@ -170,7 +170,7 @@ int main(int argc, char* argv[]) {
       for (size_t i = 0; i < cfg->UeAntNum(); i++) {
         std::memcpy(tx_data_all_symbols[i + cfg->Frame().NumBeaconSyms()] +
                         i * cfg->OfdmCaNum(),
-                    &pilot_td[0], cfg->OfdmCaNum() * sizeof(complex_float));
+                    &pilot_fd[0], cfg->OfdmCaNum() * sizeof(complex_float));
       }
     }
 
