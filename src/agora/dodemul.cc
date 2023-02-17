@@ -314,43 +314,10 @@ EventData DoDemul::Launch(size_t tag) {
     equal_t_ptr = (float*)(equaled_buffer_temp_transposed_);
     int8_t* demod_ptr = demod_buffers_[frame_slot][symbol_idx_ul][ss_id] +
                         (cfg_->ModOrderBits(Direction::kUplink) * base_sc_id);
-
-    switch (cfg_->ModOrderBits(Direction::kUplink)) {
-      case (CommsLib::kQpsk):
-        kUplinkHardDemod
-            ? DemodQpskHardLoop(equal_t_ptr,
-                                reinterpret_cast<uint8_t*>(demod_ptr),
-                                max_sc_ite)
-            : DemodQpskSoftSse(equal_t_ptr, demod_ptr, max_sc_ite);
-        break;
-      case (CommsLib::kQaM16):
-        kUplinkHardDemod
-            ? Demod16qamHardAvx2(equal_t_ptr,
-                                 reinterpret_cast<uint8_t*>(demod_ptr),
-                                 max_sc_ite)
-            : Demod16qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
-        break;
-      case (CommsLib::kQaM64):
-        kUplinkHardDemod
-            ? Demod64qamHardAvx2(equal_t_ptr,
-                                 reinterpret_cast<uint8_t*>(demod_ptr),
-                                 max_sc_ite)
-            : Demod64qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
-        break;
-      case (CommsLib::kQaM256):
-        kUplinkHardDemod
-            ? Demod256qamHardAvx2(equal_t_ptr,
-                                  reinterpret_cast<uint8_t*>(demod_ptr),
-                                  max_sc_ite)
-            : Demod256qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
-        break;
-      default:
-        std::printf("Demodulation: modulation type %s not supported!\n",
-                    cfg_->Modulation(Direction::kUplink).c_str());
-    }
+    demodulate(equal_t_ptr, demod_ptr, max_sc_ite,
+               cfg_->ModOrderBits(Direction::kUplink), kUplinkHardDemod);
     // if hard demod is enabled calculate BER with modulated bits
-    if (((kPrintPhyStats || kEnableCsvLog) &&
-        kUplinkHardDemod) &&
+    if (((kPrintPhyStats || kEnableCsvLog) && kUplinkHardDemod) &&
         (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols())) {
       size_t ue_id = mac_sched_->ScheduledUeIndex(frame_id, base_sc_id, ss_id);
       phy_stats_->UpdateDecodedBits(

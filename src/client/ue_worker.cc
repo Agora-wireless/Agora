@@ -424,43 +424,8 @@ void UeWorker::DoDemul(size_t tag) {
         demod_buffer_[frame_slot][dl_symbol_id][ant_id] +
         (config_.ModOrderBits(Direction::kDownlink) * base_sc_id);
 
-    switch (config_.ModOrderBits(Direction::kDownlink)) {
-      case (CommsLib::kQpsk):
-        kDownlinkHardDemod
-            ? DemodQpskHardLoop(equal_ptr,
-                                reinterpret_cast<uint8_t*>(demod_ptr),
-                                config_.GetOFDMDataNum())
-            : DemodQpskSoftSse(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
-        break;
-      case (CommsLib::kQaM16):
-        kDownlinkHardDemod
-            ? Demod16qamHardAvx2(equal_ptr,
-                                 reinterpret_cast<uint8_t*>(demod_ptr),
-                                 config_.GetOFDMDataNum())
-            : Demod16qamSoftAvx2(equal_ptr, demod_ptr,
-                                 config_.GetOFDMDataNum());
-        break;
-      case (CommsLib::kQaM64):
-        kDownlinkHardDemod
-            ? Demod64qamHardAvx2(equal_ptr,
-                                 reinterpret_cast<uint8_t*>(demod_ptr),
-                                 config_.GetOFDMDataNum())
-            : Demod64qamSoftAvx2(equal_ptr, demod_ptr,
-                                 config_.GetOFDMDataNum());
-        break;
-      case (CommsLib::kQaM256):
-        kDownlinkHardDemod
-            ? Demod256qamHardAvx2(equal_ptr,
-                                  reinterpret_cast<uint8_t*>(demod_ptr),
-                                  config_.GetOFDMDataNum())
-            : Demod256qamSoftAvx2(equal_ptr, demod_ptr,
-                                  config_.GetOFDMDataNum());
-        break;
-      default:
-        AGORA_LOG_INFO(
-            "UeWorker[%zu]: Demul - modulation type %s not supported!\n", tid_,
-            config_.Modulation(Direction::kDownlink).c_str());
-    }
+    demodulate(equal_ptr, demod_ptr, config_.GetOFDMDataNum(),
+               config_.ModOrderBits(Direction::kDownlink), kDownlinkHardDemod);
 
     if (kDownlinkHardDemod && (kPrintPhyStats || kEnableCsvLog) &&
         (dl_symbol_id >= config_.Frame().ClientDlPilotSymbols())) {

@@ -99,5 +99,7 @@ void Demod256qamSoftAvx2(const float* vec_in, int8_t* llr, int num);
 void Demod256qamSoftAvx512(const float* vec_in, int8_t* llr, int num);
 #endif
 void Print256Epi8(__m256i var);
+void demodulate(float* equal_ptr, int8_t* demod_ptr, size_t data_num,
+                size_t mod, bool hard_demod);
 
 #endif  // MODULATION_H_

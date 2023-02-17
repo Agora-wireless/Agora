@@ -2748,4 +2748,37 @@ void Demod256qamSoftAvx512(const float* vec_in, int8_t* llr, int num) {
   Demod256qamSoftAvx2(vec_in + 2 * next_start, llr + next_start * 8,
                       num - next_start);
 }
+
+void demodulate(float* equal_ptr, int8_t* demod_ptr, size_t data_num,
+                size_t mod, bool hard_demod) {
+  switch (mod) {
+    case 2:
+      hard_demod
+          ? DemodQpskHardLoop(equal_ptr, reinterpret_cast<uint8_t*>(demod_ptr),
+                              data_num)
+          : DemodQpskSoftSse(equal_ptr, demod_ptr, data_num);
+      break;
+    case 4:
+      hard_demod
+          ? Demod16qamHardAvx2(equal_ptr, reinterpret_cast<uint8_t*>(demod_ptr),
+                               data_num)
+          : Demod16qamSoftAvx2(equal_ptr, demod_ptr, data_num);
+      break;
+    case 6:
+      hard_demod
+          ? Demod64qamHardAvx2(equal_ptr, reinterpret_cast<uint8_t*>(demod_ptr),
+                               data_num)
+          : Demod64qamSoftAvx2(equal_ptr, demod_ptr, data_num);
+      break;
+    case 8:
+      hard_demod
+          ? Demod256qamHardAvx2(equal_ptr,
+                                reinterpret_cast<uint8_t*>(demod_ptr), data_num)
+          : Demod256qamSoftAvx2(equal_ptr, demod_ptr, data_num);
+      break;
+    default:
+      std::printf("Demodulation: modulation type %s not supported!\n",
+                  MapModToStr(mod).c_str());
+  }
+}
 #endif
