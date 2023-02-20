@@ -2748,6 +2748,7 @@ void Demod256qamSoftAvx512(const float* vec_in, int8_t* llr, int num) {
   Demod256qamSoftAvx2(vec_in + 2 * next_start, llr + next_start * 8,
                       num - next_start);
 }
+#endif
 
 void demodulate(float* equal_ptr, int8_t* demod_ptr, size_t data_num,
                 size_t mod, bool hard_demod) {
@@ -2781,4 +2782,3 @@ void demodulate(float* equal_ptr, int8_t* demod_ptr, size_t data_num,
                   MapModToStr(mod).c_str());
   }
 }
-#endif
