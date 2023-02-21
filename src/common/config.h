@@ -667,6 +667,9 @@ class Config {
   size_t dl_dir_mod_method_;
   size_t dl_dir_mod_off_ant_num_;
 
+  // Makes UEs silent eavesdroppers
+  bool dl_dir_mod_eavesdropping_;
+
   // Modulation lookup table for mapping binary bits to constellation points
   Table<complex_float> ul_mod_table_;
   Table<complex_float> dl_mod_table_;

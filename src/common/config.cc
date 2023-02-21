@@ -662,8 +662,13 @@ Config::Config(std::string jsonfilename)
   dl_dir_mod_enabled_ = dl_dir_mod_params.value("enabled", false);
   dl_dir_mod_method_ = dl_dir_mod_params.value("method", 0);
   dl_dir_mod_off_ant_num_ = dl_dir_mod_params.value("off_ant_num", 0);
+  dl_dir_mod_eavesdropping_ = dl_dir_mod_params.value("eavesdropping", false);
   if (dl_dir_mod_enabled_) {
     arma::arma_rng::set_seed_random();
+  }
+  if (dl_dir_mod_eavesdropping_) {
+    RtAssert(frame_.NumULSyms() == 0,
+             "No UL symbol is allowed in eavesdropping mode!");
   }
 
   fft_in_rru_ = tdd_conf.value("fft_in_rru", false);
@@ -1477,7 +1482,8 @@ void Config::GenData() {
     for (size_t pilot_idx = 0; pilot_idx < this->frame_.NumPilotSyms();
          pilot_idx++) {
       this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).resize(samps_per_symbol_, 0);
-      if (this->freq_orthogonal_pilot_ || ue_id == pilot_idx) {
+      if (this->dl_dir_mod_eavesdropping_ == false &&
+          (this->freq_orthogonal_pilot_ || ue_id == pilot_idx)) {
         std::vector<arma::uword> pilot_sc_list;
         for (size_t sc_id = 0; sc_id < ofdm_data_num_; sc_id++) {
           const size_t org_sc = sc_id + ofdm_data_start_;
