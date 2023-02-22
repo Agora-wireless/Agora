@@ -409,9 +409,11 @@ class Config {
   // Public functions
   void GenData();
   void GenBroadcastSlots(Table<std::complex<int16_t>>& bcast_iq_samps,
-                         size_t frame_id);
+                         size_t ctrl_msg);
+  size_t DecodeBroadcastSlots(const int16_t* const bcast_iq_samps);
   void UpdateUlMCS(const nlohmann::json& mcs);
   void UpdateDlMCS(const nlohmann::json& mcs);
+  void UpdateCtrlMCS();
 
   /// TODO document and review
   size_t GetSymbolId(size_t input_id) const;
@@ -576,6 +578,10 @@ class Config {
     return ofdm_data_num_ - GetOFDMPilotNum();
   }
 
+  inline size_t GetOFDMCtrlNum() const {
+    return ofdm_data_num_ - 2 * GetOFDMPilotNum();
+  }
+
   inline size_t GetOFDMDataIndex(size_t sc_id) const {
     return symbol_data_id_.at(sc_id);
   }
@@ -655,6 +661,8 @@ class Config {
   std::string dl_modulation_;
   size_t dl_mod_order_;
   size_t dl_mod_order_bits_;
+  size_t dl_bcast_mod_order_;
+  size_t dl_bcast_mod_order_bits_;
 
   // Modulation lookup table for mapping binary bits to constellation points
   Table<complex_float> ul_mod_table_;
