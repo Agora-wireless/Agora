@@ -120,8 +120,7 @@ RadioSetCalibrate::RadioSetCalibrate(Config* cfg, std::string calibration_type)
 
 void RadioSetCalibrate::InitRadio(size_t radio_id) {
   radios_.at(radio_id)->Init(cfg_, radio_id, cfg_->RadioId().at(radio_id),
-                             Utils::StrToChannels(cfg_->Channel()),
-                             cfg_->HwFramer());
+                             Utils::StrToChannels(cfg_->Channel()), cfg_->HwFramer(), false);
   if (calibration_type_ != "analog") {
     std::vector<double> tx_gains;
     tx_gains.emplace_back(cfg_->TxGainA());

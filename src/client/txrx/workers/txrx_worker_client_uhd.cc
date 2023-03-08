@@ -732,7 +732,7 @@ void TxRxWorkerClientUhd::TxUplinkSymbols(size_t radio_id, size_t frame_id,
       std::cout << "BAD Write (UL): For Ue " << radio_id << " " << tx_status
                 << "/" << samples_per_symbol << std::endl;
     }
-    if (true) {
+    if (false) {
       AGORA_LOG_INFO(
           "TxRxWorkerClientUhd::DoTx[%zu]: Transmitted Symbol (Frame "
           "%zu:%zu, Symbol %zu, Ue %zu) at time %lld:%lld:%lld flags %d\n",
