@@ -830,7 +830,7 @@ long long int TxRxWorkerHw::GetHwTime() {
         }
       }
     }
-    std::cout << "Start BS main recv loop..." << std::endl;
+    std::cout << "HW: Start BS main recv loop..." << std::endl;
   }  // HwFramer == false
   return hw_time;
 }

@@ -202,8 +202,8 @@ void RadioUHDSdr::Activate(Radio::ActivationTypes type, long long act_time_ns,
       "%d\n",
       SerialNumber().c_str(), Id(), act_time_ns, samples,
       static_cast<int>(type));
-  const bool is_ue = false;
-  if (is_ue) {
+  // bool is_ue_ = false;
+  if (is_ue_) {
     AGORA_LOG_INFO("setting sources to internal \n");
     dev_->set_clock_source("internal");
     dev_->set_time_source("internal");
@@ -390,7 +390,7 @@ int RadioUHDSdr::Rx(std::vector<void*>& rx_locs, size_t rx_size,
                                             rxs_->get_num_channels());
   const size_t rx_status =
       rxs_->recv(stream_buffs, rx_size, md, kRxTimeoutSec, false);
-
+  // out_flags = Radio::RxFlags::kRxFlagNone;
   const bool has_time = md.has_time_spec;
   [[maybe_unused]] const bool start_burst = md.start_of_burst;
   const bool end_burst = md.end_of_burst;

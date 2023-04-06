@@ -88,6 +88,8 @@ class Radio {
   std::string serial_number_;
   std::vector<size_t> enabled_channels_;
   bool hw_framer_{false};
+
+public:
   bool is_ue_{false};
 };
 

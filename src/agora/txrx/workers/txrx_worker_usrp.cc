@@ -15,6 +15,7 @@
 static constexpr size_t kFirstBeaconFrameAdvance = 100;
 static constexpr size_t kTxFrameAdvance = 1;
 static constexpr bool kDebugRxTimes = false;
+static constexpr bool kDebugBeacon= false;
 
 TxRxWorkerUsrp::TxRxWorkerUsrp(
     size_t core_offset, size_t tid, size_t radio_hi, size_t radio_lo,
@@ -62,6 +63,7 @@ void TxRxWorkerUsrp::DoTxRx() {
       tx_locs.at(i) = Configuration()->BeaconCi16().data();
     } else {
       tx_locs.at(i) = tx_zero_memory.at(i).data();
+      // tx_locs.at(i) = Configuration()->BeaconCi16().data();
     }
   }
 
@@ -82,6 +84,7 @@ void TxRxWorkerUsrp::DoTxRx() {
   //Keep working through any buffered samples
   const auto last_rx_time =
       DiscardRxFrames(radio_id, kFirstBeaconFrameAdvance, rx_locs);
+  // const auto last_rx_time(0);
   //Time0 is the current time (start of last rx) + total number of frame samples
   long long time0 = last_rx_time + static_cast<long long>(
                                        Configuration()->SampsPerSymbol() *
@@ -90,7 +93,26 @@ void TxRxWorkerUsrp::DoTxRx() {
   for (size_t i = 0; i < kTxFrameAdvance; i++) {
     TxBeacon(radio_id, tx_frame_number + i, tx_locs, time0);
   }
-  AGORA_LOG_INFO("Start BS main recv loop...\n");
+  // save tx beacon to file
+  if (kDebugBeacon){
+    std::ofstream outfile;
+    const std::string& file = "beacon_data.dat";
+    outfile.open(file.c_str(), std::ofstream::binary);
+    if (outfile.is_open()) {
+      std::cout<<"opened";
+      outfile.write((const char*)tx_locs.front(), Configuration()->SampsPerSymbol() * sizeof(std::vector<void*>));
+      }
+    else{
+      std::cout<<"not opened";
+    }
+    
+    if (outfile.is_open()) {
+          outfile.close();
+    }
+  }
+
+
+  AGORA_LOG_INFO("USRP: Start BS main recv loop...\n");
 
   size_t rx_frame_id = 0;
   size_t rx_symbol_id = 0;
@@ -102,8 +124,10 @@ void TxRxWorkerUsrp::DoTxRx() {
 
     //if rx is successful than update the counter / times
     // Schedule the next beacon (only on interface 0)
+    // std::cout<<"rx_symbol_id is: " << rx_symbol_id << std::endl;
     if (local_interface == 0 &&
         (rx_symbol_id == Configuration()->Frame().GetBeaconSymbol(0))) {
+      // std::cout<<"beacon sent"<<std::endl;
       TxBeacon(local_interface, rx_frame_id + kTxFrameAdvance, tx_locs, time0);
     }
 
@@ -160,7 +184,7 @@ std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(
     //Process the rx data
     if (publish_symbol) {
       const size_t ant_offset = radio_id * total_channels;
-      for (size_t ch = 0; ch < total_channels; ++ch) {
+      for (size_t ch = 0; ch < total_channels; ch++) {
         RxPacket& rx = *memory_tracking.at(ch);
         new (rx.RawPacket()) Packet(frame_id, symbol_id, 0, ant_offset + ch);
         rx_packets.push_back(rx.RawPacket());
@@ -179,7 +203,8 @@ std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(
                        rx_time_bs_);
       }
     }
-  } else {
+  } 
+  else {
     AGORA_LOG_ERROR(
         "TxRxWorkerUsrp::RecvEnqueue: Unexpected Rx return status %dn\n",
         rx_status);
@@ -390,10 +415,11 @@ long long TxRxWorkerUsrp::DiscardRxFrames(size_t radio_id,
 void TxRxWorkerUsrp::TxBeacon(size_t radio_id, size_t tx_frame_number,
                               const std::vector<void*>& tx_locs,
                               long long time0) {
+  
   long long tx_time =
       time0 + static_cast<long long>(Configuration()->SampsPerSymbol() *
                                      Configuration()->Frame().NumTotalSyms() *
-                                     tx_frame_number);
+                                     tx_frame_number - 0 * Configuration()->SampsPerSymbol());
   const int tx_ret = radio_config_.RadioTx(
       radio_id, tx_locs.data(), Radio::TxFlags::kStartEndTransmit, tx_time);
   if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
@@ -402,4 +428,5 @@ void TxRxWorkerUsrp::TxBeacon(size_t radio_id, size_t tx_frame_number,
         Configuration()->SampsPerSymbol(), tx_time, tx_frame_number);
   }
   tx_time_bs_ = tx_time;
+  // tx_time_bs_ = time0 + static_cast<long long>(Configuration()->SampsPerSymbol() * (Configuration()->Frame().NumTotalSyms()) * tx_frame_number);
 }
