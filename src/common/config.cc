@@ -1714,11 +1714,12 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
 }
 
 void Config::GenBroadcastSlots(Table<std::complex<int16_t>>& bcast_iq_samps,
-                               size_t ctrl_msg) {
+                               std::vector<size_t> ctrl_msg) {
   /*dl_bcast_iq_t.Calloc(this->frame_.NumDLBcastSyms(), samps_per_symbol_,
                       Agora_memory::Alignment_t::kAlign64);*/
   assert(bcast_iq_samps.Dim1() == this->frame_.NumDLBcastSyms() &&
          bcast_iq_samps.Dim2() == samps_per_symbol_);
+  assert(ctrl_msg.size() == this->frame_.NumDLBcastSyms());
 
   int num_bcast_bytes = dl_bcast_ldpc_config_.NumCbLen() / 8;
   int num_bcast_bytes_padded = Roundup<64>(num_bcast_bytes);
@@ -1727,10 +1728,6 @@ void Config::GenBroadcastSlots(Table<std::complex<int16_t>>& bcast_iq_samps,
       static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::kAlign64, num_bcast_bytes_padded));
   std::memset(bcast_bits_buffer, 0u, num_bcast_bytes_padded);
-  const int8_t* tmp =
-      static_cast<const int8_t*>(static_cast<const void*>(&ctrl_msg));
-
-  std::memcpy(bcast_bits_buffer, tmp, sizeof(size_t));
 
   const size_t dl_bcast_encoded_bytes =
       BitsToBytes(this->dl_bcast_ldpc_config_.NumCbCodewLen());
@@ -1764,6 +1761,11 @@ void Config::GenBroadcastSlots(Table<std::complex<int16_t>>& bcast_iq_samps,
                           Agora_memory::Alignment_t::kAlign64);
   auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
   for (size_t i = 0; i < this->frame_.NumDLBcastSyms(); i++) {
+    const int8_t* tmp =
+        static_cast<const int8_t*>(static_cast<const void*>(&ctrl_msg.at(i)));
+
+    std::memcpy(bcast_bits_buffer, tmp, sizeof(size_t));
+
     int8_t* coded_bits_ptr = dl_bcast_encoded_bits[i];
 
     if (scramble_enabled_) {

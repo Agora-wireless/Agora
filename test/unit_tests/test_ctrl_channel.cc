@@ -19,11 +19,12 @@ TEST(TestControl, VerifyCorrectness) {
   data_buffer.Calloc(cfg->Frame().NumDLBcastSyms(), cfg->SampsPerSymbol(),
                      Agora_memory::Alignment_t::kAlign64);
 
-  size_t msg = 2534;
+  std::vector<size_t> msg;
+  msg.push_back(4);
   cfg->GenBroadcastSlots(data_buffer, msg);
   auto decoded_msg =
       cfg->DecodeBroadcastSlots(reinterpret_cast<int16_t*>(data_buffer[0]));
-  ASSERT_EQ(msg, decoded_msg);
+  ASSERT_EQ(msg.at(0), decoded_msg);
   data_buffer.Free();
 }
 

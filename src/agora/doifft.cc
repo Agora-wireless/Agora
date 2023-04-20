@@ -52,7 +52,8 @@ EventData DoIFFT::Launch(size_t tag) {
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ant_id = gen_tag_t(tag).ant_id_;
 
-  const size_t symbol_idx_dl = cfg_->Frame().GetDLSymbolIdx(symbol_id);
+  const size_t symbol_idx_dl =
+      cfg_->Frame().GetDLSymbolIdx(symbol_id) + cfg_->Frame().NumDLBcastSyms();
 
   if (kDebugPrintInTask) {
     std::printf("In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n",

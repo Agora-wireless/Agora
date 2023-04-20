@@ -45,17 +45,24 @@ void AgoraBuffer::AllocateTables() {
       config_->Frame().ClientUlPilotSymbols() * config_->SpatialStreamsNum(),
       Agora_memory::Alignment_t::kAlign64);
 
-  // Downlink
-  if (config_->Frame().NumDLSyms() > 0) {
-    const size_t task_buffer_symbol_num =
-        config_->Frame().NumDLSyms() * kFrameWnd;
+  // Downlink Control + Data
+  if (config_->Frame().NumDLBcastSyms() + config_->Frame().NumDLSyms() > 0) {
+    const size_t socket_buffer_symbol_num =
+        kFrameWnd *
+        (config_->Frame().NumDLBcastSyms() + config_->Frame().NumDLSyms());
 
     size_t dl_socket_buffer_status_size =
-        config_->BsAntNum() * task_buffer_symbol_num;
+        config_->BsAntNum() * socket_buffer_symbol_num;
     size_t dl_socket_buffer_size =
         config_->DlPacketLength() * dl_socket_buffer_status_size;
     AllocBuffer1d(&dl_socket_buffer_, dl_socket_buffer_size,
                   Agora_memory::Alignment_t::kAlign64, 1);
+  }
+
+  // Downlink Data
+  if (config_->Frame().NumDLSyms() > 0) {
+    const size_t task_buffer_symbol_num =
+        kFrameWnd * config_->Frame().NumDLSyms();
 
     size_t dl_bits_buffer_size =
         kFrameWnd * config_->MacBytesNumPerframe(Direction::kDownlink);
@@ -99,8 +106,6 @@ void AgoraBuffer::AllocateTables() {
         task_buffer_symbol_num,
         Roundup<64>(config_->GetOFDMDataNum()) * config_->SpatialStreamsNum(),
         Agora_memory::Alignment_t::kAlign64);
-    AllocBuffer1d(&dl_bcast_mod_buffer_, Roundup<64>(config_->GetOFDMDataNum()),
-                  Agora_memory::Alignment_t::kAlign64, 1);
   }
 }
 
@@ -121,8 +126,10 @@ void AgoraBuffer::FreeTables() {
     calib_ul_msum_buffer_.Free();
     calib_buffer_.Free();
     dl_mod_bits_buffer_.Free();
-    FreeBuffer1d(&dl_bcast_mod_buffer_);
     dl_bits_buffer_.Free();
     dl_bits_buffer_status_.Free();
   }
+
+  // Control
+  dl_bcast_socket_buffer_.Free();
 }

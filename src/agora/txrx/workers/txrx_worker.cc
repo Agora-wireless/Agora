@@ -158,12 +158,16 @@ void TxRxWorker::ReturnRxPacket(RxPacket& unused_packet) {
 
 //Returns the location of the tx packet for a given frame / symbol / antenna
 Packet* TxRxWorker::GetTxPacket(size_t frame, size_t symbol, size_t ant) {
-  const size_t data_symbol_idx_dl =
-      Configuration()->Frame().GetDLSymbolIdx(symbol);
-  const size_t offset =
-      (Configuration()->GetTotalDataSymbolIdxDl(frame, data_symbol_idx_dl) *
-       Configuration()->BsAntNum()) +
-      ant;
+  const size_t symbol_idx_dl =
+      symbol < Configuration()->Frame().GetDLSymbol(0)
+          ? Configuration()->Frame().GetDLBcastSymbol(symbol)
+          : Configuration()->Frame().GetDLSymbolIdx(symbol) +
+                Configuration()->Frame().NumDLBcastSyms();
+  const size_t total_symbol_idx =
+      (frame % kFrameWnd) * (Configuration()->Frame().GetDLBcastSymbol(symbol) +
+                             Configuration()->Frame().NumDLSyms()) +
+      symbol_idx_dl;
+  const size_t offset = (total_symbol_idx * Configuration()->BsAntNum()) + ant;
 
   return reinterpret_cast<Packet*>(
       &tx_memory_[offset * Configuration()->DlPacketLength()]);

@@ -332,6 +332,45 @@ void TxRxWorkerHw::TxBeaconHw(size_t frame_id, size_t interface_id,
   }
 }
 
+void TxRxWorkerHw::TxBcastSymbolHw(size_t frame_id, size_t interface_id,
+                                   long long time0) {
+  RtAssert(Configuration()->Frame().NumDLBcastSyms() > 0,
+           "Number of broadcast symbols > 0 when TxBcastSymbolHw was called");
+  const auto bcast_symbol_id = Configuration()->Frame().GetDLBcastSymbol(0);
+  const size_t radio_id = interface_id + interface_offset_;
+
+  //We can just point the tx to the same zeros location, no need to make more
+  std::vector<const void*> tx_buffs(Configuration()->NumChannels(),
+                                    zeros_.data());
+
+  const size_t bcast_radio =
+      Configuration()->BeaconAnt() / Configuration()->NumChannels();
+  const size_t bcast_ch =
+      Configuration()->BeaconAnt() % Configuration()->NumChannels();
+
+  if (bcast_radio == radio_id) {
+    auto* pkt = GetTxPacket(frame_id, bcast_symbol_id, bcast_ch);
+    tx_buffs.at(bcast_ch) =
+        reinterpret_cast<void*>(pkt->data_);  // read from bcast buffer
+  }
+
+  // assuming beacon is first symbol
+  long long frame_time =
+      time0 + (Configuration()->SampsPerSymbol() *
+               ((frame_id * Configuration()->Frame().NumTotalSyms()) +
+                bcast_symbol_id));
+
+  const int tx_ret =
+      radio_config_.RadioTx(radio_id, tx_buffs.data(),
+                            GetTxFlags(radio_id, bcast_symbol_id), frame_time);
+
+  if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
+    std::cerr << "BAD Transmit on radio " << radio_id << " - status " << tx_ret
+              << ",  expected " << Configuration()->SampsPerSymbol()
+              << " at Time " << frame_time << std::endl;
+  }
+}
+
 //Called when finished with the last antenna of the given radio
 // C / L symbols must occur before the downlink D symbols.
 // Could move this to the main agora tx scheduler which should simplify the tx logic
@@ -491,6 +530,10 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
         // Schedule beacon in the future
         if (Configuration()->HwFramer() == false) {
           TxBeaconHw(tx_frame_id, radio_id, time0);
+        }
+
+        if (Configuration()->Frame().NumDLBcastSyms() > 0) {
+          TxBcastSymbolHw(tx_frame_id, radio_id, time0);
         }
 
         if (Configuration()->Frame().IsRecCalEnabled()) {
