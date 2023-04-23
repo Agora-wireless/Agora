@@ -24,6 +24,17 @@ MacScheduler::MacScheduler(Config* const cfg) : cfg_(cfg) {
       }
     }
   }
+
+  ul_mcs_buffer_.Calloc(num_groups_, cfg_->UeAntNum(),
+                        Agora_memory::Alignment_t::kAlign64);
+  dl_mcs_buffer_.Calloc(num_groups_, cfg_->UeAntNum(),
+                        Agora_memory::Alignment_t::kAlign64);
+  for (size_t gp = 0u; gp < num_groups_; gp++) {
+    for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
+      ul_mcs_buffer_[gp][ue] = cfg_->McsIndex(Direction::kUplink);
+      dl_mcs_buffer_[gp][ue] = cfg_->McsIndex(Direction::kDownlink);
+    }
+  }
 }
 
 bool MacScheduler::IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id) {
@@ -49,4 +60,14 @@ arma::uvec MacScheduler::ScheduledUeList(size_t frame_id, size_t sc_id) {
       reinterpret_cast<unsigned long long*>(
           &schedule_buffer_index_[gp][cfg_->SpatialStreamsNum() * sc_id]),
       cfg_->SpatialStreamsNum(), false));
+}
+
+size_t MacScheduler::ScheduledUeUlMcs(size_t frame_id, size_t ue_id) {
+  size_t gp = frame_id % num_groups_;
+  return ul_mcs_buffer_[gp][ue_id];
+}
+
+size_t MacScheduler::ScheduledUeDlMcs(size_t frame_id, size_t ue_id) {
+  size_t gp = frame_id % num_groups_;
+  return dl_mcs_buffer_[gp][ue_id];
 }

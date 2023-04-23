@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <utility>
 
+#include "comms-constants.inc"
 #include "comms-lib.h"
 #include "datatype_conversion.h"
 #include "gettime.h"
@@ -685,8 +686,9 @@ Config::Config(std::string jsonfilename)
       ul_num_bytes_per_cb_ * ul_ldpc_config_.NumBlocksInSymbol();
   ul_mac_packet_length_ = ul_data_bytes_num_persymbol_;
   // Smallest over the air packet structure
-  RtAssert(ul_mac_packet_length_ > sizeof(MacPacketHeaderPacked),
-           "MAC Packet size must be larger than MAC header size");
+  RtAssert(this->frame_.NumULSyms() == 0 ||
+               ul_mac_packet_length_ > sizeof(MacPacketHeaderPacked),
+           "Uplink MAC Packet size must be larger than MAC header size");
   ul_mac_data_length_max_ =
       ul_mac_packet_length_ - sizeof(MacPacketHeaderPacked);
 
@@ -702,8 +704,9 @@ Config::Config(std::string jsonfilename)
       dl_num_bytes_per_cb_ * dl_ldpc_config_.NumBlocksInSymbol();
   dl_mac_packet_length_ = dl_data_bytes_num_persymbol_;
   // Smallest over the air packet structure
-  RtAssert(dl_mac_packet_length_ > sizeof(MacPacketHeaderPacked),
-           "MAC Packet size must be larger than MAC header size");
+  RtAssert(this->frame_.NumDLSyms() == 0 ||
+               dl_mac_packet_length_ > sizeof(MacPacketHeaderPacked),
+           "Downlink MAC Packet size must be larger than MAC header size");
   dl_mac_data_length_max_ =
       dl_mac_packet_length_ - sizeof(MacPacketHeaderPacked);
 
@@ -798,59 +801,82 @@ json Config::Parse(const json& in_json, const std::string& json_handle) {
   return out_json;
 }
 
-void Config::UpdateUlMCS(const json& ul_mcs) {
-  ul_modulation_ = ul_mcs.value("modulation", "16QAM");
-  ul_mod_order_bits_ = kModulStringMap.at(ul_modulation_);
-  ul_mod_order_ = static_cast<size_t>(pow(2, ul_mod_order_bits_));
-  InitModulationTable(this->ul_mod_table_, ul_mod_order_);
-
-  double ul_code_rate = ul_mcs.value("code_rate", 0.333);
-  RtAssert(
-      ul_code_rate <= 8.0 / 9.0 && ul_code_rate >= 0.1,
-      "Invalid UL code rate! It must be a real number between 1/10 and 8/9.");
-  uint16_t base_graph = ul_mcs.value("base_graph", 1);
-  bool early_term = ul_mcs.value("earlyTermination", true);
-  int16_t max_decoder_iter = ul_mcs.value("decoderIter", 5);
-
-  // Set of LDPC lifting size Zc, from TS38.212 Table 5.3.2-1
-  std::vector<size_t> zc_vec = {
-      2,   4,   8,   16, 32, 64,  128, 256, 3,   6,   12,  24, 48,
-      96,  192, 384, 5,  10, 20,  40,  80,  160, 320, 7,   14, 28,
-      56,  112, 224, 9,  18, 36,  72,  144, 288, 11,  22,  44, 88,
-      176, 352, 13,  26, 52, 104, 208, 15,  30,  60,  120, 240};
+inline size_t select_zc(size_t base_graph, size_t code_rate,
+                        size_t mod_order_bits, size_t num_sc, size_t cb_per_sym,
+                        std::string dir) {
+  size_t n_zc = sizeof(kZc) / sizeof(size_t);
+  std::vector<size_t> zc_vec(kZc, kZc + n_zc);
   std::sort(zc_vec.begin(), zc_vec.end());
   // According to cyclic_shift.cc cyclic shifter for zc
   // larger than 256 has not been implemented, so we skip them here.
   size_t max_zc_index =
       (std::find(zc_vec.begin(), zc_vec.end(), kMaxSupportedZc) -
        zc_vec.begin());
-  size_t max_uplink_uncoded_bits =
-      size_t(this->OfdmDataNum() * ul_code_rate * ul_mod_order_bits_);
+  size_t max_uncoded_bits =
+      static_cast<size_t>(num_sc * code_rate * mod_order_bits / 1024.0);
   size_t zc = SIZE_MAX;
   size_t i = 0;
   for (; i < max_zc_index; i++) {
-    if ((zc_vec.at(i) * LdpcNumInputCols(base_graph) * kCbPerSymbol <
-         max_uplink_uncoded_bits) &&
-        (zc_vec.at(i + 1) * LdpcNumInputCols(base_graph) * kCbPerSymbol >
-         max_uplink_uncoded_bits)) {
+    if ((zc_vec.at(i) * LdpcNumInputCols(base_graph) * cb_per_sym <
+         max_uncoded_bits) &&
+        (zc_vec.at(i + 1) * LdpcNumInputCols(base_graph) * cb_per_sym >
+         max_uncoded_bits)) {
       zc = zc_vec.at(i);
       break;
     }
   }
   if (zc == SIZE_MAX) {
     AGORA_LOG_WARN(
-        "Exceeded possible range of LDPC lifting Zc for uplink! Setting "
-        "lifting size to max possible value(%zu).\nThis may lead to too many "
-        "unused subcarriers. For better use of the PHY resources, you may "
-        "reduce your coding or modulation rate.\n",
+        "Exceeded possible range of LDPC lifting Zc for " + dir +
+            "! Setting "
+            "lifting size to max possible value(%zu).\nThis may lead to too "
+            "many "
+            "unused subcarriers. For better use of the PHY resources, you may "
+            "reduce your coding or modulation rate.\n",
         kMaxSupportedZc);
     zc = kMaxSupportedZc;
   }
+  return zc;
+}
 
-  // Always positive since ul_code_rate is smaller than 1
-  size_t num_rows = static_cast<size_t>(std::round(
-                        LdpcNumInputCols(base_graph) / ul_code_rate)) -
-                    (LdpcNumInputCols(base_graph) - 2);
+void Config::UpdateUlMCS(const json& ul_mcs) {
+  if (ul_mcs.find("mcs_index") == ul_mcs.end()) {
+    ul_modulation_ = ul_mcs.value("modulation", "16QAM");
+    ul_mod_order_bits_ = kModulStringMap.at(ul_modulation_);
+
+    double ul_code_rate_usr = ul_mcs.value("code_rate", 0.333);
+    size_t code_rate_int =
+        static_cast<size_t>(std::round(ul_code_rate_usr * 1024.0));
+
+    ul_mcs_index_ = CommsLib::GetMcsIndex(ul_mod_order_bits_, code_rate_int);
+    ul_code_rate_ = GetCodeRate(ul_mcs_index_);
+    if (ul_code_rate_ / 1024.0 != ul_code_rate_usr) {
+      AGORA_LOG_WARN(
+          "Rounded the user-defined uplink code rate to the closest standard "
+          "rate %zu/1024.\n",
+          ul_code_rate_);
+    }
+  } else {
+    ul_mcs_index_ = ul_mcs.value("mcs_index", 10);  // 16QAM, 340/1024
+    ul_mod_order_bits_ = GetModOrderBits(ul_mcs_index_);
+    ul_code_rate_ = GetCodeRate(ul_mcs_index_);
+  }
+  ul_mod_order_ = static_cast<size_t>(pow(2, ul_mod_order_bits_));
+  InitModulationTable(this->ul_mod_table_, ul_mod_order_);
+
+  // TODO: find the optimal base_graph
+  uint16_t base_graph = ul_mcs.value("base_graph", 1);
+  bool early_term = ul_mcs.value("earlyTermination", true);
+  int16_t max_decoder_iter = ul_mcs.value("decoderIter", 5);
+
+  size_t zc = select_zc(base_graph, ul_code_rate_, ul_mod_order_bits_,
+                        ofdm_data_num_, kCbPerSymbol, "uplink");
+
+  // Always positive since ul_code_rate is smaller than 1024
+  size_t num_rows =
+      static_cast<size_t>(
+          std::round(1024.0 * LdpcNumInputCols(base_graph) / ul_code_rate_)) -
+      (LdpcNumInputCols(base_graph) - 2);
 
   uint32_t num_cb_len = LdpcNumInputBits(base_graph, zc);
   uint32_t num_cb_codew_len = LdpcNumEncodedBits(base_graph, zc, num_rows);
@@ -866,58 +892,42 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
 }
 
 void Config::UpdateDlMCS(const json& dl_mcs) {
-  dl_modulation_ = dl_mcs.value("modulation", "16QAM");
-  dl_mod_order_bits_ = kModulStringMap.at(dl_modulation_);
+  if (dl_mcs.find("mcs_index") == dl_mcs.end()) {
+    dl_modulation_ = dl_mcs.value("modulation", "16QAM");
+    dl_mod_order_bits_ = kModulStringMap.at(dl_modulation_);
+
+    double dl_code_rate_usr = dl_mcs.value("code_rate", 0.333);
+    size_t code_rate_int =
+        static_cast<size_t>(std::round(dl_code_rate_usr * 1024.0));
+    dl_mcs_index_ = CommsLib::GetMcsIndex(dl_mod_order_bits_, code_rate_int);
+    dl_code_rate_ = GetCodeRate(dl_mcs_index_);
+    if (dl_code_rate_ / 1024.0 != dl_code_rate_usr) {
+      AGORA_LOG_WARN(
+          "Rounded the user-defined downlink code rate to the closest standard "
+          "rate %zu/1024.\n",
+          dl_code_rate_);
+    }
+  } else {
+    dl_mcs_index_ = dl_mcs.value("mcs_index", 10);  // 16QAM, 340/1024
+    dl_mod_order_bits_ = GetModOrderBits(dl_mcs_index_);
+    dl_code_rate_ = GetCodeRate(dl_mcs_index_);
+  }
   dl_mod_order_ = static_cast<size_t>(pow(2, dl_mod_order_bits_));
   InitModulationTable(this->dl_mod_table_, dl_mod_order_);
 
-  double dl_code_rate = dl_mcs.value("code_rate", 0.333);
-  RtAssert(
-      dl_code_rate <= 8.0 / 9.0 && dl_code_rate >= 0.1,
-      "Invalid DL code rate! It must be a real number between 1/10 and 8/9.");
+  // TODO: find the optimal base_graph
   uint16_t base_graph = dl_mcs.value("base_graph", 1);
   bool early_term = dl_mcs.value("earlyTermination", true);
   int16_t max_decoder_iter = dl_mcs.value("decoderIter", 5);
 
-  // Set of LDPC lifting size Zc, from TS38.212 Table 5.3.2-1
-  std::vector<size_t> zc_vec = {
-      2,   4,   8,   16, 32, 64,  128, 256, 3,   6,   12,  24, 48,
-      96,  192, 384, 5,  10, 20,  40,  80,  160, 320, 7,   14, 28,
-      56,  112, 224, 9,  18, 36,  72,  144, 288, 11,  22,  44, 88,
-      176, 352, 13,  26, 52, 104, 208, 15,  30,  60,  120, 240};
-  std::sort(zc_vec.begin(), zc_vec.end());
-  // According to cyclic_shift.cc cyclic shifter for zc
-  // larger than 256 has not been implemented, so we skip them here.
-  const size_t max_zc_index =
-      (std::find(zc_vec.begin(), zc_vec.end(), kMaxSupportedZc) -
-       zc_vec.begin());
-  size_t max_downlink_uncoded_bits =
-      size_t(this->GetOFDMDataNum() * dl_code_rate * dl_mod_order_bits_);
-  size_t zc = SIZE_MAX;
-  size_t i = 0;
-  for (; i < max_zc_index; i++) {
-    if ((zc_vec.at(i) * LdpcNumInputCols(base_graph) * kCbPerSymbol <
-         max_downlink_uncoded_bits) &&
-        (zc_vec.at(i + 1) * LdpcNumInputCols(base_graph) * kCbPerSymbol >
-         max_downlink_uncoded_bits)) {
-      zc = zc_vec.at(i);
-      break;
-    }
-  }
-  if (zc == SIZE_MAX) {
-    AGORA_LOG_WARN(
-        "Exceeded possible range of LDPC lifting Zc for downlink! Setting "
-        "lifting size to max possible value(%zu).\nThis may lead to too many "
-        "unused subcarriers. For better use of the PHY resources, you may "
-        "reduce your coding or modulation rate.",
-        kMaxSupportedZc);
-    zc = kMaxSupportedZc;
-  }
+  size_t zc = select_zc(base_graph, dl_code_rate_, dl_mod_order_bits_,
+                        GetOFDMDataNum(), kCbPerSymbol, "downlink");
 
-  // Always positive since dl_code_rate is smaller than 1
-  size_t num_rows = static_cast<size_t>(std::round(
-                        LdpcNumInputCols(base_graph) / dl_code_rate)) -
-                    (LdpcNumInputCols(base_graph) - 2);
+  // Always positive since dl_code_rate is smaller than 1024
+  size_t num_rows =
+      static_cast<size_t>(
+          std::round(1024.0 * LdpcNumInputCols(base_graph) / dl_code_rate_)) -
+      (LdpcNumInputCols(base_graph) - 2);
 
   uint32_t num_cb_len = LdpcNumInputBits(base_graph, zc);
   uint32_t num_cb_codew_len = LdpcNumEncodedBits(base_graph, zc, num_rows);
@@ -931,61 +941,29 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
       "Downlink LDPC expansion factor is too large for number of OFDM data "
       "subcarriers.");
 }
+
 void Config::UpdateCtrlMCS() {
   if (this->frame_.NumDLBcastSyms() > 0) {
     const size_t bcast_base_graph = 1;
-    const double dl_bcast_code_rate = 1.0 / 3;
+    const size_t dl_bcast_code_rate = 340;
     dl_bcast_mod_order_ = 16;
     dl_bcast_mod_order_bits_ = 4;
     const int16_t max_decoder_iter = 5;
-    // Set of LDPC lifting size Zc, from TS38.212 Table 5.3.2-1
-    std::vector<size_t> zc_vec = {
-        2,   4,   8,   16, 32, 64,  128, 256, 3,   6,   12,  24, 48,
-        96,  192, 384, 5,  10, 20,  40,  80,  160, 320, 7,   14, 28,
-        56,  112, 224, 9,  18, 36,  72,  144, 288, 11,  22,  44, 88,
-        176, 352, 13,  26, 52, 104, 208, 15,  30,  60,  120, 240};
-    std::sort(zc_vec.begin(), zc_vec.end());
-    // According to cyclic_shift.cc cyclic shifter for zc
-    // larger than 256 has not been implemented, so we skip them here.
-    const size_t max_zc_index =
-        (std::find(zc_vec.begin(), zc_vec.end(), kMaxSupportedZc) -
-         zc_vec.begin());
-    const size_t max_dl_bcast_uncoded_bits = static_cast<size_t>(
-        std::floor(this->GetOFDMCtrlNum() * dl_bcast_code_rate *
-                   dl_bcast_mod_order_bits_));
-    std::cout << max_dl_bcast_uncoded_bits << std::endl;
-    size_t bcast_zc = SIZE_MAX;
-    bool early_term = true;
-    for (size_t i = 0; i < max_zc_index; i++) {
-      if ((zc_vec.at(i) * LdpcNumInputCols(bcast_base_graph) * kCbPerSymbol <
-           max_dl_bcast_uncoded_bits) &&
-          (zc_vec.at(i + 1) * LdpcNumInputCols(bcast_base_graph) *
-               kCbPerSymbol >
-           max_dl_bcast_uncoded_bits)) {
-        bcast_zc = zc_vec.at(i);
-        break;
-      }
-    }
-    if (bcast_zc == SIZE_MAX) {
-      AGORA_LOG_WARN(
-          "Exceeded possible range of LDPC lifting Zc for downlink broadcast! "
-          "Setting lifting size to max possible value(%zu).\nThis may lead to "
-          "too many unused subcarriers. For better use of the PHY resources, "
-          "you may reduce your coding or modulation rate.",
-          kMaxSupportedZc);
-      bcast_zc = kMaxSupportedZc;
-    }
+    size_t bcast_zc = select_zc(
+        bcast_base_graph, dl_bcast_code_rate, dl_bcast_mod_order_bits_,
+        this->GetOFDMCtrlNum(), kCbPerSymbol, "downlink broadcast");
+
     // Always positive since dl_code_rate is smaller than 1
     size_t bcast_num_rows =
-        static_cast<size_t>(std::round(LdpcNumInputCols(bcast_base_graph) /
-                                       dl_bcast_code_rate)) -
+        static_cast<size_t>(std::round(
+            1024.0 * LdpcNumInputCols(bcast_base_graph) / dl_bcast_code_rate)) -
         (LdpcNumInputCols(bcast_base_graph) - 2);
 
     uint32_t bcast_num_cb_len = LdpcNumInputBits(bcast_base_graph, bcast_zc);
     uint32_t bcast_num_cb_codew_len =
         LdpcNumEncodedBits(bcast_base_graph, bcast_zc, bcast_num_rows);
     dl_bcast_ldpc_config_ =
-        LDPCconfig(bcast_base_graph, bcast_zc, max_decoder_iter, early_term,
+        LDPCconfig(bcast_base_graph, bcast_zc, max_decoder_iter, true,
                    bcast_num_cb_len, bcast_num_cb_codew_len, bcast_num_rows, 0);
 
     dl_bcast_ldpc_config_.NumBlocksInSymbol(

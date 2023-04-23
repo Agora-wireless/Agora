@@ -518,7 +518,7 @@ void Agora::Start() {
         case EventType::kRANUpdate: {
           RanConfig rc;
           rc.n_antennas_ = event.tags_[0];
-          rc.mod_order_bits_ = event.tags_[1];
+          rc.mcs_index_ = event.tags_[1];
           rc.frame_id_ = event.tags_[2];
           UpdateRanConfig(rc);
         } break;
@@ -917,7 +917,7 @@ void Agora::HandleEventFft(size_t tag) {
 
 void Agora::UpdateRanConfig(RanConfig rc) {
   nlohmann::json msc_params = config_->MCSParams(Direction::kUplink);
-  msc_params["modulation"] = MapModToStr(rc.mod_order_bits_);
+  msc_params["mcs_index"] = rc.mcs_index_;
   config_->UpdateUlMCS(msc_params);
 }
 

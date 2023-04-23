@@ -300,6 +300,10 @@ static constexpr size_t kMaxChannels = 2;
 // helps reduce false cache line sharing.
 static constexpr size_t kMaxModType = 8;
 
+// An arbitrary setting for default Mcs for Data symbols
+// 16QAM modulation and 340/1024 code rate
+static constexpr size_t kDefaultMcsIndex = 10;
+
 // Number of cellular frames tracked by Agora stats
 static constexpr size_t kNumStatsFrames = 10000;
 

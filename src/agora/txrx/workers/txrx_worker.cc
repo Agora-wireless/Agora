@@ -160,11 +160,11 @@ void TxRxWorker::ReturnRxPacket(RxPacket& unused_packet) {
 Packet* TxRxWorker::GetTxPacket(size_t frame, size_t symbol, size_t ant) {
   const size_t symbol_idx_dl =
       symbol < Configuration()->Frame().GetDLSymbol(0)
-          ? Configuration()->Frame().GetDLBcastSymbol(symbol)
+          ? Configuration()->Frame().GetDLBcastSymbolIdx(symbol)
           : Configuration()->Frame().GetDLSymbolIdx(symbol) +
                 Configuration()->Frame().NumDLBcastSyms();
   const size_t total_symbol_idx =
-      (frame % kFrameWnd) * (Configuration()->Frame().GetDLBcastSymbol(symbol) +
+      (frame % kFrameWnd) * (Configuration()->Frame().NumDLBcastSyms() +
                              Configuration()->Frame().NumDLSyms()) +
       symbol_idx_dl;
   const size_t offset = (total_symbol_idx * Configuration()->BsAntNum()) + ant;

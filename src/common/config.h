@@ -298,6 +298,10 @@ class Config {
   inline size_t SubcarrierPerCodeBlock(Direction dir) const {
     return this->LdpcConfig(dir).NumCbCodewLen() / this->ModOrderBits(dir);
   }
+  inline size_t McsIndex(Direction dir) const {
+    return dir == Direction::kUplink ? this->ul_mcs_index_
+                                     : this->dl_mcs_index_;
+  }
 
   inline bool ScrambleEnabled() const { return this->scramble_enabled_; }
 
@@ -411,8 +415,8 @@ class Config {
   void GenBroadcastSlots(Table<std::complex<int16_t>>& bcast_iq_samps,
                          std::vector<size_t> ctrl_msg);
   size_t DecodeBroadcastSlots(const int16_t* const bcast_iq_samps);
-  void UpdateUlMCS(const nlohmann::json& mcs);
-  void UpdateDlMCS(const nlohmann::json& mcs);
+  void UpdateUlMCS(const nlohmann::json& ul_mcs_params);
+  void UpdateDlMCS(const nlohmann::json& dl_mcs_params);
   void UpdateCtrlMCS();
 
   /// TODO document and review
@@ -673,6 +677,10 @@ class Config {
   LDPCconfig dl_bcast_ldpc_config_;  // Downlink Broadcast LDPC parameters
   nlohmann::json ul_mcs_params_;     // Uplink Modulation and Coding (MCS)
   nlohmann::json dl_mcs_params_;     // Downlink Modulation and Coding (MCS)
+  size_t ul_mcs_index_;
+  size_t dl_mcs_index_;
+  size_t dl_code_rate_;
+  size_t ul_code_rate_;
   bool scramble_enabled_;
 
   // A class that holds the frame configuration the id contains letters

@@ -17,11 +17,15 @@ class MacScheduler {
   size_t ScheduledUeIndex(size_t frame_id, size_t sc_id, size_t sched_ue_id);
   arma::uvec ScheduledUeList(size_t frame_id, size_t sc_id);
   arma::uvec ScheduledUeMap(size_t frame_id, size_t sc_id);
+  size_t ScheduledUeUlMcs(size_t frame_id, size_t ue_id);
+  size_t ScheduledUeDlMcs(size_t frame_id, size_t ue_id);
 
  private:
   size_t num_groups_;
   Table<int> schedule_buffer_;
   Table<size_t> schedule_buffer_index_;
+  Table<size_t> ul_mcs_buffer_;
+  Table<size_t> dl_mcs_buffer_;
   Config* const cfg_;
 };
 

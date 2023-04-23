@@ -102,7 +102,7 @@ void MacThreadBaseStation::ProcessSnrReportFromPhy(EventData event) {
 void MacThreadBaseStation::SendRanConfigUpdate(EventData /*event*/) {
   RanConfig rc;
   rc.n_antennas_ = 0;  // TODO [arjun]: What's the correct value here?
-  rc.mod_order_bits_ = cfg_->ModOrderBits(Direction::kUplink);
+  rc.mcs_index_ = cfg_->McsIndex(Direction::kUplink);
   rc.frame_id_ = scheduler_next_frame_id_;
   // TODO: change n_antennas to a desired value
   // cfg_->BsAntNum() is added to fix compiler warning
@@ -111,7 +111,7 @@ void MacThreadBaseStation::SendRanConfigUpdate(EventData /*event*/) {
   EventData msg(EventType::kRANUpdate);
   msg.num_tags_ = 3;
   msg.tags_[0] = rc.n_antennas_;
-  msg.tags_[1] = rc.mod_order_bits_;
+  msg.tags_[1] = rc.mcs_index_;
   msg.tags_[2] = rc.frame_id_;
   RtAssert(tx_queue_->enqueue(msg),
            "MAC thread: failed to send RAN update to Agora");
@@ -259,7 +259,7 @@ void MacThreadBaseStation::SendControlInformation() {
   // send RAN control information UE
   RBIndicator ri;
   ri.ue_id_ = next_radio_id_;
-  ri.mod_order_bits_ = cfg_->ModOrderBits(Direction::kUplink);
+  ri.mcs_index_ = cfg_->McsIndex(Direction::kUplink);
   udp_comm_->Send(cfg_->UeServerAddr(), kMacBaseClientPort + ri.ue_id_,
                   reinterpret_cast<std::byte*>(&ri), sizeof(RBIndicator));
 
@@ -435,7 +435,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
 #if defined(ENABLE_RB_IND)
   RBIndicator ri;
   ri.ue_id_ = next_radio_id_;
-  ri.mod_order_bits_ = CommsLib::kQaM16;
+  ri.mcs_index_ = kDefaultMcsIndex;
 #endif
 
   if (kLogMacPackets) {
@@ -478,8 +478,9 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
 
     pkt->LoadData(src_packet->Data());
     // Insert CRC
-    pkt->Crc((uint16_t)(
-        crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) & 0xFFFF));
+    pkt->Crc(
+        (uint16_t)(crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) &
+                   0xFFFF));
 
     if (kLogMacPackets) {
       std::stringstream ss;
