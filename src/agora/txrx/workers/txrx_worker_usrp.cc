@@ -117,7 +117,7 @@ void TxRxWorkerUsrp::DoTxRx() {
   size_t rx_frame_id = 0;
   size_t rx_symbol_id = 0;
   size_t local_interface = 0;
-
+  
   while (Configuration()->Running()) {
     // receive data (assumes we rx samples_per_symbol)
     RecvEnqueue(local_interface, rx_frame_id, rx_symbol_id, rx_locs);
@@ -419,7 +419,7 @@ void TxRxWorkerUsrp::TxBeacon(size_t radio_id, size_t tx_frame_number,
   long long tx_time =
       time0 + static_cast<long long>(Configuration()->SampsPerSymbol() *
                                      Configuration()->Frame().NumTotalSyms() *
-                                     tx_frame_number - 0 * Configuration()->SampsPerSymbol());
+                                     tx_frame_number - 80 + 1 * Configuration()->SampsPerSymbol());
   const int tx_ret = radio_config_.RadioTx(
       radio_id, tx_locs.data(), Radio::TxFlags::kStartEndTransmit, tx_time);
   if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
@@ -428,5 +428,4 @@ void TxRxWorkerUsrp::TxBeacon(size_t radio_id, size_t tx_frame_number,
         Configuration()->SampsPerSymbol(), tx_time, tx_frame_number);
   }
   tx_time_bs_ = tx_time;
-  // tx_time_bs_ = time0 + static_cast<long long>(Configuration()->SampsPerSymbol() * (Configuration()->Frame().NumTotalSyms()) * tx_frame_number);
 }
