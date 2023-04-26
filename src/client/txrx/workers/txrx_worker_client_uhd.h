@@ -34,8 +34,8 @@ class TxRxWorkerClientUhd : public TxRxWorker {
   void DoTxRx() final;
 
  private:
-  size_t DoTxThread(const long long time0);
-  size_t DoTx(const long long time0);
+  size_t DoTxThread(long long time0);
+  size_t DoTx(long long time0);
   std::vector<Packet*> DoRx(size_t interface_id, size_t frame_id,
                             size_t symbol_id, long long& receive_time);
 

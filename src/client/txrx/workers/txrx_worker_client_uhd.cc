@@ -186,6 +186,7 @@ void TxRxWorkerClientUhd::DoTxRx() {
     size_t tx_status = 0;
     if (kThreadedTx == false) {
       if (time0 != 0) {
+        std::cout<<"DoTx called"<<std::endl;
         tx_status = DoTx(time0);
       }
     }
@@ -206,6 +207,7 @@ void TxRxWorkerClientUhd::DoTxRx() {
           time0 = rx_time;
           //Launch TX attempt
           if (kThreadedTx) {
+            std::cout<<"DoTxThread called" << std::endl;
             tx_thread =
                 std::thread(&TxRxWorkerClientUhd::DoTxThread, this, time0);
           }
@@ -419,7 +421,7 @@ std::vector<Packet*> TxRxWorkerClientUhd::DoRx(size_t interface_id,
   return result_packets;
 }
 
-size_t TxRxWorkerClientUhd::DoTxThread(const long long time0) {
+size_t TxRxWorkerClientUhd::DoTxThread(long long time0) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid_ + 6);
 
   AGORA_LOG_INFO(
@@ -439,7 +441,7 @@ size_t TxRxWorkerClientUhd::DoTxThread(const long long time0) {
 }
 
 //Tx data
-size_t TxRxWorkerClientUhd::DoTx(const long long time0) {
+size_t TxRxWorkerClientUhd::DoTx(long long time0) {
   auto tx_events = GetPendingTxEvents();
 
   for (const EventData& current_event : tx_events) {
@@ -467,6 +469,18 @@ size_t TxRxWorkerClientUhd::DoTx(const long long time0) {
     //For Tx we need all channels_per_interface_ antennas before we can transmit
     //we will assume that if you get the last antenna, you have already received all
     //other antennas (enforced in the passing utility)
+    
+    int interval = 200;
+    int extra_time = 10;
+    int frame_group = 0;
+    if (frame_id > 1000){
+      frame_group = (frame_id - 1000) / interval;
+    }
+    if (frame_group > 0) {
+      time0 = time0 + (frame_group * extra_time);
+    }
+
+
     if ((ant_offset + 1) == channels_per_interface_) {
       // Transmit pilot(s)
       for (size_t ch = 0; ch < channels_per_interface_; ch++) {
