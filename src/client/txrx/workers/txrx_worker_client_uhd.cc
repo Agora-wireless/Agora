@@ -23,9 +23,10 @@ static constexpr float kBeaconDetectWindow = 2.33f;
 static constexpr size_t kBeaconsToStart = 2;
 static constexpr bool kPrintClientBeaconSNR = true;
 static constexpr ssize_t kMaxBeaconAdjust = 5;
-static constexpr bool kThreadedTx = true;
+static constexpr bool kThreadedTx = false;
 
 static constexpr bool kDebugRxTimes = false;
+static constexpr bool kSyncRadio = false;
 
 TxRxWorkerClientUhd::TxRxWorkerClientUhd(
     size_t core_offset, size_t tid, size_t interface_count,
@@ -43,6 +44,8 @@ TxRxWorkerClientUhd::TxRxWorkerClientUhd(
                  rx_memory, tx_memory, sync_mutex, sync_cond, can_proceed),
       radio_(radio_config),
       program_start_ticks_(0),
+      doResync(false),
+      adjust_Tx(0),
       frame_zeros_(
           config->NumUeChannels(),
           std::vector<std::complex<int16_t>>(
@@ -186,8 +189,9 @@ void TxRxWorkerClientUhd::DoTxRx() {
     size_t tx_status = 0;
     if (kThreadedTx == false) {
       if (time0 != 0) {
-        std::cout<<"DoTx called"<<std::endl;
+        // std::cout<<"DoTx called"<<std::endl;
         tx_status = DoTx(time0);
+        doResync = false;
       }
     }
     if (tx_status == 0) {
@@ -255,6 +259,8 @@ void TxRxWorkerClientUhd::DoTxRx() {
           if (sync_index >= 0) {
             const ssize_t adjust = sync_index - Configuration()->BeaconLen() -
                                    Configuration()->OfdmTxZeroPrefix();
+            adjust_Tx = adjust;
+            doResync = true;
             if (std::abs(adjust) > kMaxBeaconAdjust) {
               AGORA_LOG_WARN(
                   "TxRxWorkerClientUhd [%zu]: Re-syncing ignored due to "
@@ -470,14 +476,20 @@ size_t TxRxWorkerClientUhd::DoTx(long long time0) {
     //we will assume that if you get the last antenna, you have already received all
     //other antennas (enforced in the passing utility)
     
-    int interval = 200;
-    int extra_time = 10;
-    int frame_group = 0;
-    if (frame_id > 1000){
-      frame_group = (frame_id - 1000) / interval;
-    }
-    if (frame_group > 0) {
-      time0 = time0 + (frame_group * extra_time);
+    // if (!kSyncRadio){
+    //   int interval = 1000;
+    //   int extra_time = 25;
+    //   int frame_group = 0;
+    //   if (frame_id > 1000){
+    //     frame_group = (frame_id - 1000) / interval;
+    //   }
+    //   if (frame_group > 0) {
+    //     time0 = time0 + (frame_group * extra_time);
+    //   }
+    // }
+
+    if (doResync){
+      time0 = time0 + adjust_Tx;
     }
 
 
