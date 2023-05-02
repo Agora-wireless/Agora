@@ -211,7 +211,7 @@ void TxRxWorkerClientUhd::DoTxRx() {
           time0 = rx_time;
           //Launch TX attempt
           if (kThreadedTx) {
-            std::cout<<"DoTxThread called" << std::endl;
+            std::cout << "DoTxThread called" << std::endl;
             tx_thread =
                 std::thread(&TxRxWorkerClientUhd::DoTxThread, this, time0);
           }
@@ -475,7 +475,7 @@ size_t TxRxWorkerClientUhd::DoTx(long long time0) {
     //For Tx we need all channels_per_interface_ antennas before we can transmit
     //we will assume that if you get the last antenna, you have already received all
     //other antennas (enforced in the passing utility)
-    
+
     // if (!kSyncRadio){
     //   int interval = 1000;
     //   int extra_time = 25;
@@ -488,10 +488,9 @@ size_t TxRxWorkerClientUhd::DoTx(long long time0) {
     //   }
     // }
 
-    if (doResync){
+    if (doResync) {
       time0 = time0 + adjust_Tx;
     }
-
 
     if ((ant_offset + 1) == channels_per_interface_) {
       // Transmit pilot(s)

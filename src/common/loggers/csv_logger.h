@@ -42,9 +42,9 @@ static constexpr size_t kAllLogs = kCsvLogs + kMatLogs;
 
 #if defined(ENABLE_CSV_LOG)
 static const std::array<std::string, kAllLogs> kCsvName = {
-    "plt-snr", "ulsnr",    "plt-rssi",  "plt-noise", "bf-snr",  "bf-rssi", "bf-noise",
-    "evm",     "evm-sc",   "evm-snr",   "ber",       "ser",     "csi",
-    "calib",   "ul-csi",   "dl-csi",    "ul-beam",   "dl-beam"};
+    "plt-snr",  "ulsnr", "plt-rssi", "plt-noise", "bf-snr",  "bf-rssi",
+    "bf-noise", "evm",   "evm-sc",   "evm-snr",   "ber",     "ser",
+    "csi",      "calib", "ul-csi",   "dl-csi",    "ul-beam", "dl-beam"};
 #endif
 
 class CsvLogger {

@@ -15,7 +15,7 @@
 static constexpr size_t kFirstBeaconFrameAdvance = 100;
 static constexpr size_t kTxFrameAdvance = 1;
 static constexpr bool kDebugRxTimes = false;
-static constexpr bool kDebugBeacon= false;
+static constexpr bool kDebugBeacon = false;
 
 TxRxWorkerUsrp::TxRxWorkerUsrp(
     size_t core_offset, size_t tid, size_t radio_hi, size_t radio_lo,
@@ -94,30 +94,30 @@ void TxRxWorkerUsrp::DoTxRx() {
     TxBeacon(radio_id, tx_frame_number + i, tx_locs, time0);
   }
   // save tx beacon to file
-  if (kDebugBeacon){
+  if (kDebugBeacon) {
     std::ofstream outfile;
     const std::string& file = "beacon_data.dat";
     outfile.open(file.c_str(), std::ofstream::binary);
     if (outfile.is_open()) {
-      std::cout<<"opened";
-      outfile.write((const char*)tx_locs.front(), Configuration()->SampsPerSymbol() * sizeof(std::vector<void*>));
-      }
-    else{
-      std::cout<<"not opened";
+      std::cout << "opened";
+      outfile.write(
+          (const char*)tx_locs.front(),
+          Configuration()->SampsPerSymbol() * sizeof(std::vector<void*>));
+    } else {
+      std::cout << "not opened";
     }
-    
+
     if (outfile.is_open()) {
-          outfile.close();
+      outfile.close();
     }
   }
-
 
   AGORA_LOG_INFO("USRP: Start BS main recv loop...\n");
 
   size_t rx_frame_id = 0;
   size_t rx_symbol_id = 0;
   size_t local_interface = 0;
-  
+
   while (Configuration()->Running()) {
     // receive data (assumes we rx samples_per_symbol)
     RecvEnqueue(local_interface, rx_frame_id, rx_symbol_id, rx_locs);
@@ -203,8 +203,7 @@ std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(
                        rx_time_bs_);
       }
     }
-  } 
-  else {
+  } else {
     AGORA_LOG_ERROR(
         "TxRxWorkerUsrp::RecvEnqueue: Unexpected Rx return status %dn\n",
         rx_status);
@@ -415,11 +414,11 @@ long long TxRxWorkerUsrp::DiscardRxFrames(size_t radio_id,
 void TxRxWorkerUsrp::TxBeacon(size_t radio_id, size_t tx_frame_number,
                               const std::vector<void*>& tx_locs,
                               long long time0) {
-  
-  long long tx_time =
-      time0 + static_cast<long long>(Configuration()->SampsPerSymbol() *
-                                     Configuration()->Frame().NumTotalSyms() *
-                                     tx_frame_number - 80 + 1 * Configuration()->SampsPerSymbol());
+  long long tx_time = time0 + static_cast<long long>(
+                                  Configuration()->SampsPerSymbol() *
+                                      Configuration()->Frame().NumTotalSyms() *
+                                      tx_frame_number -
+                                  80 + 1 * Configuration()->SampsPerSymbol());
   const int tx_ret = radio_config_.RadioTx(
       radio_id, tx_locs.data(), Radio::TxFlags::kStartEndTransmit, tx_time);
   if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
