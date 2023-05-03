@@ -1,7 +1,7 @@
 {
     "serial_file": "files/topology/topology-vulture-dirmod-eve.json",
     "cells": 1,
-    "calibrate_digital": true,
+    "calibrate_digital": false,   /*change*/
     "calibrate_analog": false,
     "channel": "A",
     "frequency": 3.6e9,
