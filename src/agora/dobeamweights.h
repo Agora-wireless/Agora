@@ -59,6 +59,11 @@ class DoBeamWeights : public Doer {
   void ComputeCalib(size_t frame_id, size_t sc_id, arma::cx_fvec& calib_sc_vec);
   void ComputeBeams(size_t tag);
 
+  /// Downlink Directional Modulation
+  void DlDirModPreNormalize(arma::cx_fmat& mat_dl_beam_tmp);
+  void DlDirModChangeBeams(arma::cx_fcube& cube_dl_beam,
+                           const arma::cx_fmat& mat_dl_csi);
+
   PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
   complex_float* pred_csi_buffer_;
 

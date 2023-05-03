@@ -657,6 +657,20 @@ Config::Config(std::string jsonfilename)
 
   this->DumpMcsInfo();
 
+  // Downlink Directional Modulation configurations
+  auto dl_dir_mod_params = this->Parse(tdd_conf, "dl_dir_mod");
+  dl_dir_mod_enabled_ = dl_dir_mod_params.value("enabled", false);
+  dl_dir_mod_method_ = dl_dir_mod_params.value("method", 0);
+  dl_dir_mod_off_ant_num_ = dl_dir_mod_params.value("off_ant_num", 0);
+  dl_dir_mod_eavesdropping_ = dl_dir_mod_params.value("eavesdropping", false);
+  if (dl_dir_mod_enabled_) {
+    arma::arma_rng::set_seed_random();
+  }
+  if (dl_dir_mod_eavesdropping_) {
+    RtAssert(frame_.NumULSyms() == 0,
+             "No UL symbol is allowed in eavesdropping mode!");
+  }
+
   fft_in_rru_ = tdd_conf.value("fft_in_rru", false);
 
   samps_per_symbol_ =
@@ -797,6 +811,8 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
   ul_mod_order_ = static_cast<size_t>(pow(2, ul_mod_order_bits_));
   InitModulationTable(this->ul_mod_table_, ul_mod_order_);
 
+  ul_hard_demod_ = ul_mcs.value("hard_demod", false);
+
   double ul_code_rate = ul_mcs.value("code_rate", 0.333);
   RtAssert(
       ul_code_rate <= 8.0 / 9.0 && ul_code_rate >= 0.1,
@@ -863,6 +879,8 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
   dl_mod_order_bits_ = kModulStringMap.at(dl_modulation_);
   dl_mod_order_ = static_cast<size_t>(pow(2, dl_mod_order_bits_));
   InitModulationTable(this->dl_mod_table_, dl_mod_order_);
+
+  dl_hard_demod_ = dl_mcs.value("hard_demod", false);
 
   double dl_code_rate = dl_mcs.value("code_rate", 0.333);
   RtAssert(
@@ -1464,7 +1482,8 @@ void Config::GenData() {
     for (size_t pilot_idx = 0; pilot_idx < this->frame_.NumPilotSyms();
          pilot_idx++) {
       this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).resize(samps_per_symbol_, 0);
-      if (this->freq_orthogonal_pilot_ || ue_id == pilot_idx) {
+      if (this->dl_dir_mod_eavesdropping_ == false &&
+          (this->freq_orthogonal_pilot_ || ue_id == pilot_idx)) {
         std::vector<arma::uword> pilot_sc_list;
         for (size_t sc_id = 0; sc_id < ofdm_data_num_; sc_id++) {
           const size_t org_sc = sc_id + ofdm_data_start_;
