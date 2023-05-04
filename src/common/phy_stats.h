@@ -41,7 +41,7 @@ class PhyStats {
   float GetNoise(size_t frame_id);
   void ClearEvmBuffer(size_t frame_id);
   void UpdatePilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
-                        complex_float* fft_data);
+                      complex_float* fft_data);
   void UpdateUlSnr(size_t frame_id, size_t ue_id, size_t ant_id,
                    std::complex<float>* rx_samps_tmp_);
   void UpdateDlPilotSnr(size_t frame_id, size_t symbol_id, size_t ant_id,

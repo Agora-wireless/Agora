@@ -288,7 +288,14 @@ class hdf5_lib:
         zero_sc_ind = np.setdiff1d(zero_sc_ind, pilot_sc_ind)
         nonzero_sc_ind = np.setdiff1d(range(fft_size), zero_sc_ind)
         ul_data_frame_num = int(metadata['UL_DATA_FRAME_NUM'])
-        tx_file_names = metadata['TX_FD_DATA_FILENAMES'].astype(str)
+        # tx_file_names = metadata['TX_FD_DATA_FILENAMES'].astype(str)
+
+
+        manual_file = ['ul_data_f_64QAM_768_1024_1_48_1_A_0.bin']
+        manual_file = np.array(manual_file)
+        tx_file_names = manual_file
+
+
         txdata = np.empty((ul_data_frame_num, ul_slot_num, num_cl,
                      fft_size), dtype='complex64')
         read_size = 2 * ul_data_frame_num * ul_slot_num * cl_ch_num * fft_size

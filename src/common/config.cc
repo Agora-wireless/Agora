@@ -666,7 +666,7 @@ Config::Config(std::string jsonfilename)
   dl_packet_length_ = Packet::kOffsetOfData + (samps_per_symbol_ * 4);
 
   //Don't check for jumbo frames when using the hardware, this might be temp
-  if (!kUseArgos) {
+  if (!kUseArgos || !kUseUHD) {
     RtAssert(packet_length_ < 9000,
              "Packet size must be smaller than jumbo frame");
   }
@@ -709,7 +709,7 @@ Config::Config(std::string jsonfilename)
   /* 12 bit samples x2 for I + Q */
 #if defined(USE_PURE_UHD)
   AGORA_LOG_INFO("Traffic calculated based on USRP ADC Settings\n");
-  static const size_t kBitsPerSample = 14 * 2;
+  static const size_t kBitsPerSample = 16 * 2;
 #else
   AGORA_LOG_INFO("Traffic calculated based on Faros ADC Settings\n");
   static const size_t kBitsPerSample = 12 * 2;

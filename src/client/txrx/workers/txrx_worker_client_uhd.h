@@ -65,5 +65,6 @@ class TxRxWorkerClientUhd : public TxRxWorker {
   std::vector<TxRxWorkerRx::RxStatusTracker> rx_status_;
   bool doResync;
   long long adjust_Tx;
+  size_t num_ue_stream;
 };
 #endif  // TXRX_WORKER_CLIENT_UHD_H_

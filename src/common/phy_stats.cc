@@ -91,7 +91,7 @@ PhyStats::PhyStats(Config* const cfg, Direction dir)
   dl_pilot_noise_.Calloc(kFrameWnd,
                          cfg->UeAntNum() * cfg->Frame().ClientDlPilotSymbols(),
                          Agora_memory::Alignment_t::kAlign64);
-						 
+
   ul_snr_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
                  Agora_memory::Alignment_t::kAlign64);
   pilot_snr_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
@@ -610,8 +610,8 @@ void PhyStats::UpdateUlSnr(size_t frame_id, size_t ue_id, size_t ant_id,
   float numSamps = config_->SampsPerSymbol();
   float ratio = dataSamps / numSamps;
   const float snr = rssi / ratio / fb_noise;
- //bs_noise_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
- //     fb_noise / config_->OfdmCaNum();
+  //bs_noise_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
+  //     fb_noise / config_->OfdmCaNum();
   ul_snr_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
       (10.0f * std::log10(snr));
 }
@@ -765,4 +765,3 @@ float PhyStats::GetNoise(size_t frame_id) {
 
   return (arma::mean(noise_vec));
 }
-

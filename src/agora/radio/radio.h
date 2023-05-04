@@ -89,7 +89,7 @@ class Radio {
   std::vector<size_t> enabled_channels_;
   bool hw_framer_{false};
 
-public:
+ public:
   bool is_ue_{false};
 };
 
