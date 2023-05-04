@@ -490,7 +490,11 @@ size_t TxRxWorkerClientUhd::DoTx(long long time0) {
     // }
 
     if (doResync) {
+<<<<<<< HEAD
       time0 = time0 + adjust_Tx / num_ue_stream;
+=======
+      time0 = time0 + adjust_Tx;
+>>>>>>> d4903393a0b09bf97333a31130dae1921fdc00a2
     }
 
     if ((ant_offset + 1) == channels_per_interface_) {
