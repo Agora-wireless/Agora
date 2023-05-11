@@ -372,9 +372,9 @@ include_directories(
   src/common/loggers
   src/recorder
   src/mac/
+  src/radio
+  src/radio/radio_set
   src/agora/
-  src/agora/radio
-  src/agora/radio/radio_set
   src/agora/txrx
   src/agora/txrx/workers
   src/client
@@ -412,13 +412,13 @@ set(COMMON_SOURCES
   src/common/crc.cc
   src/common/memory_manage.cc
   src/common/scrambler.cc
-  src/agora/radio/radio.cc
-  src/agora/radio/radio_soapysdr.cc
-  src/agora/radio/radio_data_plane.cc
-  src/agora/radio/radio_socket.cc
-  src/agora/radio/radio_data_plane_soapy.cc
-  src/agora/radio/radio_data_plane_socket.cc
-  src/agora/radio/radio_set/radio_set.cc
+  src/radio/radio.cc
+  src/radio/radio_soapysdr.cc
+  src/radio/radio_data_plane.cc
+  src/radio/radio_socket.cc
+  src/radio/radio_data_plane_soapy.cc
+  src/radio/radio_data_plane_socket.cc
+  src/radio/radio_set/radio_set.cc
   src/mac/mac_scheduler.cc
   src/common/ipc/udp_comm.cc
   src/common/ipc/network_utils.cc
@@ -454,7 +454,7 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/dodemul.cc
   src/agora/doprecode.cc
   src/agora/dodecode.cc
-  src/agora/radio/radio_set/radio_set_bs.cc
+  src/radio/radio_set/radio_set_bs.cc
   src/mac/mac_thread_basestation.cc
   src/agora/txrx/packet_txrx_sim.cc
   src/agora/txrx/packet_txrx_radio.cc
@@ -465,9 +465,9 @@ add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
 set(CLIENT_SOURCES
   ${PUREUHD_SOURCES_CLIENT}
+  src/radio/radio_set/radio_set_ue.cc
   src/client/doifft_client.cc
   src/client/dodecode_client.cc
-  src/client/radio_set_ue.cc
   src/client/ue_worker.cc
   src/client/phy-ue.cc
   src/client/txrx/packet_txrx_client_sim.cc
@@ -493,10 +493,10 @@ add_executable(agora
 target_link_libraries(agora ${COMMON_LIBS})
 
 add_executable(calibrate
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/calibrate_main.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/radio_set_calibrate.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/radio_calibrate_digital.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/radio_calibrate_analog.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/radio/radio_set/calibrate_main.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/radio/radio_set/radio_set_calibrate.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/radio/radio_set/radio_calibrate_digital.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/radio/radio_set/radio_calibrate_analog.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(calibrate ${COMMON_LIBS})
 target_compile_definitions(calibrate PRIVATE CALIBRATE)
