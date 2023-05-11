@@ -103,6 +103,7 @@ class Agora {
                           size_t symbol_idx);
 
   void ScheduleUsers(EventType event_type, size_t frame_id, size_t symbol_id);
+  void ScheduleBroadCastSymbols(EventType event_type, size_t frame_id);
 
   // Send current frame's SNR measurements from PHY to MAC
   void SendSnrReport(EventType event_type, size_t frame_id, size_t symbol_id);

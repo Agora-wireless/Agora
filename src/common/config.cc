@@ -1691,12 +1691,12 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
   return (reinterpret_cast<size_t*>(decode_buff.data()))[0];
 }
 
-void Config::GenBroadcastSlots(Table<std::complex<int16_t>>& bcast_iq_samps,
-                               std::vector<size_t> ctrl_msg) {
+void Config::GenBroadcastSlots(
+    std::vector<std::complex<int16_t>*>& bcast_iq_samps,
+    std::vector<size_t> ctrl_msg) {
   /*dl_bcast_iq_t.Calloc(this->frame_.NumDLBcastSyms(), samps_per_symbol_,
                       Agora_memory::Alignment_t::kAlign64);*/
-  assert(bcast_iq_samps.Dim1() == this->frame_.NumDLBcastSyms() &&
-         bcast_iq_samps.Dim2() == samps_per_symbol_);
+  assert(bcast_iq_samps.size() == this->frame_.NumDLBcastSyms());
   assert(ctrl_msg.size() == this->frame_.NumDLBcastSyms());
 
   int num_bcast_bytes = dl_bcast_ldpc_config_.NumCbLen() / 8;

@@ -58,6 +58,7 @@ enum class EventType : int {
   kSNRReport,    // Signal new SNR measurement from PHY to MAC
   kRANUpdate,    // Signal new RAN config to Agora
   kRBIndicator,  // Signal RB schedule to UEs
+  kBroadcast,    // Signal generation of new broadcast symbols
   kThreadTermination
 };
 
@@ -73,6 +74,7 @@ enum class DoerType : size_t {
   kDecode,
   kEncode,
   kIFFT,
+  kBroadcast,
   kPrecode,
   kRC
 };
@@ -264,6 +266,7 @@ static inline std::string ThreadTypeStr(ThreadType thread_type) {
 
 enum class SymbolType {
   kBeacon,
+  kControl,
   kUL,
   kDL,
   kPilot,
@@ -276,7 +279,7 @@ static const std::map<char, SymbolType> kSymbolMap = {
     {'B', SymbolType::kBeacon}, {'C', SymbolType::kCalDL},
     {'D', SymbolType::kDL},     {'G', SymbolType::kGuard},
     {'L', SymbolType::kCalUL},  {'P', SymbolType::kPilot},
-    {'U', SymbolType::kUL}};
+    {'U', SymbolType::kUL},     {'S', SymbolType::kControl}};
 
 enum class SubcarrierType { kNull, kDMRS, kData };
 

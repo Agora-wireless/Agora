@@ -122,8 +122,11 @@ void Agora::SendSnrReport(EventType event_type, size_t frame_id,
 }
 
 void Agora::ScheduleDownlinkProcessing(size_t frame_id) {
-  size_t num_pilot_symbols = config_->Frame().ClientDlPilotSymbols();
+  // Schedule broadcast symbols generation
+  ScheduleBroadCastSymbols(EventType::kBroadcast, frame_id);
 
+  // Schedule beamformed pilot symbols mapping
+  size_t num_pilot_symbols = config_->Frame().ClientDlPilotSymbols();
   for (size_t i = 0; i < num_pilot_symbols; i++) {
     if (beam_last_frame_ == frame_id) {
       ScheduleSubcarriers(EventType::kPrecode, frame_id,
@@ -133,6 +136,7 @@ void Agora::ScheduleDownlinkProcessing(size_t frame_id) {
     }
   }
 
+  // Schedule data symbols encoding
   for (size_t i = num_pilot_symbols; i < config_->Frame().NumDLSyms(); i++) {
     ScheduleCodeblocks(EventType::kEncode, Direction::kDownlink, frame_id,
                        config_->Frame().GetDLSymbol(i));
@@ -276,6 +280,14 @@ void Agora::ScheduleUsers(EventType event_type, size_t frame_id,
                        EventData(EventType::kPacketToMac, base_tag.tag_));
     base_tag.ue_id_++;
   }
+}
+
+void Agora::ScheduleBroadCastSymbols(EventType event_type, size_t frame_id) {
+  auto base_tag = gen_tag_t::FrmSym(frame_id, 0u);
+  const size_t qid = (frame_id & 0x1);
+  TryEnqueueFallback(message_->GetConq(event_type, qid),
+                     message_->GetPtok(event_type, qid),
+                     EventData(event_type, base_tag.tag_));
 }
 
 size_t Agora::FetchEvent(std::vector<EventData>& events_list,

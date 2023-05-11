@@ -8,6 +8,7 @@
 #include "concurrent_queue_wrapper.h"
 #include "csv_logger.h"
 #include "dobeamweights.h"
+#include "dobroadcast.h"
 #include "dodecode.h"
 #include "dodemul.h"
 #include "doencode.h"
@@ -86,6 +87,9 @@ void AgoraWorker::WorkerThread(int tid) {
       buffer_->GetUeSpecPilot(), buffer_->GetEqual(), buffer_->GetDemod(),
       mac_sched_, phy_stats_, stats_);
 
+  auto compute_bcast = std::make_unique<DoBroadcast>(
+      config_, tid, buffer_->GetDlSocket(), stats_);
+
   std::vector<Doer*> computers_vec;
   std::vector<EventType> events_vec;
   ///*************************
@@ -99,6 +103,10 @@ void AgoraWorker::WorkerThread(int tid) {
     computers_vec.push_back(compute_demul.get());
     events_vec.push_back(EventType::kDecode);
     events_vec.push_back(EventType::kDemul);
+  }
+
+  if (config_->Frame().NumDLBcastSyms() > 0) {
+    computers_vec.push_back(compute_bcast.get());
   }
 
   if (config_->Frame().NumDLSyms() > 0) {

@@ -332,11 +332,10 @@ void TxRxWorkerHw::TxBeaconHw(size_t frame_id, size_t interface_id,
   }
 }
 
-void TxRxWorkerHw::TxBcastSymbolHw(size_t frame_id, size_t interface_id,
-                                   long long time0) {
+void TxRxWorkerHw::TxBcastSymbolsHw(size_t frame_id, size_t interface_id,
+                                    long long time0) {
   RtAssert(Configuration()->Frame().NumDLBcastSyms() > 0,
            "Number of broadcast symbols > 0 when TxBcastSymbolHw was called");
-  const auto bcast_symbol_id = Configuration()->Frame().GetDLBcastSymbol(0);
   const size_t radio_id = interface_id + interface_offset_;
 
   //We can just point the tx to the same zeros location, no need to make more
@@ -348,26 +347,26 @@ void TxRxWorkerHw::TxBcastSymbolHw(size_t frame_id, size_t interface_id,
   const size_t bcast_ch =
       Configuration()->BeaconAnt() % Configuration()->NumChannels();
 
-  if (bcast_radio == radio_id) {
-    auto* pkt = GetTxPacket(frame_id, bcast_symbol_id, bcast_ch);
-    tx_buffs.at(bcast_ch) =
-        reinterpret_cast<void*>(pkt->data_);  // read from bcast buffer
-  }
+  // TX broadcast symbols
+  for (size_t i = 0; i < Configuration()->Frame().NumDLBcastSyms(); i++) {
+    size_t bcast_symbol_id = Configuration()->Frame().GetDLBcastSymbol(i);
+    long long frame_time =
+        time0 + (Configuration()->SampsPerSymbol() *
+                 ((frame_id * Configuration()->Frame().NumTotalSyms()) +
+                  bcast_symbol_id));
+    if (bcast_radio == radio_id) {
+      auto* pkt = GetTxPacket(frame_id, i, Configuration()->BeaconAnt());
+      tx_buffs.at(bcast_ch) = reinterpret_cast<void*>(pkt->data_);
+    }
+    int tx_ret = radio_config_.RadioTx(radio_id, tx_buffs.data(),
+                                       GetTxFlags(radio_id, bcast_symbol_id),
+                                       frame_time);
 
-  // assuming beacon is first symbol
-  long long frame_time =
-      time0 + (Configuration()->SampsPerSymbol() *
-               ((frame_id * Configuration()->Frame().NumTotalSyms()) +
-                bcast_symbol_id));
-
-  const int tx_ret =
-      radio_config_.RadioTx(radio_id, tx_buffs.data(),
-                            GetTxFlags(radio_id, bcast_symbol_id), frame_time);
-
-  if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
-    std::cerr << "BAD Transmit on radio " << radio_id << " - status " << tx_ret
-              << ",  expected " << Configuration()->SampsPerSymbol()
-              << " at Time " << frame_time << std::endl;
+    if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
+      std::cerr << "BAD Transmit on radio " << radio_id << " - status "
+                << tx_ret << ",  expected " << Configuration()->SampsPerSymbol()
+                << " at Time " << frame_time << std::endl;
+    }
   }
 }
 
@@ -533,7 +532,7 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
         }
 
         if (Configuration()->Frame().NumDLBcastSyms() > 0) {
-          TxBcastSymbolHw(tx_frame_id, radio_id, time0);
+          TxBcastSymbolsHw(tx_frame_id, radio_id, time0);
         }
 
         if (Configuration()->Frame().IsRecCalEnabled()) {
@@ -625,7 +624,8 @@ bool TxRxWorkerHw::IsTxSymbolNext(size_t radio_id, size_t current_symbol) {
   if (current_symbol != Configuration()->Frame().NumTotalSyms()) {
     auto next_symbol = Configuration()->GetSymbolType(current_symbol + 1);
     if ((next_symbol == SymbolType::kDL) ||
-        (next_symbol == SymbolType::kBeacon)) {
+        (next_symbol == SymbolType::kBeacon) ||
+        (next_symbol == SymbolType::kControl)) {
       tx_symbol_next = true;
     } else {
       if ((radio_id == reference_radio) &&
@@ -889,6 +889,11 @@ void TxRxWorkerHw::ScheduleTxInit(size_t frames_to_schedule, long long time0) {
       if (Configuration()->HwFramer() == false) {
         TxBeaconHw(frame, radio, time0);
       }
+
+      if (Configuration()->Frame().NumDLBcastSyms() > 0) {
+        TxBcastSymbolsHw(frame, radio, time0);
+      }
+
       //Keep the assumption that Cal is before an 'D' symbols
       // Maybe a good idea to combine / optimize the schedule by iterating through the entire frame symbol by symbol
       if (Configuration()->Frame().IsRecCalEnabled() == true) {
