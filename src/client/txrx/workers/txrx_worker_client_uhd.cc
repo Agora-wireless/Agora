@@ -263,7 +263,7 @@ void TxRxWorkerClientUhd::DoTxRx() {
             adjust_Tx = adjust;
             doResync = true;
             if (std::abs(adjust) > kMaxBeaconAdjust) {
-              AGORA_LOG_WARN(
+              AGORA_LOG_TRACE(
                   "TxRxWorkerClientUhd [%zu]: Re-syncing ignored due to "
                   "excess "
                   "offset %ld - channel %zu, sync_index: %ld, tries %zu\n ",
