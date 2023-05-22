@@ -230,33 +230,33 @@ void PhyStats::PrintEvmStats(size_t frame_id) {
      << "  EVM " << (100.0f * evm_mat) << ", SNR "
      << (-10.0f * arma::log10(evm_mat));
 
-  // for (size_t i = 0; i < config_->UeAntNum(); i++) {
-  //   float max_snr = FLT_MIN;
-  //   float min_snr = FLT_MAX;
-  //   const float* frame_snr =
-  //       &ul_snr_[frame_id % kFrameWnd][i * config_->BsAntNum()];
-  //   for (size_t j = 0; j < config_->BsAntNum(); j++) {
-  //     const size_t radio_id = j / config_->NumChannels();
-  //     const size_t cell_id = config_->CellId().at(radio_id);
-  //     if (config_->ExternalRefNode(cell_id) == true &&
-  //         radio_id == config_->RefRadio(cell_id)) {
-  //       continue;
-  //     }
-  //     if (frame_snr[j] < min_snr) {
-  //       min_snr = frame_snr[j];
-  //     }
-  //     if (frame_snr[j] > max_snr) {
-  //       max_snr = frame_snr[j];
-  //     }
-  //   }
-  //   if (min_snr == FLT_MAX) {
-  //     min_snr = -100;
-  //   }
-  //   if (max_snr == FLT_MIN) {
-  //     max_snr = -100;
-  //   }
-  //   ss << "True SNR is: " << (min_snr) << "\n";
-  // }
+  for (size_t i = 0; i < config_->UeAntNum(); i++) {
+    float max_snr = FLT_MIN;
+    float min_snr = FLT_MAX;
+    const float* frame_snr =
+        &ul_snr_[frame_id % kFrameWnd][i * config_->BsAntNum()];
+    for (size_t j = 0; j < config_->BsAntNum(); j++) {
+      const size_t radio_id = j / config_->NumChannels();
+      const size_t cell_id = config_->CellId().at(radio_id);
+      if (config_->ExternalRefNode(cell_id) == true &&
+          radio_id == config_->RefRadio(cell_id)) {
+        continue;
+      }
+      if (frame_snr[j] < min_snr) {
+        min_snr = frame_snr[j];
+      }
+      if (frame_snr[j] > max_snr) {
+        max_snr = frame_snr[j];
+      }
+    }
+    if (min_snr == FLT_MAX) {
+      min_snr = -100;
+    }
+    if (max_snr == FLT_MIN) {
+      max_snr = -100;
+    }
+    ss << "True SNR is: " << (min_snr) << "\n";
+  }
   AGORA_LOG_INFO("%s\n", ss.str().c_str());
 }
 
