@@ -164,7 +164,7 @@ void RadioUHDSdr::Setup(const std::vector<double>& tx_gains,
 
   // use the TRX antenna port for both tx and rx
   for (auto ch : EnabledChannels()) {
-    dev_->set_rx_antenna("TX/RX", ch);
+    dev_->set_rx_antenna("RX2", ch);
     dev_->set_tx_antenna("TX/RX", ch);
   }
 
@@ -202,7 +202,7 @@ void RadioUHDSdr::Activate(Radio::ActivationTypes type, long long act_time_ns,
       "%d\n",
       SerialNumber().c_str(), Id(), act_time_ns, samples,
       static_cast<int>(type));
-  bool is_ue_ = true;
+  // bool is_ue_ = true;
   if (is_ue_) {
     AGORA_LOG_INFO("setting sources to internal \n");
     dev_->set_clock_source("internal");

@@ -66,6 +66,6 @@
     "worker_thread_num": 8,
     "socket_thread_num": 1,
     "max_frame": 200000,
-    "corr_scale": [100]
+    "corr_scale": [10000]
  }
  

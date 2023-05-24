@@ -8,7 +8,62 @@
 #include "concurrent_queue_wrapper.h"
 #include "modulation.h"
 
+
 static constexpr bool kUseSIMDGather = true;
+
+void saveEqualizedSymbolsToFile(const complex_float* data, size_t num_elements, const std::string& filename) {
+    std::ofstream outFile(filename, std::ios::out | std::ios::binary);
+    if (outFile.is_open()) {
+        outFile.write(reinterpret_cast<const char*>(data), num_elements * sizeof(complex_float));
+        outFile.close();
+    } else {
+        std::cerr << "Unable to open file: " << filename << std::endl;
+    }
+}
+
+void saveEqualizedSymbolsToFile_1(float* data, size_t num_elements, const std::string& filename) {
+    std::ofstream outFile(filename, std::ios::out | std::ios::binary);
+    if (outFile.is_open()) {
+        outFile.write(reinterpret_cast<const char*>(data), num_elements * sizeof(complex_float));
+        outFile.close();
+    } else {
+        std::cerr << "Unable to open file: " << filename << std::endl;
+    }
+}
+
+void SaveDemodDataToFile(const int8_t* data_ptr, int num_symbols, const std::string& filename) {
+    std::ofstream file(filename, std::ios::binary);
+    if (!file.is_open()) {
+        std::cout << "Failed to open file for writing: " << filename << std::endl;
+        return;
+    }
+    
+    // Write the data to the file
+    file.write(reinterpret_cast<const char*>(data_ptr), num_symbols * sizeof(int8_t));
+    
+    // Close the file
+    file.close();
+    
+    std::cout << "Demod data saved to file: " << filename << std::endl;
+}
+
+void SaveEqualedDataToFile(const float* data_ptr, int num_symbols, const std::string& filename) {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cout << "Failed to open file for writing: " << filename << std::endl;
+        return;
+    }
+    
+    // Write the data to the file as text
+    for (int i = 0; i < num_symbols; ++i) {
+        file << data_ptr[i] << std::endl;
+    }
+    
+    // Close the file
+    file.close();
+    
+    std::cout << "Equaled data saved to file: " << filename << std::endl;
+}
 
 DoDemul::DoDemul(
     Config* config, int tid, Table<complex_float>& data_buffer,
@@ -271,11 +326,15 @@ EventData DoDemul::Launch(size_t tag) {
         mat_phase_correct.set_imag(sin(-cur_theta));
         mat_equaled %= mat_phase_correct;
 
-        // Measure EVM from ground truth
         if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
           phy_stats_->UpdateEvm(frame_id, data_symbol_idx_ul, cur_sc_id,
                                 mat_equaled.col(0));
         }
+      }
+      if (frame_id == 2000) {
+          std::string filename = "equalized_symbols.bin";
+          size_t num_elements = cfg_->DemulBlockSize();
+          saveEqualizedSymbolsToFile(equaled_buffer_temp_transposed_, num_elements, filename);
       }
       size_t start_tsc3 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
@@ -336,12 +395,23 @@ EventData DoDemul::Launch(size_t tag) {
             ? Demod256qamHardAvx2(equal_t_ptr,
                                   reinterpret_cast<uint8_t*>(demod_ptr),
                                   max_sc_ite)
-            : Demod256qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
+            : Demod256qamSoftAvx2(equal_ptr, demod_ptr, max_sc_ite);
         break;
       default:
         std::printf("Demodulation: modulation type %s not supported!\n",
                     cfg_->Modulation(Direction::kUplink).c_str());
     }
+
+    if (frame_id == 2000) {
+          std::string filename = "equalized_symbols_1.bin";
+          size_t num_elements = cfg_->DemulBlockSize();
+          saveEqualizedSymbolsToFile_1(equal_ptr, 1536, filename);
+
+          SaveDemodDataToFile(demod_ptr, max_sc_ite, "demod_data_16QAM_test2.bin");
+
+          SaveEqualedDataToFile(reinterpret_cast<const float*>(equal_ptr), 128, "equaled_data.txt");
+    }
+
     // if hard demod is enabled calculate BER with modulated bits
     if (((kPrintPhyStats || kEnableCsvLog) && kUplinkHardDemod) &&
         (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols())) {

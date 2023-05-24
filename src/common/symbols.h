@@ -194,7 +194,7 @@ static constexpr bool kUsePartialTrans = true;
 static constexpr bool kDownlinkHardDemod = false;
 static constexpr bool kUplinkHardDemod = false;
 
-static constexpr bool kExportConstellation = false;
+static constexpr bool kExportConstellation = true;
 static constexpr bool kPrintPhyStats = true;
 static constexpr bool kCollectPhyStats = true;
 static constexpr bool kPrintBeamStats = false;
