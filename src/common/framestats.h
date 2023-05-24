@@ -26,12 +26,13 @@ class FrameStats {
   size_t NumULSyms() const;
   size_t NumPilotSyms() const;
   size_t NumBeaconSyms() const;
-  size_t NumDLBcastSyms() const;
+  size_t NumDlControlSyms() const;
+  size_t NumDlBcastSyms() const;
   size_t NumTotalSyms() const;
 
   /* Returns SIZE_MAX if symbol number is not a beacon */
   size_t GetBeaconSymbolIdx(size_t symbol_number) const;
-  size_t GetDLBcastSymbolIdx(size_t symbol_number) const;
+  size_t GetDLControlSymbolIdx(size_t symbol_number) const;
   size_t GetDLSymbol(size_t location) const;
   inline size_t GetDLDataSymbol(size_t location) const {
     return GetDLSymbol(location + client_dl_pilot_symbols_);
@@ -64,7 +65,7 @@ class FrameStats {
     return ((this->beacon_symbols_.empty()) ? SIZE_MAX
                                             : this->beacon_symbols_.back());
   }
-  size_t GetDLBcastSymbol(size_t location) const;
+  size_t GetDLControlSymbol(size_t location) const;
 
   bool IsRecCalEnabled() const;
   size_t NumDataSyms() const;
@@ -96,7 +97,7 @@ class FrameStats {
   std::vector<size_t> ul_cal_symbols_;
   std::vector<size_t> dl_symbols_;
   std::vector<size_t> dl_cal_symbols_;
-  std::vector<size_t> dl_bcast_symbols_;
+  std::vector<size_t> dl_control_symbols_;
 
   size_t client_ul_pilot_symbols_;
   size_t client_dl_pilot_symbols_;

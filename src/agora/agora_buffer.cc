@@ -46,10 +46,10 @@ void AgoraBuffer::AllocateTables() {
       Agora_memory::Alignment_t::kAlign64);
 
   // Downlink Control + Data
-  if (config_->Frame().NumDLBcastSyms() + config_->Frame().NumDLSyms() > 0) {
+  if (config_->Frame().NumDlControlSyms() + config_->Frame().NumDLSyms() > 0) {
     const size_t socket_buffer_symbol_num =
         kFrameWnd *
-        (config_->Frame().NumDLBcastSyms() + config_->Frame().NumDLSyms());
+        (config_->Frame().NumDlControlSyms() + config_->Frame().NumDLSyms());
 
     size_t dl_socket_buffer_status_size =
         config_->BsAntNum() * socket_buffer_symbol_num;

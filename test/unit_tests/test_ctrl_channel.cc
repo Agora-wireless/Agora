@@ -16,8 +16,8 @@ TEST(TestControl, VerifyCorrectness) {
       std::make_unique<Config>("files/config/ci/tddconfig-sim-ctrl.json");
   cfg->GenData();
   std::vector<std::complex<int16_t>*> data_buffer(
-      cfg->Frame().NumDLBcastSyms());
-  for (size_t i = 0; i < cfg->Frame().NumDLBcastSyms(); i++) {
+      cfg->Frame().NumDlControlSyms());
+  for (size_t i = 0; i < cfg->Frame().NumDlControlSyms(); i++) {
     data_buffer.at(i) =
         static_cast<std::complex<int16_t>*>(Agora_memory::PaddedAlignedAlloc(
             Agora_memory::Alignment_t::kAlign64,
@@ -30,7 +30,7 @@ TEST(TestControl, VerifyCorrectness) {
   auto decoded_msg =
       cfg->DecodeBroadcastSlots(reinterpret_cast<int16_t*>(data_buffer[0]));
   ASSERT_EQ(msg.at(0), decoded_msg);
-  for (size_t i = 0; i < cfg->Frame().NumDLBcastSyms(); i++) {
+  for (size_t i = 0; i < cfg->Frame().NumDlControlSyms(); i++) {
     std::free(data_buffer.at(i));
   }
 }

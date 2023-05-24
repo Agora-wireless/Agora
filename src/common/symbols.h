@@ -105,6 +105,7 @@ enum class PrintType : int {
   kBeam,
   kDemul,
   kIFFT,
+  kBroadcast,
   kPrecode,
   kPacketTXFirst,
   kPacketTX,

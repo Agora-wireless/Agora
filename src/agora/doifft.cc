@@ -52,18 +52,14 @@ EventData DoIFFT::Launch(size_t tag) {
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ant_id = gen_tag_t(tag).ant_id_;
 
-  const size_t symbol_idx_dl =
-      cfg_->Frame().GetDLSymbolIdx(symbol_id) + cfg_->Frame().NumDLBcastSyms();
-
   if (kDebugPrintInTask) {
     std::printf("In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n",
                 tid_, frame_id, symbol_id, ant_id);
   }
 
-  const size_t offset =
-      (cfg_->GetTotalDataSymbolIdxDl(frame_id, symbol_idx_dl) *
-       cfg_->BsAntNum()) +
-      ant_id;
+  const size_t total_symbol_idx =
+      cfg_->GetTotalDlSymbolIdx(frame_id, symbol_id);
+  const size_t offset = (total_symbol_idx * cfg_->BsAntNum()) + ant_id;
 
   const size_t start_tsc1 = GetTime::WorkerRdtsc();
   duration_stat_->task_duration_[1u] += start_tsc1 - start_tsc;
@@ -144,7 +140,7 @@ EventData DoIFFT::Launch(size_t tag) {
 
   if (kPrintSocketOutput) {
     std::stringstream ss;
-    ss << "socket_tx_data" << ant_id << "_" << symbol_idx_dl << "=[";
+    ss << "socket_tx_data" << ant_id << "_" << symbol_id << "=[";
     for (size_t i = 0; i < cfg_->SampsPerSymbol(); i++) {
       ss << socket_ptr[i * 2] << "+1j*" << socket_ptr[i * 2 + 1] << " ";
     }

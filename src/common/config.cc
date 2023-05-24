@@ -943,11 +943,14 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
 }
 
 void Config::UpdateCtrlMCS() {
-  if (this->frame_.NumDLBcastSyms() > 0) {
+  if (this->frame_.NumDlControlSyms() > 0) {
+    const size_t dl_bcast_mcs_index = 10;
+    dl_bcast_mod_order_bits_ = GetModOrderBits(dl_bcast_mcs_index);
+    const size_t dl_bcast_code_rate = GetCodeRate(dl_bcast_mcs_index);
     const size_t bcast_base_graph = 1;
-    const size_t dl_bcast_code_rate = 340;
-    dl_bcast_mod_order_ = 16;
-    dl_bcast_mod_order_bits_ = 4;
+    //const size_t dl_bcast_code_rate = 340;
+    //dl_bcast_mod_order_ = 16;
+    //dl_bcast_mod_order_bits_ = 4;
     const int16_t max_decoder_iter = 5;
     size_t bcast_zc = select_zc(
         bcast_base_graph, dl_bcast_code_rate, dl_bcast_mod_order_bits_,
@@ -1694,10 +1697,10 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
 void Config::GenBroadcastSlots(
     std::vector<std::complex<int16_t>*>& bcast_iq_samps,
     std::vector<size_t> ctrl_msg) {
-  /*dl_bcast_iq_t.Calloc(this->frame_.NumDLBcastSyms(), samps_per_symbol_,
+  /*dl_bcast_iq_t.Calloc(this->frame_.NumDControlSyms(), samps_per_symbol_,
                       Agora_memory::Alignment_t::kAlign64);*/
-  assert(bcast_iq_samps.size() == this->frame_.NumDLBcastSyms());
-  assert(ctrl_msg.size() == this->frame_.NumDLBcastSyms());
+  assert(bcast_iq_samps.size() == this->frame_.NumDlControlSyms());
+  assert(ctrl_msg.size() == this->frame_.NumDlControlSyms());
 
   int num_bcast_bytes = dl_bcast_ldpc_config_.NumCbLen() / 8;
   int num_bcast_bytes_padded = Roundup<64>(num_bcast_bytes);
@@ -1714,11 +1717,11 @@ void Config::GenBroadcastSlots(
                                                std::byte(0));
 
   Table<int8_t> dl_bcast_encoded_bits;
-  dl_bcast_encoded_bits.Calloc(this->frame_.NumDLBcastSyms(),
+  dl_bcast_encoded_bits.Calloc(this->frame_.NumDlControlSyms(),
                                dl_bcast_encoded_bytes,
                                Agora_memory::Alignment_t::kAlign64);
   Table<int8_t> dl_bcast_mod_bits;
-  dl_bcast_mod_bits.Calloc(this->frame_.NumDLBcastSyms(),
+  dl_bcast_mod_bits.Calloc(this->frame_.NumDlControlSyms(),
                            this->GetOFDMCtrlNum(),
                            Agora_memory::Alignment_t::kAlign32);
   auto* dl_bcast_parity_buffer =
@@ -1732,13 +1735,13 @@ void Config::GenBroadcastSlots(
   InitModulationTable(dl_bcast_mod_table, dl_bcast_mod_order_);
   int8_t* ldpc_input = nullptr;
   Table<complex_float> dl_bcast_iq_f;
-  dl_bcast_iq_f.Calloc(this->frame_.NumDLBcastSyms(), ofdm_data_num_,
+  dl_bcast_iq_f.Calloc(this->frame_.NumDlControlSyms(), ofdm_data_num_,
                        Agora_memory::Alignment_t::kAlign64);
   Table<complex_float> dl_bcast_iq_ifft;
-  dl_bcast_iq_ifft.Calloc(this->frame_.NumDLBcastSyms(), ofdm_ca_num_,
+  dl_bcast_iq_ifft.Calloc(this->frame_.NumDlControlSyms(), ofdm_ca_num_,
                           Agora_memory::Alignment_t::kAlign64);
   auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
-  for (size_t i = 0; i < this->frame_.NumDLBcastSyms(); i++) {
+  for (size_t i = 0; i < this->frame_.NumDlControlSyms(); i++) {
     const int8_t* tmp =
         static_cast<const int8_t*>(static_cast<const void*>(&ctrl_msg.at(i)));
 

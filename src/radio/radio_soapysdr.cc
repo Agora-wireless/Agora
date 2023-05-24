@@ -868,6 +868,8 @@ void RadioSoapySdr::ConfigureTddModeUe() {
       tdd_sched.replace(s, 1, "T");
     } else if (c == 'D') {
       tdd_sched.replace(s, 1, "R");
+    } else if (c == 'S') {
+      tdd_sched.replace(s, 1, "R");
     } else if (c != 'P') {
       tdd_sched.replace(s, 1, "G");
     }

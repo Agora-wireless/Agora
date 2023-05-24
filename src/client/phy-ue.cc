@@ -899,7 +899,7 @@ void PhyUe::InitializeVarsFromCfg() {
                     (ul_symbol_perframe_ * config_->UeAntNum() * kFrameWnd);
 
   rx_buffer_size_ = config_->DlPacketLength() *
-                    (dl_symbol_perframe_ + config_->Frame().NumBeaconSyms()) *
+                    (dl_symbol_perframe_ + config_->Frame().NumDlBcastSyms()) *
                     config_->UeAntNum() * kFrameWnd;
 }
 

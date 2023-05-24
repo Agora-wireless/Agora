@@ -455,14 +455,28 @@ class Config {
     return ((frame_id % kFrameWnd) * this->frame_.NumDLSyms() + symbol_idx_dl);
   }
 
+  inline size_t GetTotalDlSymbolIdx(size_t frame_id, size_t symbol_id) {
+    const size_t symbol_idx_dl =
+        symbol_id < this->frame_.GetDLSymbol(0)
+            ? this->frame_.GetDLControlSymbolIdx(symbol_id)
+            : this->frame_.GetDLSymbolIdx(symbol_id) +
+                  this->frame_.NumDlControlSyms();
+    return (frame_id % kFrameWnd) *
+               (this->frame_.NumDlControlSyms() + this->frame_.NumDLSyms()) +
+           symbol_idx_dl;
+  }
+
   //Returns Beacon+Dl symbol index
   inline size_t GetBeaconDlIdx(size_t symbol_id) const {
     size_t symbol_idx = SIZE_MAX;
     const auto type = GetSymbolType(symbol_id);
     if (type == SymbolType::kBeacon) {
       symbol_idx = Frame().GetBeaconSymbolIdx(symbol_id);
+    } else if (type == SymbolType::kControl) {
+      symbol_idx =
+          Frame().GetDLControlSymbolIdx(symbol_id) + Frame().NumBeaconSyms();
     } else if (type == SymbolType::kDL) {
-      symbol_idx = Frame().GetDLSymbolIdx(symbol_id) + Frame().NumBeaconSyms();
+      symbol_idx = Frame().GetDLSymbolIdx(symbol_id) + Frame().NumDlBcastSyms();
     } else {
       throw std::runtime_error("Invalid BS Beacon or DL symbol id " +
                                std::to_string(symbol_id));

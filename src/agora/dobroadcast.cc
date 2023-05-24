@@ -24,36 +24,35 @@ DoBroadcast::DoBroadcast(Config* in_config, int in_tid,
 DoBroadcast::~DoBroadcast() {}
 
 void DoBroadcast::GenerateBroadcastSymbols(size_t frame_id) {
-  const size_t num_bcast_syms = cfg_->Frame().NumDLBcastSyms();
-  std::vector<std::complex<int16_t>*> bcast_iq_samps(num_bcast_syms);
-  std::vector<size_t> ctrl_data(num_bcast_syms);
-  for (size_t symbol_idx_dl = 0; symbol_idx_dl < num_bcast_syms;
+  const size_t num_control_syms = cfg_->Frame().NumDlControlSyms();
+  std::vector<std::complex<int16_t>*> bcast_iq_samps(num_control_syms);
+  std::vector<size_t> ctrl_data(num_control_syms);
+  for (size_t symbol_idx_dl = 0; symbol_idx_dl < num_control_syms;
        symbol_idx_dl++) {
-    size_t symbol_id = cfg_->Frame().GetDLBcastSymbol(symbol_idx_dl);
+    size_t symbol_id = cfg_->Frame().GetDLControlSymbol(symbol_idx_dl);
     if (kDebugPrintInTask) {
       std::printf(
           "In doBroadcast thread %d: frame: %zu, symbol: %zu, antenna: %zu\n",
           tid_, frame_id, symbol_id, cfg_->BeaconAnt());
     }
 
-    const size_t offset =
-        (cfg_->GetTotalDataSymbolIdxDl(frame_id, symbol_idx_dl) *
-         cfg_->BsAntNum()) +
-        cfg_->BeaconAnt();  // TODO: change to BroadcastAnt()
+    const size_t total_symbol_idx =
+        cfg_->GetTotalDlSymbolIdx(frame_id, symbol_id);
+    const size_t offset = (total_symbol_idx * cfg_->BsAntNum()) +
+                          cfg_->BeaconAnt();  // TODO: change to BroadcastAnt()
 
     auto* pkt = reinterpret_cast<Packet*>(
         &dl_socket_buffer_[offset * cfg_->DlPacketLength()]);
-    short* socket_ptr = &pkt->data_[2u * cfg_->OfdmTxZeroPrefix()];
-    bcast_iq_samps.push_back(
-        reinterpret_cast<std::complex<int16_t>*>(socket_ptr));
-    ctrl_data.push_back(
+    bcast_iq_samps.at(symbol_idx_dl) =
+        reinterpret_cast<std::complex<int16_t>*>(pkt->data_);
+    ctrl_data.at(symbol_idx_dl) =
         frame_id +
-        TX_FRAME_DELTA);  // TODO: later ctrl data might include other info
+        TX_FRAME_DELTA;  // TODO: later ctrl data might include other info
   }
   cfg_->GenBroadcastSlots(bcast_iq_samps, ctrl_data);
 
   if (kPrintSocketOutput) {
-    for (size_t symbol_idx_dl = 0; symbol_idx_dl < num_bcast_syms;
+    for (size_t symbol_idx_dl = 0; symbol_idx_dl < num_control_syms;
          symbol_idx_dl++) {
       std::stringstream ss;
       ss << "socket_tx_data" << cfg_->BeaconAnt() << "_" << symbol_idx_dl

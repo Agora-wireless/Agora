@@ -780,6 +780,16 @@ void Agora::Start() {
             }
           }
         } break;
+        case EventType::kBroadcast: {
+          const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+          this->stats_->MasterSetTsc(TsType::kBroadcastDone, frame_id);
+          for (size_t idx = 0; idx < config_->Frame().NumDlControlSyms();
+               idx++) {
+            size_t symbol_id = config_->Frame().GetDLControlSymbol(idx);
+            ScheduleAntennasTX(frame_id, symbol_id);
+          }
+          stats_->PrintPerFrameDone(PrintType::kBroadcast, frame_id);
+        } break;
         default:
           AGORA_LOG_ERROR("Wrong event type in message queue!");
           std::exit(0);
@@ -1080,7 +1090,9 @@ void Agora::InitializeCounters() {
     // precode_cur_frame_for_symbol_ =
     //    std::vector<size_t>(config_->Frame().NumDLSyms(), SIZE_MAX);
     ifft_counters_.Init(config_->Frame().NumDLSyms(), config_->BsAntNum());
-    tx_counters_.Init(config_->Frame().NumDLSyms(), config_->BsAntNum());
+    tx_counters_.Init(
+        config_->Frame().NumDlControlSyms() + config_->Frame().NumDLSyms(),
+        config_->BsAntNum());
     // mac data is sent per frame, so we set max symbol to 1
     mac_to_phy_counters_.Init(1, config_->SpatialStreamsNum());
   }

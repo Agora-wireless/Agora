@@ -105,8 +105,9 @@ void AgoraWorker::WorkerThread(int tid) {
     events_vec.push_back(EventType::kDemul);
   }
 
-  if (config_->Frame().NumDLBcastSyms() > 0) {
+  if (config_->Frame().NumDlControlSyms() > 0) {
     computers_vec.push_back(compute_bcast.get());
+    events_vec.push_back(EventType::kBroadcast);
   }
 
   if (config_->Frame().NumDLSyms() > 0) {
