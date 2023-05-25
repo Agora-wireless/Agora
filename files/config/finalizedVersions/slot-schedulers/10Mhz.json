@@ -63,7 +63,10 @@
         /* Frame definition */
         /* 2a explicit frame construction */
         "frame_schedule": [
-          "BPPPPPPPPUUUUUUUUUUUUUUUUUUU"
+          "BPPPPPPPPU"
+        ],
+        "special_slot": [
+          "wakka wakka"
         ],
         /* For all frame constructions */
         "client_ul_pilot_syms": 0,

@@ -48,6 +48,12 @@ static const std::string kDlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_dl_data_";
 static const std::string kUlDataFreqPrefix = kExperimentFilepath + "ul_data_f_";
 
+std::string expand_slots(std::string slot_frame, std::string special_slot, size_t user_num, bool is_slot_format, bool is_5GNR);
+
+std::string expand_slots(size_t slot_num_perframe, size_t pilot_num,
+ size_t beacon_pos, size_t ul_slot_start, size_t ul_slot_perframe, 
+ size_t dl_slot_start, size_t dl_slot_perframe, bool is_slot_format, bool is_5GNR);
+
 Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
       ul_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
@@ -256,6 +262,10 @@ Config::Config(std::string jsonfilename)
     client_rx_gain_b_.assign(gain_rx_json_b.begin(), gain_rx_json_b.end());
   }
 
+  //NEW STUFF
+  bool do_slot = tdd_conf.value("do_slot", false);
+  //
+
   rate_ = tdd_conf.value("sample_rate", 5e6);
   nco_ = tdd_conf.value("nco_frequency", 0.75 * rate_);
   bw_filter_ = rate_ + 2 * nco_;
@@ -369,6 +379,7 @@ Config::Config(std::string jsonfilename)
   // If frames not specified explicitly, construct default based on frame_type /
   // symbol_num_perframe / pilot_num / ul_symbol_num_perframe /
   // dl_symbol_num_perframe / dl_data_symbol_start
+
   if (tdd_conf.find("frame_schedule") == tdd_conf.end()) {
     size_t ul_data_symbol_num_perframe = kDefaultULSymPerFrame;
     size_t ul_data_symbol_start = kDefaultULSymStart;
@@ -507,11 +518,26 @@ Config::Config(std::string jsonfilename)
     }
     frame_ = FrameStats(sched);
   } else {
+
+
     json jframes = tdd_conf.value("frame_schedule", json::array());
+
+    json special_slot = tdd_conf.value("special_slot", json::array());
+
+
+    
+
+    std::cout << "The special slot value is: " << special_slot.at(0).get<std::string>();
+
+    if (do_slot == false){
+      std::cout<<"Do Slot is false.\n";
+    }
 
     // Only allow 1 unique frame type
     assert(jframes.size() == 1);
     frame_ = FrameStats(jframes.at(0).get<std::string>());
+
+
   }
   AGORA_LOG_INFO("Config: Frame schedule %s (%zu symbols)\n",
                  frame_.FrameIdentifier().c_str(), frame_.NumTotalSyms());
@@ -1708,4 +1734,99 @@ __attribute__((visibility("default"))) Config* ConfigNew(char* filename) {
   cfg->GenData();
   return cfg;
 }
+
+// std::string expand_slots(std::string slot_frame, size_t user_num) {
+
+  
+//     std::string slot_frame = jframes.at(0).get<std::string>();
+
+//     size_t slot_num = slot_frame.size();
+
+//     //Todo, this shouldn't be hardcoded 14
+//     //This should be defined in a variable at top of file.
+//     char ofdm_symbol_frame[14*slot_num];
+
+//     //char[slot] slots = jframes.at(0)
+
+//     std::cout << "Hey I'm printing a frame.\n" << jframes.at(0) << std::flush;
+//     std::cout<< "Hey Im printing the slot num: " << std::to_string(slot_num) << std::flush;
+
+//     //Inflate slot num
+
+//     for (size_t i = 0; i < 14*slot_num; i++){
+//       ofdm_symbol_frame[i] = slot_frame[i/14];
+//     }
+
+//     std::cout<<"Muwahahahaha I have inflated the slots into ofdm symbols: " << std::flush;
+//     std::cout<< ofdm_symbol_frame <<std::flush;
+
+
+
+
+
+
+// }
+
+std::string expand_slots(std::string slot_frame, std::string special_slot, size_t user_num, bool is_slot_format, bool is_5GNR){
+
+    if (is_slot_format){
+
+       /** The user left the special_slot undefined so the user_num is used instead
+        to generate the special slot. 
+    **/
+    if (special_slot == nullptr) { 
+      size_t num_pilots=user_num;
+      char s_slot = new char[14];
+
+      //Populate the special slot with pilot symbols.
+      for (int i = 0; i < user_num; i++){
+        s_slot[i] = 'P';
+      }
+
+    //Fill in the rest of the special slot to align timing.
+      for (int i = 0; i < 14; i++){
+        s_slot[i] = 'G';
+      }
+    }
+
+    special_slot = s_slot;
+
+    char frame = new char[14*slot_frame.size()];
+
+    //Populate the frame:
+
+    for (int i = 0; i<14*slot_frame.size(); i++){
+
+      //Insert the special slot
+      if (slot_frame[i/14] == 'S'){
+        int special_start = i;
+
+        while (i <  special_start + 14){
+          frame[i] = special_slot[i-special_start];
+          i++;
+        }
+        
+      }
+
+      frame[i] = slot_frame[i/14]
+    }
+
+  } else {
+    //It is symbol format and we can use the default behavior of just turning
+    // the json around as a string and shipping it off.
+  }
+
+ 
+  
+
+
+
+}
+
+std::string expand_slots(size_t slot_num_perframe, size_t pilot_num,
+ size_t beacon_pos, size_t ul_slot_start, size_t ul_slot_perframe, 
+ size_t dl_slot_start, size_t dl_slot_perframe, bool is_slot_format);
+
+
+ 
 }
