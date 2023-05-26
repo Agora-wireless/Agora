@@ -10,14 +10,9 @@
 #include "config.h"
 
 #include <ctime>
+#include <cmath>
 #include <filesystem>
 #include <utility>
-
-// #include <string>
-
-// #include <iostream>
-
-// #include <sstream>
 
 #include "comms-lib.h"
 #include "gettime.h"
@@ -48,11 +43,30 @@ static const std::string kDlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_dl_data_";
 static const std::string kUlDataFreqPrefix = kExperimentFilepath + "ul_data_f_";
 
-std::string expand_slots(std::string slot_frame, std::string special_slot, size_t user_num, bool is_slot_format, bool is_5GNR);
+// std::string expand_slots(std::string slot_frame, std::string special_slot, size_t user_num, bool is_slot_format, bool is_5GNR);
 
-std::string expand_slots(size_t slot_num_perframe, size_t pilot_num,
- size_t beacon_pos, size_t ul_slot_start, size_t ul_slot_perframe, 
- size_t dl_slot_start, size_t dl_slot_perframe, bool is_slot_format, bool is_5GNR);
+// std::string expand_slots(size_t slot_num_perframe, size_t pilot_num,
+//  size_t beacon_pos, size_t ul_slot_start, size_t ul_slot_perframe, 
+//  size_t dl_slot_start, size_t dl_slot_perframe, bool is_slot_format, bool is_5GNR);
+
+//Version of 5G function that handles explicit frame_schedule
+
+std::string fiveGNR(size_t numerology, size_t CBW, size_t *num_ofdm_data_sub, size_t *fft_size, size_t *sampling_rate,
+                    bool is_slot, std::string frame_schedule,  std::string special_slot);
+
+
+// //Version of 5G function that handles implicit frame_schedule
+
+// std:string fiveGNR(size_t numerology, size_t CBW, size_t num_ofdm_data_sub,
+//                     bool is_slot, size_t slot_num_perframe, size_t pilot_num, 
+//                     size_t beacon_pos, size_t ul_slot_start, size_t ul_slot_perframe,
+//                     size_t dl_slot_start, size_t dl_slot_perframe, json special_slot);
+
+//Expand the slot configuration to a symbols configuration
+std::string expand_slots(std::string frame_schedule, std::string special_slot, size_t num_symbols);
+
+
+
 
 Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -522,16 +536,24 @@ Config::Config(std::string jsonfilename)
 
     json jframes = tdd_conf.value("frame_schedule", json::array());
 
-    json special_slot = tdd_conf.value("special_slot", json::array());
+    // json special_slot = tdd_conf.value("special_slot", json::array());
+
+    // std::cout << "The special slot value is: " << special_slot.at(0).get<std::string>();
+
+    // if (do_slot == false){
+    //   std::cout<<"Do Slot is false.\n";
+    // }
+
+    // size_t numerology = 0;
+    // float CBW = 5e6;
+    // bool is_slot = true;
 
 
+    // std::string frameC = fiveGNR(numerology, CBW, &num_ofdm_data_sub, &fft_size, &sampling_rate, is_slot,
+    //         jframes, special_slot);
+
+    // cout<<"Constructed frame: " << frameC << std::flush;
     
-
-    std::cout << "The special slot value is: " << special_slot.at(0).get<std::string>();
-
-    if (do_slot == false){
-      std::cout<<"Do Slot is false.\n";
-    }
 
     // Only allow 1 unique frame type
     assert(jframes.size() == 1);
@@ -1761,71 +1783,171 @@ __attribute__((visibility("default"))) Config* ConfigNew(char* filename) {
 //     std::cout<< ofdm_symbol_frame <<std::flush;
 
 
-
-
-
-
 // }
 
-std::string expand_slots(std::string slot_frame, std::string special_slot, size_t user_num, bool is_slot_format, bool is_5GNR){
+std::string fiveGNR(size_t numerology, size_t CBW, size_t *num_ofdm_data_sub, size_t *fft_size, size_t *sampling_rate
+                    bool is_slot, std::string frame_schedule ,  std::string special_slot) {
 
-    if (is_slot_format){
+  size_t subframes_per_frame = 10; // This might need to be defined in the header.
 
-       /** The user left the special_slot undefined so the user_num is used instead
-        to generate the special slot. 
-    **/
-    if (special_slot == nullptr) { 
-      size_t num_pilots=user_num;
-      char s_slot = new char[14];
+  //This is kind of a hack, but it's faster and simpler than calculating
+  size_t[] valid_ffts = [512, 1024, 2048];
+  size_t valid_fft_size;
+ 
+  size_t num_slots = pow(2, numerology);
 
-      //Populate the special slot with pilot symbols.
-      for (int i = 0; i < user_num; i++){
-        s_slot[i] = 'P';
-      }
+  float scs = (15e3) * num_slots;
 
-    //Fill in the rest of the special slot to align timing.
-      for (int i = 0; i < 14; i++){
-        s_slot[i] = 'G';
-      }
+  size_t num_symbols = subframes_per_frame*num_slots*14;
+
+  if (num_symbols > kMaxSymbols) {
+    throw std::runtime_error("num_symbols = " << std::to_string(num_symbols) << " exceeds kMaxSymbols = " << kMaxSymbols);
+                        
+  }
+
+                      
+  //If the number of ofdm sub-carriers doesn't match the AVX512 / AVX2 reqs
+  //update it.
+  if (*num_ofdm_data_sub % 16 != 0) {
+    //make sure to put this in agora's logs.
+    //for now just using a simple print statement.
+
+    //Might also need to include a seperate case for 
+    //divisibility by 8 in the case the AVX2 architecture
+    //is used.
+
+    *num_ofdm_data_sub = (*num_ofdm_data_sub/8)*12;
+
+    std::cout << "given number of ofdm data subcarriers is" << "not divisible by 8. Updating number of ofdm data " << "subcarriers to " << std::to_string(*num_ofdm_data_sub) << ".\n" << std::flush;
+  }
+
+  //If we need to calculate the guard band this is where it should be calculated.
+
+
+//Calculate the valid fft_size
+  for (int i = 0; i < sizeof(valid_ffts) / sizeof(size_t); i++) {
+    
+    if (*num_ofdm_data_sub > valid_ffts[i]) {
+      valid_fft_size = valid_ffts[i];
     }
+  }
 
-    special_slot = s_slot;
+  //Update the fft_size if it is not valid.
+  if (valid_fft_size > fft_size) {
+    //Need to agora log this.
 
-    char frame = new char[14*slot_frame.size()];
+    fft_size = valid_fft_size;
 
-    //Populate the frame:
+    std::cout << "Specified fft_size was too small to accomodate the number" << "of data subcarriers. Setting fft_size to " << std::to_string(*fft_size) << std::flush;
 
-    for (int i = 0; i<14*slot_frame.size(); i++){
+  }
 
-      //Insert the special slot
+  //Update the sampling rate to miminum possible rate.
+  //This is one reason fft_size is validated.
+
+  sampling_rate = scs*(*fft_size);
+
+
+  //Construct frame from slots
+
+  std::string frame = expand_slots(std::string frame_schedule, std::string special_slot);
+
+
+  return frame;
+
+}
+
+std::string expand_slots(std::string frame_schedule, std::string special_slot, size_t num_symbols) {
+
+  std::string frame;
+
+  for (int i = 0; i< num_symbols; i++) {
+
+    //Insert the special slot
       if (slot_frame[i/14] == 'S'){
         int special_start = i;
 
-        while (i <  special_start + 14){
+        while (i < special_start + 14){
           frame[i] = special_slot[i-special_start];
           i++;
         }
         
       }
 
-      frame[i] = slot_frame[i/14]
-    }
+    frame[i] = frame_schedule[i/14];
+  }  
 
-  } else {
-    //It is symbol format and we can use the default behavior of just turning
-    // the json around as a string and shipping it off.
-  }
+  return frame;
+
+}
+
+
+
+//Version of 5G function that handles implicit frame_schedule
+
+// std:string fiveGNR(size_t numerology, size_t CBW, size_t num_ofdm_data_sub,
+//                     bool is_slot, size_t slot_num_perframe, size_t pilot_num, 
+//                     size_t beacon_pos, size_t ul_slot_start, size_t ul_slot_perframe,
+//                     size_t dl_slot_start, size_t dl_slot_perframe, json special_slot);
+
+
+// std::string expand_slots(std::string slot_config) {
+
+//    if (is_slot_format){
+
+//        /** The user left the special_slot undefined so the user_num is used instead
+//         to generate the special slot. 
+//     **/
+//     if (special_slot == nullptr) { 
+//       size_t num_pilots=user_num;
+//       char s_slot = new char[14];
+
+//       //Populate the special slot with pilot symbols.
+//       for (int i = 0; i < user_num; i++){
+//         s_slot[i] = 'P';
+//       }
+
+//     //Fill in the rest of the special slot to align timing.
+//       for (int i = 0; i < 14; i++){
+//         s_slot[i] = 'G';
+//       }
+//     }
+
+//     special_slot = s_slot;
+
+//     char frame = new char[14*slot_frame.size()];
+
+//     //Populate the frame:
+
+//     for (int i = 0; i<14*slot_frame.size(); i++){
+
+//       //Insert the special slot
+//       if (slot_frame[i/14] == 'S'){
+//         int special_start = i;
+
+//         while (i <  special_start + 14){
+//           frame[i] = special_slot[i-special_start];
+//           i++;
+//         }
+        
+//       }
+
+//       frame[i] = slot_frame[i/14]
+//     }
+
+//   } else {
+//     //It is symbol format and we can use the default behavior of just turning
+//     // the json around as a string and shipping it off.
+//   }
 
  
   
 
+// }
+
+  
 
 
-}
-
-std::string expand_slots(size_t slot_num_perframe, size_t pilot_num,
- size_t beacon_pos, size_t ul_slot_start, size_t ul_slot_perframe, 
- size_t dl_slot_start, size_t dl_slot_perframe, bool is_slot_format);
 
 
  
