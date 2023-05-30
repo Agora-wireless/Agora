@@ -43,36 +43,22 @@ static const std::string kDlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_dl_data_";
 static const std::string kUlDataFreqPrefix = kExperimentFilepath + "ul_data_f_";
 
-// std::string expand_slots(std::string slot_frame, std::string special_slot, size_t user_num, bool is_slot_format, bool is_5GNR);
-
-// std::string expand_slots(size_t slot_num_perframe, size_t pilot_num,
-//  size_t beacon_pos, size_t ul_slot_start, size_t ul_slot_perframe, 
-//  size_t dl_slot_start, size_t dl_slot_perframe, bool is_slot_format, bool is_5GNR);
 
 //Version of 5G function that handles explicit frame_schedule
 
 std::string fiveGNR(size_t numerology, double CBW, size_t *num_ofdm_data_sub, size_t *fft_size, double *sampling_rate,
-                    bool slot_format, std::string frame_schedule, std::string special_slot);
+                    bool slot_format, std::string frame_schedule);
 
-
-// // //Version of 5G function that handles implicit frame_schedule
-
-// // std:string fiveGNR(size_t numerology, size_t CBW, size_t num_ofdm_data_sub,
-// //                     bool is_slot, size_t slot_num_perframe, size_t pilot_num, 
-// //                     size_t beacon_pos, size_t ul_slot_start, size_t ul_slot_perframe,
-// //                     size_t dl_slot_start, size_t dl_slot_perframe, json special_slot);
-
-// //Expand the slot configuration to a symbols configuration
-std::string expand_slots(std::string frame_schedule, std::string special_slot, size_t num_symbols);
-
-
-
+// Form the beacon subframe based on the specified 5G slot / subframe format
+std::string formBeaconSubframe(int format_num, size_t user_num, std::string format_table[]);
+// Expand the slot configuration to a symbols configuration
+std::string formFrame(std::string frame_schedule, size_t user_num, std::string format_table[]);
 
 Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
       ul_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
-      frame_("")
+      frame_(""),
       config_filename_(std::move(jsonfilename)) {
   auto time = std::time(nullptr);
   auto local_time = *std::localtime(&time);
@@ -82,6 +68,17 @@ Config::Config(std::string jsonfilename)
                std::to_string(local_time.tm_hour) + "-" +
                std::to_string(local_time.tm_min) + "-" +
                std::to_string(local_time.tm_sec);
+
+  // All free symbols 'F' specified in the 5G slot config table
+  // Are represented here by a guard symbol G. 
+  format_table[0] = "DDDDDDDDDDDDDD";
+  format_table[1] = "UUUUUUUUUUUUUU";
+  format_table[3] = "DDDDDDDDDDDDDG";
+  format_table[10] = "GUUUUUUUUUUUUU";
+  format_table[28] = "DDDDDDDDDDDDGU";
+  format_table[34] = "DGUUUUUUUUUUUU";
+  format_table[48] = "DGUUUUUDGUUUUU";
+
 
   pilots_ = nullptr;
   pilots_sgn_ = nullptr;
@@ -550,23 +547,25 @@ Config::Config(std::string jsonfilename)
       std::cout << "About to read frame schedule.\n" << std::flush;
 
       
-      json special_slot = tdd_conf.value("special_slot", json::array());
-
-      std::cout << "The special slot value is: " << special_slot.at(0).get<std::string>();
-
       size_t numerology = 0;
 
       std::cout << "About to do 5GNR calcs.\n" << std::flush;
+      // Expand the slot configuration to a symbols configuration
+      std::string frame = formFrame(jframes.at(0).get<std::string>(), ue_ant_num_, format_table);
+
+      std::cout<<"Formed Frame.\n" << frame<<std::flush;
 
 
-      std::string frame = fiveGNR(numerology, CBW, &ofdm_data_num_, &ofdm_ca_num_, &rate_, slot_format,
-              jframes.at(0).get<std::string>(), special_slot.at(0).get<std::string>());
 
-      std::cout << "Done with 5G calcs.\n" << std::flush; 
 
-      //special_ = FrameStats(special_slot.at(0).get<std::string>());
+      // std::string frame = fiveGNR(numerology, CBW, &ofdm_data_num_, &ofdm_ca_num_, &rate_, slot_format,
+      //         jframes.at(0).get<std::string>());
 
-      std::cout << "Constructed frame: " << frame << std::flush;
+      // std::cout << "Done with 5G calcs.\n" << std::flush; 
+
+      // //special_ = FrameStats(special_slot.at(0).get<std::string>());
+
+      // std::cout << "Constructed frame: " << frame << std::flush;
 
       frame_ = FrameStats(frame);
 
@@ -1868,10 +1867,10 @@ std::string fiveGNR(size_t numerology, double CBW, size_t *num_ofdm_data_sub, si
   std::cout << "Stage 5.\n" << std::flush;
 
 
-  if (slot_format) {
-     //Construct frame from slots
-      return expand_slots(frame_schedule, special_slot, num_symbols);
-  }
+  // if (slot_format) {
+  //    //Construct frame from slots
+  //     return expand_slots(frame_schedule, special_slot, num_symbols);
+  // }
 
   std::cout << "Stage 6.\n" << std::flush;
 
@@ -1903,6 +1902,90 @@ std::string expand_slots(std::string frame_schedule, std::string special_slot, s
   return frame;
 
 }
+
+/**
+ * Requires: A valid format number specifying the 5G NR slot format to use
+ * and a valid user num less than 13 representing the number of users (and 
+ * hence pilot symbols) needed by the subframe.
+ * 
+ * Effects: Generates a subframe that transmits a beacon symbol and as many
+ * pilot symbols as there are users.
+ * 
+ * Notes: Currently limited to one Beacon symbols per subframe. Also currently
+ * only supporting format number 34.
+*/
+
+std::string formBeaconSubframe(int format_num, size_t user_num, std::string format_table[]) {
+  std::string subframe = format_table[format_num];
+
+  //Check the requirements:
+  if (subframe.at(0) != 'D') {
+    throw std::runtime_error(
+      "First symbols of selected format doesn't start with a downlink symbol.");
+  }
+
+  if (user_num > 12) {
+    throw std::runtime_error(
+      "Number of users exceeds pilot symbol limit of 12."
+    );
+  }
+
+  //Currently only supporting format number 34.
+  if (format_num != 34) {
+    throw std::runtime_error(
+      "Given format num for beacon subframe not equal to 34."
+      );
+  }
+
+  //Replace the downlink symbol with a beacon symbol.
+  subframe.replace(0, 1, "B");
+
+  //Add in the pilot symbols.
+  for (unsigned int i = 0; i < subframe.size(); i++) {
+
+    if (subframe.at(i) == 'U') {
+      subframe.replace(i, 1, "P");
+    }
+  }
+
+  return subframe;
+}
+
+
+// Expand the slot configuration to a symbols configuration
+std::string formFrame(std::string frame_schedule, size_t user_num, std::string format_table[]){
+  std::string frame;
+  std::string temp = "";
+  int subframes[10]; // Update this hardcoded value to a var.
+  int subframe_idx = 0;
+
+  frame += formBeaconSubframe(frame_schedule.at(0), user_num, format_table);
+  
+  /*
+  Currently use commas to seperate each number in the format string.
+   Copy all numbers between commas into a array.
+  */ 
+  
+  for (unsigned int i = 1; i < frame_schedule.size(); i++) {
+   
+    if (frame_schedule.at(i) != ',' || i == frame_schedule.size()-1) {
+      subframes[subframe_idx] = std::stoi(temp);
+      temp.clear();
+    } else {
+      temp += frame_schedule.at(i);
+    }
+      
+  }
+
+  // Create the frame based on the format nums in the subframe array.
+
+  for (int i = 0; i < 10; i++) {  
+    frame += format_table[subframes[i]];
+  }
+
+  return frame;
+}
+
 
 
 extern "C" {
