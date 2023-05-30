@@ -51,18 +51,18 @@ static const std::string kUlDataFreqPrefix = kExperimentFilepath + "ul_data_f_";
 
 //Version of 5G function that handles explicit frame_schedule
 
-std::string fiveGNR(size_t numerology, size_t CBW, size_t *num_ofdm_data_sub, size_t *fft_size, size_t *sampling_rate,
-                    bool is_slot, std::string frame_schedule,  std::string special_slot);
+std::string fiveGNR(size_t numerology, double CBW, size_t *num_ofdm_data_sub, size_t *fft_size, double *sampling_rate,
+                    bool slot_format, std::string frame_schedule, std::string special_slot);
 
 
-// //Version of 5G function that handles implicit frame_schedule
+// // //Version of 5G function that handles implicit frame_schedule
 
-// std:string fiveGNR(size_t numerology, size_t CBW, size_t num_ofdm_data_sub,
-//                     bool is_slot, size_t slot_num_perframe, size_t pilot_num, 
-//                     size_t beacon_pos, size_t ul_slot_start, size_t ul_slot_perframe,
-//                     size_t dl_slot_start, size_t dl_slot_perframe, json special_slot);
+// // std:string fiveGNR(size_t numerology, size_t CBW, size_t num_ofdm_data_sub,
+// //                     bool is_slot, size_t slot_num_perframe, size_t pilot_num, 
+// //                     size_t beacon_pos, size_t ul_slot_start, size_t ul_slot_perframe,
+// //                     size_t dl_slot_start, size_t dl_slot_perframe, json special_slot);
 
-//Expand the slot configuration to a symbols configuration
+// //Expand the slot configuration to a symbols configuration
 std::string expand_slots(std::string frame_schedule, std::string special_slot, size_t num_symbols);
 
 
@@ -72,7 +72,7 @@ Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
       ul_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
-      frame_(""),
+      frame_("")
       config_filename_(std::move(jsonfilename)) {
   auto time = std::time(nullptr);
   auto local_time = *std::localtime(&time);
@@ -277,7 +277,10 @@ Config::Config(std::string jsonfilename)
   }
 
   //NEW STUFF
-  bool do_slot = tdd_conf.value("do_slot", false);
+  slot_format = tdd_conf.value("slot_format", false);
+  CBW = tdd_conf.value("channel_bandwidth", 20e6);
+  is_5G = tdd_conf.value("is_5G", false);
+  numerology = tdd_conf.value("numerology", -1); //-1 represents to numerology.
   //
 
   rate_ = tdd_conf.value("sample_rate", 5e6);
@@ -533,33 +536,45 @@ Config::Config(std::string jsonfilename)
     frame_ = FrameStats(sched);
   } else {
 
-
     json jframes = tdd_conf.value("frame_schedule", json::array());
-
-    // json special_slot = tdd_conf.value("special_slot", json::array());
-
-    // std::cout << "The special slot value is: " << special_slot.at(0).get<std::string>();
-
-    // if (do_slot == false){
-    //   std::cout<<"Do Slot is false.\n";
-    // }
-
-    // size_t numerology = 0;
-    // float CBW = 5e6;
-    // bool is_slot = true;
-
-
-    // std::string frameC = fiveGNR(numerology, CBW, &num_ofdm_data_sub, &fft_size, &sampling_rate, is_slot,
-    //         jframes, special_slot);
-
-    // cout<<"Constructed frame: " << frameC << std::flush;
-    
 
     // Only allow 1 unique frame type
     assert(jframes.size() == 1);
-    frame_ = FrameStats(jframes.at(0).get<std::string>());
+
+    std::cout << "Base string: " << jframes.at(0).get<std::string>() << std::flush;
+    
+    
+
+    if (slot_format) {
+      
+      std::cout << "About to read frame schedule.\n" << std::flush;
+
+      
+      json special_slot = tdd_conf.value("special_slot", json::array());
+
+      std::cout << "The special slot value is: " << special_slot.at(0).get<std::string>();
+
+      size_t numerology = 0;
+
+      std::cout << "About to do 5GNR calcs.\n" << std::flush;
 
 
+      std::string frame = fiveGNR(numerology, CBW, &ofdm_data_num_, &ofdm_ca_num_, &rate_, slot_format,
+              jframes.at(0).get<std::string>(), special_slot.at(0).get<std::string>());
+
+      std::cout << "Done with 5G calcs.\n" << std::flush; 
+
+      //special_ = FrameStats(special_slot.at(0).get<std::string>());
+
+      std::cout << "Constructed frame: " << frame << std::flush;
+
+      frame_ = FrameStats(frame);
+
+    } else {
+      frame_ = FrameStats(jframes.at(0).get<std::string>());
+    }
+
+  
   }
   AGORA_LOG_INFO("Config: Frame schedule %s (%zu symbols)\n",
                  frame_.FrameIdentifier().c_str(), frame_.NumTotalSyms());
@@ -595,6 +610,21 @@ Config::Config(std::string jsonfilename)
 
   frame_.SetClientPilotSyms(client_ul_pilot_syms, client_dl_pilot_syms);
 
+  // if (slot_format) {
+  //   if ((freq_orthogonal_pilot_ == false) &&
+  //     (ue_ant_num_ != special_.NumPilotSyms())) {
+  //   RtAssert(
+  //       false,
+  //       "Number of pilot symbols: " + std::to_string(frame_.NumPilotSyms()) +
+  //           " does not match number of UEs: " + std::to_string(ue_ant_num_));
+  //     }
+  // } else {
+    
+  // }
+
+  std::cout << "Num pilot syms: " << frame_.NumPilotSyms() << std::flush;
+
+
   if ((freq_orthogonal_pilot_ == false) &&
       (ue_ant_num_ != frame_.NumPilotSyms())) {
     RtAssert(
@@ -602,6 +632,7 @@ Config::Config(std::string jsonfilename)
         "Number of pilot symbols: " + std::to_string(frame_.NumPilotSyms()) +
             " does not match number of UEs: " + std::to_string(ue_ant_num_));
   }
+
   if ((freq_orthogonal_pilot_ == false) && (ue_radio_id_.empty() == true) &&
       (tdd_conf.find("ue_radio_num") == tdd_conf.end())) {
     ue_num_ = frame_.NumPilotSyms();
@@ -1750,48 +1781,16 @@ void Config::Print() const {
   }
 }
 
-extern "C" {
-__attribute__((visibility("default"))) Config* ConfigNew(char* filename) {
-  auto* cfg = new Config(filename);
-  cfg->GenData();
-  return cfg;
-}
 
-// std::string expand_slots(std::string slot_frame, size_t user_num) {
-
-  
-//     std::string slot_frame = jframes.at(0).get<std::string>();
-
-//     size_t slot_num = slot_frame.size();
-
-//     //Todo, this shouldn't be hardcoded 14
-//     //This should be defined in a variable at top of file.
-//     char ofdm_symbol_frame[14*slot_num];
-
-//     //char[slot] slots = jframes.at(0)
-
-//     std::cout << "Hey I'm printing a frame.\n" << jframes.at(0) << std::flush;
-//     std::cout<< "Hey Im printing the slot num: " << std::to_string(slot_num) << std::flush;
-
-//     //Inflate slot num
-
-//     for (size_t i = 0; i < 14*slot_num; i++){
-//       ofdm_symbol_frame[i] = slot_frame[i/14];
-//     }
-
-//     std::cout<<"Muwahahahaha I have inflated the slots into ofdm symbols: " << std::flush;
-//     std::cout<< ofdm_symbol_frame <<std::flush;
-
-
-// }
-
-std::string fiveGNR(size_t numerology, size_t CBW, size_t *num_ofdm_data_sub, size_t *fft_size, size_t *sampling_rate
-                    bool is_slot, std::string frame_schedule ,  std::string special_slot) {
+std::string fiveGNR(size_t numerology, double CBW, size_t *num_ofdm_data_sub, size_t *fft_size, double *sampling_rate,
+ bool slot_format, std::string frame_schedule, std::string special_slot) {
 
   size_t subframes_per_frame = 10; // This might need to be defined in the header.
 
   //This is kind of a hack, but it's faster and simpler than calculating
-  size_t[] valid_ffts = [512, 1024, 2048];
+  size_t valid_ffts[] = {512, 1024, 2048};
+
+  
   size_t valid_fft_size;
  
   size_t num_slots = pow(2, numerology);
@@ -1800,10 +1799,17 @@ std::string fiveGNR(size_t numerology, size_t CBW, size_t *num_ofdm_data_sub, si
 
   size_t num_symbols = subframes_per_frame*num_slots*14;
 
+
+  std::cout << "Stage 1.\n" << std::flush;
+
   if (num_symbols > kMaxSymbols) {
-    throw std::runtime_error("num_symbols = " << std::to_string(num_symbols) << " exceeds kMaxSymbols = " << kMaxSymbols);
+    //std::string error_message = "num_symbols = " << std::to_string(num_symbols) << " exceeds kMaxSymbols = " << std::to_string(kMaxSymbols);
+    throw std::runtime_error("num symbols ecceeds max symbols.\n");
                         
   }
+
+    std::cout << "Stage 2.\n" << std::flush;
+
 
                       
   //If the number of ofdm sub-carriers doesn't match the AVX512 / AVX2 reqs
@@ -1823,9 +1829,12 @@ std::string fiveGNR(size_t numerology, size_t CBW, size_t *num_ofdm_data_sub, si
 
   //If we need to calculate the guard band this is where it should be calculated.
 
+  std::cout << "Stage 3.\n" << std::flush;
+
+
 
 //Calculate the valid fft_size
-  for (int i = 0; i < sizeof(valid_ffts) / sizeof(size_t); i++) {
+  for (unsigned int i = 0; i < sizeof(valid_ffts) / sizeof(size_t); i++) {
     
     if (*num_ofdm_data_sub > valid_ffts[i]) {
       valid_fft_size = valid_ffts[i];
@@ -1833,27 +1842,41 @@ std::string fiveGNR(size_t numerology, size_t CBW, size_t *num_ofdm_data_sub, si
   }
 
   //Update the fft_size if it is not valid.
-  if (valid_fft_size > fft_size) {
+  if (valid_fft_size > *fft_size) {
     //Need to agora log this.
 
-    fft_size = valid_fft_size;
+    *fft_size = valid_fft_size;
 
     std::cout << "Specified fft_size was too small to accomodate the number" << "of data subcarriers. Setting fft_size to " << std::to_string(*fft_size) << std::flush;
 
   }
 
+  std::cout << "Stage 4.\n" << std::flush;
+
+
   //Update the sampling rate to miminum possible rate.
   //This is one reason fft_size is validated.
 
-  sampling_rate = scs*(*fft_size);
+  *sampling_rate = scs*(*fft_size);
 
 
-  //Construct frame from slots
+  /*
+  if slot format is specified the frame needs to be constructed, otherwise
+  the frame schedule can be returned as is
+  */
 
-  std::string frame = expand_slots(std::string frame_schedule, std::string special_slot);
+  std::cout << "Stage 5.\n" << std::flush;
 
 
-  return frame;
+  if (slot_format) {
+     //Construct frame from slots
+      return expand_slots(frame_schedule, special_slot, num_symbols);
+  }
+
+  std::cout << "Stage 6.\n" << std::flush;
+
+
+  return frame_schedule;
 
 }
 
@@ -1861,20 +1884,20 @@ std::string expand_slots(std::string frame_schedule, std::string special_slot, s
 
   std::string frame;
 
-  for (int i = 0; i< num_symbols; i++) {
+  for (size_t i = 0; i< num_symbols; i++) {
 
     //Insert the special slot
-      if (slot_frame[i/14] == 'S'){
-        int special_start = i;
+      if (frame_schedule[i/14] == 'S'){
+        size_t special_start = i;
 
         while (i < special_start + 14){
-          frame[i] = special_slot[i-special_start];
+          frame+=special_slot[i-special_start];
           i++;
         }
         
       }
 
-    frame[i] = frame_schedule[i/14];
+    frame+=frame_schedule[i/14];
   }  
 
   return frame;
@@ -1882,73 +1905,12 @@ std::string expand_slots(std::string frame_schedule, std::string special_slot, s
 }
 
 
-
-//Version of 5G function that handles implicit frame_schedule
-
-// std:string fiveGNR(size_t numerology, size_t CBW, size_t num_ofdm_data_sub,
-//                     bool is_slot, size_t slot_num_perframe, size_t pilot_num, 
-//                     size_t beacon_pos, size_t ul_slot_start, size_t ul_slot_perframe,
-//                     size_t dl_slot_start, size_t dl_slot_perframe, json special_slot);
-
-
-// std::string expand_slots(std::string slot_config) {
-
-//    if (is_slot_format){
-
-//        /** The user left the special_slot undefined so the user_num is used instead
-//         to generate the special slot. 
-//     **/
-//     if (special_slot == nullptr) { 
-//       size_t num_pilots=user_num;
-//       char s_slot = new char[14];
-
-//       //Populate the special slot with pilot symbols.
-//       for (int i = 0; i < user_num; i++){
-//         s_slot[i] = 'P';
-//       }
-
-//     //Fill in the rest of the special slot to align timing.
-//       for (int i = 0; i < 14; i++){
-//         s_slot[i] = 'G';
-//       }
-//     }
-
-//     special_slot = s_slot;
-
-//     char frame = new char[14*slot_frame.size()];
-
-//     //Populate the frame:
-
-//     for (int i = 0; i<14*slot_frame.size(); i++){
-
-//       //Insert the special slot
-//       if (slot_frame[i/14] == 'S'){
-//         int special_start = i;
-
-//         while (i <  special_start + 14){
-//           frame[i] = special_slot[i-special_start];
-//           i++;
-//         }
-        
-//       }
-
-//       frame[i] = slot_frame[i/14]
-//     }
-
-//   } else {
-//     //It is symbol format and we can use the default behavior of just turning
-//     // the json around as a string and shipping it off.
-//   }
-
- 
-  
-
-// }
-
-  
-
-
-
+extern "C" {
+__attribute__((visibility("default"))) Config* ConfigNew(char* filename) {
+  auto* cfg = new Config(filename);
+  cfg->GenData();
+  return cfg;
+}
 
  
 }

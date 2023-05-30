@@ -343,6 +343,7 @@ class Config {
   }
 
   inline const FrameStats& Frame() const { return this->frame_; }
+  //inline const FrameStats Special() const {return this->frame_;};
   inline const std::vector<std::complex<float>>& PilotCf32() const {
     return this->pilot_cf32_;
   };
@@ -716,15 +717,6 @@ class Config {
   std::vector<size_t> ref_ant_;
   std::vector<size_t> cell_id_;
 
-  //5G related data that needs to be collected for a 5G frame
-
-  bool is_5G;
-  size_t numerology;
-  size_t CBW; //Channel Band width
-
-  //Needed to indicate if slot format or symbol format is being used
-  bool is_slot;
-
   // Controls whether the synchronization and frame time keeping is done
   // in hardware or software
   // true: use hardware correlator; false: use software corrleator
@@ -956,5 +948,13 @@ class Config {
   std::string trace_file_;
   std::string timestamp_;
   std::vector<std::string> ul_tx_f_data_files_;
+
+
+  //5G variables
+
+  bool slot_format;
+  bool is_5G;
+  double CBW;
+  size_t numerology;
 };
 #endif /* CONFIG_HPP_ */
