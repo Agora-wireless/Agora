@@ -956,5 +956,10 @@ class Config {
   bool is_5G;
   double CBW;
   size_t numerology;
+
+  //Slot format table;
+
+  std::string format_table[55];
+
 };
 #endif /* CONFIG_HPP_ */
