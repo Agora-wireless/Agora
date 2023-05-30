@@ -78,7 +78,7 @@
         /* Frame definition */
         /* 2a explicit frame construction */
         "frame_schedule": [
-          "BSUUUUUUUG"
+          "34,0,0,0,0,0,0,0,0,0,0"
         ],
         "special_slot": [
           "PPPPPPPPGGGGGG"

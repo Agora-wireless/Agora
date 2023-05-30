@@ -1918,6 +1918,12 @@ std::string expand_slots(std::string frame_schedule, std::string special_slot, s
 std::string formBeaconSubframe(int format_num, size_t user_num, std::string format_table[]) {
   std::string subframe = format_table[format_num];
 
+  std::cout<<"format_num should be"<<std::to_string(format_num)<<std::flush;
+
+  std::cout<<"format_num should be"<<std::to_string(format_num)<<std::flush;
+
+  std::cout<<"Subframe should be"<<subframe<<std::flush;
+
   //Check the requirements:
   if (subframe.at(0) != 'D') {
     throw std::runtime_error(
@@ -1959,29 +1965,58 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::string f
   int subframes[10]; // Update this hardcoded value to a var.
   int subframe_idx = 0;
 
-  frame += formBeaconSubframe(frame_schedule.at(0), user_num, format_table);
+  std::cout << "HERE 0.\n" << std::flush;
+
+    std::cout << frame_schedule <<".\n" << std::flush;
+
   
   /*
   Currently use commas to seperate each number in the format string.
    Copy all numbers between commas into a array.
   */ 
+
+  std::cout << "HERE 1.\n" << std::flush;
   
-  for (unsigned int i = 1; i < frame_schedule.size(); i++) {
+  for (unsigned int i = 0; i < frame_schedule.size(); i++) {
+
+    std::cout<<"Frame sched at i: " << std::to_string(frame_schedule.at(i))<<"\n."<<std::flush;
    
-    if (frame_schedule.at(i) != ',' || i == frame_schedule.size()-1) {
+    if (frame_schedule.at(i) == ',') {
+      std::cout<<"In if statement. temp is: " << temp << ".\n"<<std::flush;
       subframes[subframe_idx] = std::stoi(temp);
+      subframe_idx++;
       temp.clear();
     } else {
-      temp += frame_schedule.at(i);
+      std::cout<<"i: " << std::to_string(i) << " || ";
+      temp += std::to_string(frame_schedule.at(i) - 48);
+      std::cout<<temp<<".\n"<<std::flush;
+    }
+
+    if (i == frame_schedule.size()-1) {
+      subframes[subframe_idx] = std::stoi(temp);
+      subframe_idx++;
+      temp.clear();
     }
       
   }
 
+  std::cout << "HERE 2.\n" << std::flush;
+
+  for (int i = 0; i < 10; i++) {
+    std::cout<< subframes[i] << " " << std::flush;
+  }
+
+
   // Create the frame based on the format nums in the subframe array.
 
-  for (int i = 0; i < 10; i++) {  
+  frame += formBeaconSubframe(subframes[0], user_num, format_table);
+
+  for (int i = 1; i < 10; i++) {  
     frame += format_table[subframes[i]];
   }
+
+  std::cout << "HERE 3.\n" << std::flush;
+
 
   return frame;
 }
