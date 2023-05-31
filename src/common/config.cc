@@ -1813,8 +1813,8 @@ std::string fiveGNR(size_t numerology, double CBW, size_t *num_ofdm_data_sub, si
 
   if (num_symbols > kMaxSymbols) {
     //std::string error_message = "num_symbols = " << std::to_string(num_symbols) << " exceeds kMaxSymbols = " << std::to_string(kMaxSymbols);
-    throw std::runtime_error("num symbols ecceeds max symbols.\n");
-                        
+    throw std::runtime_error("num symbols exceeds max symbols.\n");
+                      
   }
 
     std::cout << "Stage 2.\n" << std::flush;
@@ -2042,8 +2042,21 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int,
   std::cout<<"beacon subframe formed.\n"<<std::flush;
 
   for (int i = 1; i < 10; i++) {  
-    std::cout<<"accessing: " << std::to_string(subframes[i]) <<"\n";
-    frame += format_table[subframes[i]];
+    try {
+      std::cout<<"accessing: " << std::to_string(subframes[i]) <<"\n";
+      frame += format_table.at(subframes[i]);
+    } catch (std::out_of_range &e) {
+      std::cout<<"User specified a non supported subframe format.\n" <<std::flush;
+      std::cout<<"Currently supported subframe formats are: " << std::flush;
+      for (auto format = format_table.begin(); format != format_table.end(); format++) {
+        std::cout<<" " << format->first << " : " << format->second <<std::flush;;
+      }
+
+      throw std::runtime_error(
+        "Non supported frame format."
+      );
+    }
+    
   }
 
   std::cout << "HERE 3.\n" << std::flush;
