@@ -50,9 +50,9 @@ std::string fiveGNR(size_t numerology, double CBW, size_t *num_ofdm_data_sub, si
                     bool slot_format, std::string frame_schedule);
 
 // Form the beacon subframe based on the specified 5G slot / subframe format
-std::string formBeaconSubframe(int format_num, size_t user_num, std::string format_table[]);
+std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, std::string> format_table);
 // Expand the slot configuration to a symbols configuration
-std::string formFrame(std::string frame_schedule, size_t user_num, std::string format_table[]);
+std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table);
 
 Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -1925,7 +1925,7 @@ std::string expand_slots(std::string frame_schedule, std::string special_slot, s
  * only supporting format number 34.
 */
 
-std::string formBeaconSubframe(int format_num, size_t user_num, std::string format_table[]) {
+std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, std::string> format_table) {
   std::string subframe = format_table[format_num];
 
   std::cout<<"format_num should be"<<std::to_string(format_num)<<std::flush;
@@ -1978,7 +1978,7 @@ std::string formBeaconSubframe(int format_num, size_t user_num, std::string form
 
 
 // Expand the slot configuration to a symbols configuration
-std::string formFrame(std::string frame_schedule, size_t user_num, std::string format_table[]){
+std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table){
   std::string frame;
   std::string temp = "";
   int subframes[10]; // Update this hardcoded value to a var.
@@ -2060,6 +2060,7 @@ __attribute__((visibility("default"))) Config* ConfigNew(char* filename) {
   cfg->GenData();
   return cfg;
 }
+
 
  
 }

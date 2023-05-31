@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <string>
 #include <vector>
+#include <map>
 
 #include "armadillo"
 #include "common_typedef_sdk.h"
@@ -959,7 +960,10 @@ class Config {
 
   //Slot format table;
 
-  std::string format_table[55];
+  //std::string format_table[55];
+
+  std::map<int, std::string> format_table;
+
 
 };
 #endif /* CONFIG_HPP_ */
