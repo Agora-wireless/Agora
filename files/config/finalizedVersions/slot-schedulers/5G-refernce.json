@@ -54,12 +54,6 @@
         "tx_gain_a": 20,
         "rx_gain_b": 20,
         "tx_gain_b": 20,
-        "tx_advance": [
-          0
-        ],
-        "corr_scale": [
-          1
-        ],
         "calib_tx_gain_a": 20,
         "calib_tx_gain_b": 20,
         "client_gain_adjust_a": [
@@ -78,7 +72,7 @@
         /* Frame definition */
         /* 2a explicit frame construction */
         "frame_schedule": [
-          "34,0,0,0,0,0,0,0,0,0,0"
+          "34,0,0,0,0,0,0,0,0,0"
         ],
         "special_slot": [
           "PPPPPPPPGGGGGG"

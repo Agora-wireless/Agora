@@ -538,25 +538,37 @@ Config::Config(std::string jsonfilename)
     // Only allow 1 unique frame type
     assert(jframes.size() == 1);
 
-    std::cout << "Base string: " << jframes.at(0).get<std::string>() << std::flush;
-    
-    
+    std::string frame = jframes.at(0).get<std::string>();
 
-    if (slot_format) {
+
+    std::cout << "Base string: " << frame << std::flush;
+
+
+    //Read the input string from the frame schedule 
+    // and ues .find on the string to find the first instance of 
+    // a comma to determine if the specified mode is symbol or
+    //subframe based
+
+    //Also use a hashmap to store the values of the slot_format table
+    // instead of using an array since we don't want to waste memory 
+    // and we don't need particularly fast lookups.
+
+    /*
+    If an apostrophe delimiter is found in the frame string, execute logic to
+    convert a subframe formated frame into the symbol formated frame that Agora
+    is designed to handle.
+    */ 
+    if (frame.find(",")!=std::string::npos) {
       
       std::cout << "About to read frame schedule.\n" << std::flush;
 
-      
       size_t numerology = 0;
 
       std::cout << "About to do 5GNR calcs.\n" << std::flush;
       // Expand the slot configuration to a symbols configuration
-      std::string frame = formFrame(jframes.at(0).get<std::string>(), ue_ant_num_, format_table);
+      frame = formFrame(frame, ue_ant_num_, format_table);
 
       std::cout<<"Formed Frame.\n" << frame<<std::flush;
-
-
-
 
       // std::string frame = fiveGNR(numerology, CBW, &ofdm_data_num_, &ofdm_ca_num_, &rate_, slot_format,
       //         jframes.at(0).get<std::string>());
@@ -567,11 +579,9 @@ Config::Config(std::string jsonfilename)
 
       // std::cout << "Constructed frame: " << frame << std::flush;
 
-      frame_ = FrameStats(frame);
+    } 
 
-    } else {
-      frame_ = FrameStats(jframes.at(0).get<std::string>());
-    }
+    frame_ = FrameStats(frame);
 
   
   }
@@ -1920,9 +1930,10 @@ std::string formBeaconSubframe(int format_num, size_t user_num, std::string form
 
   std::cout<<"format_num should be"<<std::to_string(format_num)<<std::flush;
 
-  std::cout<<"format_num should be"<<std::to_string(format_num)<<std::flush;
+  std::cout<<"user_num should be"<<std::to_string(user_num)<<std::flush;
 
   std::cout<<"Subframe should be"<<subframe<<std::flush;
+  int pilot_num = 0;
 
   //Check the requirements:
   if (subframe.at(0) != 'D') {
@@ -1949,8 +1960,16 @@ std::string formBeaconSubframe(int format_num, size_t user_num, std::string form
   //Add in the pilot symbols.
   for (unsigned int i = 0; i < subframe.size(); i++) {
 
+    /*
+     Once user_num many pilot_nums have been put in the beacon subframe, break.
+    */
+    if (pilot_num >= user_num) {
+      break;
+    }
+
     if (subframe.at(i) == 'U') {
       subframe.replace(i, 1, "P");
+      pilot_num++;
     }
   }
 
@@ -1967,7 +1986,7 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::string f
 
   std::cout << "HERE 0.\n" << std::flush;
 
-    std::cout << frame_schedule <<".\n" << std::flush;
+  std::cout << frame_schedule <<".\n" << std::flush;
 
   
   /*
@@ -1979,23 +1998,29 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::string f
   
   for (unsigned int i = 0; i < frame_schedule.size(); i++) {
 
-    std::cout<<"Frame sched at i: " << std::to_string(frame_schedule.at(i))<<"\n."<<std::flush;
+    // Throw an error if the input frame schedule has more than 10 subframes.
+    if (subframe_idx > 9) {
+      throw std::runtime_error(
+        "Entered frame_schedule has more than 10 subframes."
+      );
+    }
    
-    if (frame_schedule.at(i) == ',') {
-      std::cout<<"In if statement. temp is: " << temp << ".\n"<<std::flush;
+    if (frame_schedule.at(i) == ',') {   
+
+      std::cout<<"subframe index: " << std::to_string(subframe_idx) << "\n"<<std::flush;
       subframes[subframe_idx] = std::stoi(temp);
       subframe_idx++;
       temp.clear();
     } else {
-      std::cout<<"i: " << std::to_string(i) << " || ";
       temp += std::to_string(frame_schedule.at(i) - 48);
-      std::cout<<temp<<".\n"<<std::flush;
-    }
+    } 
 
     if (i == frame_schedule.size()-1) {
+      std::cout<<"In the last position of the frame schedule."<<std::flush;
+      std::cout<<"subframe index: " << std::to_string(subframe_idx) << "\n"<<std::flush;
       subframes[subframe_idx] = std::stoi(temp);
-      subframe_idx++;
-      temp.clear();
+      // subframe_idx++;
+      // temp.clear();
     }
       
   }
@@ -2003,7 +2028,8 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::string f
   std::cout << "HERE 2.\n" << std::flush;
 
   for (int i = 0; i < 10; i++) {
-    std::cout<< subframes[i] << " " << std::flush;
+    std::cout<< "Printing i: " << std::to_string(i) << " subframe: " << std::to_string(subframes[i]) <<"   "<<std::flush;
+    //std::cout<< subframes[i] << " " << std::flush;
   }
 
 
@@ -2011,7 +2037,12 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::string f
 
   frame += formBeaconSubframe(subframes[0], user_num, format_table);
 
+  std::cout<<" \n frame is currently: " << frame << ".\n";
+
+  std::cout<<"beacon subframe formed.\n"<<std::flush;
+
   for (int i = 1; i < 10; i++) {  
+    std::cout<<"accessing: " << std::to_string(subframes[i]) <<"\n";
     frame += format_table[subframes[i]];
   }
 
