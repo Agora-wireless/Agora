@@ -18,7 +18,7 @@
         "demul_block_size": 48,
         "cp_size": 128,
         "fft_size": 2048,
-        "ofdm_data_num": 1200,
+        "ofdm_data_num": 1272,
         "ofdm_pilot_spacing": 16,
         /*  (fft_size - ofdm_data_num_) / 2 */
         "ofdm_data_start": 424,
@@ -69,10 +69,11 @@
         "slot_format": true,
         "channel Bandwidth": 10e6,
         "numerology": 0,
+        "channel_bandwidth": 20e6,
         /* Frame definition */
         /* 2a explicit frame construction */
         "frame_schedule": [
-          "34,34,1,34,0,28,800,1,0,1"
+          "34,34,1,34,0,28,0,1,0,1"
         ],
         "special_slot": [
           "PPPPPPPPGGGGGG"

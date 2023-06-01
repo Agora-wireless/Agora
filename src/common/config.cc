@@ -46,8 +46,8 @@ static const std::string kUlDataFreqPrefix = kExperimentFilepath + "ul_data_f_";
 
 //Version of 5G function that handles explicit frame_schedule
 
-std::string fiveGNR(size_t numerology, double CBW, size_t *num_ofdm_data_sub, size_t *fft_size, double *sampling_rate,
-                    bool slot_format, std::string frame_schedule);
+std::string fiveGNR(size_t numerology, size_t *num_ofdm_data_sub, size_t *fft_size, double *sampling_rate, double CBW,
+ std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table);
 
 // Form the beacon subframe based on the specified 5G slot / subframe format
 std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, std::string> format_table);
@@ -273,13 +273,9 @@ Config::Config(std::string jsonfilename)
     client_rx_gain_b_.assign(gain_rx_json_b.begin(), gain_rx_json_b.end());
   }
 
-  //NEW STUFF
-  slot_format = tdd_conf.value("slot_format", false);
-  CBW = tdd_conf.value("channel_bandwidth", 20e6);
-  is_5G = tdd_conf.value("is_5G", false);
-  numerology = tdd_conf.value("numerology", -1); //-1 represents to numerology.
-  //
-
+  //0 is currently the only suported numerology.
+  numerology = tdd_conf.value("numerology", 0);
+  CBW = tdd_conf.value("channel_bandwidth", -1); // -1 means no CBW specified.
   rate_ = tdd_conf.value("sample_rate", 5e6);
   nco_ = tdd_conf.value("nco_frequency", 0.75 * rate_);
   bw_filter_ = rate_ + 2 * nco_;
@@ -543,16 +539,6 @@ Config::Config(std::string jsonfilename)
 
     std::cout << "Base string: " << frame << std::flush;
 
-
-    //Read the input string from the frame schedule 
-    // and ues .find on the string to find the first instance of 
-    // a comma to determine if the specified mode is symbol or
-    //subframe based
-
-    //Also use a hashmap to store the values of the slot_format table
-    // instead of using an array since we don't want to waste memory 
-    // and we don't need particularly fast lookups.
-
     /*
     If an apostrophe delimiter is found in the frame string, execute logic to
     convert a subframe formated frame into the symbol formated frame that Agora
@@ -561,23 +547,13 @@ Config::Config(std::string jsonfilename)
     if (frame.find(",")!=std::string::npos) {
       
       std::cout << "About to read frame schedule.\n" << std::flush;
-
-      size_t numerology = 0;
-
       std::cout << "About to do 5GNR calcs.\n" << std::flush;
       // Expand the slot configuration to a symbols configuration
-      frame = formFrame(frame, ue_ant_num_, format_table);
+      //frame = formFrame(frame, ue_ant_num_, format_table);
+      frame = fiveGNR(numerology, &ofdm_data_num_, &ofdm_ca_num_, &rate_, CBW,
+       frame, ue_num_, format_table);
 
       std::cout<<"Formed Frame.\n" << frame<<std::flush;
-
-      // std::string frame = fiveGNR(numerology, CBW, &ofdm_data_num_, &ofdm_ca_num_, &rate_, slot_format,
-      //         jframes.at(0).get<std::string>());
-
-      // std::cout << "Done with 5G calcs.\n" << std::flush; 
-
-      // //special_ = FrameStats(special_slot.at(0).get<std::string>());
-
-      // std::cout << "Constructed frame: " << frame << std::flush;
 
     } 
 
@@ -618,18 +594,6 @@ Config::Config(std::string jsonfilename)
            "Number of UL pilot symbol exceeds number of UL symbols!");
 
   frame_.SetClientPilotSyms(client_ul_pilot_syms, client_dl_pilot_syms);
-
-  // if (slot_format) {
-  //   if ((freq_orthogonal_pilot_ == false) &&
-  //     (ue_ant_num_ != special_.NumPilotSyms())) {
-  //   RtAssert(
-  //       false,
-  //       "Number of pilot symbols: " + std::to_string(frame_.NumPilotSyms()) +
-  //           " does not match number of UEs: " + std::to_string(ue_ant_num_));
-  //     }
-  // } else {
-    
-  // }
 
   std::cout << "Num pilot syms: " << frame_.NumPilotSyms() << std::flush;
 
@@ -1791,8 +1755,10 @@ void Config::Print() const {
 }
 
 
-std::string fiveGNR(size_t numerology, double CBW, size_t *num_ofdm_data_sub, size_t *fft_size, double *sampling_rate,
- bool slot_format, std::string frame_schedule, std::string special_slot) {
+std::string fiveGNR(size_t numerology, size_t *num_ofdm_data_sub, size_t *fft_size, double *sampling_rate, double CBW,
+ std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table) {
+  double GB; //Guardband.
+  double TBW; //Transmission bandwidth.
 
   size_t subframes_per_frame = 10; // This might need to be defined in the header.
 
@@ -1808,7 +1774,6 @@ std::string fiveGNR(size_t numerology, double CBW, size_t *num_ofdm_data_sub, si
 
   size_t num_symbols = subframes_per_frame*num_slots*14;
 
-
   std::cout << "Stage 1.\n" << std::flush;
 
   if (num_symbols > kMaxSymbols) {
@@ -1817,7 +1782,7 @@ std::string fiveGNR(size_t numerology, double CBW, size_t *num_ofdm_data_sub, si
                       
   }
 
-    std::cout << "Stage 2.\n" << std::flush;
+  std::cout << "Stage 2.\n" << std::flush;
 
 
                       
@@ -1831,9 +1796,9 @@ std::string fiveGNR(size_t numerology, double CBW, size_t *num_ofdm_data_sub, si
     //divisibility by 8 in the case the AVX2 architecture
     //is used.
 
-    *num_ofdm_data_sub = (*num_ofdm_data_sub/8)*12;
+    *num_ofdm_data_sub = floor(*num_ofdm_data_sub/16)*16;
 
-    std::cout << "given number of ofdm data subcarriers is" << "not divisible by 8. Updating number of ofdm data " << "subcarriers to " << std::to_string(*num_ofdm_data_sub) << ".\n" << std::flush;
+    std::cout << "given number of ofdm data subcarriers is" << "not divisible by 16. Updating number of ofdm data " << "subcarriers to " << std::to_string(*num_ofdm_data_sub) << ".\n" << std::flush;
   }
 
   //If we need to calculate the guard band this is where it should be calculated.
@@ -1866,50 +1831,62 @@ std::string fiveGNR(size_t numerology, double CBW, size_t *num_ofdm_data_sub, si
   //Update the sampling rate to miminum possible rate.
   //This is one reason fft_size is validated.
 
-  *sampling_rate = scs*(*fft_size);
+  *sampling_rate = scs*(*fft_size); 
+
+  //calculate channel bandwidth based on the specified parameters.
+
+  TBW = *num_ofdm_data_sub * scs;
+
+  //If the user specified a desired CBW, verify that the CBW is valid.
+  if (CBW > 0) {
+    //CBW must be in MHz and SCS must be in Khz
+    GB = (1e3) * (1000 * (CBW / 1e6) - (*num_ofdm_data_sub + 1) * (scs / 1e3)) / 2;
+    if (TBW + 2*GB > CBW) {
+    std::cout<<"Calculated channel bandwidth is larger than specified channel ";
+    std::cout<<"bandwidth. Calculated bandwidth is ";
+    std::cout << std::to_string(TBW + 2*GB) << ".\n" << std::flush;
+    }
+
+  } else { 
+    /*
+    If the user doesn't specify a CBW, calculate the CBW that supports
+    their design specs. This method only works for CBW up to 50 Mhz.
+    Divide the Transmission bandwidth by 5. Round up, calculate
+    GB see if CBW is valid and if not we recalculate the CBW.
+    */
+
+   CBW = 5*round(TBW / 5);
+
+   GB = (1e3) * (1000 * (CBW / 1e6) - (*num_ofdm_data_sub + 1) * (scs / 1e3)) / 2;
+
+   if (TBW + 2*GB > CBW) {
+    CBW += 5e6; // Increase by 5 MHz to the next standard CBW.
+    GB = (1e3) * (1000 * (CBW / 1e6) - (*num_ofdm_data_sub + 1) * (scs / 1e3)) / 2;
+   }
+
+  }
+
+  
+
+  //Output in agora's logs, currently to console
+  // all the specifics of the transmission.
+
+  std::cout<<"Transmission properties: .\n";
+  std::cout<< "Channel bandwitdh: " << std::to_string((TBW + 2*GB) / 1e6);
+  std::cout<< " MHz.\n";
+  std::cout<<"sampling rate: " << std::to_string(*sampling_rate / 1e6);
+  std::cout<<"MHz.\n";
+  std::cout<<"OFDM_data_num: " << std::to_string(*num_ofdm_data_sub)<<".\n";
+  std::cout<<"FFT_num: " << std::to_string(*fft_size)<<".\n";
 
 
-  /*
-  if slot format is specified the frame needs to be constructed, otherwise
-  the frame schedule can be returned as is
-  */
-
-  std::cout << "Stage 5.\n" << std::flush;
-
-
-  // if (slot_format) {
-  //    //Construct frame from slots
-  //     return expand_slots(frame_schedule, special_slot, num_symbols);
-  // }
 
   std::cout << "Stage 6.\n" << std::flush;
 
+  frame_schedule  = formFrame(frame_schedule, user_num, format_table);
+
 
   return frame_schedule;
-
-}
-
-std::string expand_slots(std::string frame_schedule, std::string special_slot, size_t num_symbols) {
-
-  std::string frame;
-
-  for (size_t i = 0; i< num_symbols; i++) {
-
-    //Insert the special slot
-      if (frame_schedule[i/14] == 'S'){
-        size_t special_start = i;
-
-        while (i < special_start + 14){
-          frame+=special_slot[i-special_start];
-          i++;
-        }
-        
-      }
-
-    frame+=frame_schedule[i/14];
-  }  
-
-  return frame;
 
 }
 
@@ -1933,7 +1910,7 @@ std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, st
   std::cout<<"user_num should be"<<std::to_string(user_num)<<std::flush;
 
   std::cout<<"Subframe should be"<<subframe<<std::flush;
-  int pilot_num = 0;
+  size_t pilot_num = 0;
 
   //Check the requirements:
   if (subframe.at(0) != 'D') {
