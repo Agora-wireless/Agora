@@ -1774,16 +1774,17 @@ std::string fiveGNR(size_t numerology, size_t *num_ofdm_data_sub, size_t *fft_si
 
   size_t num_symbols = subframes_per_frame*num_slots*14;
 
-  std::cout << "Stage 1.\n" << std::flush;
-
   if (num_symbols > kMaxSymbols) {
+
     //std::string error_message = "num_symbols = " << std::to_string(num_symbols) << " exceeds kMaxSymbols = " << std::to_string(kMaxSymbols);
+    std::cout<<"\n" << std::flush;
+
+    AGORA_LOG_ERROR(
+            " *** Error: AGORA LOG ERROR TEST\n");
+
     throw std::runtime_error("num symbols exceeds max symbols.\n");
                       
   }
-
-  std::cout << "Stage 2.\n" << std::flush;
-
 
                       
   //If the number of ofdm sub-carriers doesn't match the AVX512 / AVX2 reqs
@@ -1798,14 +1799,11 @@ std::string fiveGNR(size_t numerology, size_t *num_ofdm_data_sub, size_t *fft_si
 
     *num_ofdm_data_sub = floor(*num_ofdm_data_sub/16)*16;
 
-    std::cout << "given number of ofdm data subcarriers is" << "not divisible by 16. Updating number of ofdm data " << "subcarriers to " << std::to_string(*num_ofdm_data_sub) << ".\n" << std::flush;
+    std::cout << "given number of ofdm data subcarriers is ";
+    std::cout << "not divisible by 16. Updating number of ofdm data ";
+    std::cout << "subcarriers to " << std::to_string(*num_ofdm_data_sub);
+    std::cout << ".\n" << std::flush;
   }
-
-  //If we need to calculate the guard band this is where it should be calculated.
-
-  std::cout << "Stage 3.\n" << std::flush;
-
-
 
 //Calculate the valid fft_size
   for (unsigned int i = 0; i < sizeof(valid_ffts) / sizeof(size_t); i++) {
@@ -1821,12 +1819,13 @@ std::string fiveGNR(size_t numerology, size_t *num_ofdm_data_sub, size_t *fft_si
 
     *fft_size = valid_fft_size;
 
-    std::cout << "Specified fft_size was too small to accomodate the number" << "of data subcarriers. Setting fft_size to " << std::to_string(*fft_size) << std::flush;
+    AGORA_LOG_WARN("Specified fft_size was too small to accomodate the number", 
+     "of data subcarriers. Setting fft_size to %zu.\n", *fft_size
+    );
+
+    //std::cout << "Specified fft_size was too small to accomodate the number" << "of data subcarriers. Setting fft_size to " << std::to_string(*fft_size) << std::flush;
 
   }
-
-  std::cout << "Stage 4.\n" << std::flush;
-
 
   //Update the sampling rate to miminum possible rate.
   //This is one reason fft_size is validated.
@@ -1842,9 +1841,14 @@ std::string fiveGNR(size_t numerology, size_t *num_ofdm_data_sub, size_t *fft_si
     //CBW must be in MHz and SCS must be in Khz
     GB = (1e3) * (1000 * (CBW / 1e6) - (*num_ofdm_data_sub + 1) * (scs / 1e3)) / 2;
     if (TBW + 2*GB > CBW) {
-    std::cout<<"Calculated channel bandwidth is larger than specified channel ";
-    std::cout<<"bandwidth. Calculated bandwidth is ";
-    std::cout << std::to_string(TBW + 2*GB) << ".\n" << std::flush;
+
+      AGORA_LOG_WARN("Calculated channel bandwidth is larger than specified" 
+      " channel bandwidth. Calculated bandwidth is %d.\n", (TBW + 2*GB)
+      );
+
+    // std::cout<<"Calculated channel bandwidth is larger than specified channel ";
+    // std::cout<<"bandwidth. Calculated bandwidth is ";
+    // std::cout << std::to_string(TBW + 2*GB) << ".\n" << std::flush;
     }
 
   } else { 
@@ -1866,22 +1870,34 @@ std::string fiveGNR(size_t numerology, size_t *num_ofdm_data_sub, size_t *fft_si
 
   }
 
+  std::cout<<"Error here 1?"<<std::flush;
+
   
 
   //Output in agora's logs, currently to console
   // all the specifics of the transmission.
 
-  std::cout<<"Transmission properties: .\n";
-  std::cout<< "Channel bandwitdh: " << std::to_string((TBW + 2*GB) / 1e6);
-  std::cout<< " MHz.\n";
-  std::cout<<"sampling rate: " << std::to_string(*sampling_rate / 1e6);
-  std::cout<<"MHz.\n";
-  std::cout<<"OFDM_data_num: " << std::to_string(*num_ofdm_data_sub)<<".\n";
-  std::cout<<"FFT_num: " << std::to_string(*fft_size)<<".\n";
+
+  AGORA_LOG_INFO(
+    "Transmission properties: .\n Channel bandwidth: %f MHz.\n"
+    "Sampling rate: %f MHz.\nOFDM_data_num: %zu.\nFFT_size: %zu.\n", 
+    (TBW + 2*GB) / 1e6,*sampling_rate / 1e6, *num_ofdm_data_sub, *fft_size
+  ); 
+
+  
+  
 
 
 
-  std::cout << "Stage 6.\n" << std::flush;
+
+  // std::cout<<"Transmission properties: .\n";
+  // std::cout<< "Channel bandwitdh: " << std::to_string((TBW + 2*GB) / 1e6);
+  // std::cout<< " MHz.\n";
+  // std::cout<<"sampling rate: " << std::to_string(*sampling_rate / 1e6);
+  // std::cout<<"MHz.\n";
+  // std::cout<<"OFDM_data_num: " << std::to_string(*num_ofdm_data_sub)<<".\n";
+  // std::cout<<"FFT_num: " << std::to_string(*fft_size)<<".\n";
+
 
   frame_schedule  = formFrame(frame_schedule, user_num, format_table);
 
@@ -1905,11 +1921,11 @@ std::string fiveGNR(size_t numerology, size_t *num_ofdm_data_sub, size_t *fft_si
 std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, std::string> format_table) {
   std::string subframe = format_table[format_num];
 
-  std::cout<<"format_num should be"<<std::to_string(format_num)<<std::flush;
+  // std::cout<<"format_num should be"<<std::to_string(format_num)<<std::flush;
 
-  std::cout<<"user_num should be"<<std::to_string(user_num)<<std::flush;
+  // std::cout<<"user_num should be"<<std::to_string(user_num)<<std::flush;
 
-  std::cout<<"Subframe should be"<<subframe<<std::flush;
+  // std::cout<<"Subframe should be"<<subframe<<std::flush;
   size_t pilot_num = 0;
 
   //Check the requirements:
@@ -1961,9 +1977,9 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int,
   int subframes[10]; // Update this hardcoded value to a var.
   int subframe_idx = 0;
 
-  std::cout << "HERE 0.\n" << std::flush;
+  // std::cout << "HERE 0.\n" << std::flush;
 
-  std::cout << frame_schedule <<".\n" << std::flush;
+  // std::cout << frame_schedule <<".\n" << std::flush;
 
   
   /*
@@ -1984,7 +2000,7 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int,
    
     if (frame_schedule.at(i) == ',') {   
 
-      std::cout<<"subframe index: " << std::to_string(subframe_idx) << "\n"<<std::flush;
+      //std::cout<<"subframe index: " << std::to_string(subframe_idx) << "\n"<<std::flush;
       subframes[subframe_idx] = std::stoi(temp);
       subframe_idx++;
       temp.clear();
@@ -1993,8 +2009,8 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int,
     } 
 
     if (i == frame_schedule.size()-1) {
-      std::cout<<"In the last position of the frame schedule."<<std::flush;
-      std::cout<<"subframe index: " << std::to_string(subframe_idx) << "\n"<<std::flush;
+      //std::cout<<"In the last position of the frame schedule."<<std::flush;
+      //std::cout<<"subframe index: " << std::to_string(subframe_idx) << "\n"<<std::flush;
       subframes[subframe_idx] = std::stoi(temp);
       // subframe_idx++;
       // temp.clear();
@@ -2002,12 +2018,11 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int,
       
   }
 
-  std::cout << "HERE 2.\n" << std::flush;
+  //std::cout << "HERE 2.\n" << std::flush;
 
-  for (int i = 0; i < 10; i++) {
-    std::cout<< "Printing i: " << std::to_string(i) << " subframe: " << std::to_string(subframes[i]) <<"   "<<std::flush;
-    //std::cout<< subframes[i] << " " << std::flush;
-  }
+  // for (int i = 0; i < 10; i++) {
+  //   std::cout<< "Printing i: " << std::to_string(i) << " subframe: " << std::to_string(subframes[i]) <<"   "<<std::flush;
+  // }
 
 
   // Create the frame based on the format nums in the subframe array.
@@ -2020,14 +2035,24 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int,
 
   for (int i = 1; i < 10; i++) {  
     try {
-      std::cout<<"accessing: " << std::to_string(subframes[i]) <<"\n";
+      //std::cout<<"accessing: " << std::to_string(subframes[i]) <<"\n";
       frame += format_table.at(subframes[i]);
     } catch (std::out_of_range &e) {
-      std::cout<<"User specified a non supported subframe format.\n" <<std::flush;
-      std::cout<<"Currently supported subframe formats are: " << std::flush;
+
+      std::string error_message = "User specified a non supported subframe "
+      "format.\nCurrently supported subframe formats are:";
+
+
+      // std::cout<<"User specified a non supported subframe format.\n" <<std::flush;
+      // std::cout<<"Currently supported subframe formats are: " << std::flush;
       for (auto format = format_table.begin(); format != format_table.end(); format++) {
-        std::cout<<" " << format->first << " : " << format->second <<std::flush;;
+        error_message += " %i : %s", format->first, format->second;
+        //std::cout<<" " << format->first << " : " << format->second <<std::flush;;
       }
+
+      AGORA_LOG_ERROR(
+          error_message + "\n"
+          );
 
       throw std::runtime_error(
         "Non supported frame format."
@@ -2036,7 +2061,7 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int,
     
   }
 
-  std::cout << "HERE 3.\n" << std::flush;
+  //std::cout << "HERE 3.\n" << std::flush;
 
 
   return frame;
