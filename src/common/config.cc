@@ -546,14 +546,14 @@ Config::Config(std::string jsonfilename)
     */ 
     if (frame.find(",")!=std::string::npos) {
       
-      std::cout << "About to read frame schedule.\n" << std::flush;
-      std::cout << "About to do 5GNR calcs.\n" << std::flush;
+      // std::cout << "About to read frame schedule.\n" << std::flush;
+      // std::cout << "About to do 5GNR calcs.\n" << std::flush;
       // Expand the slot configuration to a symbols configuration
       //frame = formFrame(frame, ue_ant_num_, format_table);
       frame = fiveGNR(numerology, &ofdm_data_num_, &ofdm_ca_num_, &rate_, CBW,
-       frame, ue_num_, format_table);
+      frame, ue_num_, format_table);
 
-      std::cout<<"Formed Frame.\n" << frame<<std::flush;
+      // std::cout<<"Formed Frame.\n" << frame<<std::flush;
 
     } 
 
@@ -595,7 +595,7 @@ Config::Config(std::string jsonfilename)
 
   frame_.SetClientPilotSyms(client_ul_pilot_syms, client_dl_pilot_syms);
 
-  std::cout << "Num pilot syms: " << frame_.NumPilotSyms() << std::flush;
+  std::cout << "Num pilot syms: " << frame_.NumPilotSyms() << ".\n" << std::flush;
 
 
   if ((freq_orthogonal_pilot_ == false) &&
@@ -1799,10 +1799,15 @@ std::string fiveGNR(size_t numerology, size_t *num_ofdm_data_sub, size_t *fft_si
 
     *num_ofdm_data_sub = floor(*num_ofdm_data_sub/16)*16;
 
-    std::cout << "given number of ofdm data subcarriers is ";
-    std::cout << "not divisible by 16. Updating number of ofdm data ";
-    std::cout << "subcarriers to " << std::to_string(*num_ofdm_data_sub);
-    std::cout << ".\n" << std::flush;
+    // std::cout << "The given number of ofdm data subcarriers is ";
+    // std::cout << "not divisible by 16. Updating number of ofdm data ";
+    // std::cout << "subcarriers to " << std::to_string(*num_ofdm_data_sub);
+    // std::cout << ".\n" << std::flush;
+
+    AGORA_LOG_WARN("The given number of ofdm data subcarriers is "
+    "not divisible by 16. Updating number of ofdm data subcarriers to %zu.\n", 
+    *num_ofdm_data_sub
+    );
   }
 
 //Calculate the valid fft_size
@@ -1870,7 +1875,7 @@ std::string fiveGNR(size_t numerology, size_t *num_ofdm_data_sub, size_t *fft_si
 
   }
 
-  std::cout<<"Error here 1?"<<std::flush;
+  //std::cout<<"Error here 1?"<<std::flush;
 
   
 
@@ -1879,7 +1884,7 @@ std::string fiveGNR(size_t numerology, size_t *num_ofdm_data_sub, size_t *fft_si
 
 
   AGORA_LOG_INFO(
-    "Transmission properties: .\n Channel bandwidth: %f MHz.\n"
+    "Transmission properties:\n Channel bandwidth: %f MHz.\n"
     "Sampling rate: %f MHz.\nOFDM_data_num: %zu.\nFFT_size: %zu.\n", 
     (TBW + 2*GB) / 1e6,*sampling_rate / 1e6, *num_ofdm_data_sub, *fft_size
   ); 
@@ -1987,7 +1992,7 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int,
    Copy all numbers between commas into a array.
   */ 
 
-  std::cout << "HERE 1.\n" << std::flush;
+ // std::cout << "HERE 1.\n" << std::flush;
   
   for (unsigned int i = 0; i < frame_schedule.size(); i++) {
 
@@ -1995,6 +2000,12 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int,
     if (subframe_idx > 9) {
       throw std::runtime_error(
         "Entered frame_schedule has more than 10 subframes."
+      );
+    }
+
+    if (i == frame_schedule.size()-1 && subframe_idx != 9){
+      throw std::runtime_error(
+        "There are less than 10 frames in the frame schedule."
       );
     }
    
@@ -2018,6 +2029,7 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int,
       
   }
 
+
   //std::cout << "HERE 2.\n" << std::flush;
 
   // for (int i = 0; i < 10; i++) {
@@ -2029,9 +2041,9 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int,
 
   frame += formBeaconSubframe(subframes[0], user_num, format_table);
 
-  std::cout<<" \n frame is currently: " << frame << ".\n";
+  // std::cout<<" \n frame is currently: " << frame << ".\n";
 
-  std::cout<<"beacon subframe formed.\n"<<std::flush;
+  // std::cout<<"beacon subframe formed.\n"<<std::flush;
 
   for (int i = 1; i < 10; i++) {  
     try {
