@@ -3,6 +3,7 @@ import time
 import os.path
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 def process_csv_file(file_path, last_processed_frame, prev_frame_number, prev_reading, ax, ylabel, line_color, log_scale=False):
     if not os.path.exists(file_path):
@@ -84,6 +85,13 @@ def monitor_csv_files(evm_file_path, snr_file_path, ber_file_path, data_rate):
         time.sleep(1)
 
 if __name__ == '__main__':
+    cmd1 = "rm log-evm-BS.csv"
+    cmd2 = "rm log-ulsnr-BS.csv"
+    cmd3 = "rm log-ber-BS.csv"
+    os.system(cmd1)
+    os.system(cmd2)
+    os.system(cmd3)
+
     evm_csv_file_path = 'log-evm-BS.csv'  # Replace with the actual path to your EVM CSV file
     snr_csv_file_path = 'log-ulsnr-BS.csv'  # Replace with the actual path to your SNR CSV file
     ber_csv_file_path = 'log-ber-BS.csv'  # Replace with the actual path to your BER CSV file

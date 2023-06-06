@@ -98,7 +98,7 @@ void RadioUHDSdr::Init(const Config* cfg, size_t id, const std::string& serial,
     // const std::string frame_size = std::to_string(cfg->SampsPerSymbol() * 4);
     // args["send_frame_size"] = frame_size;
     // args["recv_frame_size"] = frame_size;
-
+    args["master_clock_rate"] = "122.88e6";
     for (size_t tries = 0; tries < kMakeMaxAttempts; tries++) {
       try {
         dev_ = uhd::usrp::multi_usrp::make(args);
@@ -190,8 +190,8 @@ void RadioUHDSdr::Setup(const std::vector<double>& tx_gains,
     dev_->set_tx_freq(tr1, ch);
 
     // kUseUHD
-    dev_->set_rx_gain(rx_gains.at(ch), "PGA0", ch);
-    dev_->set_tx_gain(tx_gains.at(ch), "PGA0", ch);
+    dev_->set_rx_gain(rx_gains.at(ch), ch);
+    dev_->set_tx_gain(tx_gains.at(ch), ch);
   }  // end for (const auto& ch : EnabledChannels())
 }
 
@@ -202,7 +202,7 @@ void RadioUHDSdr::Activate(Radio::ActivationTypes type, long long act_time_ns,
       "%d\n",
       SerialNumber().c_str(), Id(), act_time_ns, samples,
       static_cast<int>(type));
-  // bool is_ue_ = true;
+  bool is_ue_ = true;
   if (is_ue_) {
     AGORA_LOG_INFO("setting sources to internal \n");
     dev_->set_clock_source("internal");
