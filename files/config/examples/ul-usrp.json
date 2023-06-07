@@ -1,13 +1,13 @@
 {
     "serial_file": "files/topology/bs-usrp-addr.json",
     "cells": 1,
-    "channel": "A",
+    "channel": "B",
     "frequency": 3e9,
     "single_gain": true,
-    "rx_gain_a": 20,
-    "tx_gain_a": 20,
-    "rx_gain_b": 20,
-    "tx_gain_b": 20,
+    "rx_gain_a": 30,
+    "tx_gain_a": 30,
+    "rx_gain_b": 30,
+    "tx_gain_b": 30,
     "sample_rate": 122.88e6,
     "cp_size": 32,
     "fft_size": 1024,
@@ -17,12 +17,12 @@
     "ul_mcs": {
         "modulation": "64QAM",
         "code_rate": 0.333,
-        "decoderIter": 15
+        "decoderIter": 20
     },
     "dl_mcs" : {
         "modulation": "64QAM",
         "code_rate": 0.333,
-        "decoderIter": 15
+        "decoderIter": 20
     },
     "ofdm_tx_zero_prefix": 160,
     "ofdm_tx_zero_postfix": 160,
@@ -35,18 +35,18 @@
     "beamsweep": false,
     /* UE configuration */
     "ue_resync_period": 500,
-    "ue_channel": "A",
+    "ue_channel": "B",
     "ue_rx_gain_a": [
-        60
+        62
     ],
     "ue_tx_gain_a": [
-        60 
+        62 
     ],
     "ue_rx_gain_b": [
-        60  
+        62  
     ],
     "ue_tx_gain_b": [
-        60
+        62
     ],
     "tx_advance": [
         330 

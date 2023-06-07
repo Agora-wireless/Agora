@@ -102,6 +102,9 @@ void RadioUHDSdr::Init(const Config* cfg, size_t id, const std::string& serial,
     for (size_t tries = 0; tries < kMakeMaxAttempts; tries++) {
       try {
         dev_ = uhd::usrp::multi_usrp::make(args);
+	uhd::usrp::subdev_spec_t subdev_spec("B:0 B:1");
+        dev_->set_rx_subdev_spec(subdev_spec);
+        dev_->set_tx_subdev_spec(subdev_spec);
         break;
       } catch (const std::runtime_error& e) {
         const auto* message = e.what();
@@ -164,8 +167,10 @@ void RadioUHDSdr::Setup(const std::vector<double>& tx_gains,
 
   // use the TRX antenna port for both tx and rx
   for (auto ch : EnabledChannels()) {
+    std::cout<<"ch is " << ch << std::endl;
     dev_->set_rx_antenna("RX2", ch);
     dev_->set_tx_antenna("TX/RX", ch);
+    std::cout<<"antenna setting finished";
   }
 
   for (const auto& ch : EnabledChannels()) {
@@ -193,6 +198,7 @@ void RadioUHDSdr::Setup(const std::vector<double>& tx_gains,
     dev_->set_rx_gain(rx_gains.at(ch), ch);
     dev_->set_tx_gain(tx_gains.at(ch), ch);
   }  // end for (const auto& ch : EnabledChannels())
+  std::cout<<"no issue here";
 }
 
 void RadioUHDSdr::Activate(Radio::ActivationTypes type, long long act_time_ns,

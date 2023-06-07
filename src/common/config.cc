@@ -1403,7 +1403,7 @@ void Config::GenData() {
   float pilot_max_mag = CommsLib::FindMaxAbs(pilot_ifft, this->ofdm_ca_num_);
   // additional 2^2 (6dB) power backoff
   this->scale_ =
-      2 * std::max({ul_max_mag, dl_max_mag, ue_pilot_max_mag, pilot_max_mag});
+      1 * std::max({ul_max_mag, dl_max_mag, ue_pilot_max_mag, pilot_max_mag});
 
   float dl_papr = dl_max_mag /
                   CommsLib::FindMeanAbs(dl_iq_ifft, this->frame_.NumDLSyms(),
