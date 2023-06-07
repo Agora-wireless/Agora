@@ -122,7 +122,7 @@ std::vector<Packet*> TxRxWorkerClientSim::RecvEnqueue(size_t interface_id) {
             "RecvEnqueue: Ctrl channel frame_id mismatch error (%zu/%zu)!\n",
             ctrl_frame_id, pkt->frame_id_);
       }
-      rx_placement.Free();
+      ReturnRxPacket(rx_placement);
     } else {
       // Push kPacketRX event into the queue.
       const EventData rx_message(EventType::kPacketRX,

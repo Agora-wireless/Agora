@@ -57,14 +57,19 @@ EventData DoIFFT::Launch(size_t tag) {
                 tid_, frame_id, symbol_id, ant_id);
   }
 
+  const size_t dl_symbol_idx = cfg_->Frame().GetDLSymbolIdx(symbol_id);
+  const size_t total_symbol_idx_dl =
+      cfg_->GetTotalDataSymbolIdxDl(frame_id, dl_symbol_idx);
+  const size_t in_offset = (total_symbol_idx_dl * cfg_->BsAntNum()) + ant_id;
+
   const size_t total_symbol_idx =
-      cfg_->GetTotalDlSymbolIdx(frame_id, symbol_id);
-  const size_t offset = (total_symbol_idx * cfg_->BsAntNum()) + ant_id;
+      cfg_->GetTotalSymbolIdxDl(frame_id, symbol_id);
+  const size_t out_offset = (total_symbol_idx * cfg_->BsAntNum()) + ant_id;
 
   const size_t start_tsc1 = GetTime::WorkerRdtsc();
   duration_stat_->task_duration_[1u] += start_tsc1 - start_tsc;
 
-  auto* ifft_in_ptr = reinterpret_cast<float*>(dl_ifft_buffer_[offset]);
+  auto* ifft_in_ptr = reinterpret_cast<float*>(dl_ifft_buffer_[in_offset]);
   auto* ifft_out_ptr =
       (kUseOutOfPlaceIFFT || kMemcpyBeforeIFFT) ? ifft_out_ : ifft_in_ptr;
 
@@ -117,8 +122,8 @@ EventData DoIFFT::Launch(size_t tag) {
     ss << "IFFT_output" << ant_id << "=[";
     for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
       ss << std::fixed << std::setw(5) << std::setprecision(3)
-         << dl_ifft_buffer_[offset][i].re << "+1j*"
-         << dl_ifft_buffer_[offset][i].im << " ";
+         << dl_ifft_buffer_[in_offset][i].re << "+1j*"
+         << dl_ifft_buffer_[in_offset][i].im << " ";
     }
     ss << "];" << std::endl;
     std::cout << ss.str();
@@ -128,7 +133,7 @@ EventData DoIFFT::Launch(size_t tag) {
   duration_stat_->task_duration_[2u] += start_tsc2 - start_tsc1;
 
   auto* pkt = reinterpret_cast<Packet*>(
-      &dl_socket_buffer_[offset * cfg_->DlPacketLength()]);
+      &dl_socket_buffer_[out_offset * cfg_->DlPacketLength()]);
   short* socket_ptr = &pkt->data_[2u * cfg_->OfdmTxZeroPrefix()];
 
   // IFFT scaled results by OfdmCaNum(), we scale down IFFT results

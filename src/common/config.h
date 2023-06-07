@@ -455,7 +455,7 @@ class Config {
     return ((frame_id % kFrameWnd) * this->frame_.NumDLSyms() + symbol_idx_dl);
   }
 
-  inline size_t GetTotalDlSymbolIdx(size_t frame_id, size_t symbol_id) {
+  inline size_t GetTotalSymbolIdxDl(size_t frame_id, size_t symbol_id) {
     const size_t symbol_idx_dl =
         symbol_id < this->frame_.GetDLSymbol(0)
             ? this->frame_.GetDLControlSymbolIdx(symbol_id)

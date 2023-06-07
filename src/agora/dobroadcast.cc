@@ -37,7 +37,7 @@ void DoBroadcast::GenerateBroadcastSymbols(size_t frame_id) {
     }
 
     const size_t total_symbol_idx =
-        cfg_->GetTotalDlSymbolIdx(frame_id, symbol_id);
+        cfg_->GetTotalSymbolIdxDl(frame_id, symbol_id);
     const size_t offset = (total_symbol_idx * cfg_->BsAntNum()) +
                           cfg_->BeaconAnt();  // TODO: change to BroadcastAnt()
 
@@ -46,8 +46,7 @@ void DoBroadcast::GenerateBroadcastSymbols(size_t frame_id) {
     bcast_iq_samps.at(symbol_idx_dl) =
         reinterpret_cast<std::complex<int16_t>*>(pkt->data_);
     ctrl_data.at(symbol_idx_dl) =
-        frame_id +
-        TX_FRAME_DELTA;  // TODO: later ctrl data might include other info
+        frame_id;  // TODO: later ctrl data might include other info
   }
   cfg_->GenBroadcastSlots(bcast_iq_samps, ctrl_data);
 
