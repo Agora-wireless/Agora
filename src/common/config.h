@@ -411,6 +411,7 @@ class Config {
   inline Table<std::complex<int16_t>>& DlIqT() { return this->dl_iq_t_; }
 
   // Public functions
+  void GenPilots();
   void GenData();
   void GenBroadcastSlots(std::vector<std::complex<int16_t>*>& bcast_iq_samps,
                          std::vector<size_t> ctrl_msg);
@@ -737,7 +738,9 @@ class Config {
   std::vector<uint32_t> beacon_;
   complex_float* pilots_;
   complex_float* pilots_sgn_;
+  complex_float* pilot_ifft_;
   Table<complex_float> ue_specific_pilot_;
+  Table<complex_float> ue_pilot_ifft_;
   Table<std::complex<int16_t>> ue_specific_pilot_t_;
   std::vector<std::complex<float>> common_pilot_;
 

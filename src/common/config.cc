@@ -32,6 +32,7 @@ static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
 static constexpr size_t kVarNodesSize = 1024 * 1024 * sizeof(int16_t);
+static constexpr size_t kControlMCS = 5;  // QPSK, 308/1024
 
 /// Print the I/Q samples in the pilots
 static constexpr bool kDebugPrintPilot = false;
@@ -1021,7 +1022,7 @@ void Config::DumpMcsInfo() {
       dl_ldpc_config_.NumRows(), dl_modulation_.c_str());
 }
 
-void Config::GenData() {
+void Config::GenPilots() {
   if ((kUseArgos == true) || (kUseUHD == true) || (kUsePureUHD == true)) {
     std::vector<std::vector<double>> gold_ifft =
         CommsLib::GetSequence(128, CommsLib::kGoldIfft);
@@ -1097,17 +1098,17 @@ void Config::GenData() {
                      (float)std::pow(std::abs(this->common_pilot_[i]), 2);
     this->pilots_sgn_[i] = {pilot_sgn.real(), pilot_sgn.imag()};
   }
-  complex_float* pilot_ifft;
-  AllocBuffer1d(&pilot_ifft, this->ofdm_ca_num_,
+  complex_float* pilot_ifft_;
+  AllocBuffer1d(&pilot_ifft_, this->ofdm_ca_num_,
                 Agora_memory::Alignment_t::kAlign64, 1);
   for (size_t j = 0; j < ofdm_data_num_; j++) {
     // FFT Shift
     const size_t k = j + ofdm_data_start_ >= ofdm_ca_num_ / 2
                          ? j + ofdm_data_start_ - ofdm_ca_num_ / 2
                          : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
-    pilot_ifft[k] = this->pilots_[j];
+    pilot_ifft_[k] = this->pilots_[j];
   }
-  CommsLib::IFFT(pilot_ifft, this->ofdm_ca_num_, false);
+  CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
 
   // Generate UE-specific pilots based on Zadoff-Chu sequence for phase tracking
   this->ue_specific_pilot_.Malloc(this->ue_ant_num_, this->ofdm_data_num_,
@@ -1115,9 +1116,8 @@ void Config::GenData() {
   this->ue_specific_pilot_t_.Calloc(this->ue_ant_num_, this->samps_per_symbol_,
                                     Agora_memory::Alignment_t::kAlign64);
 
-  Table<complex_float> ue_pilot_ifft;
-  ue_pilot_ifft.Calloc(this->ue_ant_num_, this->ofdm_ca_num_,
-                       Agora_memory::Alignment_t::kAlign64);
+  ue_pilot_ifft_.Calloc(this->ue_ant_num_, this->ofdm_ca_num_,
+                        Agora_memory::Alignment_t::kAlign64);
   for (size_t i = 0; i < ue_ant_num_; i++) {
     auto zc_ue_pilot_i = CommsLib::SeqCyclicShift(
         zc_seq,
@@ -1129,11 +1129,14 @@ void Config::GenData() {
       const size_t k = j + ofdm_data_start_ >= ofdm_ca_num_ / 2
                            ? j + ofdm_data_start_ - ofdm_ca_num_ / 2
                            : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
-      ue_pilot_ifft[i][k] = this->ue_specific_pilot_[i][j];
+      ue_pilot_ifft_[i][k] = this->ue_specific_pilot_[i][j];
     }
-    CommsLib::IFFT(ue_pilot_ifft[i], ofdm_ca_num_, false);
+    CommsLib::IFFT(ue_pilot_ifft_[i], ofdm_ca_num_, false);
   }
+}
 
+void Config::GenData() {
+  this->GenPilots();
   // Get uplink and downlink raw bits either from file or random numbers
   const size_t dl_num_bytes_per_ue_pad =
       Roundup<64>(this->dl_num_bytes_per_cb_) *
@@ -1462,8 +1465,8 @@ void Config::GenData() {
       CommsLib::FindMaxAbs(dl_iq_ifft, this->frame_.NumDLSyms(),
                            this->ue_ant_num_ * this->ofdm_ca_num_);
   float ue_pilot_max_mag = CommsLib::FindMaxAbs(
-      ue_pilot_ifft, this->ue_ant_num_, this->ofdm_ca_num_);
-  float pilot_max_mag = CommsLib::FindMaxAbs(pilot_ifft, this->ofdm_ca_num_);
+      ue_pilot_ifft_, this->ue_ant_num_, this->ofdm_ca_num_);
+  float pilot_max_mag = CommsLib::FindMaxAbs(pilot_ifft_, this->ofdm_ca_num_);
   // additional 2^2 (6dB) power backoff
   this->scale_ =
       2 * std::max({ul_max_mag, dl_max_mag, ue_pilot_max_mag, pilot_max_mag});
@@ -1501,18 +1504,18 @@ void Config::GenData() {
 
   // Generate time domain ue-specific pilot symbols
   for (size_t i = 0; i < this->ue_ant_num_; i++) {
-    CommsLib::Ifft2tx(ue_pilot_ifft[i], this->ue_specific_pilot_t_[i],
+    CommsLib::Ifft2tx(ue_pilot_ifft_[i], this->ue_specific_pilot_t_[i],
                       this->ofdm_ca_num_, this->ofdm_tx_zero_prefix_,
                       this->cp_len_, kDebugDownlink ? 1 : this->scale_);
   }
 
   this->pilot_ci16_.resize(samps_per_symbol_, 0);
-  CommsLib::Ifft2tx(pilot_ifft, this->pilot_ci16_.data(), ofdm_ca_num_,
+  CommsLib::Ifft2tx(pilot_ifft_, this->pilot_ci16_.data(), ofdm_ca_num_,
                     ofdm_tx_zero_prefix_, cp_len_, scale_);
 
   for (size_t i = 0; i < ofdm_ca_num_; i++) {
-    this->pilot_cf32_.emplace_back(pilot_ifft[i].re / scale_,
-                                   pilot_ifft[i].im / scale_);
+    this->pilot_cf32_.emplace_back(pilot_ifft_[i].re / scale_,
+                                   pilot_ifft_[i].im / scale_);
   }
   this->pilot_cf32_.insert(this->pilot_cf32_.begin(),
                            this->pilot_cf32_.end() - this->cp_len_,
@@ -1544,16 +1547,16 @@ void Config::GenData() {
                                         : (org_sc + center_sc);
           if (this->freq_orthogonal_pilot_ == false ||
               sc_id % this->pilot_sc_group_size_ == ue_id) {
-            pilot_ifft[shifted_sc] = this->pilots_[sc_id];
+            pilot_ifft_[shifted_sc] = this->pilots_[sc_id];
             pilot_sc_list.push_back(org_sc);
           } else {
-            pilot_ifft[shifted_sc].re = 0.0f;
-            pilot_ifft[shifted_sc].im = 0.0f;
+            pilot_ifft_[shifted_sc].re = 0.0f;
+            pilot_ifft_[shifted_sc].im = 0.0f;
           }
         }
         pilot_ue_sc_.at(ue_id) = arma::uvec(pilot_sc_list);
-        CommsLib::IFFT(pilot_ifft, this->ofdm_ca_num_, false);
-        CommsLib::Ifft2tx(pilot_ifft,
+        CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
+        CommsLib::Ifft2tx(pilot_ifft_,
                           this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).data(),
                           ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
       }
@@ -1575,10 +1578,10 @@ void Config::GenData() {
                   << ue_specific_pilot_[ue_id][sc_id].im << " ";
       }
       std::cout << std::endl << "];" << std::endl;
-      std::cout << "ue_pilot_ifft[" << ue_id << "] = [" << std::endl;
+      std::cout << "ue_pilot_ifft_[" << ue_id << "] = [" << std::endl;
       for (size_t ifft_idx = 0; ifft_idx < ofdm_ca_num_; ifft_idx++) {
-        std::cout << ue_pilot_ifft[ue_id][ifft_idx].re << "+1i*"
-                  << ue_pilot_ifft[ue_id][ifft_idx].im << " ";
+        std::cout << ue_pilot_ifft_[ue_id][ifft_idx].re << "+1i*"
+                  << ue_pilot_ifft_[ue_id][ifft_idx].im << " ";
       }
       std::cout << std::endl << "];" << std::endl;
     }
@@ -1588,10 +1591,8 @@ void Config::GenData() {
   delete[](dl_temp_parity_buffer);
   ul_iq_ifft.Free();
   dl_iq_ifft.Free();
-  ue_pilot_ifft.Free();
   dl_encoded_bits.Free();
   ul_encoded_bits.Free();
-  FreeBuffer1d(&pilot_ifft);
 }
 
 size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
@@ -1651,9 +1652,6 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
   int16_t num_channel_llrs = dl_bcast_ldpc_config_.NumCbCodewLen();
   struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
   struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {};
-  int16_t* resp_var_nodes =
-      static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::kAlign64, kVarNodesSize));
   ldpc_decoder_5gnr_request.numChannelLlrs = num_channel_llrs;
   ldpc_decoder_5gnr_request.numFillerBits = num_filler_bits;
   ldpc_decoder_5gnr_request.maxIterations =
@@ -1666,11 +1664,13 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
 
   int num_msg_bits = dl_bcast_ldpc_config_.NumCbLen() - num_filler_bits;
   ldpc_decoder_5gnr_response.numMsgBits = num_msg_bits;
+  int16_t* resp_var_nodes =
+      static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
+          Agora_memory::Alignment_t::kAlign64, kVarNodesSize));
   ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
-  int num_bcast_bytes = dl_bcast_ldpc_config_.NumCbLen() / 8;
-  int num_bcast_bytes_padded = Roundup<64>(num_bcast_bytes);
-  std::vector<uint8_t> decode_buff(num_bcast_bytes_padded);
+  int num_bcast_bytes = BitsToBytes(dl_bcast_ldpc_config_.NumCbLen());
+  std::vector<uint8_t> decode_buff(num_bcast_bytes);
 
   ldpc_decoder_5gnr_request.varNodes = demod_buff_ptr;
   ldpc_decoder_5gnr_response.compactedMessageBytes =
@@ -1819,8 +1819,10 @@ Config::~Config() {
   ul_iq_f_.Free();
   ul_iq_t_.Free();
 
+  FreeBuffer1d(&pilot_ifft_);
   ue_specific_pilot_t_.Free();
   ue_specific_pilot_.Free();
+  ue_pilot_ifft_.Free();
 }
 
 /* TODO Inspect and document */
