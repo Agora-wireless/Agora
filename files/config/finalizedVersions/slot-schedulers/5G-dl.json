@@ -18,7 +18,7 @@
         "demul_block_size": 48,
         "cp_size": 128,
         "fft_size": 2048,
-        "ofdm_data_num": 1272,
+        "ofdm_data_num": 1264,
         "ofdm_pilot_spacing": 16,
         /*  (fft_size - ofdm_data_num_) / 2 */
         "ofdm_data_start": 424,
@@ -67,7 +67,6 @@
         /* 5G settings */
 
         "slot_format": true,
-        "channel Bandwidth": 10e6,
         "numerology": 0,
         "channel_bandwidth": 10e6,
         /* Frame definition */
