@@ -51,7 +51,7 @@ int main(int argc, char* argv[]) {
   const DataGenerator::Profile profile =
       FLAGS_profile == "123" ? DataGenerator::Profile::kProfile123
                              : DataGenerator::Profile::kRandom;
-  DataGenerator data_generator(cfg.get(), 0 /* RNG seed */, profile);
+  DataGenerator data_generator(cfg.get(), seed, profile);
 
   std::printf(
       "DataGenerator: Config file: %s, data profile = %s\n",
@@ -63,6 +63,11 @@ int main(int argc, char* argv[]) {
 
   std::printf("DataGenerator: Generating encoded and modulated data\n");
   srand(time(nullptr));
+
+  std::vector<complex_float> pilot_fd =
+      data_generator.GetCommonPilotFreqDomain();
+  Table<complex_float> ue_specific_pilot =
+      data_generator.GetUeSpecificPilotFreqDomain();
 
   // Step 1: Generate the information buffers and LDPC-encoded buffers for
   // uplink
@@ -121,11 +126,15 @@ int main(int argc, char* argv[]) {
         for (size_t j = 0; j < num_symbols_per_cb; j++) {
           size_t num_bits =
               ((j + 1) < num_symbols_per_cb) ? bits_per_symbol : remaining_bits;
+          auto ofdm_symbol = data_generator.GetModulation(
+              &encoded_codewords[ue_id * num_cbs_per_ue + i][offset],
+              cfg->ModTable(dir), num_bits,
+              // cfg->LdpcConfig(dir).NumEncodedBytes(),
+              cfg->ModOrderBits(dir));
           modulated_codewords[ue_id * cfg->Frame().NumDataSyms() +
                               i * num_symbols_per_cb + j] =
-              data_generator.GetModulation(
-                  &encoded_codewords[ue_id * num_cbs_per_ue + i][offset],
-                  num_bits);
+              data_generator.MapOFDMSymbol(
+                  ofdm_symbol, ue_specific_pilot[ue_id], SymbolType::kUL);
           remaining_bits -= bits_per_symbol;
           offset += BitsToBytes(bits_per_symbol);
         }
@@ -143,9 +152,6 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
       pre_ifft_data_syms[i] = data_generator.BinForIfft(modulated_codewords[i]);
     }
-
-    std::vector<complex_float> pilot_fd =
-        data_generator.GetCommonPilotFreqDomain();
 
     // Put pilot and data symbols together
     Table<complex_float> tx_data_all_symbols;

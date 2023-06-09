@@ -82,10 +82,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kUplink));
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(
-                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kUplink)) &
-            0xFFFF));
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
+                                pkt->Data(),
+                                cfg_->MacPayloadMaxLength(Direction::kUplink)) &
+                            0xFFFF));
       }
     }
 
@@ -282,8 +282,12 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     std::vector<std::vector<complex_float>> ul_modulated_codewords(
         num_ul_codeblocks);
     for (size_t i = 0; i < num_ul_codeblocks; i++) {
+      auto ofdm_symbol = this->GetModulation(
+          &ul_encoded_codewords.at(i)[0], cfg_->ModTable(Direction::kUplink),
+          cfg_->LdpcConfig(Direction::kUplink).NumEncodedBytes(),
+          cfg_->ModOrderBits(Direction::kUplink));
       ul_modulated_codewords.at(i) =
-          this->GetModulation(ul_encoded_codewords.at(i));
+          this->MapOFDMSymbol(ofdm_symbol, nullptr, SymbolType::kUL);
     }
 
     // Place modulated uplink data codewords into central IFFT bins
@@ -295,26 +299,11 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     }
   }
 
-  // Generate UE-specific pilots (phase tracking & downlink channel estimation)
-  Table<complex_float> ue_specific_pilot;
-  const std::vector<std::complex<float>> zc_seq =
-      Utils::DoubleToCfloat(CommsLib::GetSequence(this->cfg_->OfdmDataNum(),
-                                                  CommsLib::kLteZadoffChu));
-  const std::vector<std::complex<float>> zc_common_pilot =
-      CommsLib::SeqCyclicShift(zc_seq, M_PI / 4.0);  // Used in LTE SRS
-  ue_specific_pilot.Malloc(this->cfg_->UeAntNum(), this->cfg_->OfdmDataNum(),
-                           Agora_memory::Alignment_t::kAlign64);
-  for (size_t i = 0; i < this->cfg_->UeAntNum(); i++) {
-    auto zc_ue_pilot_i =
-        CommsLib::SeqCyclicShift(zc_seq, i * M_PI / 6.0);  // LTE DMRS
-    for (size_t j = 0; j < this->cfg_->OfdmDataNum(); j++) {
-      ue_specific_pilot[i][j] = {zc_ue_pilot_i[j].real(),
-                                 zc_ue_pilot_i[j].imag()};
-    }
-  }
-
   // Generate common sounding pilots
   std::vector<complex_float> pilot_fd = this->GetCommonPilotFreqDomain();
+
+  // Generate UE-specific pilots (phase tracking & downlink channel estimation)
+  Table<complex_float> ue_specific_pilot = this->GetUeSpecificPilotFreqDomain();
 
   // Put pilot and data symbols together
   Table<complex_float> tx_data_all_symbols;
@@ -492,10 +481,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kDownlink));
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(
-                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kDownlink)) &
-            0xFFFF));
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(pkt->Data(),
+                                                    cfg_->MacPayloadMaxLength(
+                                                        Direction::kDownlink)) &
+                            0xFFFF));
       }
     }
 
@@ -582,8 +571,12 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     for (size_t i = 0; i < num_dl_codeblocks; i++) {
       const size_t sym_offset = i % (symbol_blocks);
       const size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
-      dl_modulated_codewords.at(i) = this->GetDLModulation(
-          dl_encoded_codewords.at(i), ue_specific_pilot[ue_id]);
+      auto ofdm_symbol = this->GetModulation(
+          &dl_encoded_codewords.at(i)[0], cfg_->ModTable(Direction::kDownlink),
+          cfg_->LdpcConfig(Direction::kDownlink).NumEncodedBytes(),
+          cfg_->ModOrderBits(Direction::kDownlink));
+      dl_modulated_codewords.at(i) = this->MapOFDMSymbol(
+          ofdm_symbol, ue_specific_pilot[ue_id], SymbolType::kDL);
     }
 
     {

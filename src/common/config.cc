@@ -32,6 +32,7 @@ static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
 static constexpr size_t kVarNodesSize = 1024 * 1024 * sizeof(int16_t);
+static constexpr size_t kControlMCS = 4;  // QPSK, 308/1024
 
 /// Print the I/Q samples in the pilots
 static constexpr bool kDebugPrintPilot = false;
@@ -320,16 +321,22 @@ Config::Config(std::string jsonfilename)
   ofdm_data_stop_ = ofdm_data_start_ + ofdm_data_num_;
 
   // Build subcarrier map for data ofdm symbols
-  symbol_map_.resize(ofdm_data_num_);
+  ul_symbol_map_.resize(ofdm_data_num_, SubcarrierType::kData);
+  dl_symbol_map_.resize(ofdm_data_num_);
+  control_symbol_map_.resize(ofdm_data_num_);
   // Maps subcarrier index to data index
-  symbol_data_id_.resize(ofdm_data_num_, 0);
+  dl_symbol_data_id_.resize(ofdm_data_num_, 0);
   size_t data_idx = 0;
   for (size_t i = 0; i < ofdm_data_num_; i++) {
     if (i % ofdm_pilot_spacing_ == 0) {  // TODO: make this index configurable
-      symbol_map_.at(i) = SubcarrierType::kDMRS;
+      dl_symbol_map_.at(i) = SubcarrierType::kDMRS;
+      control_symbol_map_.at(i) = SubcarrierType::kDMRS;
     } else {
-      symbol_map_.at(i) = SubcarrierType::kData;
-      symbol_data_id_.at(i) = data_idx;
+      dl_symbol_map_.at(i) = SubcarrierType::kData;
+      control_symbol_map_.at(i) = (i % ofdm_pilot_spacing_ == 1)
+                                      ? SubcarrierType::kPTRS
+                                      : SubcarrierType::kData;
+      dl_symbol_data_id_.at(i) = data_idx;
       data_idx++;
     }
   }
@@ -860,6 +867,7 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
     ul_mcs_index_ = ul_mcs.value("mcs_index", 10);  // 16QAM, 340/1024
     ul_mod_order_bits_ = GetModOrderBits(ul_mcs_index_);
     ul_code_rate_ = GetCodeRate(ul_mcs_index_);
+    ul_modulation_ = MapModToStr(ul_mod_order_bits_);
   }
   ul_mod_order_ = static_cast<size_t>(pow(2, ul_mod_order_bits_));
   InitModulationTable(this->ul_mod_table_, ul_mod_order_);
@@ -911,6 +919,7 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
     dl_mcs_index_ = dl_mcs.value("mcs_index", 10);  // 16QAM, 340/1024
     dl_mod_order_bits_ = GetModOrderBits(dl_mcs_index_);
     dl_code_rate_ = GetCodeRate(dl_mcs_index_);
+    dl_modulation_ = MapModToStr(dl_mod_order_bits_);
   }
   dl_mod_order_ = static_cast<size_t>(pow(2, dl_mod_order_bits_));
   InitModulationTable(this->dl_mod_table_, dl_mod_order_);
@@ -944,13 +953,13 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
 
 void Config::UpdateCtrlMCS() {
   if (this->frame_.NumDlControlSyms() > 0) {
-    const size_t dl_bcast_mcs_index = 10;
+    const size_t dl_bcast_mcs_index = kControlMCS;
+    const size_t bcast_base_graph =
+        1;  // TODO: For MCS < 5, base_graph 1 doesn't work
     dl_bcast_mod_order_bits_ = GetModOrderBits(dl_bcast_mcs_index);
     const size_t dl_bcast_code_rate = GetCodeRate(dl_bcast_mcs_index);
-    const size_t bcast_base_graph = 1;
-    //const size_t dl_bcast_code_rate = 340;
-    //dl_bcast_mod_order_ = 16;
-    //dl_bcast_mod_order_bits_ = 4;
+    dl_bcast_mod_order_ = (size_t)(std::pow(2, dl_bcast_mod_order_bits_));
+    std::string dl_bcast_modulation = MapModToStr(dl_bcast_mod_order_bits_);
     const int16_t max_decoder_iter = 5;
     size_t bcast_zc = select_zc(
         bcast_base_graph, dl_bcast_code_rate, dl_bcast_mod_order_bits_,
@@ -982,7 +991,7 @@ void Config::UpdateCtrlMCS() {
         "%d "
         "information "
         "bits per encoding, %d bits per encoded code word, decoder "
-        "iterations: %d, code rate %.3f (nRows = %zu), modulation QPSK\n",
+        "iterations: %d, code rate %.3f (nRows = %zu), modulation %s\n",
         dl_bcast_ldpc_config_.ExpansionFactor(),
         dl_bcast_ldpc_config_.NumBlocksInSymbol(),
         dl_bcast_ldpc_config_.NumCbLen(), dl_bcast_ldpc_config_.NumCbCodewLen(),
@@ -990,7 +999,7 @@ void Config::UpdateCtrlMCS() {
         1.f * LdpcNumInputCols(dl_bcast_ldpc_config_.BaseGraph()) /
             (LdpcNumInputCols(dl_bcast_ldpc_config_.BaseGraph()) - 2 +
              dl_bcast_ldpc_config_.NumRows()),
-        dl_bcast_ldpc_config_.NumRows());
+        dl_bcast_ldpc_config_.NumRows(), dl_bcast_modulation.c_str());
   }
 }
 
@@ -1640,9 +1649,10 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
                             exp(arma::cx_float(0, -phase_shift));
     }
   }
-  int8_t* demod_buff_ptr = static_cast<int8_t*>(
-      Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
-                                       dl_bcast_mod_order_bits_ * ctrl_sc_num));
+  int8_t* demod_buff_ptr =
+      static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
+          Agora_memory::Alignment_t::kAlign64,
+          Roundup<64>(dl_bcast_mod_order_bits_ * ctrl_sc_num)));
   demodulate(reinterpret_cast<float*>(&eq_buff[0]), demod_buff_ptr, ctrl_sc_num,
              dl_bcast_mod_order_bits_, false);
 
@@ -1670,11 +1680,11 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
 
   int num_bcast_bytes = dl_bcast_ldpc_config_.NumCbLen() / 8;
   int num_bcast_bytes_padded = Roundup<64>(num_bcast_bytes);
-  std::vector<uint8_t> decode_buff(num_bcast_bytes_padded);
+  uint8_t* decode_buff = static_cast<uint8_t*>(Agora_memory::PaddedAlignedAlloc(
+      Agora_memory::Alignment_t::kAlign64, num_bcast_bytes_padded));
 
   ldpc_decoder_5gnr_request.varNodes = demod_buff_ptr;
-  ldpc_decoder_5gnr_response.compactedMessageBytes =
-      static_cast<uint8_t*>(decode_buff.data());
+  ldpc_decoder_5gnr_response.compactedMessageBytes = decode_buff;
 
   bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
                           &ldpc_decoder_5gnr_response);
@@ -1683,15 +1693,14 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
     std::unique_ptr<AgoraScrambler::Scrambler> scrambler =
         std::make_unique<AgoraScrambler::Scrambler>();
 
-    scrambler->Descramble(static_cast<uint8_t*>(decode_buff.data()),
-                          num_bcast_bytes);
+    scrambler->Descramble(decode_buff, num_bcast_bytes);
   }
   FreeBuffer1d(&bcast_fft_buff);
   FreeBuffer1d(&eq_buff);
   FreeBuffer1d(&demod_buff_ptr);
   FreeBuffer1d(&resp_var_nodes);
 
-  return (reinterpret_cast<size_t*>(decode_buff.data()))[0];
+  return (reinterpret_cast<size_t*>(decode_buff))[0];
 }
 
 void Config::GenBroadcastSlots(
@@ -1712,6 +1721,7 @@ void Config::GenBroadcastSlots(
 
   const size_t dl_bcast_encoded_bytes =
       BitsToBytes(this->dl_bcast_ldpc_config_.NumCbCodewLen());
+  std::cout << dl_bcast_encoded_bytes << std::endl;
 
   SimdAlignByteVector dl_bcast_scramble_buffer(num_bcast_bytes_padded,
                                                std::byte(0));

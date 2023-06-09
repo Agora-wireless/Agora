@@ -31,7 +31,7 @@ class DataGenerator {
 
   explicit DataGenerator(Config* cfg, uint64_t seed = 0,
                          Profile profile = Profile::kRandom)
-      : cfg_(cfg), profile_(profile) {
+      : cfg_(cfg), seed_(seed), profile_(profile) {
     if (seed != 0) {
       fast_rand_.seed_ = seed;
     }
@@ -105,59 +105,73 @@ class DataGenerator {
    * @param encoded_codeword The encoded LDPC codeword bit sequence
    * @return An array of complex floats with OfdmDataNum() elements
    */
-  std::vector<complex_float> GetModulation(
-      const std::vector<int8_t>& encoded_codeword) {
-    std::vector<complex_float> modulated_codeword(cfg_->OfdmDataNum());
-    std::vector<uint8_t> mod_input(cfg_->OfdmDataNum());
+  std::vector<complex_float> GetModulation(const int8_t* encoded_codeword,
+                                           Table<complex_float> mod_table,
+                                           const size_t num_bits,
+                                           const size_t mod_order_bits) {
+    size_t num_subcarrier_symbols = num_bits / mod_order_bits;
+    std::vector<complex_float> modulated_codeword(num_subcarrier_symbols);
+    std::vector<uint8_t> mod_input(num_subcarrier_symbols);
 
     AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
-                    &mod_input[0],
-                    cfg_->LdpcConfig(Direction::kUplink).NumEncodedBytes(),
-                    cfg_->ModOrderBits(Direction::kUplink));
+                    &mod_input[0], BitsToBytes(num_bits), mod_order_bits);
 
-    for (size_t i = 0; i < cfg_->OfdmDataNum(); i++) {
-      modulated_codeword[i] =
-          ModSingleUint8(mod_input[i], cfg_->ModTable(Direction::kUplink));
+    for (size_t i = 0; i < num_subcarrier_symbols; i++) {
+      modulated_codeword[i] = ModSingleUint8(mod_input[i], mod_table);
     }
     return modulated_codeword;
   }
 
-  std::vector<complex_float> GetDLModulation(
-      const std::vector<int8_t>& encoded_codeword, complex_float* pilot_seq) {
-    std::vector<complex_float> modulated_codeword(cfg_->OfdmDataNum());
-    std::vector<uint8_t> mod_input(cfg_->GetOFDMDataNum());
-
-    AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
-                    &mod_input[0],
-                    cfg_->LdpcConfig(Direction::kDownlink).NumEncodedBytes(),
-                    cfg_->ModOrderBits(Direction::kDownlink));
-
-    for (size_t i = 0; i < cfg_->OfdmDataNum(); i++) {
-      if (cfg_->IsDataSubcarrier(i) == true) {
-        modulated_codeword[i] =
-            ModSingleUint8(mod_input[cfg_->GetOFDMDataIndex(i)],
-                           cfg_->ModTable(Direction::kDownlink));
-      } else {
-        modulated_codeword[i] = pilot_seq[i];
+  std::vector<complex_float> MapOFDMSymbol(
+      const std::vector<complex_float>& modulated_codeword,
+      complex_float* pilot_seq, SymbolType symbol_type) {
+    std::vector<complex_float> ofdm_symbol(cfg_->OfdmDataNum());  // Zeroed
+    for (size_t i = 0; i < modulated_codeword.size(); i++) {
+      if (symbol_type == SymbolType::kUL) {
+        ofdm_symbol.at(i) = modulated_codeword.at(i);
+      } else if (symbol_type == SymbolType::kDL) {
+        if (cfg_->IsDataSubcarrier(i) == true) {
+          ofdm_symbol.at(i) = modulated_codeword.at(cfg_->GetOFDMDataIndex(i));
+        } else {
+          ofdm_symbol.at(i) = pilot_seq[i];
+        }
+      } else if (symbol_type == SymbolType::kControl) {
+        if (cfg_->IsControlDataSubcarrier(i) == true) {
+          ofdm_symbol.at(i) = modulated_codeword.at(cfg_->GetOFDMDataIndex(i));
+        } else {
+          ofdm_symbol.at(i) = pilot_seq[i];
+        }
       }
     }
-    return modulated_codeword;
+    return ofdm_symbol;
   }
 
-  std::vector<complex_float> GetModulation(const int8_t* encoded_codeword,
-                                           size_t num_bits) {
-    std::vector<complex_float> modulated_codeword(cfg_->OfdmDataNum());
-    std::vector<uint8_t> mod_input(cfg_->OfdmDataNum());
-
-    AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
-                    &mod_input[0], BitsToBytes(num_bits),
-                    cfg_->ModOrderBits(Direction::kUplink));
-
-    for (size_t i = 0; i < cfg_->OfdmDataNum(); i++) {
-      modulated_codeword[i] =
-          ModSingleUint8(mod_input[i], cfg_->ModTable(Direction::kUplink));
+  void GetNoisySymbol(const std::vector<complex_float>& modulated_symbol,
+                      std::vector<complex_float>& noisy_symbol,
+                      float noise_level) {
+    std::default_random_engine generator(seed_);
+    std::normal_distribution<double> distribution(0.0, 1.0);
+    for (size_t j = 0; j < modulated_symbol.size(); j++) {
+      complex_float noise = {
+          static_cast<float>(distribution(generator)) * noise_level,
+          static_cast<float>(distribution(generator)) * noise_level};
+      noisy_symbol.at(j).re = modulated_symbol.at(j).re + noise.re;
+      noisy_symbol.at(j).im = modulated_symbol.at(j).im + noise.im;
     }
-    return modulated_codeword;
+  }
+
+  void GetNoisySymbol(const complex_float* modulated_symbol,
+                      complex_float* noisy_symbol, size_t length,
+                      float noise_level) {
+    std::default_random_engine generator(seed_);
+    std::normal_distribution<double> distribution(0.0, 1.0);
+    for (size_t j = 0; j < length; j++) {
+      complex_float noise = {
+          static_cast<float>(distribution(generator)) * noise_level,
+          static_cast<float>(distribution(generator)) * noise_level};
+      noisy_symbol[j].re = modulated_symbol[j].re + noise.re;
+      noisy_symbol[j].im = modulated_symbol[j].im + noise.im;
+    }
   }
 
   /**
@@ -192,9 +206,31 @@ class DataGenerator {
     return ret;
   }
 
+  /// Return the user-spepcific frequency-domain pilot symbol with OfdmCaNum complex floats
+  Table<complex_float> GetUeSpecificPilotFreqDomain() const {
+    Table<complex_float> ue_specific_pilot;
+    const std::vector<std::complex<float>> zc_seq =
+        Utils::DoubleToCfloat(CommsLib::GetSequence(this->cfg_->OfdmDataNum(),
+                                                    CommsLib::kLteZadoffChu));
+    const std::vector<std::complex<float>> zc_common_pilot =
+        CommsLib::SeqCyclicShift(zc_seq, M_PI / 4.0);  // Used in LTE SRS
+    ue_specific_pilot.Malloc(this->cfg_->UeAntNum(), this->cfg_->OfdmDataNum(),
+                             Agora_memory::Alignment_t::kAlign64);
+    for (size_t i = 0; i < this->cfg_->UeAntNum(); i++) {
+      auto zc_ue_pilot_i =
+          CommsLib::SeqCyclicShift(zc_seq, i * M_PI / 6.0);  // LTE DMRS
+      for (size_t j = 0; j < this->cfg_->OfdmDataNum(); j++) {
+        ue_specific_pilot[i][j] = {zc_ue_pilot_i[j].real(),
+                                   zc_ue_pilot_i[j].imag()};
+      }
+    }
+    return ue_specific_pilot;
+  }
+
  private:
-  FastRand fast_rand_;     // A fast random number generator
-  Config* cfg_;            // The global Agora config
+  FastRand fast_rand_;  // A fast random number generator
+  Config* cfg_;         // The global Agora config
+  uint64_t seed_;
   const Profile profile_;  // The pattern of the input byte sequence
 };
 
