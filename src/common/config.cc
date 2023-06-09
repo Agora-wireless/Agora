@@ -1098,7 +1098,6 @@ void Config::GenPilots() {
                      (float)std::pow(std::abs(this->common_pilot_[i]), 2);
     this->pilots_sgn_[i] = {pilot_sgn.real(), pilot_sgn.imag()};
   }
-  complex_float* pilot_ifft_;
   AllocBuffer1d(&pilot_ifft_, this->ofdm_ca_num_,
                 Agora_memory::Alignment_t::kAlign64, 1);
   for (size_t j = 0; j < ofdm_data_num_; j++) {
