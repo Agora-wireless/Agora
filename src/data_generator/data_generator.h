@@ -12,6 +12,7 @@
 #include "comms-lib.h"
 #include "config.h"
 #include "modulation.h"
+#include "phy_ldpc_decoder_5gnr.h"
 #include "utils_ldpc.h"
 
 /**
@@ -225,6 +226,36 @@ class DataGenerator {
       }
     }
     return ue_specific_pilot;
+  }
+
+  void GetDecodedData(Table<int8_t>& demoded_data,
+                      Table<uint8_t>& decoded_codewords,
+                      const LDPCconfig& ldpc_config, size_t num_codeblocks) {
+    struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
+    struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {};
+
+    // Decoder setup
+    ldpc_decoder_5gnr_request.numChannelLlrs = ldpc_config.NumCbCodewLen();
+    ldpc_decoder_5gnr_request.numFillerBits = 0;
+    ldpc_decoder_5gnr_request.maxIterations = ldpc_config.MaxDecoderIter();
+    ldpc_decoder_5gnr_request.enableEarlyTermination =
+        ldpc_config.EarlyTermination();
+    ldpc_decoder_5gnr_request.Zc = ldpc_config.ExpansionFactor();
+    ldpc_decoder_5gnr_request.baseGraph = ldpc_config.BaseGraph();
+    ldpc_decoder_5gnr_request.nRows = ldpc_config.NumRows();
+    ldpc_decoder_5gnr_response.numMsgBits = ldpc_config.NumCbLen();
+    auto* resp_var_nodes = static_cast<int16_t*>(
+        Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
+                                         1024 * 1024 * sizeof(int16_t)));
+    ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
+
+    for (size_t i = 0; i < num_codeblocks; i++) {
+      ldpc_decoder_5gnr_request.varNodes = demoded_data[i];
+      ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_codewords[i];
+      bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
+                              &ldpc_decoder_5gnr_response);
+    }
+    std::free(resp_var_nodes);
   }
 
  private:

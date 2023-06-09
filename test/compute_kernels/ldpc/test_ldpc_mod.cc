@@ -143,49 +143,21 @@ int main(int argc, char* argv[]) {
           &encoded_codewords[i][0], cfg->ModTable(dir),
           cfg->LdpcConfig(dir).NumCbCodewLen(), cfg->ModOrderBits(dir));
 
-      /*auto noisy_symbol = std::vector<complex_float>(
-          modulated_codewords[i], modulated_codewords[i] + cfg->OfdmDataNum());*/
       data_generator.GetNoisySymbol(&ofdm_symbol[0], modulated_codewords[i],
                                     num_subcarriers, kNoiseLevels[noise_id]);
 
       demodulate((float*)modulated_codewords[i], demod_data_all_symbols[i],
                  num_subcarriers, cfg->ModOrderBits(dir), false);
-      /*demodulate((float*)ofdm_symbol.data(), demod_data_all_symbols[i],
-                 num_subcarriers, cfg->ModOrderBits(dir), false);*/
     }
 
     const LDPCconfig& ldpc_config = cfg->LdpcConfig(dir);
-
-    struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
-    struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {};
-
-    // Decoder setup
-    ldpc_decoder_5gnr_request.numChannelLlrs = ldpc_config.NumCbCodewLen();
-    ldpc_decoder_5gnr_request.numFillerBits = 0;
-    ldpc_decoder_5gnr_request.maxIterations = ldpc_config.MaxDecoderIter();
-    ldpc_decoder_5gnr_request.enableEarlyTermination =
-        ldpc_config.EarlyTermination();
-    ldpc_decoder_5gnr_request.Zc = ldpc_config.ExpansionFactor();
-    ldpc_decoder_5gnr_request.baseGraph = ldpc_config.BaseGraph();
-    ldpc_decoder_5gnr_request.nRows = ldpc_config.NumRows();
-    ldpc_decoder_5gnr_response.numMsgBits = ldpc_config.NumCbLen();
-    auto* resp_var_nodes = static_cast<int16_t*>(
-        Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
-                                         1024 * 1024 * sizeof(int16_t)));
-    ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
-
     Table<uint8_t> decoded_codewords;
     decoded_codewords.Calloc(num_codeblocks, num_subcarriers,
                              Agora_memory::Alignment_t::kAlign64);
-
     double freq_ghz = GetTime::MeasureRdtscFreq();
     size_t start_tsc = GetTime::WorkerRdtsc();
-    for (size_t i = 0; i < num_codeblocks; i++) {
-      ldpc_decoder_5gnr_request.varNodes = demod_data_all_symbols[i];
-      ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_codewords[i];
-      bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
-                              &ldpc_decoder_5gnr_response);
-    }
+    data_generator.GetDecodedData(demod_data_all_symbols, decoded_codewords,
+                                  ldpc_config, num_codeblocks);
 
     size_t duration = GetTime::WorkerRdtsc() - start_tsc;
     std::printf("Decoding of %zu blocks takes %.2f us per block\n",
@@ -228,7 +200,6 @@ int main(int argc, char* argv[]) {
         1.f * error_num / total, block_error_num, num_codeblocks,
         1.f * block_error_num / num_codeblocks);
 
-    std::free(resp_var_nodes);
     modulated_codewords.Free();
     demod_data_all_symbols.Free();
     decoded_codewords.Free();
