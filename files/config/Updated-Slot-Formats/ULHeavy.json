@@ -4,7 +4,7 @@
         /* Experiment setup (topology), either enter section 1a or 1b */
         /* 1a */
         "cells": 1,
-        "antenna_num": 8,
+        "antenna_num": 1,
         "ue_num": 1,
         /* 1c */
         "ref_ant": 0,
