@@ -5,7 +5,7 @@
         /* 1a */
         "cells": 1,
         "antenna_num": 8,
-        "ue_num": 8,
+        "ue_num": 1,
         /* 1c */
         "ref_ant": 0,
         "external_ref_node": false,
@@ -64,7 +64,7 @@
         /* Frame definition */
         /* 2a explicit frame construction */
         "frame_schedule": [
-          "BPPPPPPPPUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU"
+          "BGPUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU"
         ],
         /* For all frame constructions */
         "client_ul_pilot_syms": 0,
@@ -101,7 +101,7 @@
         "bs_mac_tx_port": 9170,
         "ue_mac_rx_port": 8080,
         "ue_mac_tx_port": 8180,
-        "core_offset": 12,
+        "core_offset": 0,
         "worker_thread_num": 25,
         "socket_thread_num": 4,
         "max_frame": 9600
