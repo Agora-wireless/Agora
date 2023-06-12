@@ -1783,44 +1783,11 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size
 
   scs = (15e3) * num_slots;
 
-  // if (num_symbols > kMaxSymbols) {
-
-  //   AGORA_LOG_ERROR(
-  //           " *** Error: Number of symbols exceeded %i symbols.\n", kMaxSymbols);
-
-  //   throw std::runtime_error("Num symbols exceeds max symbols.\n");
-                      
-  // }
-
   RtAssert(num_symbols <= kMaxSymbols, "Number of symbols exceeded "+ std::to_string(kMaxSymbols) + " symbols.\n");
-
-  //If the number of ofdm sub-carriers doesn't match the AVX512 / AVX2 reqs
-  //update it.
-
-  // if (num_ofdm_data_sub % 16 != 0) {
-  //   //make sure to put this in agora's logs.
-  //   //Might also need to include a seperate case for 
-  //   //divisibility by 8 in the case the AVX2 architecture
-  //   //is used.
-  //   AGORA_LOG_ERROR("The given number of ofdm data subcarriers is "
-  //   "not divisible by 16. 
-  //   );
-  //   throw std::runtime_error("num_ofdm_data_sub is not divisible by 16.\n");
-  // }
-
-  std::cout<<"The ofdm data sub is: " << std::to_string(num_ofdm_data_sub) << ".\n";
 
   RtAssert(!(num_ofdm_data_sub % 16), "The given number of ofdm data subcarriers is not divisible by 16.\n");
 
-  //Check if the fft_size is valid.
-  // if (num_ofdm_data_sub > fft_size) {
-  //   AGORA_LOG_WARN("Specified fft_size was too small to accomodate the number", 
-  //    "of data subcarriers. Setting fft_size to %zu.\n", fft_size
-  //   );
-  // }
-
   RtAssert(fft_size > num_ofdm_data_sub, "The fft_size is smaller than the number of subcarriers.\n");
-
 
   for (int i = 0; i < 4; i++) {
     if (fft_size == valid_ffts[i]) {
@@ -1828,30 +1795,14 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size
     }
   }
 
-  std::cout<<"Here.\n" <<std::flush;
-
-  // if (!fft_is_valid){
-  //   AGORA_LOG_ERROR("Specified fft_size is not valid")
-  // }
-
   RtAssert(fft_is_valid, "Specified fft_size is not a valid fft size,\n");
 
-  std::cout<<"Here2.\n" <<std::flush;
-
-  //Update the sampling rate to miminum possible rate.
-  //This is one reason fft_size is validated.
-  
   min_sampling_rate = scs*(fft_size); 
-
-  std::cout<<"Here2.5.\n"<<std::flush;
 
   if (min_sampling_rate < sampling_rate) {
     AGORA_LOG_WARN("Specified sampling rate %f is larger than the minimum"
     "required sampling rate of %f.\n", sampling_rate, min_sampling_rate);
   }
-
-    std::cout<<"Here3.\n" <<std::flush;
-
 
   //calculate channel bandwidth based on the specified parameters and
   // verify that the specified channel bandwidth is valid.
@@ -1861,13 +1812,6 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size
     //CBW must be in MHz and SCS must be in Khz
   GB = (1e3) * (1000 * (CBW / 1e6) - (num_ofdm_data_sub + 1) * (scs / 1e3)) / 2;
   
-  // if (TBW + 2*GB > CBW) {
-  //   AGORA_LOG_ERROR("Calculated channel bandwidth is larger than specified" 
-  //   " channel bandwidth. Calculated bandwidth is %d.\n", (TBW + 2*GB)
-  //   );
-  //   throw std::runtime_error("Specified Bandwidth too small.");
-  // }
-
   RtAssert(CBW > TBW + 2*GB, "Specified CBW is smaller than required theoretical value.\n");
 
   AGORA_LOG_INFO(
@@ -1875,7 +1819,6 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size
     "Sampling rate: %f MHz.\nOFDM_data_num: %zu.\nFFT_size: %zu.\n", 
     (TBW + 2*GB) / 1e6,sampling_rate / 1e6, num_ofdm_data_sub, fft_size
   ); 
-
 
   frame_schedule = formFrame(frame_schedule, user_num, format_table);
 
@@ -1898,39 +1841,12 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size
 std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, std::string> format_table) {
   std::string subframe = format_table[format_num];
 
-  // std::cout<<"format_num should be"<<std::to_string(format_num)<<std::flush;
-
-  // std::cout<<"user_num should be"<<std::to_string(user_num)<<std::flush;
-
-  // std::cout<<"Subframe should be"<<subframe<<std::flush;
   size_t pilot_num = 0;
 
-  //Check the requirements:
-  // if (subframe.at(0) != 'D') {
-  //   throw std::runtime_error(
-  //     "First symbol of selected format doesn't start with a downlink symbol.");
-  // }
 
   RtAssert(subframe.at(0) == 'D', "First symbol of selected format doesn't start with a downlink symbol.");
-
-  // if (user_num > 12) {
-  //   throw std::runtime_error(
-  //     "Number of users exceeds pilot symbol limit of 12."
-  //   );
-  // }
-
+  
   RtAssert(user_num < 12, "Number of users exceeds pilot symbol limit of 12.");
-
-  // Am trying to support more formats than just format 34.
-
-  //Currently only supporting format number 34.
-  // if (format_num != 34) {
-  //   throw std::runtime_error(
-  //     "Given format num for beacon subframe not equal to 34."
-  //     );
-  // }
-
-  // RtAssert(format_num == 34, "specified format num for beacon subframe not equal to 34.\n");
 
   //Replace the downlink symbol with a beacon symbol.
   subframe.replace(0, 1, "B");
@@ -1972,8 +1888,6 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int,
   Currently use commas to seperate each number in the format string.
    Copy all numbers between commas into a array.
   */ 
-
- // std::cout << "HERE 1.\n" << std::flush;
   
   for (unsigned int i = 0; i < frame_schedule.size(); i++) {
 
@@ -2020,12 +1934,8 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int,
       std::string error_message = "User specified a non supported subframe "
       "format.\nCurrently supported subframe formats are:";
 
-
-      // std::cout<<"User specified a non supported subframe format.\n" <<std::flush;
-      // std::cout<<"Currently supported subframe formats are: " << std::flush;
       for (auto format = format_table.begin(); format != format_table.end(); format++) {
         error_message += " %i : %s", format->first, format->second;
-        //std::cout<<" " << format->first << " : " << format->second <<std::flush;;
       }
 
       AGORA_LOG_ERROR(
@@ -2042,8 +1952,6 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int,
   return frame;
 }
 
-
-
 extern "C" {
 __attribute__((visibility("default"))) Config* ConfigNew(char* filename) {
   auto* cfg = new Config(filename);
@@ -2051,6 +1959,4 @@ __attribute__((visibility("default"))) Config* ConfigNew(char* filename) {
   return cfg;
 }
 
-
- 
 }

@@ -63,29 +63,21 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
                                                cfg->Frame().NumTotalSyms()));
   ticks_wnd2_ = ticks_all_ * 15;
 
-  std::cout << "This is where we fail.\n" << std::flush;
-
   AGORA_LOG_INFO(
       "Initializing sender, sending to base station server at %s, frame "
       "duration = %.2f ms, slow start = %s\n",
       cfg->BsServerAddr().c_str(), frame_duration_ / 1000.0,
       enable_slow_start == 1 ? "yes" : "no");
 
-  std::cout << "Dead yet?\n" << std::flush;
-
   unused(server_mac_addr_str);
   for (auto& i : packet_count_per_symbol_) {
     i = new size_t[cfg->Frame().NumTotalSyms()]();
   }
 
-  std::cout << "How about now?\n" << std::flush;
-
   InitIqFromFile(std::string(TOSTRING(PROJECT_DIRECTORY)) +
                  "/files/experiment/LDPC_rx_data_" +
                  std::to_string(cfg->OfdmCaNum()) + "_ant" +
                  std::to_string(cfg->BsAntNum()) + ".bin");
-
-  std::cout << "Does InitIQFromFile Finish?\n" << std::flush;
 
   task_ptok_ =
       static_cast<moodycamel::ProducerToken**>(Agora_memory::PaddedAlignedAlloc(
