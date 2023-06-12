@@ -13,6 +13,8 @@
 #include "config.h"
 #include "modulation.h"
 #include "phy_ldpc_decoder_5gnr.h"
+#include "scrambler.h"
+#include "simd_types.h"
 #include "utils_ldpc.h"
 
 /**
@@ -85,20 +87,26 @@ class DataGenerator {
    * @param  input_ptr             The input bit sequence to be encoded
    * @param  encoded_codeword      The generated encoded codeword bit sequence
    */
-  static void GenCodeblock(const LDPCconfig& lc, const int8_t* input_ptr,
-                           std::vector<int8_t>& encoded_codeword) {
-    // const LDPCconfig& lc = cfg_->LdpcConfig(dir);
+  static void GenCodeblock(const LDPCconfig& lc,
+                           const std::vector<int8_t> input_ptr,
+                           std::vector<int8_t>& encoded_codeword,
+                           size_t padding_size = 0,
+                           bool scramble_enabled = false) {
+    std::vector<int8_t> scramble_buffer;
+    scramble_buffer.assign(input_ptr.begin(), input_ptr.end());
+    if (scramble_enabled) {
+      scramble_buffer.resize(input_ptr.size() + padding_size, 0u);
+      auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
+      scrambler->Scramble(scramble_buffer.data(), input_ptr.size());
+    }
+
     std::vector<int8_t> parity;
     parity.resize(
         LdpcEncodingParityBufSize(lc.BaseGraph(), lc.ExpansionFactor()));
 
-    encoded_codeword.resize(
-        LdpcEncodingEncodedBufSize(lc.BaseGraph(), lc.ExpansionFactor()));
-
     LdpcEncodeHelper(lc.BaseGraph(), lc.ExpansionFactor(), lc.NumRows(),
-                     &encoded_codeword.at(0), &parity.at(0), input_ptr);
-
-    encoded_codeword.resize(lc.NumEncodedBytes());
+                     &encoded_codeword.at(0), &parity.at(0),
+                     &scramble_buffer.at(0));
   }
 
   /**
@@ -228,7 +236,9 @@ class DataGenerator {
   }
 
   static void GetDecodedData(int8_t* demoded_data, uint8_t* decoded_codewords,
-                             const LDPCconfig& ldpc_config) {
+                             const LDPCconfig& ldpc_config,
+                             size_t num_decoded_bytes,
+                             bool scramble_enabled = false) {
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
     struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {};
 
@@ -251,13 +261,19 @@ class DataGenerator {
     ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_codewords;
     bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
                             &ldpc_decoder_5gnr_response);
+    if (scramble_enabled) {
+      auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
+      scrambler->Descramble(decoded_codewords, num_decoded_bytes);
+    }
     std::free(resp_var_nodes);
   }
 
   static void GetDecodedDataBatch(Table<int8_t>& demoded_data,
                                   Table<uint8_t>& decoded_codewords,
                                   const LDPCconfig& ldpc_config,
-                                  size_t num_codeblocks) {
+                                  size_t num_codeblocks,
+                                  size_t num_decoded_bytes,
+                                  bool scramble_enabled = false) {
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
     struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {};
 
@@ -281,6 +297,10 @@ class DataGenerator {
       ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_codewords[i];
       bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
                               &ldpc_decoder_5gnr_response);
+      if (scramble_enabled) {
+        auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
+        scrambler->Descramble(decoded_codewords[i], num_decoded_bytes);
+      }
     }
     std::free(resp_var_nodes);
   }

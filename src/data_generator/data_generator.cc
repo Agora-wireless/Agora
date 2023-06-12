@@ -136,7 +136,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
     std::vector<std::vector<int8_t>> ul_information(num_ul_codeblocks);
     std::vector<std::vector<int8_t>> ul_encoded_codewords(num_ul_codeblocks);
-
+    size_t ul_encoded_bytes = LdpcEncodingEncodedBufSize(
+        ul_ldpc_config.BaseGraph(), ul_ldpc_config.ExpansionFactor());
     for (size_t cb = 0; cb < num_ul_codeblocks; cb++) {
       // i : symbol -> ue -> cb (repeat)
       size_t sym_id = cb / (symbol_blocks);
@@ -155,20 +156,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       int8_t* cb_start = &ul_mac_info.at(ue_id).at(ue_cb_cnt * ul_cb_bytes);
       ul_information.at(cb) =
           std::vector<int8_t>(cb_start, cb_start + ul_cb_bytes);
-
-      std::memcpy(ul_scrambler_buffer.data(), ul_information.at(cb).data(),
-                  ul_cb_bytes);
-
-      if (this->cfg_->ScrambleEnabled()) {
-        scrambler->Scramble(ul_scrambler_buffer.data(), ul_cb_bytes);
-      }
-
-      if (ul_cb_padding > 0) {
-        std::memset(&ul_scrambler_buffer.at(ul_cb_bytes), 0u, ul_cb_padding);
-      }
-      DataGenerator::GenCodeblock(
-          ul_ldpc_config, reinterpret_cast<int8_t*>(ul_scrambler_buffer.data()),
-          ul_encoded_codewords.at(cb));
+      ul_encoded_codewords.at(cb).resize(ul_encoded_bytes);
+      DataGenerator::GenCodeblock(ul_ldpc_config, ul_information.at(cb),
+                                  ul_encoded_codewords.at(cb), ul_cb_padding,
+                                  this->cfg_->ScrambleEnabled());
     }
 
     {
@@ -537,6 +528,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
     std::vector<std::vector<int8_t>> dl_information(num_dl_codeblocks);
     std::vector<std::vector<int8_t>> dl_encoded_codewords(num_dl_codeblocks);
+    size_t dl_encoded_bytes = LdpcEncodingEncodedBufSize(
+        dl_ldpc_config.BaseGraph(), dl_ldpc_config.ExpansionFactor());
     for (size_t cb = 0; cb < num_dl_codeblocks; cb++) {
       // i : symbol -> ue -> cb (repeat)
       const size_t sym_id = cb / (symbol_blocks);
@@ -549,20 +542,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       int8_t* cb_start = &dl_mac_info.at(ue_id).at(ue_cb_cnt * dl_cb_bytes);
       dl_information.at(cb) =
           std::vector<int8_t>(cb_start, cb_start + dl_cb_bytes);
-
-      std::memcpy(dl_scrambler_buffer.data(), dl_information.at(cb).data(),
-                  dl_cb_bytes);
-
-      if (this->cfg_->ScrambleEnabled()) {
-        scrambler->Scramble(dl_scrambler_buffer.data(), dl_cb_bytes);
-      }
-
-      if (dl_cb_padding > 0u) {
-        std::memset(&dl_scrambler_buffer.at(dl_cb_bytes), 0u, dl_cb_padding);
-      }
-      DataGenerator::GenCodeblock(
-          dl_ldpc_config, reinterpret_cast<int8_t*>(dl_scrambler_buffer.data()),
-          dl_encoded_codewords.at(cb));
+      dl_encoded_codewords.at(cb).resize(dl_encoded_bytes);
+      DataGenerator::GenCodeblock(dl_ldpc_config, dl_information.at(cb),
+                                  dl_encoded_codewords.at(cb), dl_cb_padding,
+                                  this->cfg_->ScrambleEnabled());
     }
 
     // Modulate the encoded codewords

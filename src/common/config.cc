@@ -1658,14 +1658,8 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
   std::vector<uint8_t> decode_buff(num_bcast_bytes);
 
   DataGenerator::GetDecodedData(demod_buff_ptr, &decode_buff[0],
-                                dl_bcast_ldpc_config_);
-  if (scramble_enabled_) {
-    std::unique_ptr<AgoraScrambler::Scrambler> scrambler =
-        std::make_unique<AgoraScrambler::Scrambler>();
-
-    scrambler->Descramble(static_cast<uint8_t*>(decode_buff.data()),
-                          num_bcast_bytes);
-  }
+                                dl_bcast_ldpc_config_, num_bcast_bytes,
+                                scramble_enabled_);
   FreeBuffer1d(&bcast_fft_buff);
   FreeBuffer1d(&eq_buff);
   FreeBuffer1d(&demod_buff_ptr);
@@ -1725,6 +1719,8 @@ void Config::GenBroadcastSlots(
     std::memcpy(bcast_bits_buffer, tmp, sizeof(size_t));
 
     int8_t* coded_bits_ptr = dl_bcast_encoded_bits[i];
+    /*DataGenerator::GenCodeblock(dl_bcast_ldpc_config, bcast_bits_buffer,
+                                coded_bits_ptr, scramble_enabled_);*/
 
     if (scramble_enabled_) {
       scrambler->Scramble(dl_bcast_scramble_buffer.data(), bcast_bits_buffer,
