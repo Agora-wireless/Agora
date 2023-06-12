@@ -5,7 +5,7 @@
         /* 1a */
         "cells": 1,
         "antenna_num": 8,
-        "ue_num": 1,
+        "ue_num": 8,
         /* 1c */
         "ref_ant": 0,
         "external_ref_node": false,
@@ -64,7 +64,7 @@
         /* Frame definition */
         /* 2a explicit frame construction */
         "frame_schedule": [
-          "BPUUUUUUUUUU"
+          "BPPPPPPPPUUUUUU"
         ],
         /* For all frame constructions */
         "client_ul_pilot_syms": 0,
