@@ -1828,21 +1828,30 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size
     }
   }
 
+  std::cout<<"Here.\n" <<std::flush;
+
   // if (!fft_is_valid){
   //   AGORA_LOG_ERROR("Specified fft_size is not valid")
   // }
 
   RtAssert(fft_is_valid, "Specified fft_size is not a valid fft size,\n");
 
+  std::cout<<"Here2.\n" <<std::flush;
+
   //Update the sampling rate to miminum possible rate.
   //This is one reason fft_size is validated.
   
   min_sampling_rate = scs*(fft_size); 
 
+  std::cout<<"Here2.5.\n"<<std::flush;
+
   if (min_sampling_rate < sampling_rate) {
-    AGORA_LOG_WARN("Specified sampling rate %d is larger than the minimum"
-    "required sampling rate of %d.\n", sampling_rate, min_sampling_rate);
+    AGORA_LOG_WARN("Specified sampling rate %f is larger than the minimum"
+    "required sampling rate of %f.\n", sampling_rate, min_sampling_rate);
   }
+
+    std::cout<<"Here3.\n" <<std::flush;
+
 
   //calculate channel bandwidth based on the specified parameters and
   // verify that the specified channel bandwidth is valid.
