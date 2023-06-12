@@ -5,13 +5,13 @@
         /* 1a */
         "cells": 1,
         "antenna_num": 8,
-        "ue_num": 8,
+        "ue_num": 1,
         /* 1c */
         "ref_ant": 0,
         "external_ref_node": false,
         "channel": "A",
         "radio_num": 8,
-        "sample_rate": 15.36e6,
+        "sample_rate": 5e6,
         "demul_block_size": 48,
         "cp_size": 128,
         "fft_size": 1024,
