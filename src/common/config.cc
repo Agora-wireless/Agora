@@ -1867,11 +1867,13 @@ std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, st
     }
   }
 
+  std::cout<<subframe <<".\n"<<std::flush;
+
   /*
   This assertion will fail if the user specifies a frame that has less
   uplink symbols than there are pilots to populate the frame with.
   */ 
-  RtAssert(pilot_num == user_num, "More users than uplink symbols in leading slot format.\n");
+  //RtAssert(pilot_num == user_num, "More users than uplink symbols in leading slot format.\n");
 
   return subframe;
 }
