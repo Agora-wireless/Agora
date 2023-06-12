@@ -83,6 +83,7 @@ Config::Config(std::string jsonfilename)
   format_table[41] = "DDGGGUUUUUUUUU";
   format_table[45] = "DDDDDDGGUUUUUU";
   format_table[48] = "DGUUUUUDGUUUUU";
+  format_table[80] = "UUUUUUUUUUUUGG"; //Not a real format but using for test purposes.
 
 
   pilots_ = nullptr;
