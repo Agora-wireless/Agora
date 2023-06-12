@@ -92,10 +92,11 @@ int main(int argc, char* argv[]) {
     std::vector<std::vector<int8_t>> information(num_codeblocks);
     std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
     for (size_t i = 0; i < num_codeblocks; i++) {
-      data_generator.GenRawData(dir, information.at(i),
+      data_generator.GenRawData(cfg->LdpcConfig(dir), information.at(i),
                                 i % cfg->UeAntNum() /* UE ID */);
       std::memcpy(input_ptr, information.at(i).data(), input_size);
-      data_generator.GenCodeblock(dir, input_ptr, encoded_codewords.at(i));
+      DataGenerator::GenCodeblock(cfg->LdpcConfig(dir), input_ptr,
+                                  encoded_codewords.at(i));
     }
 
     // Save uplink information bytes to file
@@ -126,11 +127,9 @@ int main(int argc, char* argv[]) {
         for (size_t j = 0; j < num_symbols_per_cb; j++) {
           size_t num_bits =
               ((j + 1) < num_symbols_per_cb) ? bits_per_symbol : remaining_bits;
-          auto ofdm_symbol = data_generator.GetModulation(
+          auto ofdm_symbol = DataGenerator::GetModulation(
               &encoded_codewords[ue_id * num_cbs_per_ue + i][offset],
-              cfg->ModTable(dir), num_bits,
-              // cfg->LdpcConfig(dir).NumEncodedBytes(),
-              cfg->ModOrderBits(dir));
+              cfg->ModTable(dir), num_bits, cfg->ModOrderBits(dir));
           modulated_codewords[ue_id * cfg->Frame().NumDataSyms() +
                               i * num_symbols_per_cb + j] =
               data_generator.MapOFDMSymbol(
@@ -277,9 +276,9 @@ int main(int argc, char* argv[]) {
                                       cfg->OfdmDataNum() * cfg->UeAntNum(),
                                       Agora_memory::Alignment_t::kAlign64);
     Table<int8_t> demod_data_all_symbols;
-    demod_data_all_symbols.Calloc(
-        cfg->UeAntNum(), cfg->OfdmDataNum() * cfg->Frame().NumDataSyms() * 8,
-        Agora_memory::Alignment_t::kAlign64);
+    demod_data_all_symbols.Calloc(cfg->UeAntNum() * cfg->Frame().NumDataSyms(),
+                                  cfg->OfdmDataNum() * cfg->ModOrderBits(dir),
+                                  Agora_memory::Alignment_t::kAlign64);
     for (size_t i = data_sym_start; i < cfg->Frame().NumTotalSyms(); i++) {
       arma::cx_fmat mat_rx_data(
           reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
@@ -302,56 +301,24 @@ int main(int argc, char* argv[]) {
       mat_equalized_data = mat_equalized_data.st();
 
       for (size_t j = 0; j < cfg->UeAntNum(); j++) {
-        size_t cb_id = (i - data_sym_start) / num_symbols_per_cb;
-        size_t symbol_id_in_cb = (i - data_sym_start) % num_symbols_per_cb;
-        auto* demod_ptr = demod_data_all_symbols[j] +
-                          (cb_id * num_symbols_per_cb * 8 +
-                           symbol_id_in_cb * cfg->ModOrderBits(dir)) *
-                              cfg->OfdmDataNum();
-        auto* equal_t_ptr =
-            (float*)(equalized_data_all_symbols[i - data_sym_start] +
-                     j * cfg->OfdmDataNum());
+        size_t symbol_id = i - data_sym_start;
+        size_t offset = j * cfg->Frame().NumDataSyms() + symbol_id;
+        auto* demod_ptr = demod_data_all_symbols[offset];
+        auto* equal_t_ptr = (float*)(equalized_data_all_symbols[symbol_id] +
+                                     j * cfg->OfdmDataNum());
         demodulate(equal_t_ptr, demod_ptr, cfg->OfdmDataNum(),
                    cfg->ModOrderBits(dir), false);
       }
     }
 
     const LDPCconfig& ldpc_config = cfg->LdpcConfig(dir);
-
-    struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
-    struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {};
-
-    // Decoder setup
-    ldpc_decoder_5gnr_request.numChannelLlrs = ldpc_config.NumCbCodewLen();
-    ldpc_decoder_5gnr_request.numFillerBits = 0;
-    ldpc_decoder_5gnr_request.maxIterations = ldpc_config.MaxDecoderIter();
-    ldpc_decoder_5gnr_request.enableEarlyTermination =
-        ldpc_config.EarlyTermination();
-    ldpc_decoder_5gnr_request.Zc = ldpc_config.ExpansionFactor();
-    ldpc_decoder_5gnr_request.baseGraph = ldpc_config.BaseGraph();
-    ldpc_decoder_5gnr_request.nRows = ldpc_config.NumRows();
-    ldpc_decoder_5gnr_response.numMsgBits = ldpc_config.NumCbLen();
-    auto* resp_var_nodes = static_cast<int16_t*>(
-        Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
-                                         1024 * 1024 * sizeof(int16_t)));
-    ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
-
     Table<uint8_t> decoded_codewords;
     decoded_codewords.Calloc(num_codeblocks, cfg->OfdmDataNum(),
                              Agora_memory::Alignment_t::kAlign64);
     double freq_ghz = GetTime::MeasureRdtscFreq();
     size_t start_tsc = GetTime::WorkerRdtsc();
-    for (size_t i = 0; i < cfg->UeAntNum(); i++) {
-      for (size_t j = 0; j < num_cbs_per_ue; j++) {
-        ldpc_decoder_5gnr_request.varNodes =
-            demod_data_all_symbols[i] +
-            j * cfg->OfdmDataNum() * 8 * num_symbols_per_cb;
-        ldpc_decoder_5gnr_response.compactedMessageBytes =
-            decoded_codewords[i * num_cbs_per_ue + j];
-        bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
-                                &ldpc_decoder_5gnr_response);
-      }
-    }
+    DataGenerator::GetDecodedDataBatch(
+        demod_data_all_symbols, decoded_codewords, ldpc_config, num_codeblocks);
 
     size_t duration = GetTime::WorkerRdtsc() - start_tsc;
     std::printf("Decoding of %zu blocks takes %.2f us per block\n",
@@ -394,7 +361,6 @@ int main(int argc, char* argv[]) {
         1.f * error_num / total, block_error_num, num_codeblocks,
         1.f * block_error_num / num_codeblocks);
 
-    std::free(resp_var_nodes);
     demod_data_all_symbols.Free();
     equalized_data_all_symbols.Free();
     precoder.Free();

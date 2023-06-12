@@ -166,9 +166,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       if (ul_cb_padding > 0) {
         std::memset(&ul_scrambler_buffer.at(ul_cb_bytes), 0u, ul_cb_padding);
       }
-      this->GenCodeblock(Direction::kUplink,
-                         reinterpret_cast<int8_t*>(ul_scrambler_buffer.data()),
-                         ul_encoded_codewords.at(cb));
+      DataGenerator::GenCodeblock(
+          ul_ldpc_config, reinterpret_cast<int8_t*>(ul_scrambler_buffer.data()),
+          ul_encoded_codewords.at(cb));
     }
 
     {
@@ -282,9 +282,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     std::vector<std::vector<complex_float>> ul_modulated_codewords(
         num_ul_codeblocks);
     for (size_t i = 0; i < num_ul_codeblocks; i++) {
-      auto ofdm_symbol = this->GetModulation(
+      auto ofdm_symbol = DataGenerator::GetModulation(
           &ul_encoded_codewords.at(i)[0], cfg_->ModTable(Direction::kUplink),
-          cfg_->LdpcConfig(Direction::kUplink).NumEncodedBytes(),
+          cfg_->LdpcConfig(Direction::kUplink).NumCbCodewLen(),
           cfg_->ModOrderBits(Direction::kUplink));
       ul_modulated_codewords.at(i) =
           this->MapOFDMSymbol(ofdm_symbol, nullptr, SymbolType::kUL);
@@ -560,9 +560,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       if (dl_cb_padding > 0u) {
         std::memset(&dl_scrambler_buffer.at(dl_cb_bytes), 0u, dl_cb_padding);
       }
-      this->GenCodeblock(Direction::kDownlink,
-                         reinterpret_cast<int8_t*>(dl_scrambler_buffer.data()),
-                         dl_encoded_codewords.at(cb));
+      DataGenerator::GenCodeblock(
+          dl_ldpc_config, reinterpret_cast<int8_t*>(dl_scrambler_buffer.data()),
+          dl_encoded_codewords.at(cb));
     }
 
     // Modulate the encoded codewords
@@ -571,9 +571,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     for (size_t i = 0; i < num_dl_codeblocks; i++) {
       const size_t sym_offset = i % (symbol_blocks);
       const size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
-      auto ofdm_symbol = this->GetModulation(
+      auto ofdm_symbol = DataGenerator::GetModulation(
           &dl_encoded_codewords.at(i)[0], cfg_->ModTable(Direction::kDownlink),
-          cfg_->LdpcConfig(Direction::kDownlink).NumEncodedBytes(),
+          cfg_->LdpcConfig(Direction::kDownlink).NumCbCodewLen(),
           cfg_->ModOrderBits(Direction::kDownlink));
       dl_modulated_codewords.at(i) = this->MapOFDMSymbol(
           ofdm_symbol, ue_specific_pilot[ue_id], SymbolType::kDL);

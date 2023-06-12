@@ -15,6 +15,7 @@
 
 #include "comms-constants.inc"
 #include "comms-lib.h"
+#include "data_generator.h"
 #include "datatype_conversion.h"
 #include "gettime.h"
 #include "logger.h"
@@ -792,6 +793,7 @@ Config::Config(std::string jsonfilename)
         "%zu frame(s) using %zu symbols per frame\n",
         RecipCalFrameCnt(), frame_.NumDLCalSyms());
   }
+
   Print();
 }
 
@@ -869,8 +871,7 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
     ul_code_rate_ = GetCodeRate(ul_mcs_index_);
     ul_modulation_ = MapModToStr(ul_mod_order_bits_);
   }
-  ul_mod_order_ = static_cast<size_t>(pow(2, ul_mod_order_bits_));
-  InitModulationTable(this->ul_mod_table_, ul_mod_order_);
+  InitModulationTable(this->ul_mod_table_, ul_mod_order_bits_);
 
   // TODO: find the optimal base_graph
   uint16_t base_graph = ul_mcs.value("base_graph", 1);
@@ -921,8 +922,7 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
     dl_code_rate_ = GetCodeRate(dl_mcs_index_);
     dl_modulation_ = MapModToStr(dl_mod_order_bits_);
   }
-  dl_mod_order_ = static_cast<size_t>(pow(2, dl_mod_order_bits_));
-  InitModulationTable(this->dl_mod_table_, dl_mod_order_);
+  InitModulationTable(this->dl_mod_table_, dl_mod_order_bits_);
 
   // TODO: find the optimal base_graph
   uint16_t base_graph = dl_mcs.value("base_graph", 1);
@@ -958,7 +958,6 @@ void Config::UpdateCtrlMCS() {
         1;  // TODO: For MCS < 5, base_graph 1 doesn't work
     dl_bcast_mod_order_bits_ = GetModOrderBits(dl_bcast_mcs_index);
     const size_t dl_bcast_code_rate = GetCodeRate(dl_bcast_mcs_index);
-    dl_bcast_mod_order_ = (size_t)(std::pow(2, dl_bcast_mod_order_bits_));
     std::string dl_bcast_modulation = MapModToStr(dl_bcast_mod_order_bits_);
     const int16_t max_decoder_iter = 5;
     size_t bcast_zc = select_zc(
@@ -1655,38 +1654,11 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
   demodulate(reinterpret_cast<float*>(&eq_buff[0]), demod_buff_ptr, ctrl_sc_num,
              dl_bcast_mod_order_bits_, false);
 
-  // Decoder setup
-  int16_t num_filler_bits = 0;
-  int16_t num_channel_llrs = dl_bcast_ldpc_config_.NumCbCodewLen();
-  struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
-  struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {};
-  ldpc_decoder_5gnr_request.numChannelLlrs = num_channel_llrs;
-  ldpc_decoder_5gnr_request.numFillerBits = num_filler_bits;
-  ldpc_decoder_5gnr_request.maxIterations =
-      dl_bcast_ldpc_config_.MaxDecoderIter();
-  ldpc_decoder_5gnr_request.enableEarlyTermination =
-      dl_bcast_ldpc_config_.EarlyTermination();
-  ldpc_decoder_5gnr_request.Zc = dl_bcast_ldpc_config_.ExpansionFactor();
-  ldpc_decoder_5gnr_request.baseGraph = dl_bcast_ldpc_config_.BaseGraph();
-  ldpc_decoder_5gnr_request.nRows = dl_bcast_ldpc_config_.NumRows();
-
-  int num_msg_bits = dl_bcast_ldpc_config_.NumCbLen() - num_filler_bits;
-  ldpc_decoder_5gnr_response.numMsgBits = num_msg_bits;
-  int16_t* resp_var_nodes =
-      static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::kAlign64, kVarNodesSize));
-  ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
-
   int num_bcast_bytes = BitsToBytes(dl_bcast_ldpc_config_.NumCbLen());
   std::vector<uint8_t> decode_buff(num_bcast_bytes);
 
-  ldpc_decoder_5gnr_request.varNodes = demod_buff_ptr;
-  ldpc_decoder_5gnr_response.compactedMessageBytes =
-      static_cast<uint8_t*>(decode_buff.data());
-
-  bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
-                          &ldpc_decoder_5gnr_response);
-
+  DataGenerator::GetDecodedData(demod_buff_ptr, &decode_buff[0],
+                                dl_bcast_ldpc_config_);
   if (scramble_enabled_) {
     std::unique_ptr<AgoraScrambler::Scrambler> scrambler =
         std::make_unique<AgoraScrambler::Scrambler>();
@@ -1697,7 +1669,6 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
   FreeBuffer1d(&bcast_fft_buff);
   FreeBuffer1d(&eq_buff);
   FreeBuffer1d(&demod_buff_ptr);
-  FreeBuffer1d(&resp_var_nodes);
 
   return (reinterpret_cast<size_t*>(decode_buff.data()))[0];
 }
@@ -1705,8 +1676,6 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
 void Config::GenBroadcastSlots(
     std::vector<std::complex<int16_t>*>& bcast_iq_samps,
     std::vector<size_t> ctrl_msg) {
-  /*dl_bcast_iq_t.Calloc(this->frame_.NumDControlSyms(), samps_per_symbol_,
-                      Agora_memory::Alignment_t::kAlign64);*/
   assert(bcast_iq_samps.size() == this->frame_.NumDlControlSyms());
   assert(ctrl_msg.size() == this->frame_.NumDlControlSyms());
 
@@ -1720,7 +1689,6 @@ void Config::GenBroadcastSlots(
 
   const size_t dl_bcast_encoded_bytes =
       BitsToBytes(this->dl_bcast_ldpc_config_.NumCbCodewLen());
-  std::cout << dl_bcast_encoded_bytes << std::endl;
 
   SimdAlignByteVector dl_bcast_scramble_buffer(num_bcast_bytes_padded,
                                                std::byte(0));
@@ -1741,7 +1709,7 @@ void Config::GenBroadcastSlots(
               this->dl_bcast_ldpc_config_.ExpansionFactor())));
 
   Table<complex_float> dl_bcast_mod_table;
-  InitModulationTable(dl_bcast_mod_table, dl_bcast_mod_order_);
+  InitModulationTable(dl_bcast_mod_table, dl_bcast_mod_order_bits_);
   int8_t* ldpc_input = nullptr;
   Table<complex_float> dl_bcast_iq_f;
   dl_bcast_iq_f.Calloc(this->frame_.NumDlControlSyms(), ofdm_data_num_,
@@ -1817,6 +1785,13 @@ Config::~Config() {
     std::free(pilots_sgn_);
     pilots_sgn_ = nullptr;
   }
+  if (pilot_ifft_ != nullptr) {
+    FreeBuffer1d(&pilot_ifft_);
+  }
+  ue_specific_pilot_t_.Free();
+  ue_specific_pilot_.Free();
+  ue_pilot_ifft_.Free();
+
   ul_mod_table_.Free();
   dl_mod_table_.Free();
   dl_bits_.Free();
@@ -1827,11 +1802,6 @@ Config::~Config() {
   dl_iq_t_.Free();
   ul_iq_f_.Free();
   ul_iq_t_.Free();
-
-  FreeBuffer1d(&pilot_ifft_);
-  ue_specific_pilot_t_.Free();
-  ue_specific_pilot_.Free();
-  ue_pilot_ifft_.Free();
 }
 
 /* TODO Inspect and document */

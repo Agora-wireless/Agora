@@ -105,10 +105,11 @@ int main(int argc, char* argv[]) {
     std::vector<std::vector<int8_t>> information(num_codeblocks);
     std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
     for (size_t i = 0; i < num_codeblocks; i++) {
-      data_generator.GenRawData(dir, information.at(i),
+      data_generator.GenRawData(cfg->LdpcConfig(dir), information.at(i),
                                 i % cfg->UeAntNum() /* UE ID */);
       std::memcpy(input_ptr, information.at(i).data(), input_size);
-      data_generator.GenCodeblock(dir, input_ptr, encoded_codewords.at(i));
+      DataGenerator::GenCodeblock(cfg->LdpcConfig(dir), input_ptr,
+                                  encoded_codewords.at(i));
     }
 
     // Save uplink information bytes to file
@@ -131,15 +132,15 @@ int main(int argc, char* argv[]) {
     modulated_codewords.Calloc(num_codeblocks, num_subcarriers,
                                Agora_memory::Alignment_t::kAlign64);
     Table<int8_t> demod_data_all_symbols;
-    demod_data_all_symbols.Calloc(num_codeblocks,
-                                  num_subcarriers * cfg->ModOrderBits(dir),
-                                  Agora_memory::Alignment_t::kAlign64);
+    demod_data_all_symbols.Calloc(
+        num_codeblocks, Roundup<64>(num_subcarriers * cfg->ModOrderBits(dir)),
+        Agora_memory::Alignment_t::kAlign64);
     /*std::vector<uint8_t> mod_input(cfg->OfdmDataNum());*/
 
     // Modulate, add noise, and demodulate the encoded codewords
     for (size_t i = 0; i < num_codeblocks; i++) {
       //std::cout << cfg->LdpcConfig(dir).NumCbCodewLen() << std::endl;
-      auto ofdm_symbol = data_generator.GetModulation(
+      auto ofdm_symbol = DataGenerator::GetModulation(
           &encoded_codewords[i][0], cfg->ModTable(dir),
           cfg->LdpcConfig(dir).NumCbCodewLen(), cfg->ModOrderBits(dir));
 
@@ -156,8 +157,8 @@ int main(int argc, char* argv[]) {
                              Agora_memory::Alignment_t::kAlign64);
     double freq_ghz = GetTime::MeasureRdtscFreq();
     size_t start_tsc = GetTime::WorkerRdtsc();
-    data_generator.GetDecodedData(demod_data_all_symbols, decoded_codewords,
-                                  ldpc_config, num_codeblocks);
+    DataGenerator::GetDecodedDataBatch(
+        demod_data_all_symbols, decoded_codewords, ldpc_config, num_codeblocks);
 
     size_t duration = GetTime::WorkerRdtsc() - start_tsc;
     std::printf("Decoding of %zu blocks takes %.2f us per block\n",

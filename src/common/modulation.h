@@ -55,7 +55,7 @@ static inline std::string MapModToStr(size_t mod_order) {
   }
 }
 
-void InitModulationTable(Table<complex_float>& table, size_t mod_order);
+void InitModulationTable(Table<complex_float>& table, size_t mod_order_bits);
 void InitQpskTable(Table<complex_float>& table);
 void InitQam16Table(Table<complex_float>& table);
 void InitQam64Table(Table<complex_float>& table);

@@ -63,9 +63,9 @@ class DataGenerator {
    * @param  information           The generated input bit sequence
    * @param  ue_id                 ID of the UE that this codeblock belongs to
    */
-  void GenRawData(Direction dir, std::vector<int8_t>& information,
+  void GenRawData(const LDPCconfig& lc, std::vector<int8_t>& information,
                   size_t ue_id) {
-    const LDPCconfig& lc = cfg_->LdpcConfig(dir);
+    // const LDPCconfig& lc = cfg_->LdpcConfig(dir);
     information.resize(
         LdpcEncodingInputBufSize(lc.BaseGraph(), lc.ExpansionFactor()));
 
@@ -85,9 +85,9 @@ class DataGenerator {
    * @param  input_ptr             The input bit sequence to be encoded
    * @param  encoded_codeword      The generated encoded codeword bit sequence
    */
-  void GenCodeblock(Direction dir, const int8_t* input_ptr,
-                    std::vector<int8_t>& encoded_codeword) {
-    const LDPCconfig& lc = cfg_->LdpcConfig(dir);
+  static void GenCodeblock(const LDPCconfig& lc, const int8_t* input_ptr,
+                           std::vector<int8_t>& encoded_codeword) {
+    // const LDPCconfig& lc = cfg_->LdpcConfig(dir);
     std::vector<int8_t> parity;
     parity.resize(
         LdpcEncodingParityBufSize(lc.BaseGraph(), lc.ExpansionFactor()));
@@ -106,10 +106,9 @@ class DataGenerator {
    * @param encoded_codeword The encoded LDPC codeword bit sequence
    * @return An array of complex floats with OfdmDataNum() elements
    */
-  std::vector<complex_float> GetModulation(const int8_t* encoded_codeword,
-                                           Table<complex_float> mod_table,
-                                           const size_t num_bits,
-                                           const size_t mod_order_bits) {
+  static std::vector<complex_float> GetModulation(
+      const int8_t* encoded_codeword, Table<complex_float> mod_table,
+      const size_t num_bits, const size_t mod_order_bits) {
     size_t num_subcarrier_symbols = num_bits / mod_order_bits;
     std::vector<complex_float> modulated_codeword(num_subcarrier_symbols);
     std::vector<uint8_t> mod_input(num_subcarrier_symbols);
@@ -228,9 +227,37 @@ class DataGenerator {
     return ue_specific_pilot;
   }
 
-  void GetDecodedData(Table<int8_t>& demoded_data,
-                      Table<uint8_t>& decoded_codewords,
-                      const LDPCconfig& ldpc_config, size_t num_codeblocks) {
+  static void GetDecodedData(int8_t* demoded_data, uint8_t* decoded_codewords,
+                             const LDPCconfig& ldpc_config) {
+    struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
+    struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {};
+
+    // Decoder setup
+    ldpc_decoder_5gnr_request.numChannelLlrs = ldpc_config.NumCbCodewLen();
+    ldpc_decoder_5gnr_request.numFillerBits = 0;
+    ldpc_decoder_5gnr_request.maxIterations = ldpc_config.MaxDecoderIter();
+    ldpc_decoder_5gnr_request.enableEarlyTermination =
+        ldpc_config.EarlyTermination();
+    ldpc_decoder_5gnr_request.Zc = ldpc_config.ExpansionFactor();
+    ldpc_decoder_5gnr_request.baseGraph = ldpc_config.BaseGraph();
+    ldpc_decoder_5gnr_request.nRows = ldpc_config.NumRows();
+    ldpc_decoder_5gnr_response.numMsgBits = ldpc_config.NumCbLen();
+    auto* resp_var_nodes = static_cast<int16_t*>(
+        Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
+                                         1024 * 1024 * sizeof(int16_t)));
+    ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
+
+    ldpc_decoder_5gnr_request.varNodes = demoded_data;
+    ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_codewords;
+    bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
+                            &ldpc_decoder_5gnr_response);
+    std::free(resp_var_nodes);
+  }
+
+  static void GetDecodedDataBatch(Table<int8_t>& demoded_data,
+                                  Table<uint8_t>& decoded_codewords,
+                                  const LDPCconfig& ldpc_config,
+                                  size_t num_codeblocks) {
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
     struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {};
 

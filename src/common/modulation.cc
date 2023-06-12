@@ -39,27 +39,30 @@ void Print128Epi8(__m128i var) {
  ***********************************************************************************
  */
 
-void InitModulationTable(Table<complex_float>& mod_table, size_t mod_order) {
+void InitModulationTable(Table<complex_float>& mod_table,
+                         size_t mod_order_bits) {
   if (!mod_table.IsAllocated()) {
     mod_table.Malloc(1, pow(2, kMaxModType),
                      Agora_memory::Alignment_t::kAlign32);
   }
   // mod_table.malloc(pow(2, kMaxModType), 2, 32);
-  switch (mod_order) {
-    case 4:
+  switch (mod_order_bits) {
+    case 2:
       InitQpskTable(mod_table);
       break;
-    case 16:
+    case 4:
       InitQam16Table(mod_table);
       break;
-    case 64:
+    case 6:
       InitQam64Table(mod_table);
       break;
-    case 256:
+    case 8:
       InitQam256Table(mod_table);
       break;
     default: {
-      std::printf("Modulation order not supported, use default value 4\n");
+      std::printf(
+          "Modulation order %zu not supported, use default value 4 (16QAM)\n",
+          mod_order_bits);
       InitQam16Table(mod_table);
     }
   }
