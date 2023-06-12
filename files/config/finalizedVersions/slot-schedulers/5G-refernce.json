@@ -30,11 +30,11 @@
         "ofdm_rx_zero_prefix_cal_dl": 0,
         /* Modulation and Coding settings */
         "ul_mcs" : {
-          "modulation": "64QAM",
+          "modulation": "16QAM",
           "code_rate": 0.333
         },
         "dl_mcs" : {
-          "modulation": "64QAM",
+          "modulation": "16QAM",
           "code_rate": 0.333
         },
         /* General settings */
@@ -69,11 +69,11 @@
         "slot_format": true,
         "channel Bandwidth": 10e6,
         "numerology": 0,
-        "channel_bandwidth": 10e6,
+        "channel_bandwidth": 20e6,
         /* Frame definition */
         /* 2a explicit frame construction */
         "frame_schedule": [
-          "34,0,0,0,0,0,0,0,0,0"
+          "34,34,1,34,0,28,0,1,0,1"
         ],
         "special_slot": [
           "PPPPPPPPGGGGGG"
