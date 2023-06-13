@@ -1,4 +1,4 @@
-[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fuhd-dev-wip)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/uhd-dev-wip/)
+[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2FCubic23)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/Cubic23/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
