@@ -2,7 +2,6 @@ import csv
 import time
 import os.path
 import matplotlib
-matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import numpy as np
 import os
