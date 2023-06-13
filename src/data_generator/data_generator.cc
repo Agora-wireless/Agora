@@ -361,10 +361,6 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum(),
       Agora_memory::Alignment_t::kAlign64);
   size_t data_start = this->cfg_->CpLen() + this->cfg_->OfdmTxZeroPrefix();
-  auto* ifft_shift_tmp =
-      static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::kAlign64,
-          cfg_->OfdmCaNum() * sizeof(complex_float)));
   for (size_t i = 0; i < this->cfg_->Frame().NumTotalSyms(); i++) {
     arma::cx_fmat mat_input_data(
         reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
@@ -387,8 +383,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       auto* this_ofdm_symbol =
           rx_data_all_symbols[i] + j * this->cfg_->SampsPerSymbol() +
           this->cfg_->CpLen() + this->cfg_->OfdmTxZeroPrefix();
-      CommsLib::FFTShift(this_ofdm_symbol, ifft_shift_tmp,
-                         this->cfg_->OfdmCaNum());
+      CommsLib::FFTShift(this_ofdm_symbol, this->cfg_->OfdmCaNum());
       CommsLib::IFFT(this_ofdm_symbol, this->cfg_->OfdmCaNum(), false);
     }
   }
@@ -708,7 +703,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       }
       for (size_t j = 0; j < this->cfg_->BsAntNum(); j++) {
         complex_float* ptr_ifft = dl_ifft_data[i] + j * this->cfg_->OfdmCaNum();
-        CommsLib::FFTShift(ptr_ifft, ifft_shift_tmp, this->cfg_->OfdmCaNum());
+        CommsLib::FFTShift(ptr_ifft, this->cfg_->OfdmCaNum());
         CommsLib::IFFT(ptr_ifft, this->cfg_->OfdmCaNum(), false);
 
         short* tx_symbol = dl_tx_data[i] + j * this->cfg_->SampsPerSymbol() * 2;
@@ -794,5 +789,4 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   tx_data_all_symbols.Free();
   rx_data_all_symbols.Free();
   ue_specific_pilot.Free();
-  std::free(ifft_shift_tmp);
 }

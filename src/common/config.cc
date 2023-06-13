@@ -33,7 +33,7 @@ static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
 static constexpr size_t kVarNodesSize = 1024 * 1024 * sizeof(int16_t);
-static constexpr size_t kControlMCS = 10;  // QPSK, 308/1024
+static constexpr size_t kControlMCS = 5;  // QPSK, 379/1024
 
 /// Print the I/Q samples in the pilots
 static constexpr bool kDebugPrintPilot = false;
@@ -1616,12 +1616,9 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
                           reinterpret_cast<float*>(bcast_fft_buff),
                           ofdm_ca_num_ * 2);
   CommsLib::FFT(bcast_fft_buff, ofdm_ca_num_);
-  std::vector<complex_float> temp_fft_buf(ofdm_ca_num_);
-  auto* temp_buff = reinterpret_cast<complex_float*>(temp_fft_buf.data());
-  auto* fft_buff_complex = reinterpret_cast<complex_float*>(bcast_fft_buff);
-  CommsLib::FFTShift(fft_buff_complex, temp_buff, ofdm_ca_num_);
-  auto* bcast_buff_complex =
-      reinterpret_cast<arma::cx_float*>(fft_buff_complex);
+  //auto* fft_buff_complex = reinterpret_cast<complex_float*>(bcast_fft_buff);
+  CommsLib::FFTShift(bcast_fft_buff, ofdm_ca_num_);
+  auto* bcast_buff_complex = reinterpret_cast<arma::cx_float*>(bcast_fft_buff);
 
   size_t ctrl_sc_num = this->GetOFDMCtrlNum();
   std::vector<arma::cx_float> csi_buff(ofdm_data_num_);
@@ -1654,10 +1651,9 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
           exp(arma::cx_float(0, -phase_shift));
     }
   }
-  int8_t* demod_buff_ptr =
-      static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::kAlign64,
-          Roundup<64>(dl_bcast_mod_order_bits_ * ctrl_sc_num)));
+  int8_t* demod_buff_ptr = static_cast<int8_t*>(
+      Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
+                                       dl_bcast_mod_order_bits_ * ctrl_sc_num));
   demodulate(reinterpret_cast<float*>(&eq_buff[0]), demod_buff_ptr, ctrl_sc_num,
              dl_bcast_mod_order_bits_, false);
 

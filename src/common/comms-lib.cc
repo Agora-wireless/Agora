@@ -572,7 +572,9 @@ MKL_LONG CommsLib::FFT(complex_float* in_out, int fft_size) {
   return status;
 }
 
-void CommsLib::FFTShift(complex_float* in, complex_float* tmp, int fft_size) {
+void CommsLib::FFTShift(complex_float* in, int fft_size) {
+  std::vector<complex_float> tmp_fft(fft_size / 2);
+  auto* tmp = reinterpret_cast<complex_float*>(tmp_fft.data());
   std::memcpy(tmp, in + fft_size / 2, sizeof(float) * fft_size);
   std::memcpy(in + fft_size / 2, in, sizeof(float) * fft_size);
   std::memcpy(in, tmp, sizeof(float) * fft_size);
