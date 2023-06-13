@@ -11,12 +11,12 @@
         "external_ref_node": false,
         "channel": "A",
         "radio_num": 1,
-        "sample_rate": 5e6,
+        "sample_rate": 30.72e6,
         "demul_block_size": 48,
         "cp_size": 128,
-        "fft_size": 1024,
-        "ofdm_data_num": 304,
-        "channel_bandwidth": 5e6,
+        "fft_size": 2048,
+        "ofdm_data_num": 1264,
+        "channel_bandwidth": 20e6,
         "ofdm_pilot_spacing": 16,
         /*  (fft_size - ofdm_data_num_) / 2 */
         "ofdm_data_start": 424,
@@ -64,7 +64,7 @@
         /* Frame definition */
         /* 2a explicit frame construction */
         "frame_schedule": [
-          "BGPUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU"
+          "34,1,1,1,1,1,1,1,1,1"
         ],
         /* For all frame constructions */
         "client_ul_pilot_syms": 0,
