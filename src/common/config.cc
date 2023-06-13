@@ -83,7 +83,6 @@ Config::Config(std::string jsonfilename)
   format_table[41] = "DDGGGUUUUUUUUU";
   format_table[45] = "DDDDDDGGUUUUUU";
   format_table[48] = "DGUUUUUDGUUUUU";
-  format_table[80] = "UUUUUUUUUUUUGG"; //Not a real format but using for test purposes.
 
 
   pilots_ = nullptr;
@@ -1851,9 +1850,10 @@ std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, st
 
   //Replace the downlink symbol with a beacon symbol.
   subframe.replace(0, 1, "B");
+  subframe.replace(1, 1, "G");
 
   //Add in the pilot symbols.
-  for (unsigned int i = 0; i < subframe.size(); i++) {
+  for (unsigned int i = 2; i < subframe.size(); i++) {
 
     /*
      Once user_num many pilot_nums have been put in the beacon subframe, break.
@@ -1862,19 +1862,17 @@ std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, st
       break;
     }
 
-    if (subframe.at(i) == 'U') {
-      subframe.replace(i, 1, "P");
-      pilot_num++;
-    }
+    /*
+    If the last symbol of the first slot is a D and this D is not overwritten
+    by a pilot and the first symbols of the next slot is a U we might get a DU 
+    pair which could cause an error.
+    */
+    subframe.replace(i, 1, "P");
+    pilot_num++;
+
   }
 
   std::cout<<subframe <<".\n"<<std::flush;
-
-  /*
-  This assertion will fail if the user specifies a frame that has less
-  uplink symbols than there are pilots to populate the frame with.
-  */ 
-  //RtAssert(pilot_num == user_num, "More users than uplink symbols in leading slot format.\n");
 
   return subframe;
 }
