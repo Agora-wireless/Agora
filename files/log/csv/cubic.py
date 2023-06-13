@@ -1,6 +1,8 @@
 import csv
 import time
 import os.path
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -27,6 +29,9 @@ def process_csv_file(file_path, last_processed_frame, prev_frame_number, prev_re
             frame_number = int(lines[i][0])
             reading = float(lines[i][1])
 
+            if (ylabel == 'BER') and (reading == 0):
+                reading = float(0.0001)
+
             if (frame_number + 1) % 500 == 0:
                 frame_numbers.append(frame_number)
                 readings.append(reading)
@@ -35,14 +40,23 @@ def process_csv_file(file_path, last_processed_frame, prev_frame_number, prev_re
                     frame_numbers.insert(0, prev_frame_number)
                     readings.insert(0, prev_reading)
 
-                ax.plot(frame_numbers, readings, color=line_color)
+                ax.plot(frame_numbers, readings, color=line_color, linewidth=5.5, marker='o', markersize=10)
                 ax.set_xlabel('Frame Number')
                 ax.set_ylabel(ylabel)
 
-                if log_scale:
-                    readings = np.where(np.array(readings) == 0, 1e-6, readings)  # Treat 0 as a very small value
+                if ylabel == 'EVM (%)':
+                    ax.set_ylim([0, 20])
+                if ylabel == 'SNR (dB)':
+                    ax.set_ylim([0, 40])
+
+                if ylabel == 'BER':
                     ax.set_yscale('log')
-                    ax.set_ylim([np.min(readings), np.max(readings)])  # Adjust y-axis limits based on data
+                    ax.set_ylim([1e-5, 1])
+
+                    # Custom y-tick values
+                    ax.set_yticks([1e-4, 1e-3, 1e-2, 1e-1, 1])
+                    ax.set_yticklabels(['1e-4', '1e-3', '1e-2', '1e-1', '1'])
+
 
                 prev_frame_number = frame_number
                 prev_reading = reading
@@ -74,15 +88,17 @@ def monitor_csv_files(evm_file_path, snr_file_path, ber_file_path, data_rate):
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 10))
     fig.suptitle('Agora mmWave Performance')
 
+    plt.ion()  # Enable interactive mode
+
     while True:
         last_processed_frame_evm, prev_frame_number_evm, prev_evm_reading = process_csv_file(evm_file_path, last_processed_frame_evm, prev_frame_number_evm, prev_evm_reading, ax1, 'EVM (%)', 'blue')
         last_processed_frame_snr, prev_frame_number_snr, prev_snr_reading = process_csv_file(snr_file_path, last_processed_frame_snr, prev_frame_number_snr, prev_snr_reading, ax2, 'SNR (dB)', 'red')
-        last_processed_frame_ber, prev_frame_number_ber, prev_ber_reading = process_csv_file(ber_file_path, last_processed_frame_ber, prev_frame_number_ber, prev_ber_reading, ax3, 'BER)', 'green')
+        last_processed_frame_ber, prev_frame_number_ber, prev_ber_reading = process_csv_file(ber_file_path, last_processed_frame_ber, prev_frame_number_ber, prev_ber_reading, ax3, 'BER', 'green')
 
         plt.tight_layout()
         plt.pause(0.001)
 
-        time.sleep(1)
+        time.sleep(0.1)
 
 if __name__ == '__main__':
     cmd1 = "rm log-evm-BS.csv"
@@ -95,9 +111,9 @@ if __name__ == '__main__':
     evm_csv_file_path = 'log-evm-BS.csv'  # Replace with the actual path to your EVM CSV file
     snr_csv_file_path = 'log-ulsnr-BS.csv'  # Replace with the actual path to your SNR CSV file
     ber_csv_file_path = 'log-ber-BS.csv'  # Replace with the actual path to your BER CSV file
-    data_rate = 3371 # Replace with the actual data rate in Mbps
+    data_rate = 50000 # Replace with the actual data rate in Mbps
 
     while not os.path.exists(evm_csv_file_path) or not os.path.exists(snr_csv_file_path) or not os.path.exists(ber_csv_file_path):
-        time.sleep(1)
+        time.sleep(0.1)
 
     monitor_csv_files(evm_csv_file_path, snr_csv_file_path, ber_csv_file_path, data_rate)
