@@ -28,6 +28,10 @@ static const std::string kTxDataFilename = kOutputFilepath + "tx_data.bin";
 static const std::string kDecodeDataFilename =
     kOutputFilepath + "decode_data.bin";
 
+static const std::string kOutputFilepath_demul = kProjectDirectory + "/files/log/csv/";
+static const std::string kEqualDataFilename = kOutputFilepath_demul + "equal_data.bin";
+
+
 //Recording parameters
 static constexpr size_t kRecordFrameInterval = 1;
 static constexpr size_t kDefaultQueueSize = 36;
@@ -447,6 +451,9 @@ void Agora::Start() {
               stats_->PrintPerFrameDone(PrintType::kDemul, frame_id);
               if (kPrintPhyStats) {
                 this->phy_stats_->PrintEvmStats(frame_id);
+                if (frame_id != 0 && ((frame_id % 500) == 0)){
+                  SaveEqualDataToFile(frame_id);
+                }
               }
               this->phy_stats_->RecordCsiCond(frame_id, config_->LogScNum());
               this->phy_stats_->RecordEvm(frame_id, config_->LogScNum());
@@ -475,6 +482,7 @@ void Agora::Start() {
                                      frame_id, symbol_id);
                 }
               }
+            
             }
           }
         } break;
@@ -820,6 +828,10 @@ finish:
     SaveTxDataToFile(this->stats_->LastFrameId());
   }
 
+  if (flags_.enable_save_equal_data_to_file_ == true) {
+    SaveEqualDataToFile(this->stats_->LastFrameId());
+  }
+
   // Calculate and print per-user BER
   if ((kEnableMac == false) && (kPrintPhyStats == true)) {
     this->phy_stats_->PrintPhyStats();
@@ -1154,6 +1166,31 @@ void Agora::SaveDecodeDataToFile(int frame_id) {
     }
   }  // end else
 }
+
+void Agora::SaveEqualDataToFile(int frame_id) {
+  float* ptr;
+  int size;
+
+  GetEqualData(&ptr, &size);
+  std::string outputFilename = kEqualDataFilename;
+  AGORA_LOG_INFO("Saving equal data to %s\n", outputFilename.c_str());
+
+  auto* fp = std::fopen(outputFilename.c_str(), "wb");
+  if (fp == nullptr) {
+    AGORA_LOG_ERROR("SaveEqualDataToFile error creating file pointer\n")
+  } else {
+    const auto write_status =
+        std::fwrite(ptr, sizeof(float), size, fp);
+    if (write_status != size) {
+      AGORA_LOG_ERROR("SaveEqualDataToFile error while writting file\n")
+    }
+    const auto close_status = std::fclose(fp);
+    if (close_status != 0) {
+      AGORA_LOG_ERROR("SaveEqualDataToFile error while closing file\n")
+    }
+  }  // end else
+}
+
 
 void Agora::SaveTxDataToFile(int frame_id) {
   const auto& cfg = config_;

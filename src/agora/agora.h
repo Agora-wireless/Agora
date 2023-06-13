@@ -38,6 +38,10 @@ class Agora {
 
   // Flags that allow developer control over Agora internals
   struct {
+    // Use void GetEqualData(float** ptr, int* size); to dump the equal_buffer
+    // before the demodulation.
+    bool enable_save_equal_data_to_file_ = true;
+
     //     void getEqualData(float** ptr, int* size);Before exiting, save
     //     LDPC-decoded or demodulated data to a file
     bool enable_save_decode_data_to_file_ = false;
@@ -76,6 +80,7 @@ class Agora {
   void FreeQueues();
 
   void SaveDecodeDataToFile(int frame_id);
+  void SaveEqualDataToFile(int frame_id);
   void SaveTxDataToFile(int frame_id);
 
   void HandleEventFft(size_t tag);
