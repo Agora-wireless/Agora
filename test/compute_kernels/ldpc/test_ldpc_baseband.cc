@@ -88,18 +88,15 @@ int main(int argc, char* argv[]) {
       LdpcEncodingInputBufSize(cfg->LdpcConfig(dir).BaseGraph(),
                                cfg->LdpcConfig(dir).ExpansionFactor()));
   auto* input_ptr = new int8_t[input_size];
-  size_t num_encoded_bytes = LdpcEncodingEncodedBufSize(
-      cfg->LdpcConfig(dir).BaseGraph(), cfg->LdpcConfig(dir).ExpansionFactor());
   for (size_t noise_id = 0; noise_id < 15; noise_id++) {
     std::vector<std::vector<int8_t>> information(num_codeblocks);
     std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
     for (size_t i = 0; i < num_codeblocks; i++) {
       data_generator.GenRawData(cfg->LdpcConfig(dir), information.at(i),
                                 i % cfg->UeAntNum() /* UE ID */);
-      //information.at(i).resize(input_size, 0);
-      encoded_codewords.at(i).resize(num_encoded_bytes);
-      DataGenerator::GenCodeblock(cfg->LdpcConfig(dir), information.at(i),
-                                  encoded_codewords.at(i));
+      encoded_codewords.at(i) = DataGenerator::GenCodeblock(
+          cfg->LdpcConfig(dir), &information.at(i).at(0),
+          information.at(i).size());
     }
 
     // Save uplink information bytes to file
@@ -135,8 +132,9 @@ int main(int argc, char* argv[]) {
               cfg->ModTable(dir), num_bits, cfg->ModOrderBits(dir));
           modulated_codewords[ue_id * cfg->Frame().NumDataSyms() +
                               i * num_symbols_per_cb + j] =
-              data_generator.MapOFDMSymbol(
-                  ofdm_symbol, ue_specific_pilot[ue_id], SymbolType::kUL);
+              DataGenerator::MapOFDMSymbol(cfg.get(), ofdm_symbol,
+                                           ue_specific_pilot[ue_id],
+                                           SymbolType::kUL);
           remaining_bits -= bits_per_symbol;
           offset += BitsToBytes(bits_per_symbol);
         }
@@ -152,7 +150,8 @@ int main(int argc, char* argv[]) {
     std::vector<std::vector<complex_float>> pre_ifft_data_syms(
         cfg->UeAntNum() * cfg->Frame().NumDataSyms());
     for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
-      pre_ifft_data_syms[i] = data_generator.BinForIfft(modulated_codewords[i]);
+      pre_ifft_data_syms[i] =
+          DataGenerator::BinForIfft(cfg.get(), modulated_codewords[i]);
     }
 
     // Put pilot and data symbols together

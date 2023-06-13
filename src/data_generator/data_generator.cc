@@ -21,7 +21,6 @@
 #include "logger.h"
 #include "memory_manage.h"
 #include "modulation.h"
-#include "scrambler.h"
 #include "simd_types.h"
 #include "utils_ldpc.h"
 
@@ -54,14 +53,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     std::filesystem::create_directory(directory);
   }
   srand(time(nullptr));
-  auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
   std::unique_ptr<DoCRC> crc_obj = std::make_unique<DoCRC>();
   const size_t ul_cb_bytes = cfg_->NumBytesPerCb(Direction::kUplink);
   const size_t ul_cb_padding = cfg_->NumPaddingBytesPerCb(Direction::kUplink);
   LDPCconfig ul_ldpc_config = this->cfg_->LdpcConfig(Direction::kUplink);
-
-  SimdAlignByteVector ul_scrambler_buffer(ul_cb_bytes + ul_cb_padding,
-                                          std::byte(0));
 
   // Step 1: Generate the information buffers (MAC Packets) and LDPC-encoded
   // buffers for uplink
@@ -136,8 +131,6 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
     std::vector<std::vector<int8_t>> ul_information(num_ul_codeblocks);
     std::vector<std::vector<int8_t>> ul_encoded_codewords(num_ul_codeblocks);
-    size_t ul_encoded_bytes = LdpcEncodingEncodedBufSize(
-        ul_ldpc_config.BaseGraph(), ul_ldpc_config.ExpansionFactor());
     for (size_t cb = 0; cb < num_ul_codeblocks; cb++) {
       // i : symbol -> ue -> cb (repeat)
       size_t sym_id = cb / (symbol_blocks);
@@ -156,10 +149,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       int8_t* cb_start = &ul_mac_info.at(ue_id).at(ue_cb_cnt * ul_cb_bytes);
       ul_information.at(cb) =
           std::vector<int8_t>(cb_start, cb_start + ul_cb_bytes);
-      ul_encoded_codewords.at(cb).resize(ul_encoded_bytes);
-      DataGenerator::GenCodeblock(ul_ldpc_config, ul_information.at(cb),
-                                  ul_encoded_codewords.at(cb), ul_cb_padding,
-                                  this->cfg_->ScrambleEnabled());
+      ul_encoded_codewords.at(cb) = DataGenerator::GenCodeblock(
+          ul_ldpc_config, &ul_information.at(cb).at(0), ul_cb_bytes,
+          ul_cb_padding, this->cfg_->ScrambleEnabled());
     }
 
     {
@@ -277,8 +269,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
           &ul_encoded_codewords.at(i)[0], cfg_->ModTable(Direction::kUplink),
           cfg_->LdpcConfig(Direction::kUplink).NumCbCodewLen(),
           cfg_->ModOrderBits(Direction::kUplink));
-      ul_modulated_codewords.at(i) =
-          this->MapOFDMSymbol(ofdm_symbol, nullptr, SymbolType::kUL);
+      ul_modulated_codewords.at(i) = DataGenerator::MapOFDMSymbol(
+          cfg_, ofdm_symbol, nullptr, SymbolType::kUL);
     }
 
     // Place modulated uplink data codewords into central IFFT bins
@@ -286,7 +278,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     pre_ifft_data_syms.resize(this->cfg_->UeAntNum() *
                               this->cfg_->Frame().NumUlDataSyms());
     for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
-      pre_ifft_data_syms.at(i) = this->BinForIfft(ul_modulated_codewords.at(i));
+      pre_ifft_data_syms.at(i) = BinForIfft(cfg_, ul_modulated_codewords.at(i));
     }
   }
 
@@ -451,9 +443,6 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   const size_t dl_cb_bytes = cfg_->NumBytesPerCb(Direction::kDownlink);
   const size_t dl_cb_padding = cfg_->NumPaddingBytesPerCb(Direction::kDownlink);
 
-  SimdAlignByteVector dl_scrambler_buffer(dl_cb_bytes + dl_cb_padding,
-                                          std::byte(0));
-
   if (this->cfg_->Frame().NumDLSyms() > 0) {
     const size_t num_dl_mac_bytes =
         this->cfg_->MacBytesNumPerframe(Direction::kDownlink);
@@ -528,8 +517,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
     std::vector<std::vector<int8_t>> dl_information(num_dl_codeblocks);
     std::vector<std::vector<int8_t>> dl_encoded_codewords(num_dl_codeblocks);
-    size_t dl_encoded_bytes = LdpcEncodingEncodedBufSize(
-        dl_ldpc_config.BaseGraph(), dl_ldpc_config.ExpansionFactor());
+    /*size_t dl_encoded_bytes = LdpcEncodingEncodedBufSize(
+        dl_ldpc_config.BaseGraph(), dl_ldpc_config.ExpansionFactor());*/
     for (size_t cb = 0; cb < num_dl_codeblocks; cb++) {
       // i : symbol -> ue -> cb (repeat)
       const size_t sym_id = cb / (symbol_blocks);
@@ -542,10 +531,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       int8_t* cb_start = &dl_mac_info.at(ue_id).at(ue_cb_cnt * dl_cb_bytes);
       dl_information.at(cb) =
           std::vector<int8_t>(cb_start, cb_start + dl_cb_bytes);
-      dl_encoded_codewords.at(cb).resize(dl_encoded_bytes);
-      DataGenerator::GenCodeblock(dl_ldpc_config, dl_information.at(cb),
-                                  dl_encoded_codewords.at(cb), dl_cb_padding,
-                                  this->cfg_->ScrambleEnabled());
+      dl_encoded_codewords.at(cb) = DataGenerator::GenCodeblock(
+          dl_ldpc_config, &dl_information.at(cb).at(0), dl_cb_bytes,
+          dl_cb_padding, this->cfg_->ScrambleEnabled());
     }
 
     // Modulate the encoded codewords
@@ -558,8 +546,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
           &dl_encoded_codewords.at(i)[0], cfg_->ModTable(Direction::kDownlink),
           cfg_->LdpcConfig(Direction::kDownlink).NumCbCodewLen(),
           cfg_->ModOrderBits(Direction::kDownlink));
-      dl_modulated_codewords.at(i) = this->MapOFDMSymbol(
-          ofdm_symbol, ue_specific_pilot[ue_id], SymbolType::kDL);
+      dl_modulated_codewords.at(i) = DataGenerator::MapOFDMSymbol(
+          cfg_, ofdm_symbol, ue_specific_pilot[ue_id], SymbolType::kDL);
     }
 
     {

@@ -33,7 +33,7 @@ static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
 static constexpr size_t kVarNodesSize = 1024 * 1024 * sizeof(int16_t);
-static constexpr size_t kControlMCS = 5;  // QPSK, 308/1024
+static constexpr size_t kControlMCS = 10;  // QPSK, 308/1024
 
 /// Print the I/Q samples in the pilots
 static constexpr bool kDebugPrintPilot = false;
@@ -327,18 +327,24 @@ Config::Config(std::string jsonfilename)
   control_symbol_map_.resize(ofdm_data_num_);
   // Maps subcarrier index to data index
   dl_symbol_data_id_.resize(ofdm_data_num_, 0);
+  dl_symbol_ctrl_id_.resize(ofdm_data_num_, 0);
   size_t data_idx = 0;
+  size_t ctrl_idx = 0;
   for (size_t i = 0; i < ofdm_data_num_; i++) {
     if (i % ofdm_pilot_spacing_ == 0) {  // TODO: make this index configurable
       dl_symbol_map_.at(i) = SubcarrierType::kDMRS;
       control_symbol_map_.at(i) = SubcarrierType::kDMRS;
     } else {
       dl_symbol_map_.at(i) = SubcarrierType::kData;
-      control_symbol_map_.at(i) = (i % ofdm_pilot_spacing_ == 1)
-                                      ? SubcarrierType::kPTRS
-                                      : SubcarrierType::kData;
       dl_symbol_data_id_.at(i) = data_idx;
       data_idx++;
+      if (i % ofdm_pilot_spacing_ == 1) {
+        control_symbol_map_.at(i) = SubcarrierType::kPTRS;
+      } else {
+        control_symbol_map_.at(i) = SubcarrierType::kData;
+        dl_symbol_ctrl_id_.at(i) = ctrl_idx;
+        ctrl_idx++;
+      }
     }
   }
 
@@ -1631,7 +1637,8 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
     if (j % ofdm_pilot_spacing_ == 0) {
       csi_buff.at(j) = (bcast_buff_complex[sc_id] / arma::cx_float(p.re, p.im));
     } else {
-      csi_buff.at(j) = csi_buff.at(j - 1);
+      csi_buff.at(j) = csi_buff.at(
+          j - 1);  // TODO: Not correct when 0th subcarrier is not pilot
       if (j % ofdm_pilot_spacing_ == 1) {
         phase_shift += arg((bcast_buff_complex[sc_id] / csi_buff.at(j)) *
                            arma::cx_float(p.re, -p.im));
@@ -1639,12 +1646,12 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
     }
   }
   phase_shift /= this->GetOFDMPilotNum();
-  size_t data_idx = 0;
   for (size_t j = 0; j < ofdm_data_num_; j++) {
     size_t sc_id = j + ofdm_data_start_;
-    if (j % ofdm_pilot_spacing_ != 0 && j % ofdm_pilot_spacing_ != 1) {
-      eq_buff[data_idx++] = (bcast_buff_complex[sc_id] / csi_buff.at(j)) *
-                            exp(arma::cx_float(0, -phase_shift));
+    if (this->IsControlSubcarrier(j) == true) {
+      eq_buff[GetOFDMCtrlIndex(j)] =
+          (bcast_buff_complex[sc_id] / csi_buff.at(j)) *
+          exp(arma::cx_float(0, -phase_shift));
     }
   }
   int8_t* demod_buff_ptr =
@@ -1654,7 +1661,7 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
   demodulate(reinterpret_cast<float*>(&eq_buff[0]), demod_buff_ptr, ctrl_sc_num,
              dl_bcast_mod_order_bits_, false);
 
-  int num_bcast_bytes = BitsToBytes(dl_bcast_ldpc_config_.NumCbLen());
+  int num_bcast_bytes = dl_bcast_ldpc_config_.NumCbLen() / 8;
   std::vector<uint8_t> decode_buff(num_bcast_bytes);
 
   DataGenerator::GetDecodedData(demod_buff_ptr, &decode_buff[0],
@@ -1678,98 +1685,38 @@ void Config::GenBroadcastSlots(
   int num_padding_bytes = num_bcast_bytes_padded - num_bcast_bytes;
   int8_t* bcast_bits_buffer =
       static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::kAlign64, num_bcast_bytes_padded));
-  std::memset(bcast_bits_buffer, 0u, num_bcast_bytes_padded);
-
-  const size_t dl_bcast_encoded_bytes =
-      BitsToBytes(this->dl_bcast_ldpc_config_.NumCbCodewLen());
-
-  SimdAlignByteVector dl_bcast_scramble_buffer(num_bcast_bytes_padded,
-                                               std::byte(0));
-
-  Table<int8_t> dl_bcast_encoded_bits;
-  dl_bcast_encoded_bits.Calloc(this->frame_.NumDlControlSyms(),
-                               dl_bcast_encoded_bytes,
-                               Agora_memory::Alignment_t::kAlign64);
-  Table<int8_t> dl_bcast_mod_bits;
-  dl_bcast_mod_bits.Calloc(this->frame_.NumDlControlSyms(),
-                           this->GetOFDMCtrlNum(),
-                           Agora_memory::Alignment_t::kAlign32);
-  auto* dl_bcast_parity_buffer =
-      static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::kAlign64,
-          LdpcEncodingEncodedBufSize(
-              this->dl_bcast_ldpc_config_.BaseGraph(),
-              this->dl_bcast_ldpc_config_.ExpansionFactor())));
+          Agora_memory::Alignment_t::kAlign64, num_bcast_bytes));
+  std::memset(bcast_bits_buffer, 0u, num_bcast_bytes);
 
   Table<complex_float> dl_bcast_mod_table;
   InitModulationTable(dl_bcast_mod_table, dl_bcast_mod_order_bits_);
-  int8_t* ldpc_input = nullptr;
-  Table<complex_float> dl_bcast_iq_f;
-  dl_bcast_iq_f.Calloc(this->frame_.NumDlControlSyms(), ofdm_data_num_,
-                       Agora_memory::Alignment_t::kAlign64);
-  Table<complex_float> dl_bcast_iq_ifft;
-  dl_bcast_iq_ifft.Calloc(this->frame_.NumDlControlSyms(), ofdm_ca_num_,
-                          Agora_memory::Alignment_t::kAlign64);
-  auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
+
   for (size_t i = 0; i < this->frame_.NumDlControlSyms(); i++) {
     const int8_t* tmp =
         static_cast<const int8_t*>(static_cast<const void*>(&ctrl_msg.at(i)));
 
     std::memcpy(bcast_bits_buffer, tmp, sizeof(size_t));
 
-    int8_t* coded_bits_ptr = dl_bcast_encoded_bits[i];
-    /*DataGenerator::GenCodeblock(dl_bcast_ldpc_config, bcast_bits_buffer,
-                                coded_bits_ptr, scramble_enabled_);*/
+    auto coded_bits_ptr = DataGenerator::GenCodeblock(
+        dl_bcast_ldpc_config_, bcast_bits_buffer, num_bcast_bytes,
+        num_padding_bytes, scramble_enabled_);
 
-    if (scramble_enabled_) {
-      scrambler->Scramble(dl_bcast_scramble_buffer.data(), bcast_bits_buffer,
-                          num_bcast_bytes);
-      ldpc_input = reinterpret_cast<int8_t*>(dl_bcast_scramble_buffer.data());
-    } else {
-      ldpc_input = bcast_bits_buffer;
-    }
-    if (num_padding_bytes > 0) {
-      std::memset(&ldpc_input[num_bcast_bytes], 0u, num_padding_bytes);
-    }
-
-    LdpcEncodeHelper(dl_bcast_ldpc_config_.BaseGraph(),
-                     dl_bcast_ldpc_config_.ExpansionFactor(),
-                     dl_bcast_ldpc_config_.NumRows(), coded_bits_ptr,
-                     dl_bcast_parity_buffer, ldpc_input);
-    int8_t* mod_input_ptr = dl_bcast_mod_bits[i];
-    AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
-                    reinterpret_cast<uint8_t*>(mod_input_ptr),
-                    dl_bcast_encoded_bytes, dl_bcast_mod_order_bits_);
-    size_t data_idx = 0;
-    for (size_t j = 0; j < ofdm_data_num_; j++) {
-      size_t sc = j + ofdm_data_start_;
-      if (j % ofdm_pilot_spacing_ != 0 && j % ofdm_pilot_spacing_ != 1) {
-        dl_bcast_iq_f[i][j] =
-            ModSingleUint8(mod_input_ptr[data_idx++], dl_bcast_mod_table);
-      } else {
-        dl_bcast_iq_f[i][j] = pilots_[j];
-      }
-      // FFT Shift
-      const size_t k = sc >= ofdm_ca_num_ / 2 ? sc - ofdm_ca_num_ / 2
-                                              : sc + ofdm_ca_num_ / 2;
-      dl_bcast_iq_ifft[i][k] = dl_bcast_iq_f[i][j];
-    }
-    CommsLib::IFFT(dl_bcast_iq_ifft[i], ofdm_ca_num_, false);
+    auto modulated_vector = DataGenerator::GetModulation(
+        &coded_bits_ptr[0], dl_bcast_mod_table,
+        dl_bcast_ldpc_config_.NumCbCodewLen(), dl_bcast_mod_order_bits_);
+    auto mapped_symbol = DataGenerator::MapOFDMSymbol(
+        this, modulated_vector, pilots_, SymbolType::kControl);
+    auto ofdm_symbol = DataGenerator::BinForIfft(this, mapped_symbol, true);
+    CommsLib::IFFT(&ofdm_symbol[0], ofdm_ca_num_, false);
     // additional 2^2 (6dB) power backoff
     float dl_bcast_scale =
-        2 * CommsLib::FindMaxAbs(dl_bcast_iq_ifft[i], this->ofdm_ca_num_);
-    CommsLib::Ifft2tx(dl_bcast_iq_ifft[i], bcast_iq_samps[i],
-                      this->ofdm_ca_num_, this->ofdm_tx_zero_prefix_,
-                      this->cp_len_, dl_bcast_scale);
+        2 * CommsLib::FindMaxAbs(&ofdm_symbol[0], ofdm_symbol.size());
+    CommsLib::Ifft2tx(&ofdm_symbol[0], bcast_iq_samps[i], this->ofdm_ca_num_,
+                      this->ofdm_tx_zero_prefix_, this->cp_len_,
+                      dl_bcast_scale);
   }
   FreeBuffer1d(&bcast_bits_buffer);
-  dl_bcast_iq_ifft.Free();
-  dl_bcast_iq_f.Free();
   dl_bcast_mod_table.Free();
-  dl_bcast_mod_bits.Free();
-  dl_bcast_encoded_bits.Free();
-  FreeBuffer1d(&dl_bcast_parity_buffer);
 }
 
 Config::~Config() {

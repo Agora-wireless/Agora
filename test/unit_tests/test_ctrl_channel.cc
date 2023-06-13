@@ -25,7 +25,7 @@ TEST(TestControl, VerifyCorrectness) {
   }
 
   std::vector<size_t> msg;
-  msg.push_back(4);
+  msg.push_back(1051);
   cfg->GenBroadcastSlots(data_buffer, msg);
   auto decoded_msg =
       cfg->DecodeBroadcastSlots(reinterpret_cast<int16_t*>(data_buffer[0]));

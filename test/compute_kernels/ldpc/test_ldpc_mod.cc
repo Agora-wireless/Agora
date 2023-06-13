@@ -101,17 +101,15 @@ int main(int argc, char* argv[]) {
       LdpcEncodingInputBufSize(cfg->LdpcConfig(dir).BaseGraph(),
                                cfg->LdpcConfig(dir).ExpansionFactor()));
   auto* input_ptr = new int8_t[input_size];
-  size_t num_encoded_bytes = LdpcEncodingEncodedBufSize(
-      cfg->LdpcConfig(dir).BaseGraph(), cfg->LdpcConfig(dir).ExpansionFactor());
   for (size_t noise_id = 0; noise_id < 15; noise_id++) {
     std::vector<std::vector<int8_t>> information(num_codeblocks);
     std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
     for (size_t i = 0; i < num_codeblocks; i++) {
       data_generator.GenRawData(cfg->LdpcConfig(dir), information.at(i),
                                 i % cfg->UeAntNum() /* UE ID */);
-      encoded_codewords.at(i).resize(num_encoded_bytes);
-      DataGenerator::GenCodeblock(cfg->LdpcConfig(dir), information.at(i),
-                                  encoded_codewords.at(i));
+      encoded_codewords.at(i) = DataGenerator::GenCodeblock(
+          cfg->LdpcConfig(dir), &information.at(i).at(0),
+          information.at(i).size());
     }
 
     // Save uplink information bytes to file

@@ -605,10 +605,14 @@ class Config {
     return dl_symbol_data_id_.at(sc_id);
   }
 
+  inline size_t GetOFDMCtrlIndex(size_t sc_id) const {
+    return dl_symbol_ctrl_id_.at(sc_id);
+  }
+
   inline bool IsDataSubcarrier(size_t sc_id) const {
     return dl_symbol_map_.at(sc_id) == SubcarrierType::kData;
   }
-  inline bool IsControlDataSubcarrier(size_t sc_id) const {
+  inline bool IsControlSubcarrier(size_t sc_id) const {
     return control_symbol_map_.at(sc_id) == SubcarrierType::kData;
   }
   inline const std::string& ConfigFilename() const { return config_filename_; }
@@ -714,6 +718,7 @@ class Config {
   std::vector<SubcarrierType> dl_symbol_map_;
   std::vector<SubcarrierType> control_symbol_map_;
   std::vector<size_t> dl_symbol_data_id_;
+  std::vector<size_t> dl_symbol_ctrl_id_;
 
   Table<int8_t> dl_bits_;
   Table<int8_t> ul_bits_;
