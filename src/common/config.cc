@@ -26,7 +26,7 @@
 using json = nlohmann::json;
 
 static constexpr size_t kMacAlignmentBytes = 64u;
-static constexpr bool kDebugPrintConfiguration = false;
+static constexpr bool kDebugPrintConfiguration = true;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
 
@@ -42,17 +42,19 @@ static const std::string kUlDataFilePrefix =
 static const std::string kDlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_dl_data_";
 static const std::string kUlDataFreqPrefix = kExperimentFilepath + "ul_data_f_";
+static const size_t kFlexibleSlotFormatIdx = 2;
+static const size_t subframes_per_frame = 10;
 
 
 //Version of 5G function that handles explicit frame_schedule
 
 std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size, double sampling_rate, double CBW,
-std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table);
+std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table, std::vector<std::string> flex_formats);
 
 // Form the beacon subframe based on the specified 5G slot / subframe format
 std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, std::string> format_table);
 // Expand the slot configuration to a symbols configuration
-std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table);
+std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table, std::vector<std::string> flex_formats);
 
 Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -210,6 +212,8 @@ Config::Config(std::string jsonfilename)
                                                 kShortIdLen)
                     : ue_radio_id_.at(i)));
   }
+
+  std::vector<std::string> flex_formats = tdd_conf.value("flex_formats", json::array());
 
   channel_ = tdd_conf.value("channel", "A");
   ue_channel_ = tdd_conf.value("ue_channel", channel_);
@@ -545,7 +549,7 @@ Config::Config(std::string jsonfilename)
     std::string frame = jframes.at(0).get<std::string>();
 
 
-    std::cout << "Base string: " << frame << std::flush;
+    //std::cout << "Base string: " << frame << std::flush;
 
     /*
     If an apostrophe delimiter is found in the frame string, execute logic to
@@ -554,14 +558,10 @@ Config::Config(std::string jsonfilename)
     */ 
     if (frame.find(",")!=std::string::npos) {
       
-      // std::cout << "About to read frame schedule.\n" << std::flush;
-      // std::cout << "About to do 5GNR calcs.\n" << std::flush;
       // Expand the slot configuration to a symbols configuration
-      //frame = formFrame(frame, ue_ant_num_, format_table);
       frame = fiveGNR(numerology, ofdm_data_num_, ofdm_ca_num_, rate_, CBW,
-      frame, ue_num_, format_table);
+      frame, ue_num_, format_table, flex_formats);
 
-      // std::cout<<"Formed Frame.\n" << frame<<std::flush;
 
     } 
 
@@ -1764,16 +1764,13 @@ void Config::Print() const {
 
 
 std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size, double sampling_rate, double CBW,
- std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table) {
+ std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table, std::vector<std::string> flex_formats) {
   double GB; //Guardband.
   double TBW; //Transmission bandwidth.
   double min_sampling_rate;
   float scs;
 
   bool fft_is_valid = false;
-
-  size_t subframes_per_frame = 10; // This might need to be defined in the header.
-
   //This is kind of a hack, but it's faster and simpler than calculating.
   size_t valid_ffts[] = {512, 1024, 1536, 2048};
 
@@ -1820,7 +1817,7 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size
     (TBW + 2*GB) / 1e6,sampling_rate / 1e6, num_ofdm_data_sub, fft_size
   ); 
 
-  frame_schedule = formFrame(frame_schedule, user_num, format_table);
+  frame_schedule = formFrame(frame_schedule, user_num, format_table, flex_formats);
 
   return frame_schedule;
 
@@ -1871,15 +1868,12 @@ std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, st
     pilot_num++;
 
   }
-
-  std::cout<<subframe <<".\n"<<std::flush;
-
   return subframe;
 }
 
 
 // Expand the slot configuration to a symbols configuration
-std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table){
+std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table, std::vector<std::string> flex_formats) {
   std::string frame;
   std::string temp = "";
   int subframes[10]; // Update this hardcoded value to a var.
@@ -1907,7 +1901,6 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int,
    
     if (frame_schedule.at(i) == ',') {   
 
-      //std::cout<<"subframe index: " << std::to_string(subframe_idx) << "\n"<<std::flush;
       subframes[subframe_idx] = std::stoi(temp);
       subframe_idx++;
       temp.clear();
@@ -1926,30 +1919,32 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int,
 
   frame += formBeaconSubframe(subframes[0], user_num, format_table);
 
+  size_t flex_format_idx = 0;
+
   for (int i = 1; i < 10; i++) {  
     try {
-      //std::cout<<"accessing: " << std::to_string(subframes[i]) <<"\n";
-      frame += format_table.at(subframes[i]);
+      if (subframes[i] == 2) {
+        frame += flex_formats.at(flex_format_idx);
+        flex_format_idx++;
+        
+
+      } else {
+        frame += format_table.at(subframes[i]);
+      }
+      
     } catch (std::out_of_range &e) {
 
       std::string error_message = "User specified a non supported subframe "
       "format.\nCurrently supported subframe formats are:";
 
       for (auto format = format_table.begin(); format != format_table.end(); format++) {
-        error_message += " %i : %s", format->first, format->second;
+        error_message += std::to_string(format->first) + " " + format->second + ".\n";
       }
 
-      AGORA_LOG_ERROR(
-          error_message + "\n"
-          );
-
-      throw std::runtime_error(
-        "Non supported frame format."
-      );
+      throw std::runtime_error(error_message);
     }
     
   }
-
   return frame;
 }
 

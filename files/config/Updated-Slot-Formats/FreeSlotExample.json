@@ -61,7 +61,12 @@
         /* Frame definition */
         /* 2a explicit frame construction */
         "frame_schedule": [
-          "0,0,0,0,0,27,1,1,1,1"
+          "0,2,0,2,0,27,2,1,1,1"
+        ],
+        "flex_formats": [
+                "GUDUDUDUDUDUDG",
+                "GGGGGGGGGGGGGG",
+                "GGGGGGGGGGGGGG"
         ],
         /* For all frame constructions */
         "client_ul_pilot_syms": 0,
