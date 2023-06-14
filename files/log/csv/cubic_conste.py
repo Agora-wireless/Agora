@@ -32,12 +32,12 @@ def plot_coordinates(coordinates, angle=np.pi/14, ax=None):
     i = np.array([coord[0] for coord in coordinates])
     q = np.array([coord[1] for coord in coordinates])
     ax.scatter(i * np.cos(angle) + q * np.sin(angle), - i * np.sin(angle) + q * np.cos(angle), s=10)
-    ax.set_xlabel('I', fontsize=14)
-    ax.set_ylabel('Q', fontsize=14)
-    ax.set_xticks(np.arange(-2, 2.5, 0.5))
-    ax.set_yticks(np.arange(-2, 2.5, 0.5))
+    ax.set_xlabel('I', fontsize=18)
+    ax.set_ylabel('Q', fontsize=18)
+    ax.set_xticks(np.arange(-1.5, 1.5, 0.5))
+    ax.set_yticks(np.arange(-1.5, 1.5, 0.5))
     ax.tick_params(axis='both', which='major', labelsize=12)
-    ax.set_title('Coordinates Plot - ' + MODULATION_TYPE, fontsize=16)
+    ax.set_title('Coordinates Plot - ' + MODULATION_TYPE, fontsize=22)
 
 def update_plot(file_path):
     plt.ion()  # Turn on interactive mode

@@ -85,21 +85,21 @@ def monitor_csv_files(evm_file_path, snr_file_path, ber_file_path, data_rate):
     prev_ber_reading = None
 
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 10))
-    fig.suptitle('Agora mmWave Performance', fontsize=16)
+    fig.suptitle('Agora mmWave Performance', fontsize=22)
 
     plt.ion()  # Enable interactive mode
 
     while True:
-        ax1.set_xlabel('Frame Number', fontsize=14)
-        ax1.set_ylabel('EVM (%)', fontsize=14)
+        ax1.set_xlabel('Frame Number', fontsize=18)
+        ax1.set_ylabel('EVM (%)', fontsize=18)
         ax1.tick_params(axis='both', which='major', labelsize=12)
 
-        ax2.set_xlabel('Frame Number', fontsize=14)
-        ax2.set_ylabel('SNR (dB)', fontsize=14)
+        ax2.set_xlabel('Frame Number', fontsize=18)
+        ax2.set_ylabel('SNR (dB)', fontsize=18)
         ax2.tick_params(axis='both', which='major', labelsize=12)
 
-        ax3.set_xlabel('Frame Number', fontsize=14)
-        ax3.set_ylabel('BER', fontsize=14)
+        ax3.set_xlabel('Frame Number', fontsize=18)
+        ax3.set_ylabel('BER', fontsize=18)
         ax3.tick_params(axis='both', which='major', labelsize=12)
 
         last_processed_frame_evm, prev_frame_number_evm, prev_evm_reading = process_csv_file(evm_file_path, last_processed_frame_evm, prev_frame_number_evm, prev_evm_reading, ax1, 'EVM (%)', 'blue')
