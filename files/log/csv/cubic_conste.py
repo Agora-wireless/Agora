@@ -28,16 +28,16 @@ def parse_coordinates(data):
         coordinates.append((real, imag))
     return coordinates
 
-def plot_coordinates(coordinates, angle=np.pi/12, ax=None):
+def plot_coordinates(coordinates, angle=np.pi/14, ax=None):
     i = np.array([coord[0] for coord in coordinates])
     q = np.array([coord[1] for coord in coordinates])
-    ax.scatter(i * np.cos(angle) + q * np.sin(angle), - i * np.sin(angle) + q * np.cos(angle), s=1)
-    ax.set_xlabel('I')
-    ax.set_ylabel('Q')
-    ax.set_xlim(-2, 2)
-    ax.set_ylim(-2, 2)
-    ax.set_title('Coordinates Plot - ' + MODULATION_TYPE)
-
+    ax.scatter(i * np.cos(angle) + q * np.sin(angle), - i * np.sin(angle) + q * np.cos(angle), s=10)
+    ax.set_xlabel('I', fontsize=14)
+    ax.set_ylabel('Q', fontsize=14)
+    ax.set_xticks(np.arange(-2, 2.5, 0.5))
+    ax.set_yticks(np.arange(-2, 2.5, 0.5))
+    ax.tick_params(axis='both', which='major', labelsize=12)
+    ax.set_title('Coordinates Plot - ' + MODULATION_TYPE, fontsize=16)
 
 def update_plot(file_path):
     plt.ion()  # Turn on interactive mode
@@ -64,8 +64,8 @@ def main():
             update_plot("equal_data.bin")
             break
         else:
-            print("File 'equal_data.bin' not found. Waiting...")
-            time.sleep(1)  # Wait for 1 second before checking again
+            # print("File 'equal_data.bin' not found. Waiting...")
+            time.sleep(0.01)  # Wait for 1 second before checking again
 
 if __name__ == "__main__":
     main()
