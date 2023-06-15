@@ -1757,6 +1757,21 @@ void Config::Print() const {
   }
 }
 
+/**
+ * Requires: numerology
+ *           num_ofdm_data_sub
+ *           fft_size
+ *           sampling_rate
+ *           CBW: Channel bandwidth
+ *           frame_schedule
+ *           user_num
+ *           format_table
+ *           flex_formats
+ *            .
+ * 
+ * Effects: Verifies that the passed specs are 5G compliant and compatible
+ *          with eachother and returns a 5G formated frame.
+*/
 std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size, double sampling_rate, double CBW,
  std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table, std::vector<std::string> flex_formats) {
   double GB; //Guardband.
@@ -1813,15 +1828,12 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size
 }
 
 /**
- * Requires: A valid format number specifying the 5G NR slot format to use
- * and a valid user num less than 13 representing the number of users (and 
- * hence pilot symbols) needed by the subframe.
+ * Requires: A valid format number specifying the 5G NR slot format to use,
+ * a valid user num less than 13 representing the number of users (and 
+ * hence pilot symbols) needed by the subframe and a slot format_table.
  * 
  * Effects: Generates a subframe that transmits a beacon symbol and as many
  * pilot symbols as there are users.
- * 
- * Notes: Currently limited to one Beacon symbols per subframe. Also currently
- * only supporting format number 34.
 */
 
 std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, std::string> format_table) {
@@ -1859,7 +1871,16 @@ std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, st
 }
 
 
-// Expand the slot configuration to a symbols configuration
+/**
+ * Requires: frame_schedule
+ *           user_num
+ *           format_table
+ *           flex_formats
+ *            .
+ * 
+ * Effects: Builds a symbol based frame which Agora is built to handle from the 
+ *          slot format based frame given in the frame schedule.
+*/
 std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table, std::vector<std::string> flex_formats) {
   std::string frame;
   std::string temp = "";
