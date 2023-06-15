@@ -289,7 +289,6 @@ Config::Config(std::string jsonfilename)
   RtAssert(numerology == 0, "Numerology not equal to zero.\n");
 
   CBW = tdd_conf.value("channel_bandwidth", 0); // 0 means no CBW specified.
-  RtAssert(CBW != 0, "Channel Bandwidth isn't specified!\n");
   rate_ = tdd_conf.value("sample_rate", 5e6);
   nco_ = tdd_conf.value("nco_frequency", 0.75 * rate_);
   bw_filter_ = rate_ + 2 * nco_;
@@ -1764,19 +1763,16 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size
   double TBW; //Transmission bandwidth.
   double min_sampling_rate;
   float scs; //Sub carrier spacing.
-
   bool fft_is_valid = false;
+  size_t num_slots = pow(2, numerology);
+  size_t num_symbols = kSubframesPerFrame*num_slots*14;
   
   //This is kind of a hack, but it's faster and simpler than calculating.
-  size_t numValidFFTs = 4;
-
-  size_t valid_ffts[] = {512, 1024, 1536, 2048};
-
-  size_t num_slots = pow(2, numerology);
-
-  size_t num_symbols = kSubframesPerFrame*num_slots*14;
-
+  std::vector<size_t> valid_ffts{512, 1024, 1536, 2048};
+  
   scs = (15e3) * num_slots;
+
+  RtAssert(CBW != 0, "Channel Bandwidth isn't specified!\n");
 
   RtAssert(num_symbols <= kMaxSymbols, "Number of symbols exceeded "+ std::to_string(kMaxSymbols) + " symbols.\n");
 
@@ -1784,8 +1780,8 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size
 
   RtAssert(fft_size > num_ofdm_data_sub, "The fft_size is smaller than the number of subcarriers.\n");
 
-  for (size_t i = 0; i < numValidFFTs; i++) {
-    if (fft_size == valid_ffts[i]) {
+  for (size_t i = 0; i < valid_ffts.size(); i++) {
+    if (fft_size == valid_ffts.at(i)) {
       fft_is_valid = true;
     }
   }

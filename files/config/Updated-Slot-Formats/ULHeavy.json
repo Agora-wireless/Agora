@@ -10,7 +10,6 @@
         "ref_ant": 0,
         "external_ref_node": false,
         "channel": "A",
-        "radio_num": 1,
         "sample_rate": 30.72e6,
         "demul_block_size": 48,
         "cp_size": 128,
