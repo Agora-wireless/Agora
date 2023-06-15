@@ -43,7 +43,7 @@ static const std::string kDlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_dl_data_";
 static const std::string kUlDataFreqPrefix = kExperimentFilepath + "ul_data_f_";
 static const size_t kFlexibleSlotFormatIdx = 2;
-static const size_t subframes_per_frame = 10;
+static const size_t kSubframesPerFrame = 10;
 
 
 //Version of 5G function that handles explicit frame_schedule
@@ -71,8 +71,12 @@ Config::Config(std::string jsonfilename)
                std::to_string(local_time.tm_min) + "-" +
                std::to_string(local_time.tm_sec);
 
-  // All free symbols 'F' specified in the 5G slot config table
-  // Are represented here by a guard symbol G. 
+  /*
+  All free symbols 'F' specified in the 5G slot config table
+  Are represented here by a guard symbol G. Also, format 2 is
+  handled separately and so is not included in this table.
+  */ 
+
   format_table[0] = "DDDDDDDDDDDDDD";
   format_table[1] = "UUUUUUUUUUUUUU";
   format_table[3] = "DDDDDDDDDDDDDG";
@@ -212,8 +216,6 @@ Config::Config(std::string jsonfilename)
                                                 kShortIdLen)
                     : ue_radio_id_.at(i)));
   }
-
-  std::vector<std::string> flex_formats = tdd_conf.value("flex_formats", json::array());
 
   channel_ = tdd_conf.value("channel", "A");
   ue_channel_ = tdd_conf.value("ue_channel", channel_);
@@ -542,32 +544,25 @@ Config::Config(std::string jsonfilename)
   } else {
 
     json jframes = tdd_conf.value("frame_schedule", json::array());
+    
+    std::vector<std::string> flex_formats = tdd_conf.value("flex_formats", json::array());
 
     // Only allow 1 unique frame type
     assert(jframes.size() == 1);
 
     std::string frame = jframes.at(0).get<std::string>();
 
-
-    //std::cout << "Base string: " << frame << std::flush;
-
     /*
     If an apostrophe delimiter is found in the frame string, execute logic to
     convert a subframe formated frame into the symbol formated frame that Agora
     is designed to handle.
     */ 
-    if (frame.find(",")!=std::string::npos) {
-      
-      // Expand the slot configuration to a symbols configuration
+    if (frame.find(",")!=std::string::npos) { 
       frame = fiveGNR(numerology, ofdm_data_num_, ofdm_ca_num_, rate_, CBW,
       frame, ue_num_, format_table, flex_formats);
-
-
     } 
 
     frame_ = FrameStats(frame);
-
-  
   }
   AGORA_LOG_INFO("Config: Frame schedule %s (%zu symbols)\n",
                  frame_.FrameIdentifier().c_str(), frame_.NumTotalSyms());
@@ -1758,25 +1753,28 @@ void Config::Print() const {
               << "Noise Level: " << noise_level_ << std::endl
               << "UL Bytes per CB: " << ul_num_bytes_per_cb_ << std::endl
               << "DL Bytes per CB: " << dl_num_bytes_per_cb_ << std::endl
-              << "FFT in rru: " << fft_in_rru_ << std::endl;
+              << "FFT in rru: " << fft_in_rru_ << std::endl
+              << "Channel bandwidth: " << CBW << std::endl;
   }
 }
-
 
 std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size, double sampling_rate, double CBW,
  std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table, std::vector<std::string> flex_formats) {
   double GB; //Guardband.
   double TBW; //Transmission bandwidth.
   double min_sampling_rate;
-  float scs;
+  float scs; //Sub carrier spacing.
 
   bool fft_is_valid = false;
+  
   //This is kind of a hack, but it's faster and simpler than calculating.
+  size_t numValidFFTs = 4;
+
   size_t valid_ffts[] = {512, 1024, 1536, 2048};
 
   size_t num_slots = pow(2, numerology);
 
-  size_t num_symbols = subframes_per_frame*num_slots*14;
+  size_t num_symbols = kSubframesPerFrame*num_slots*14;
 
   scs = (15e3) * num_slots;
 
@@ -1786,7 +1784,7 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size
 
   RtAssert(fft_size > num_ofdm_data_sub, "The fft_size is smaller than the number of subcarriers.\n");
 
-  for (int i = 0; i < 4; i++) {
+  for (size_t i = 0; i < numValidFFTs; i++) {
     if (fft_size == valid_ffts[i]) {
       fft_is_valid = true;
     }
@@ -1801,8 +1799,10 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size
     "required sampling rate of %f.\n", sampling_rate, min_sampling_rate);
   }
 
-  //calculate channel bandwidth based on the specified parameters and
-  // verify that the specified channel bandwidth is valid.
+  /*
+  Calculate channel bandwidth based on the specified parameters and
+  verify that the specified channel bandwidth is valid.
+  */ 
 
   TBW = num_ofdm_data_sub * scs;
 
@@ -1811,16 +1811,9 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size
   
   RtAssert(CBW > TBW + 2*GB, "Specified CBW is smaller than required theoretical value.\n");
 
-  AGORA_LOG_INFO(
-    "Transmission properties:\n Channel bandwidth: %f MHz.\n"
-    "Sampling rate: %f MHz.\nOFDM_data_num: %zu.\nFFT_size: %zu.\n", 
-    (TBW + 2*GB) / 1e6,sampling_rate / 1e6, num_ofdm_data_sub, fft_size
-  ); 
-
   frame_schedule = formFrame(frame_schedule, user_num, format_table, flex_formats);
 
   return frame_schedule;
-
 }
 
 /**
@@ -1840,12 +1833,10 @@ std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, st
 
   size_t pilot_num = 0;
 
-
   RtAssert(subframe.at(0) == 'D', "First symbol of selected format doesn't start with a downlink symbol.");
-  
   RtAssert(user_num < 12, "Number of users exceeds pilot symbol limit of 12.");
 
-  //Replace the downlink symbol with a beacon symbol.
+  //Replace the first symbol with a beacon symbol.
   subframe.replace(0, 1, "B");
   subframe.replace(1, 1, "G");
 
@@ -1853,7 +1844,7 @@ std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, st
   for (unsigned int i = 2; i < subframe.size(); i++) {
 
     /*
-     Once user_num many pilot_nums have been put in the beacon subframe, break.
+     Break once user_num many pilot_nums have been put in the beacon subframe.
     */
     if (pilot_num >= user_num) {
       break;
@@ -1876,13 +1867,8 @@ std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, st
 std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table, std::vector<std::string> flex_formats) {
   std::string frame;
   std::string temp = "";
-  int subframes[10]; // Update this hardcoded value to a var.
+  int subframes[kSubframesPerFrame]; // Update this hardcoded value to a var.
   int subframe_idx = 0;
-
-  /*
-  Currently use commas to seperate each number in the format string.
-   Copy all numbers between commas into a array.
-  */ 
   
   for (unsigned int i = 0; i < frame_schedule.size(); i++) {
 
@@ -1921,9 +1907,9 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int,
 
   size_t flex_format_idx = 0;
 
-  for (int i = 1; i < 10; i++) {  
+  for (size_t i = 1; i < kSubframesPerFrame; i++) {  
     try {
-      if (subframes[i] == 2) {
+      if (subframes[i] == kFlexibleSlotFormatIdx) {
         frame += flex_formats.at(flex_format_idx);
         flex_format_idx++;
         
@@ -1954,5 +1940,4 @@ __attribute__((visibility("default"))) Config* ConfigNew(char* filename) {
   cfg->GenData();
   return cfg;
 }
-
 }
