@@ -86,8 +86,8 @@
         "fft_block_size": 1,
         "encode_block_size": 1,
         /* compute configuration */
-        "bs_server_addr": "127.0.0.1",
-        "bs_rru_addr": "127.0.0.1",
+        "bs_server_addr": "192.168.2.1",
+        "bs_rru_addr": "192.168.2.2",
         "ue_server_addr": "127.0.0.1",
         "mac_remote_addr": "127.0.0.1",
         "bs_server_port": 8000,
