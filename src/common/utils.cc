@@ -495,21 +495,25 @@ void Utils::PrintVec(const arma::cx_fvec& c, const std::string& ss) {
   std::cout << so.str();
 }
 
-void Utils::WriteVector(const std::string filename, const std::string desc,
-                        const std::vector<int> vec_data) {
+void Utils::WriteVector(const std::string& filename, const std::string& desc,
+                        const std::vector<int>& vec_data) {
   std::stringstream so;
   std::ofstream of;
   of.open(filename);
-  if (desc.size() > 0) so << desc << std::endl;
+  if (!desc.empty()) {
+    so << desc << std::endl;
+  }
   for (size_t j = 0; j < vec_data.size(); j++) {
     so << vec_data.at(j);
-    if (j < vec_data.size() - 1) so << std::endl;
+    if (j < vec_data.size() - 1) {
+      so << std::endl;
+    }
   }
   of << so.str();
   of.close();
 }
 
-std::vector<int> Utils::ReadVector(const std::string filename,
+std::vector<int> Utils::ReadVector(const std::string& filename,
                                    const bool skip_line) {
   std::string line;
   bool first_line = skip_line;
@@ -529,41 +533,45 @@ std::vector<int> Utils::ReadVector(const std::string filename,
 }
 
 void Utils::WriteVectorOfComplex(
-    const std::string filename, const std::string desc,
-    const std::array<std::vector<std::complex<double>>, kMaxChannels>
+    const std::string& filename, const std::string& desc,
+    const std::array<std::vector<std::complex<double>>, kMaxChannels>&
         vec_data) {
   size_t num_lines = 0;
   for (size_t i = 0; i < kMaxChannels; i++) {
-    if (num_lines != 0 && vec_data.at(i).size() != 0 &&
+    if (num_lines != 0 && !vec_data.at(i).empty() &&
         vec_data.at(i).size() != num_lines) {
       std::cerr
           << "Bad input data format! Inconsistent vector size among channels."
           << std::endl;
-    } else if (vec_data.at(i).size() > 0) {
+    } else if (!vec_data.at(i).empty()) {
       num_lines = vec_data.at(i).size();
     }
   }
   std::stringstream so;
   std::ofstream of;
   of.open(filename);
-  if (desc.size() > 0) so << desc << std::endl;
+  if (!desc.empty()) {
+    so << desc << std::endl;
+  }
   for (size_t j = 0; j < num_lines; j++) {
     for (size_t i = 0; i < kMaxChannels; i++) {
       // if channel data is populated
-      if (vec_data.at(i).size() > 0) {
+      if (!vec_data.at(i).empty()) {
         so << vec_data.at(i).at(j).real() << "+" << vec_data.at(i).at(j).imag()
            << ",";
       }
     }
-    if (j < num_lines - 1) so << std::endl;
+    if (j < num_lines - 1) {
+      so << std::endl;
+    }
   }
   of << so.str();
   of.close();
 }
 
 std::array<std::vector<std::complex<double>>, kMaxChannels>
-Utils::ReadVectorOfComplex(const std::string filename, const bool skip_line,
-                           const std::vector<size_t> present_channels) {
+Utils::ReadVectorOfComplex(const std::string& filename, const bool skip_line,
+                           const std::vector<size_t>& present_channels) {
   std::string cur_line;
   bool first_line = skip_line;
   std::ifstream myfile(filename, std::ifstream::in);
