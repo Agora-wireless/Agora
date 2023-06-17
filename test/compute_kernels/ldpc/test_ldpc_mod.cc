@@ -153,7 +153,7 @@ int main(int argc, char* argv[]) {
         modulated_codewords[i][j].re = modulated_codewords[i][j].re + noise.re;
         modulated_codewords[i][j].im = modulated_codewords[i][j].im + noise.im;
       }
-      demodulate((float*)modulated_codewords[i], demod_data_all_symbols[i],
+      Demodulate((float*)modulated_codewords[i], demod_data_all_symbols[i],
                  cfg->OfdmDataNum(), cfg->ModOrderBits(dir), false);
     }
 

@@ -314,7 +314,7 @@ EventData DoDemul::Launch(size_t tag) {
     equal_t_ptr = (float*)(equaled_buffer_temp_transposed_);
     int8_t* demod_ptr = demod_buffers_[frame_slot][symbol_idx_ul][ss_id] +
                         (cfg_->ModOrderBits(Direction::kUplink) * base_sc_id);
-    demodulate(equal_t_ptr, demod_ptr, max_sc_ite,
+    Demodulate(equal_t_ptr, demod_ptr, max_sc_ite,
                cfg_->ModOrderBits(Direction::kUplink), kUplinkHardDemod);
     // if hard demod is enabled calculate BER with modulated bits
     if (((kPrintPhyStats || kEnableCsvLog) && kUplinkHardDemod) &&

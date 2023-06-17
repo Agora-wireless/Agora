@@ -21,7 +21,7 @@ DoBroadcast::DoBroadcast(Config* in_config, int in_tid,
   }
 }
 
-DoBroadcast::~DoBroadcast() {}
+DoBroadcast::~DoBroadcast() = default;
 
 void DoBroadcast::GenerateBroadcastSymbols(size_t frame_id) {
   const size_t num_control_syms = cfg_->Frame().NumDlControlSyms();

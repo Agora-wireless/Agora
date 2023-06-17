@@ -305,7 +305,7 @@ int main(int argc, char* argv[]) {
         auto* equal_t_ptr =
             (float*)(equalized_data_all_symbols[i - data_sym_start] +
                      j * cfg->OfdmDataNum());
-        demodulate(equal_t_ptr, demod_ptr, cfg->OfdmDataNum(),
+        Demodulate(equal_t_ptr, demod_ptr, cfg->OfdmDataNum(),
                    cfg->ModOrderBits(dir), false);
       }
     }

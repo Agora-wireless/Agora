@@ -802,9 +802,9 @@ json Config::Parse(const json& in_json, const std::string& json_handle) {
   return out_json;
 }
 
-inline size_t select_zc(size_t base_graph, size_t code_rate,
-                        size_t mod_order_bits, size_t num_sc, size_t cb_per_sym,
-                        std::string dir) {
+inline size_t SelectZc(size_t base_graph, size_t code_rate,
+                       size_t mod_order_bits, size_t num_sc, size_t cb_per_sym,
+                       const std::string& dir) {
   size_t n_zc = sizeof(kZc) / sizeof(size_t);
   std::vector<size_t> zc_vec(kZc, kZc + n_zc);
   std::sort(zc_vec.begin(), zc_vec.end());
@@ -870,8 +870,8 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
   bool early_term = ul_mcs.value("earlyTermination", true);
   int16_t max_decoder_iter = ul_mcs.value("decoderIter", 5);
 
-  size_t zc = select_zc(base_graph, ul_code_rate_, ul_mod_order_bits_,
-                        ofdm_data_num_, kCbPerSymbol, "uplink");
+  size_t zc = SelectZc(base_graph, ul_code_rate_, ul_mod_order_bits_,
+                       ofdm_data_num_, kCbPerSymbol, "uplink");
 
   // Always positive since ul_code_rate is smaller than 1024
   size_t num_rows =
@@ -921,8 +921,8 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
   bool early_term = dl_mcs.value("earlyTermination", true);
   int16_t max_decoder_iter = dl_mcs.value("decoderIter", 5);
 
-  size_t zc = select_zc(base_graph, dl_code_rate_, dl_mod_order_bits_,
-                        GetOFDMDataNum(), kCbPerSymbol, "downlink");
+  size_t zc = SelectZc(base_graph, dl_code_rate_, dl_mod_order_bits_,
+                       GetOFDMDataNum(), kCbPerSymbol, "downlink");
 
   // Always positive since dl_code_rate is smaller than 1024
   size_t num_rows =
@@ -953,9 +953,9 @@ void Config::UpdateCtrlMCS() {
     //dl_bcast_mod_order_ = 16;
     //dl_bcast_mod_order_bits_ = 4;
     const int16_t max_decoder_iter = 5;
-    size_t bcast_zc = select_zc(
-        bcast_base_graph, dl_bcast_code_rate, dl_bcast_mod_order_bits_,
-        this->GetOFDMCtrlNum(), kCbPerSymbol, "downlink broadcast");
+    size_t bcast_zc =
+        SelectZc(bcast_base_graph, dl_bcast_code_rate, dl_bcast_mod_order_bits_,
+                 this->GetOFDMCtrlNum(), kCbPerSymbol, "downlink broadcast");
 
     // Always positive since dl_code_rate is smaller than 1
     size_t bcast_num_rows =
@@ -1643,7 +1643,7 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
   int8_t* demod_buff_ptr = static_cast<int8_t*>(
       Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
                                        dl_bcast_mod_order_bits_ * ctrl_sc_num));
-  demodulate(reinterpret_cast<float*>(&eq_buff[0]), demod_buff_ptr, ctrl_sc_num,
+  Demodulate(reinterpret_cast<float*>(&eq_buff[0]), demod_buff_ptr, ctrl_sc_num,
              dl_bcast_mod_order_bits_, false);
 
   // Decoder setup
