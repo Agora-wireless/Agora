@@ -239,7 +239,7 @@ EventData DoFFT::Launch(size_t tag) {
   } else if (sym_type == SymbolType::kUL) {
     if (kCollectPhyStats) {
       const size_t ul_symbol_id = cfg_->Frame().GetULSymbolIdx(symbol_id);
-      if (ul_symbol_id == cfg_->Frame().ClientUlPilotSymbols()) {
+      if (ul_symbol_id == cfg_->Frame().ClientUlDataSymbols()) {
         SimdConvertShortToFloat(pkt->data_,
                                 reinterpret_cast<float*>(rx_samps_tmp_),
                                 2 * cfg_->SampsPerSymbol());

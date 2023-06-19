@@ -73,6 +73,11 @@ class FrameStats {
   inline size_t ClientUlPilotSymbols() const {
     return client_ul_pilot_symbols_;
   }
+
+  inline size_t ClientUlDataSymbols() const {
+    return client_ul_data_symbols_;
+  }
+
   inline size_t ClientDlPilotSymbols() const {
     return client_dl_pilot_symbols_;
   }
