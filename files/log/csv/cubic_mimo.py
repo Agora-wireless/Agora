@@ -56,7 +56,7 @@ def process_csv_file(file_path, last_processed_frame, prev_frame_number, prev_re
                 ax.set_ylabel(ylabel)
 
                 if ylabel == 'EVM (%)':
-                    ax.set_ylim([0, 10000])
+                    ax.set_ylim([0, 40])
                 if ylabel == 'SNR (dB)':
                     ax.set_ylim([0, 40])
 

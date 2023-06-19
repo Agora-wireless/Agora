@@ -28,7 +28,7 @@ def parse_coordinates(data):
         coordinates.append((real, imag))
     return coordinates
 
-def plot_coordinates(coordinates, angle=np.pi/14, ax=None):
+def plot_coordinates(coordinates, angle=np.pi/10, ax=None):
     i = np.array([coord[0] for coord in coordinates])
     q = np.array([coord[1] for coord in coordinates])
     ax.scatter(i * np.cos(angle) + q * np.sin(angle), - i * np.sin(angle) + q * np.cos(angle), s=10)
@@ -37,7 +37,7 @@ def plot_coordinates(coordinates, angle=np.pi/14, ax=None):
     ax.set_xticks(np.arange(-1.5, 1.5, 0.5))
     ax.set_yticks(np.arange(-1.5, 1.5, 0.5))
     ax.tick_params(axis='both', which='major', labelsize=12)
-    ax.set_title('Coordinates Plot - ' + MODULATION_TYPE, fontsize=22)
+    ax.set_title('Signal Constellation', fontsize=22)
 
 def update_plot(file_path):
     plt.ion()  # Turn on interactive mode
