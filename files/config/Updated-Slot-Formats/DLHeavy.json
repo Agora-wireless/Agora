@@ -81,6 +81,6 @@
         "core_offset": 4,
         "worker_thread_num": 24,
         "socket_thread_num": 2,
-        "max_frame": 9600
+        "max_frame": 100
       }
       
