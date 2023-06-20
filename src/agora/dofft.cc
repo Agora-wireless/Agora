@@ -247,6 +247,18 @@ EventData DoFFT::Launch(size_t tag) {
                     ul_symbol_id, ant_id);
         std::fflush(stdout);
         phy_stats_->UpdateUlSnr(frame_id, ul_symbol_id, ant_id, rx_samps_tmp_);
+
+        if (frame_id % 1000 == 0) {
+          int num_elements = 1376;
+          std::ofstream outfile("files/log/csv/data.txt", std::ios::binary);
+          if (outfile.is_open()) {
+              outfile.write(reinterpret_cast<char*>(rx_samps_tmp_), num_elements * sizeof(std::complex<float>));
+              outfile.close();
+              std::cout << "Data saved successfully." << std::endl;
+          } else {
+              std::cout << "Unable to open the file." << std::endl;
+          }
+        }
       }
     }
     PartialTranspose(cfg_->GetDataBuf(data_buffer_, frame_id, symbol_id),
