@@ -258,6 +258,13 @@ EventData DoFFT::Launch(size_t tag) {
           } else {
               std::cout << "Unable to open the file." << std::endl;
           }
+          std::string filePath = "files/log/csv/fft_data.txt";
+          std::ofstream file(filePath, std::ios::binary);
+          arma::cx_fvec fft_vec(reinterpret_cast<arma::cx_float*>(fft_inout_),
+                            cfg_->OfdmCaNum(), false);
+          size_t dataSize = fft_vec.n_elem * sizeof(arma::cx_float);
+          file.write(reinterpret_cast<const char*>(fft_vec.memptr()), dataSize);
+          file.close();
         }
       }
     }
