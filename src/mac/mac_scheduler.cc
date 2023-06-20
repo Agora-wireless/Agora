@@ -37,6 +37,13 @@ MacScheduler::MacScheduler(Config* const cfg) : cfg_(cfg) {
   }
 }
 
+MacScheduler::~MacScheduler() {
+  schedule_buffer_.Free();
+  schedule_buffer_index_.Free();
+  ul_mcs_buffer_.Free();
+  dl_mcs_buffer_.Free();
+}
+
 bool MacScheduler::IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id) {
   size_t gp = frame_id % num_groups_;
   return (schedule_buffer_[gp][ue_id + cfg_->UeAntNum() * sc_id] != 0);

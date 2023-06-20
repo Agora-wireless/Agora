@@ -10,8 +10,7 @@
 class MacScheduler {
  public:
   explicit MacScheduler(Config* const cfg);
-
-  ~MacScheduler() = default;
+  ~MacScheduler();
 
   bool IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id);
   size_t ScheduledUeIndex(size_t frame_id, size_t sc_id, size_t sched_ue_id);
