@@ -661,9 +661,7 @@ Config::Config(std::string jsonfilename)
 
   dl_mcs_params_ = this->Parse(tdd_conf, "dl_mcs");
   this->UpdateDlMCS(dl_mcs_params_);
-
   this->DumpMcsInfo();
-
   this->UpdateCtrlMCS();
 
   fft_in_rru_ = tdd_conf.value("fft_in_rru", false);
@@ -860,6 +858,7 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
   } else {
     ul_mcs_index_ = ul_mcs.value("mcs_index", 10);  // 16QAM, 340/1024
     ul_mod_order_bits_ = GetModOrderBits(ul_mcs_index_);
+    ul_modulation_ = MapModToStr(ul_mod_order_bits_);
     ul_code_rate_ = GetCodeRate(ul_mcs_index_);
   }
   ul_mod_order_ = static_cast<size_t>(pow(2, ul_mod_order_bits_));
@@ -911,6 +910,7 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
   } else {
     dl_mcs_index_ = dl_mcs.value("mcs_index", 10);  // 16QAM, 340/1024
     dl_mod_order_bits_ = GetModOrderBits(dl_mcs_index_);
+    dl_modulation_ = MapModToStr(dl_mod_order_bits_);
     dl_code_rate_ = GetCodeRate(dl_mcs_index_);
   }
   dl_mod_order_ = static_cast<size_t>(pow(2, dl_mod_order_bits_));
