@@ -53,6 +53,7 @@ Config::Config(std::string jsonfilename)
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_bcast_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       frame_(""),
+      pilot_ifft_(nullptr),
       config_filename_(std::move(jsonfilename)) {
   auto time = std::time(nullptr);
   auto local_time = *std::localtime(&time);
@@ -1098,8 +1099,11 @@ void Config::GenPilots() {
                      (float)std::pow(std::abs(this->common_pilot_[i]), 2);
     this->pilots_sgn_[i] = {pilot_sgn.real(), pilot_sgn.imag()};
   }
+
+  RtAssert(pilot_ifft_ == nullptr, "pilot_ifft_ should be null");
   AllocBuffer1d(&pilot_ifft_, this->ofdm_ca_num_,
                 Agora_memory::Alignment_t::kAlign64, 1);
+
   for (size_t j = 0; j < ofdm_data_num_; j++) {
     // FFT Shift
     const size_t k = j + ofdm_data_start_ >= ofdm_ca_num_ / 2
@@ -1696,8 +1700,6 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
 void Config::GenBroadcastSlots(
     std::vector<std::complex<int16_t>*>& bcast_iq_samps,
     std::vector<size_t> ctrl_msg) {
-  /*dl_bcast_iq_t.Calloc(this->frame_.NumDControlSyms(), samps_per_symbol_,
-                      Agora_memory::Alignment_t::kAlign64);*/
   assert(bcast_iq_samps.size() == this->frame_.NumDlControlSyms());
   assert(ctrl_msg.size() == this->frame_.NumDlControlSyms());
 
@@ -1818,7 +1820,9 @@ Config::~Config() {
   ul_iq_f_.Free();
   ul_iq_t_.Free();
 
-  FreeBuffer1d(&pilot_ifft_);
+  if (pilot_ifft_ != nullptr) {
+    FreeBuffer1d(&pilot_ifft_);
+  }
   ue_specific_pilot_t_.Free();
   ue_specific_pilot_.Free();
   ue_pilot_ifft_.Free();
