@@ -691,22 +691,25 @@ Config::Config(std::string jsonfilename)
       (((ul_ldpc_config_.NumCbLen() / ul_ldpc_config_.ExpansionFactor()) - 1) *
            (ul_ldpc_config_.ExpansionFactor() / 8) +
        32);
+  const size_t ul_ldpc_sugg_input = LdpcEncodingInputBufSize(
+      ul_ldpc_config_.BaseGraph(), ul_ldpc_config_.ExpansionFactor());
 
   if (ul_ldpc_input_min >
       (ul_num_bytes_per_cb_ + ul_num_padding_bytes_per_cb_)) {
-    AGORA_LOG_ERROR(
+    ul_num_padding_bytes_per_cb_ =
+        Roundup<64>(ul_ldpc_sugg_input) - ul_num_bytes_per_cb_;
+    AGORA_LOG_WARN(
         "LDPC required Input Buffer size exceeds uplink code block size!\n"
-        "uplink CB Bytes %zu, CB Padding %zu, LDPC Input Min for zc 64:256: "
-        "%zu, Suggested Input Size %zu\n",
+        "uplink CB Bytes %zu, Added CB Padding %zu, LDPC Input Min for zc "
+        "64:256: %zu, Suggested Input Size %zu, Actual Size %zu\n",
         ul_ldpc_config_.NumCbLen() / 8, ul_num_padding_bytes_per_cb_,
-        ul_ldpc_input_min,
-        LdpcEncodingInputBufSize(ul_ldpc_config_.BaseGraph(),
-                                 ul_ldpc_config_.ExpansionFactor()));
+        ul_ldpc_input_min, ul_ldpc_sugg_input,
+        ul_num_padding_bytes_per_cb_ + ul_num_bytes_per_cb_);
   }
 
-  RtAssert(
-      ul_ldpc_input_min < (ul_num_bytes_per_cb_ + ul_num_padding_bytes_per_cb_),
-      "LDPC required Input Buffer size exceeds uplink cb size!");
+  //RtAssert(
+  //    ul_ldpc_input_min < (ul_num_bytes_per_cb_ + ul_num_padding_bytes_per_cb_),
+  //    "LDPC required Input Buffer size exceeds uplink cb size!");
 
   // Smallest over the air packet structure
   RtAssert(this->frame_.NumULSyms() == 0 ||
@@ -743,22 +746,28 @@ Config::Config(std::string jsonfilename)
       (((dl_ldpc_config_.NumCbLen() / dl_ldpc_config_.ExpansionFactor()) - 1) *
            (dl_ldpc_config_.ExpansionFactor() / 8) +
        32);
+  const size_t dl_ldpc_sugg_input = LdpcEncodingInputBufSize(
+      dl_ldpc_config_.BaseGraph(), dl_ldpc_config_.ExpansionFactor());
 
   if (dl_ldpc_input_min >
       (dl_num_bytes_per_cb_ + dl_num_padding_bytes_per_cb_)) {
-    AGORA_LOG_ERROR(
+    // Can cause a lot of wasted space, specifically the second argument of the max
+    dl_num_padding_bytes_per_cb_ =
+        Roundup<64>(dl_ldpc_sugg_input) - dl_num_bytes_per_cb_;
+    AGORA_LOG_WARN(
         "LDPC required Input Buffer size exceeds downlink code block size!\n"
-        "Downlink CB Bytes %zu, CB Padding %zu, LDPC Input Min for zc 64:256: "
-        "%zu, Suggested Input Size %zu\n",
+        "Downlink CB Bytes %zu, Added CB Padding %zu, LDPC Input Min for zc "
+        "64:256: %zu, Suggested Input Size %zu, Actual Size %zu\n",
         dl_ldpc_config_.NumCbLen() / 8, dl_num_padding_bytes_per_cb_,
         dl_ldpc_input_min,
         LdpcEncodingInputBufSize(dl_ldpc_config_.BaseGraph(),
-                                 dl_ldpc_config_.ExpansionFactor()));
+                                 dl_ldpc_config_.ExpansionFactor()),
+        dl_num_padding_bytes_per_cb_ + dl_num_bytes_per_cb_);
   }
 
-  RtAssert(
-      dl_ldpc_input_min < (dl_num_bytes_per_cb_ + dl_num_padding_bytes_per_cb_),
-      "LDPC required Input Buffer size exceeds downlink cb size!");
+  //RtAssert(
+  //    dl_ldpc_input_min < (dl_num_bytes_per_cb_ + dl_num_padding_bytes_per_cb_),
+  //    "LDPC required Input Buffer size exceeds downlink cb size!");
 
   this->running_.store(true);
   /* 12 bit samples x2 for I + Q */
