@@ -1,4 +1,4 @@
-[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fdevelop)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/develop/)
+[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fdataset-channel-model)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/dataset-channel-model/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
