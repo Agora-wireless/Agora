@@ -90,12 +90,9 @@ class DataGenerator {
   static std::vector<int8_t> GenCodeblock(const LDPCconfig& lc,
                                           const int8_t* input_ptr,
                                           size_t input_size,
-                                          size_t padding_size = 0,
                                           bool scramble_enabled = false) {
-    std::vector<int8_t> scramble_buffer;
-    scramble_buffer.assign(input_ptr, input_ptr + input_size);
+    std::vector<int8_t> scramble_buffer(input_ptr, input_ptr + input_size);
     if (scramble_enabled) {
-      scramble_buffer.resize(input_size + padding_size, 0u);
       auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
       scrambler->Scramble(scramble_buffer.data(), input_size);
     }
@@ -109,7 +106,7 @@ class DataGenerator {
 
     LdpcEncodeHelper(lc.BaseGraph(), lc.ExpansionFactor(), lc.NumRows(),
                      &encoded_codeword.at(0), &parity.at(0),
-                     &scramble_buffer.at(0));
+                     reinterpret_cast<int8_t*>(scramble_buffer.data()));
     return encoded_codeword;
   }
 
@@ -120,15 +117,15 @@ class DataGenerator {
    */
   static std::vector<complex_float> GetModulation(
       const int8_t* encoded_codeword, Table<complex_float> mod_table,
-      const size_t num_bits, const size_t mod_order_bits) {
-    size_t num_subcarrier_symbols = num_bits / mod_order_bits;
-    std::vector<complex_float> modulated_codeword(num_subcarrier_symbols);
-    std::vector<uint8_t> mod_input(num_subcarrier_symbols);
+      const size_t num_bits, const size_t num_subcarriers,
+      const size_t mod_order_bits) {
+    std::vector<complex_float> modulated_codeword(num_subcarriers);
+    std::vector<uint8_t> mod_input(num_subcarriers, 0);
 
     AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
                     &mod_input[0], BitsToBytes(num_bits), mod_order_bits);
 
-    for (size_t i = 0; i < num_subcarrier_symbols; i++) {
+    for (size_t i = 0; i < num_subcarriers; i++) {
       modulated_codeword[i] = ModSingleUint8(mod_input[i], mod_table);
     }
     return modulated_codeword;
@@ -137,19 +134,28 @@ class DataGenerator {
   static std::vector<complex_float> MapOFDMSymbol(
       Config* cfg, const std::vector<complex_float>& modulated_codeword,
       complex_float* pilot_seq, SymbolType symbol_type) {
-    std::vector<complex_float> ofdm_symbol(cfg->OfdmDataNum());  // Zeroed
-    for (size_t i = 0; i < modulated_codeword.size(); i++) {
+    std::vector<complex_float> ofdm_symbol(cfg->OfdmDataNum(),
+                                           {0, 0});  // Zeroed
+    for (size_t i = 0; i < cfg->OfdmDataNum(); i++) {
       if (symbol_type == SymbolType::kUL) {
-        ofdm_symbol.at(i) = modulated_codeword.at(i);
+        if (i < modulated_codeword.size()) {
+          ofdm_symbol.at(i) = modulated_codeword.at(i);
+        }
       } else if (symbol_type == SymbolType::kDL) {
         if (cfg->IsDataSubcarrier(i) == true) {
-          ofdm_symbol.at(i) = modulated_codeword.at(cfg->GetOFDMDataIndex(i));
+          size_t data_idx = cfg->GetOFDMDataIndex(i);
+          if (data_idx < modulated_codeword.size()) {
+            ofdm_symbol.at(i) = modulated_codeword.at(data_idx);
+          }
         } else {
           ofdm_symbol.at(i) = pilot_seq[i];
         }
       } else if (symbol_type == SymbolType::kControl) {
         if (cfg->IsControlSubcarrier(i) == true) {
-          ofdm_symbol.at(i) = modulated_codeword.at(cfg->GetOFDMCtrlIndex(i));
+          size_t ctrl_idx = cfg->GetOFDMCtrlIndex(i);
+          if (ctrl_idx < modulated_codeword.size()) {
+            ofdm_symbol.at(i) = modulated_codeword.at(ctrl_idx);
+          }
         } else {
           ofdm_symbol.at(i) = pilot_seq[i];
         }
@@ -238,6 +244,19 @@ class DataGenerator {
           static_cast<float>(distribution(generator)) * noise_level};
       noisy_symbol[j].re = modulated_symbol[j].re + noise.re;
       noisy_symbol[j].im = modulated_symbol[j].im + noise.im;
+    }
+  }
+
+  static void GetNoisySymbol(complex_float* modulated_symbol, size_t length,
+                             float noise_level, unsigned seed = 0) {
+    std::default_random_engine generator(seed);
+    std::normal_distribution<double> distribution(0.0, 1.0);
+    for (size_t j = 0; j < length; j++) {
+      complex_float noise = {
+          static_cast<float>(distribution(generator)) * noise_level,
+          static_cast<float>(distribution(generator)) * noise_level};
+      modulated_symbol[j].re += noise.re;
+      modulated_symbol[j].im += noise.im;
     }
   }
 

@@ -55,7 +55,6 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   srand(time(nullptr));
   std::unique_ptr<DoCRC> crc_obj = std::make_unique<DoCRC>();
   const size_t ul_cb_bytes = cfg_->NumBytesPerCb(Direction::kUplink);
-  const size_t ul_cb_padding = cfg_->NumPaddingBytesPerCb(Direction::kUplink);
   LDPCconfig ul_ldpc_config = this->cfg_->LdpcConfig(Direction::kUplink);
 
   // Step 1: Generate the information buffers (MAC Packets) and LDPC-encoded
@@ -77,10 +76,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kUplink));
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
-                                pkt->Data(),
-                                cfg_->MacPayloadMaxLength(Direction::kUplink)) &
-                            0xFFFF));
+        pkt->Crc((uint16_t)(
+            crc_obj->CalculateCrc24(
+                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kUplink)) &
+            0xFFFF));
       }
     }
 
@@ -151,7 +150,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
           std::vector<int8_t>(cb_start, cb_start + ul_cb_bytes);
       ul_encoded_codewords.at(cb) = DataGenerator::GenCodeblock(
           ul_ldpc_config, &ul_information.at(cb).at(0), ul_cb_bytes,
-          ul_cb_padding, this->cfg_->ScrambleEnabled());
+          this->cfg_->ScrambleEnabled());
     }
 
     {
@@ -268,7 +267,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       auto ofdm_symbol = DataGenerator::GetModulation(
           &ul_encoded_codewords.at(i)[0], cfg_->ModTable(Direction::kUplink),
           cfg_->LdpcConfig(Direction::kUplink).NumCbCodewLen(),
-          cfg_->ModOrderBits(Direction::kUplink));
+          cfg_->OfdmDataNum(), cfg_->ModOrderBits(Direction::kUplink));
       ul_modulated_codewords.at(i) = DataGenerator::MapOFDMSymbol(
           cfg_, ofdm_symbol, nullptr, SymbolType::kUL);
     }
@@ -436,7 +435,6 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   const LDPCconfig dl_ldpc_config =
       this->cfg_->LdpcConfig(Direction::kDownlink);
   const size_t dl_cb_bytes = cfg_->NumBytesPerCb(Direction::kDownlink);
-  const size_t dl_cb_padding = cfg_->NumPaddingBytesPerCb(Direction::kDownlink);
 
   if (this->cfg_->Frame().NumDLSyms() > 0) {
     const size_t num_dl_mac_bytes =
@@ -456,10 +454,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kDownlink));
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(pkt->Data(),
-                                                    cfg_->MacPayloadMaxLength(
-                                                        Direction::kDownlink)) &
-                            0xFFFF));
+        pkt->Crc((uint16_t)(
+            crc_obj->CalculateCrc24(
+                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kDownlink)) &
+            0xFFFF));
       }
     }
 
@@ -528,7 +526,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
           std::vector<int8_t>(cb_start, cb_start + dl_cb_bytes);
       dl_encoded_codewords.at(cb) = DataGenerator::GenCodeblock(
           dl_ldpc_config, &dl_information.at(cb).at(0), dl_cb_bytes,
-          dl_cb_padding, this->cfg_->ScrambleEnabled());
+          this->cfg_->ScrambleEnabled());
     }
 
     // Modulate the encoded codewords
@@ -540,7 +538,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       auto ofdm_symbol = DataGenerator::GetModulation(
           &dl_encoded_codewords.at(i)[0], cfg_->ModTable(Direction::kDownlink),
           cfg_->LdpcConfig(Direction::kDownlink).NumCbCodewLen(),
-          cfg_->ModOrderBits(Direction::kDownlink));
+          cfg_->OfdmDataNum(), cfg_->ModOrderBits(Direction::kDownlink));
       dl_modulated_codewords.at(i) = DataGenerator::MapOFDMSymbol(
           cfg_, ofdm_symbol, ue_specific_pilot[ue_id], SymbolType::kDL);
     }

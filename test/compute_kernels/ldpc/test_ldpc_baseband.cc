@@ -129,7 +129,8 @@ int main(int argc, char* argv[]) {
               ((j + 1) < num_symbols_per_cb) ? bits_per_symbol : remaining_bits;
           auto ofdm_symbol = DataGenerator::GetModulation(
               &encoded_codewords[ue_id * num_cbs_per_ue + i][offset],
-              cfg->ModTable(dir), num_bits, cfg->ModOrderBits(dir));
+              cfg->ModTable(dir), num_bits, cfg->OfdmDataNum(),
+              cfg->ModOrderBits(dir));
           modulated_codewords[ue_id * cfg->Frame().NumDataSyms() +
                               i * num_symbols_per_cb + j] =
               DataGenerator::MapOFDMSymbol(cfg.get(), ofdm_symbol,

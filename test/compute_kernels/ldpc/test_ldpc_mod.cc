@@ -140,7 +140,8 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < num_codeblocks; i++) {
       auto ofdm_symbol = DataGenerator::GetModulation(
           &encoded_codewords[i][0], cfg->ModTable(dir),
-          cfg->LdpcConfig(dir).NumCbCodewLen(), cfg->ModOrderBits(dir));
+          cfg->LdpcConfig(dir).NumCbCodewLen(), cfg->OfdmDataNum(),
+          cfg->ModOrderBits(dir));
 
       data_generator.GetNoisySymbol(&ofdm_symbol[0], modulated_codewords[i],
                                     num_subcarriers, kNoiseLevels[noise_id]);

@@ -1599,6 +1599,9 @@ void Config::GenData() {
     }
   }
 
+  if (pilot_ifft_ != nullptr) {
+    FreeBuffer1d(&pilot_ifft_);
+  }
   delete[](ul_temp_parity_buffer);
   delete[](dl_temp_parity_buffer);
   ul_iq_ifft.Free();
@@ -1616,15 +1619,16 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
                           reinterpret_cast<float*>(bcast_fft_buff),
                           ofdm_ca_num_ * 2);
   CommsLib::FFT(bcast_fft_buff, ofdm_ca_num_);
-  //auto* fft_buff_complex = reinterpret_cast<complex_float*>(bcast_fft_buff);
   CommsLib::FFTShift(bcast_fft_buff, ofdm_ca_num_);
   auto* bcast_buff_complex = reinterpret_cast<arma::cx_float*>(bcast_fft_buff);
 
-  size_t ctrl_sc_num = this->GetOFDMCtrlNum();
+  size_t sc_num = GetOFDMCtrlNum();
+  size_t ctrl_sc_num =
+      dl_bcast_ldpc_config_.NumCbCodewLen() / dl_bcast_mod_order_bits_;
   std::vector<arma::cx_float> csi_buff(ofdm_data_num_);
-  arma::cx_float* eq_buff = static_cast<arma::cx_float*>(
-      Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
-                                       ctrl_sc_num * sizeof(float) * 2));
+  arma::cx_float* eq_buff =
+      static_cast<arma::cx_float*>(Agora_memory::PaddedAlignedAlloc(
+          Agora_memory::Alignment_t::kAlign64, sc_num * sizeof(float) * 2));
 
   // estimate channel from pilot subcarriers
   float phase_shift = 0;
@@ -1654,13 +1658,13 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
   int8_t* demod_buff_ptr = static_cast<int8_t*>(
       Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
                                        dl_bcast_mod_order_bits_ * ctrl_sc_num));
-  demodulate(reinterpret_cast<float*>(&eq_buff[0]), demod_buff_ptr, ctrl_sc_num,
-             dl_bcast_mod_order_bits_, false);
+  demodulate(reinterpret_cast<float*>(&eq_buff[0]), demod_buff_ptr,
+             2 * ctrl_sc_num, dl_bcast_mod_order_bits_, false);
 
-  int num_bcast_bytes = dl_bcast_ldpc_config_.NumCbLen() / 8;
-  std::vector<uint8_t> decode_buff(num_bcast_bytes);
+  int num_bcast_bytes = BitsToBytes(dl_bcast_ldpc_config_.NumCbLen());
+  std::vector<uint8_t> decode_buff(num_bcast_bytes, 0u);
 
-  DataGenerator::GetDecodedData(demod_buff_ptr, &decode_buff[0],
+  DataGenerator::GetDecodedData(demod_buff_ptr, &decode_buff.at(0),
                                 dl_bcast_ldpc_config_, num_bcast_bytes,
                                 scramble_enabled_);
   FreeBuffer1d(&bcast_fft_buff);
@@ -1676,30 +1680,23 @@ void Config::GenBroadcastSlots(
   assert(bcast_iq_samps.size() == this->frame_.NumDlControlSyms());
   assert(ctrl_msg.size() == this->frame_.NumDlControlSyms());
 
-  int num_bcast_bytes = dl_bcast_ldpc_config_.NumCbLen() / 8;
-  int num_bcast_bytes_padded = Roundup<64>(num_bcast_bytes);
-  int num_padding_bytes = num_bcast_bytes_padded - num_bcast_bytes;
-  int8_t* bcast_bits_buffer =
-      static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::kAlign64, num_bcast_bytes));
-  std::memset(bcast_bits_buffer, 0u, num_bcast_bytes);
+  int num_bcast_bytes = BitsToBytes(dl_bcast_ldpc_config_.NumCbLen());
+  std::vector<int8_t> bcast_bits_buffer(num_bcast_bytes, 0);
 
   Table<complex_float> dl_bcast_mod_table;
   InitModulationTable(dl_bcast_mod_table, dl_bcast_mod_order_bits_);
 
   for (size_t i = 0; i < this->frame_.NumDlControlSyms(); i++) {
-    const int8_t* tmp =
-        static_cast<const int8_t*>(static_cast<const void*>(&ctrl_msg.at(i)));
-
-    std::memcpy(bcast_bits_buffer, tmp, sizeof(size_t));
+    std::memcpy(bcast_bits_buffer.data(), ctrl_msg.data(), sizeof(size_t));
 
     auto coded_bits_ptr = DataGenerator::GenCodeblock(
-        dl_bcast_ldpc_config_, bcast_bits_buffer, num_bcast_bytes,
-        num_padding_bytes, scramble_enabled_);
+        dl_bcast_ldpc_config_, &bcast_bits_buffer.at(0), num_bcast_bytes,
+        scramble_enabled_);
 
-    auto modulated_vector = DataGenerator::GetModulation(
-        &coded_bits_ptr[0], dl_bcast_mod_table,
-        dl_bcast_ldpc_config_.NumCbCodewLen(), dl_bcast_mod_order_bits_);
+    auto modulated_vector =
+        DataGenerator::GetModulation(&coded_bits_ptr[0], dl_bcast_mod_table,
+                                     dl_bcast_ldpc_config_.NumCbCodewLen(),
+                                     ofdm_data_num_, dl_bcast_mod_order_bits_);
     auto mapped_symbol = DataGenerator::MapOFDMSymbol(
         this, modulated_vector, pilots_, SymbolType::kControl);
     auto ofdm_symbol = DataGenerator::BinForIfft(this, mapped_symbol, true);
@@ -1711,7 +1708,6 @@ void Config::GenBroadcastSlots(
                       this->ofdm_tx_zero_prefix_, this->cp_len_,
                       dl_bcast_scale);
   }
-  FreeBuffer1d(&bcast_bits_buffer);
   dl_bcast_mod_table.Free();
 }
 
@@ -1723,9 +1719,6 @@ Config::~Config() {
   if (pilots_sgn_ != nullptr) {
     std::free(pilots_sgn_);
     pilots_sgn_ = nullptr;
-  }
-  if (pilot_ifft_ != nullptr) {
-    FreeBuffer1d(&pilot_ifft_);
   }
   ue_specific_pilot_t_.Free();
   ue_specific_pilot_.Free();
