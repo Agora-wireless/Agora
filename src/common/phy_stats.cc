@@ -195,7 +195,7 @@ void PhyStats::PrintDlSnrStats(size_t frame_id, const arma::uvec& ue_list) {
   ss << "Frame " << frame_id << " DL Pilot SNR (dB) at " << std::fixed
      << std::setw(5) << std::setprecision(1);
   size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
-  for (auto& i : ue_list) {
+  for (const auto& i : ue_list) {
     //for (size_t i = 0; i < config_->UeAntNum(); i++) {
     ss << "UE Antenna " << i << ": [ ";
     for (size_t j = 0; j < dl_pilots_num; j++) {

@@ -279,8 +279,8 @@ int main(int argc, char* argv[]) {
                                       cfg->OfdmDataNum() * cfg->UeAntNum(),
                                       Agora_memory::Alignment_t::kAlign64);
     Table<int8_t> demod_data_all_symbols;
-    demod_data_all_symbols.Calloc(cfg->UeAntNum() * cfg->Frame().NumDataSyms(),
-                                  cfg->OfdmDataNum() * cfg->ModOrderBits(dir),
+    demod_data_all_symbols.Calloc(num_codeblocks,
+                                  cfg->LdpcConfig(dir).NumCbCodewLen(),
                                   Agora_memory::Alignment_t::kAlign64);
     for (size_t i = data_sym_start; i < cfg->Frame().NumTotalSyms(); i++) {
       arma::cx_fmat mat_rx_data(
@@ -303,14 +303,22 @@ int main(int argc, char* argv[]) {
 
       mat_equalized_data = mat_equalized_data.st();
 
+      size_t symbol_id = i - data_sym_start;
       for (size_t j = 0; j < cfg->UeAntNum(); j++) {
-        size_t symbol_id = i - data_sym_start;
-        size_t offset = j * cfg->Frame().NumDataSyms() + symbol_id;
-        auto* demod_ptr = demod_data_all_symbols[offset];
-        auto* equal_t_ptr = (float*)(equalized_data_all_symbols[symbol_id] +
-                                     j * cfg->OfdmDataNum());
-        demodulate(equal_t_ptr, demod_ptr, cfg->OfdmDataNum(),
-                   cfg->ModOrderBits(dir), false);
+        size_t cb_id = symbol_id / num_symbols_per_cb;
+        size_t symbol_id_in_cb = symbol_id % num_symbols_per_cb;
+        size_t offset = j * num_cbs_per_ue + cb_id;
+        auto* demod_ptr =
+            demod_data_all_symbols[offset] +
+            symbol_id_in_cb * cfg->OfdmDataNum() * cfg->ModOrderBits(dir);
+        auto* equal_t_ptr =
+            (float*)(equalized_data_all_symbols[i - data_sym_start] +
+                     j * cfg->OfdmDataNum());
+
+        Demodulate(
+            equal_t_ptr, demod_ptr,
+            cfg->LdpcConfig(dir).NumCbCodewLen() / cfg->ModOrderBits(dir),
+            cfg->ModOrderBits(dir), false);
       }
     }
 
@@ -375,6 +383,7 @@ int main(int argc, char* argv[]) {
     csi_matrices_data.Free();
     decoded_codewords.Free();
   }
+  ue_specific_pilot.Free();
   delete[] input_ptr;
   return 0;
 }

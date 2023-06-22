@@ -146,7 +146,7 @@ int main(int argc, char* argv[]) {
       data_generator.GetNoisySymbol(&ofdm_symbol[0], modulated_codewords[i],
                                     num_subcarriers, kNoiseLevels[noise_id]);
 
-      demodulate((float*)modulated_codewords[i], demod_data_all_symbols[i],
+      Demodulate((float*)modulated_codewords[i], demod_data_all_symbols[i],
                  num_subcarriers, cfg->ModOrderBits(dir), false);
     }
 

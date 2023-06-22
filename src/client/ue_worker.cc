@@ -420,7 +420,7 @@ void UeWorker::DoDemul(size_t tag) {
         demod_buffer_[frame_slot][dl_symbol_id][ant_id] +
         (config_.ModOrderBits(Direction::kDownlink) * base_sc_id);
 
-    demodulate(equal_ptr, demod_ptr, config_.GetOFDMDataNum(),
+    Demodulate(equal_ptr, demod_ptr, config_.GetOFDMDataNum(),
                config_.ModOrderBits(Direction::kDownlink), kDownlinkHardDemod);
 
     if (kDownlinkHardDemod && (kPrintPhyStats || kEnableCsvLog) &&

@@ -54,6 +54,7 @@ Config::Config(std::string jsonfilename)
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_bcast_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       frame_(""),
+      pilot_ifft_(nullptr),
       config_filename_(std::move(jsonfilename)) {
   auto time = std::time(nullptr);
   auto local_time = *std::localtime(&time);
@@ -674,9 +675,7 @@ Config::Config(std::string jsonfilename)
 
   dl_mcs_params_ = this->Parse(tdd_conf, "dl_mcs");
   this->UpdateDlMCS(dl_mcs_params_);
-
   this->DumpMcsInfo();
-
   this->UpdateCtrlMCS();
 
   fft_in_rru_ = tdd_conf.value("fft_in_rru", false);
@@ -816,9 +815,9 @@ json Config::Parse(const json& in_json, const std::string& json_handle) {
   return out_json;
 }
 
-inline size_t select_zc(size_t base_graph, size_t code_rate,
-                        size_t mod_order_bits, size_t num_sc, size_t cb_per_sym,
-                        std::string dir) {
+inline size_t SelectZc(size_t base_graph, size_t code_rate,
+                       size_t mod_order_bits, size_t num_sc, size_t cb_per_sym,
+                       const std::string& dir) {
   size_t n_zc = sizeof(kZc) / sizeof(size_t);
   std::vector<size_t> zc_vec(kZc, kZc + n_zc);
   std::sort(zc_vec.begin(), zc_vec.end());
@@ -874,6 +873,7 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
   } else {
     ul_mcs_index_ = ul_mcs.value("mcs_index", 10);  // 16QAM, 340/1024
     ul_mod_order_bits_ = GetModOrderBits(ul_mcs_index_);
+    ul_modulation_ = MapModToStr(ul_mod_order_bits_);
     ul_code_rate_ = GetCodeRate(ul_mcs_index_);
     ul_modulation_ = MapModToStr(ul_mod_order_bits_);
   }
@@ -884,8 +884,8 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
   bool early_term = ul_mcs.value("earlyTermination", true);
   int16_t max_decoder_iter = ul_mcs.value("decoderIter", 5);
 
-  size_t zc = select_zc(base_graph, ul_code_rate_, ul_mod_order_bits_,
-                        ofdm_data_num_, kCbPerSymbol, "uplink");
+  size_t zc = SelectZc(base_graph, ul_code_rate_, ul_mod_order_bits_,
+                       ofdm_data_num_, kCbPerSymbol, "uplink");
 
   // Always positive since ul_code_rate is smaller than 1024
   size_t num_rows =
@@ -925,6 +925,7 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
   } else {
     dl_mcs_index_ = dl_mcs.value("mcs_index", 10);  // 16QAM, 340/1024
     dl_mod_order_bits_ = GetModOrderBits(dl_mcs_index_);
+    dl_modulation_ = MapModToStr(dl_mod_order_bits_);
     dl_code_rate_ = GetCodeRate(dl_mcs_index_);
     dl_modulation_ = MapModToStr(dl_mod_order_bits_);
   }
@@ -935,8 +936,8 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
   bool early_term = dl_mcs.value("earlyTermination", true);
   int16_t max_decoder_iter = dl_mcs.value("decoderIter", 5);
 
-  size_t zc = select_zc(base_graph, dl_code_rate_, dl_mod_order_bits_,
-                        GetOFDMDataNum(), kCbPerSymbol, "downlink");
+  size_t zc = SelectZc(base_graph, dl_code_rate_, dl_mod_order_bits_,
+                       GetOFDMDataNum(), kCbPerSymbol, "downlink");
 
   // Always positive since dl_code_rate is smaller than 1024
   size_t num_rows =
@@ -966,9 +967,9 @@ void Config::UpdateCtrlMCS() {
     const size_t dl_bcast_code_rate = GetCodeRate(dl_bcast_mcs_index);
     std::string dl_bcast_modulation = MapModToStr(dl_bcast_mod_order_bits_);
     const int16_t max_decoder_iter = 5;
-    size_t bcast_zc = select_zc(
-        bcast_base_graph, dl_bcast_code_rate, dl_bcast_mod_order_bits_,
-        this->GetOFDMCtrlNum(), kCbPerSymbol, "downlink broadcast");
+    size_t bcast_zc =
+        SelectZc(bcast_base_graph, dl_bcast_code_rate, dl_bcast_mod_order_bits_,
+                 this->GetOFDMCtrlNum(), kCbPerSymbol, "downlink broadcast");
 
     // Always positive since dl_code_rate is smaller than 1
     size_t bcast_num_rows =
@@ -1111,8 +1112,11 @@ void Config::GenPilots() {
                      (float)std::pow(std::abs(this->common_pilot_[i]), 2);
     this->pilots_sgn_[i] = {pilot_sgn.real(), pilot_sgn.imag()};
   }
+
+  RtAssert(pilot_ifft_ == nullptr, "pilot_ifft_ should be null");
   AllocBuffer1d(&pilot_ifft_, this->ofdm_ca_num_,
                 Agora_memory::Alignment_t::kAlign64, 1);
+
   for (size_t j = 0; j < ofdm_data_num_; j++) {
     // FFT Shift
     const size_t k = j + ofdm_data_start_ >= ofdm_ca_num_ / 2
@@ -1658,7 +1662,7 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
   int8_t* demod_buff_ptr = static_cast<int8_t*>(
       Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
                                        dl_bcast_mod_order_bits_ * ctrl_sc_num));
-  demodulate(reinterpret_cast<float*>(&eq_buff[0]), demod_buff_ptr,
+  Demodulate(reinterpret_cast<float*>(&eq_buff[0]), demod_buff_ptr,
              2 * ctrl_sc_num, dl_bcast_mod_order_bits_, false);
 
   int num_bcast_bytes = BitsToBytes(dl_bcast_ldpc_config_.NumCbLen());
