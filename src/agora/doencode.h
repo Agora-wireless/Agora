@@ -44,6 +44,7 @@ class DoEncode : public Doer {
 
   // Intermediate buffer to hold pre/post scrambled data
   int8_t* scrambler_buffer_;
+  size_t scrambler_buffer_bytes_;
 
   MacScheduler* mac_sched_;
   DurationStat* duration_stat_;

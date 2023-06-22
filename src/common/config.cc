@@ -685,6 +685,29 @@ Config::Config(std::string jsonfilename)
   ul_data_bytes_num_persymbol_ =
       ul_num_bytes_per_cb_ * ul_ldpc_config_.NumBlocksInSymbol();
   ul_mac_packet_length_ = ul_data_bytes_num_persymbol_;
+
+  //((cb_len_bits / zc_size) - 1) * (zc_size / 8) + kProcBytes(32)
+  const size_t ul_ldpc_input_min =
+      (((ul_ldpc_config_.NumCbLen() / ul_ldpc_config_.ExpansionFactor()) - 1) *
+           (ul_ldpc_config_.ExpansionFactor() / 8) +
+       32);
+
+  if (ul_ldpc_input_min >
+      (ul_num_bytes_per_cb_ + ul_num_padding_bytes_per_cb_)) {
+    AGORA_LOG_ERROR(
+        "LDPC required Input Buffer size exceeds uplink code block size!\n"
+        "uplink CB Bytes %zu, CB Padding %zu, LDPC Input Min for zc 64:256: "
+        "%zu, Suggested Input Size %zu\n",
+        ul_ldpc_config_.NumCbLen() / 8, ul_num_padding_bytes_per_cb_,
+        ul_ldpc_input_min,
+        LdpcEncodingInputBufSize(ul_ldpc_config_.BaseGraph(),
+                                 ul_ldpc_config_.ExpansionFactor()));
+  }
+
+  RtAssert(
+      ul_ldpc_input_min < (ul_num_bytes_per_cb_ + ul_num_padding_bytes_per_cb_),
+      "LDPC required Input Buffer size exceeds uplink cb size!");
+
   // Smallest over the air packet structure
   RtAssert(this->frame_.NumULSyms() == 0 ||
                ul_mac_packet_length_ > sizeof(MacPacketHeaderPacked),
@@ -714,6 +737,28 @@ Config::Config(std::string jsonfilename)
   dl_mac_data_bytes_num_perframe_ =
       dl_mac_data_length_max_ * dl_mac_packets_perframe_;
   dl_mac_bytes_num_perframe_ = dl_mac_packet_length_ * dl_mac_packets_perframe_;
+
+  //((cb_len_bits / zc_size) - 1) * (zc_size / 8) + kProcBytes(32)
+  const size_t dl_ldpc_input_min =
+      (((dl_ldpc_config_.NumCbLen() / dl_ldpc_config_.ExpansionFactor()) - 1) *
+           (dl_ldpc_config_.ExpansionFactor() / 8) +
+       32);
+
+  if (dl_ldpc_input_min >
+      (dl_num_bytes_per_cb_ + dl_num_padding_bytes_per_cb_)) {
+    AGORA_LOG_ERROR(
+        "LDPC required Input Buffer size exceeds downlink code block size!\n"
+        "Downlink CB Bytes %zu, CB Padding %zu, LDPC Input Min for zc 64:256: "
+        "%zu, Suggested Input Size %zu\n",
+        dl_ldpc_config_.NumCbLen() / 8, dl_num_padding_bytes_per_cb_,
+        dl_ldpc_input_min,
+        LdpcEncodingInputBufSize(dl_ldpc_config_.BaseGraph(),
+                                 dl_ldpc_config_.ExpansionFactor()));
+  }
+
+  RtAssert(
+      dl_ldpc_input_min < (dl_num_bytes_per_cb_ + dl_num_padding_bytes_per_cb_),
+      "LDPC required Input Buffer size exceeds downlink cb size!");
 
   this->running_.store(true);
   /* 12 bit samples x2 for I + Q */
@@ -828,11 +873,9 @@ inline size_t SelectZc(size_t base_graph, size_t code_rate,
   if (zc == SIZE_MAX) {
     AGORA_LOG_WARN(
         "Exceeded possible range of LDPC lifting Zc for " + dir +
-            "! Setting "
-            "lifting size to max possible value(%zu).\nThis may lead to too "
-            "many "
-            "unused subcarriers. For better use of the PHY resources, you may "
-            "reduce your coding or modulation rate.\n",
+            "! Setting lifting size to max possible value(%zu).\nThis may lead "
+            "to too many unused subcarriers. For better use of the PHY "
+            "resources, you may reduce your coding or modulation rate.\n",
         kMaxSupportedZc);
     zc = kMaxSupportedZc;
   }
