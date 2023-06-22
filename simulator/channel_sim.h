@@ -32,7 +32,8 @@ class ChannelSim {
              size_t user_thread_num, size_t worker_thread_num,
              size_t in_core_offset = 30,
              std::string in_chan_type = std::string("RAYLEIGH"),
-             double in_chan_snr = 20);
+             double in_chan_snr = 20, 
+             std::string dataset_path = std::string("") );
   ~ChannelSim();
 
   void Run();
@@ -110,6 +111,8 @@ class ChannelSim {
 
   std::string channel_type_;
   double channel_snr_;
+
+  std::string dataset_path_;
 
   TimeFrameCounters ue_rx_;
   TimeFrameCounters ue_tx_;

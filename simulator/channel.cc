@@ -10,11 +10,14 @@ static constexpr bool kPrintChannelOutput = false;
 static constexpr bool kPrintSNRCheck = false;
 static constexpr double kMeanChannelGain = 0.1f;
 
+//EXAMPlE DATASET
+static std::string kDatasetAlias = "16_4_16_clu2_all.hdf5";
+
 Channel::Channel(const Config* const config, std::string& in_channel_type,
-                 double in_channel_snr)
+                 double in_channel_snr,  std::string& dataset_path )
     : cfg_(config),
       sim_chan_model_(std::move(in_channel_type)),
-      channel_snr_db_(in_channel_snr) {
+      channel_snr_db_(in_channel_snr){
   bs_ant_ = cfg_->BsAntNum();
   ue_ant_ = cfg_->UeAntNum();
   n_samps_ = cfg_->SampsPerSymbol();
@@ -27,9 +30,15 @@ Channel::Channel(const Config* const config, std::string& in_channel_type,
     chan_model_ = kRan3Gpp;
     printf("3GPP Model in progress, setting to RAYLEIGH channel \n");
     chan_model_ = kRayleigh;
+  } else if (sim_chan_model_ == "DATASET" ) {
+
+    DatasetChannelModel::InstantiateDataset( dataset_path );
+    chan_model_ = kDataset;
+
   } else {
     chan_model_ = kAwgn;
   }
+
   float snr_lin = std::pow(10, channel_snr_db_ / 10.0f);
   noise_samp_std_ = std::sqrt(kMeanChannelGain / (snr_lin * 2.0f));
   std::cout << "Noise level to be used is: " << std::fixed << std::setw(5)
@@ -59,6 +68,14 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
           h_ = arma::cx_fmat(rmat, imat);
           h_ = sqrt(kMeanChannelGain / 2.0f) * h_;
           // H = H / abs(H).max();
+        }
+        break;
+
+      case kDataset:
+        {
+
+          h_ = DatasetChannelModel::GetAndUpdateMatrix();
+
         }
         break;
 
@@ -118,4 +135,5 @@ void Channel::Lte3gpp(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst) {
                   arma::randn<arma::fmat>(cfg_->UeAntNum(), cfg_->BsAntNum()));
   h = (1 / sqrt(2)) * h;
   fmat_dst = fmat_src * h;
+
 }

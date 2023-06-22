@@ -21,10 +21,13 @@
 #include "symbols.h"
 #include "utils.h"
 
+//TESTING 
+#include "channel_models/dataset_model.h"
+
 class Channel {
  public:
   Channel(const Config* const config, std::string& channel_type,
-          double channel_snr);
+          double channel_snr, std::string& dataset_path );
   ~Channel();
 
   // Dimensions of fmat_src: ( bscfg->sampsPerSymbol, uecfg->UE_ANT_NUM )
@@ -59,9 +62,12 @@ class Channel {
   std::string sim_chan_model_;
   double channel_snr_db_;
   double noise_samp_std_;
-  enum ChanModel { kAwgn, kRayleigh, kRan3Gpp } chan_model_;
 
+  //enum ChanModel { kAwgn, kRayleigh, kRan3Gpp } chan_model_; 
+  enum ChanModel { kAwgn, kRayleigh, kRan3Gpp, kDataset } chan_model_; 
+  
   arma::cx_fmat h_;
+
 };
 
 #endif  // CHANNEL_H_

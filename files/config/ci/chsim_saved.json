@@ -1,18 +1,16 @@
 {
-  "max_frame": 399,
-  "fft_size": 512,
-  "ofdm_data_num": 256, /*Subcarriers*/ 
+  "fft_size": 512,/*1024,512, fft_size > ofdm_data_num, powers of 2...y 64, 128, 256, 512*/ 
+  "ofdm_data_num": 304, // 1 Number of subcarriers
   "demul_block_size": 48,
   "ul_mcs" : {
-    "mcs_index": 10 /*16QAM, 340/1204*/
+    "code_rate": 0.333
   },
   "dl_mcs" : {
-    "mcs_index": 15 /*16QAM, 616/1024*/
+    "code_rate": 0.333
   },
   "sample_rate" : 1e6,
-  "spatial_streams" : 2,
-  "ue_radio_num": 16, /*UEs max 16*/
-  "bs_radio_num": 16, /*BSs max 64*/
+  "ue_radio_num": 4,
+  "bs_radio_num": 32,
   "symbol_num_perframe": 24,
   "client_ul_pilot_syms": 2,
   "ul_data_symbol_start": 17,
@@ -23,9 +21,9 @@
   "beacon_position": 0,
   "bs_server_port": 8100,
   "bs_rru_port": 8200,
-  "core_offset": 4,
-  "worker_thread_num": 8, 
-  "socket_thread_num": 4, 
+  "core_offset": 5,
+  "worker_thread_num": 12,
+  "socket_thread_num": 1,
   "ue_core_offset": 1,
   "ue_worker_thread_num": 2,
   "ue_socket_thread_num": 1
