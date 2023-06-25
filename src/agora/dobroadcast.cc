@@ -46,7 +46,9 @@ void DoBroadcast::GenerateBroadcastSymbols(size_t frame_id) {
     bcast_iq_samps.at(symbol_idx_dl) =
         reinterpret_cast<std::complex<int16_t>*>(pkt->data_);
     ctrl_data.at(symbol_idx_dl) =
-        frame_id;  // TODO: later ctrl data might include other info
+        frame_id + (kUseArgos
+                        ? TX_FRAME_DELTA
+                        : 0);  // TODO: later ctrl data might include other info
   }
   cfg_->GenBroadcastSlots(bcast_iq_samps, ctrl_data);
 

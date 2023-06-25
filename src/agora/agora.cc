@@ -727,6 +727,17 @@ void Agora::Start() {
           }
         } break;
 
+        case EventType::kBroadcast: {
+          const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+          this->stats_->MasterSetTsc(TsType::kBroadcastDone, frame_id);
+          for (size_t idx = 0; idx < config_->Frame().NumDlControlSyms();
+               idx++) {
+            size_t symbol_id = config_->Frame().GetDLControlSymbol(idx);
+            ScheduleAntennasTX(frame_id, symbol_id);
+          }
+          stats_->PrintPerFrameDone(PrintType::kBroadcast, frame_id);
+        } break;
+
         case EventType::kPacketTX: {
           // Data is sent
           const size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
@@ -779,16 +790,6 @@ void Agora::Start() {
               tx_begin = GetTime::GetTimeUs();
             }
           }
-        } break;
-        case EventType::kBroadcast: {
-          const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          this->stats_->MasterSetTsc(TsType::kBroadcastDone, frame_id);
-          for (size_t idx = 0; idx < config_->Frame().NumDlControlSyms();
-               idx++) {
-            size_t symbol_id = config_->Frame().GetDLControlSymbol(idx);
-            ScheduleAntennasTX(frame_id, symbol_id);
-          }
-          stats_->PrintPerFrameDone(PrintType::kBroadcast, frame_id);
         } break;
         default:
           AGORA_LOG_ERROR("Wrong event type in message queue!");
