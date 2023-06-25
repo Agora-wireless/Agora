@@ -1615,6 +1615,7 @@ void Config::GenData() {
 }
 
 size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
+  size_t start_tsc = GetTime::WorkerRdtsc();
   size_t delay_offset = (ofdm_rx_zero_prefix_client_ + cp_len_) * 2;
   complex_float* bcast_fft_buff = static_cast<complex_float*>(
       Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
@@ -1674,15 +1675,20 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
   FreeBuffer1d(&bcast_fft_buff);
   FreeBuffer1d(&eq_buff);
   FreeBuffer1d(&demod_buff_ptr);
-
+  double duration =
+      GetTime::CyclesToUs(GetTime::WorkerRdtsc() - start_tsc, freq_ghz_);
+  if (kDebugPrintInTask) {
+    std::printf("DecodeBroadcast completed in %2.2f us\n", duration);
+  }
   return (reinterpret_cast<size_t*>(decode_buff.data()))[0];
 }
 
 void Config::GenBroadcastSlots(
     std::vector<std::complex<int16_t>*>& bcast_iq_samps,
     std::vector<size_t> ctrl_msg) {
+  // TODO: Enable a vector of bytes to TX'edd in each symbol
   assert(bcast_iq_samps.size() == this->frame_.NumDlControlSyms());
-  assert(ctrl_msg.size() == this->frame_.NumDlControlSyms());
+  size_t start_tsc = GetTime::WorkerRdtsc();
 
   int num_bcast_bytes = BitsToBytes(dl_bcast_ldpc_config_.NumCbLen());
   std::vector<int8_t> bcast_bits_buffer(num_bcast_bytes, 0);
@@ -1713,6 +1719,11 @@ void Config::GenBroadcastSlots(
                       dl_bcast_scale);
   }
   dl_bcast_mod_table.Free();
+  double duration =
+      GetTime::CyclesToUs(GetTime::WorkerRdtsc() - start_tsc, freq_ghz_);
+  if (kDebugPrintInTask) {
+    std::printf("GenBroadcast completed in %2.2f us\n", duration);
+  }
 }
 
 Config::~Config() {
