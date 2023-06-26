@@ -16,13 +16,14 @@ DoDemul::DoDemul(
     Table<complex_float>& ue_spec_pilot_buffer,
     Table<complex_float>& equal_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
-    PhyStats* in_phy_stats, Stats* stats_manager)
+    MacScheduler* mac_sched, PhyStats* in_phy_stats, Stats* stats_manager)
     : Doer(config, tid),
       data_buffer_(data_buffer),
       ul_beam_matrices_(ul_beam_matrices),
       ue_spec_pilot_buffer_(ue_spec_pilot_buffer),
       equal_buffer_(equal_buffer),
       demod_buffers_(demod_buffers),
+      mac_sched_(mac_sched),
       phy_stats_(in_phy_stats) {
   duration_stat_ = stats_manager->GetDurationStat(DoerType::kDemul, tid);
 
@@ -50,10 +51,11 @@ DoDemul::DoDemul(
   MKL_Complex8 alpha = {1, 0};
   MKL_Complex8 beta = {0, 0};
 
-  mkl_jit_status_t status = mkl_jit_create_cgemm(
-      &jitter_, MKL_COL_MAJOR, MKL_NOTRANS, MKL_NOTRANS, cfg_->UeAntNum(), 1,
-      cfg_->BsAntNum(), &alpha, cfg_->UeAntNum(), cfg_->BsAntNum(), &beta,
-      cfg_->UeAntNum());
+  mkl_jit_status_t status =
+      mkl_jit_create_cgemm(&jitter_, MKL_COL_MAJOR, MKL_NOTRANS, MKL_NOTRANS,
+                           cfg_->SpatialStreamsNum(), 1, cfg_->BsAntNum(),
+                           &alpha, cfg_->SpatialStreamsNum(), cfg_->BsAntNum(),
+                           &beta, cfg_->SpatialStreamsNum());
   if (MKL_JIT_ERROR == status) {
     std::fprintf(
         stderr,
@@ -203,13 +205,14 @@ EventData DoDemul::Launch(size_t tag) {
       if (kExportConstellation) {
         equal_ptr =
             (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                            [cur_sc_id * cfg_->UeAntNum()]);
+                                            [cur_sc_id *
+                                             cfg_->SpatialStreamsNum()]);
       } else {
         equal_ptr =
             (arma::cx_float*)(&equaled_buffer_temp_[(cur_sc_id - base_sc_id) *
-                                                    cfg_->UeAntNum()]);
+                                                    cfg_->SpatialStreamsNum()]);
       }
-      arma::cx_fmat mat_equaled(equal_ptr, cfg_->UeAntNum(), 1, false);
+      arma::cx_fmat mat_equaled(equal_ptr, cfg_->SpatialStreamsNum(), 1, false);
 
       arma::cx_float* data_ptr = reinterpret_cast<arma::cx_float*>(
           &data_gather_buffer_[j * cfg_->BsAntNum()]);
@@ -224,40 +227,43 @@ EventData DoDemul::Launch(size_t tag) {
 #else
       arma::cx_fmat mat_data(data_ptr, cfg_->BsAntNum(), 1, false);
 
-      arma::cx_fmat mat_ul_beam(ul_beam_ptr, cfg_->UeAntNum(), cfg_->BsAntNum(),
-                                false);
+      arma::cx_fmat mat_ul_beam(ul_beam_ptr, cfg_->SpatialStreamsNum(),
+                                cfg_->BsAntNum(), false);
       mat_equaled = mat_ul_beam * mat_data;
 #endif
-
+      auto ue_list = mac_sched_->ScheduledUeList(frame_id, cur_sc_id);
       if (symbol_idx_ul <
           cfg_->Frame().ClientUlPilotSymbols()) {  // Calc new phase shift
         if (symbol_idx_ul == 0 && cur_sc_id == 0) {
           // Reset previous frame
           arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
               ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
-          arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(),
-                                        cfg_->Frame().ClientUlPilotSymbols(),
-                                        false);
+          arma::cx_fmat mat_phase_shift(
+              phase_shift_ptr, cfg_->SpatialStreamsNum(),
+              cfg_->Frame().ClientUlPilotSymbols(), false);
           mat_phase_shift.fill(0);
         }
         arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
             &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
-                                  [symbol_idx_ul * cfg_->UeAntNum()]);
-        arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(), 1,
-                                      false);
+                                  [symbol_idx_ul * cfg_->SpatialStreamsNum()]);
+        arma::cx_fmat mat_phase_shift(phase_shift_ptr,
+                                      cfg_->SpatialStreamsNum(), 1, false);
+
+        arma::cx_fvec cur_sc_pilot_data = ue_pilot_data_.col(cur_sc_id);
         arma::cx_fmat shift_sc =
-            sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
+            arma::sign(mat_equaled % conj(cur_sc_pilot_data(ue_list)));
         mat_phase_shift += shift_sc;
       }
       // apply previously calc'ed phase shift to data
       else if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
         arma::cx_float* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
             ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
-        arma::cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeAntNum(),
+        arma::cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->SpatialStreamsNum(),
                                      cfg_->Frame().ClientUlPilotSymbols(),
                                      false);
         arma::fmat theta_mat = arg(pilot_corr_mat);
-        arma::fmat theta_inc = arma::zeros<arma::fmat>(cfg_->UeAntNum(), 1);
+        arma::fmat theta_inc =
+            arma::zeros<arma::fmat>(cfg_->SpatialStreamsNum(), 1);
         for (size_t s = 1; s < cfg_->Frame().ClientUlPilotSymbols(); s++) {
           arma::fmat theta_diff = theta_mat.col(s) - theta_mat.col(s - 1);
           theta_inc += theta_diff;
@@ -274,7 +280,7 @@ EventData DoDemul::Launch(size_t tag) {
         // Measure EVM from ground truth
         if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
           phy_stats_->UpdateEvm(frame_id, data_symbol_idx_ul, cur_sc_id,
-                                mat_equaled.col(0));
+                                mat_equaled.col(0), ue_list);
         }
       }
       size_t start_tsc3 = GetTime::WorkerRdtsc();
@@ -284,67 +290,36 @@ EventData DoDemul::Launch(size_t tag) {
   }
 
   size_t start_tsc3 = GetTime::WorkerRdtsc();
-  __m256i index2 =
-      _mm256_setr_epi32(0, 1, cfg_->UeAntNum() * 2, cfg_->UeAntNum() * 2 + 1,
-                        cfg_->UeAntNum() * 4, cfg_->UeAntNum() * 4 + 1,
-                        cfg_->UeAntNum() * 6, cfg_->UeAntNum() * 6 + 1);
+  __m256i index2 = _mm256_setr_epi32(
+      0, 1, cfg_->SpatialStreamsNum() * 2, cfg_->SpatialStreamsNum() * 2 + 1,
+      cfg_->SpatialStreamsNum() * 4, cfg_->SpatialStreamsNum() * 4 + 1,
+      cfg_->SpatialStreamsNum() * 6, cfg_->SpatialStreamsNum() * 6 + 1);
   auto* equal_t_ptr = reinterpret_cast<float*>(equaled_buffer_temp_transposed_);
-  for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
+  for (size_t ss_id = 0; ss_id < cfg_->SpatialStreamsNum(); ss_id++) {
     float* equal_ptr = nullptr;
     if (kExportConstellation) {
       equal_ptr = reinterpret_cast<float*>(
           &equal_buffer_[total_data_symbol_idx_ul]
-                        [base_sc_id * cfg_->UeAntNum() + ue_id]);
+                        [base_sc_id * cfg_->SpatialStreamsNum() + ss_id]);
     } else {
-      equal_ptr = reinterpret_cast<float*>(equaled_buffer_temp_ + ue_id);
+      equal_ptr = reinterpret_cast<float*>(equaled_buffer_temp_ + ss_id);
     }
     size_t k_num_double_in_sim_d256 = sizeof(__m256) / sizeof(double);  // == 4
     for (size_t j = 0; j < max_sc_ite / k_num_double_in_sim_d256; j++) {
       __m256 equal_t_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
       _mm256_store_ps(equal_t_ptr, equal_t_temp);
       equal_t_ptr += 8;
-      equal_ptr += cfg_->UeAntNum() * k_num_double_in_sim_d256 * 2;
+      equal_ptr += cfg_->SpatialStreamsNum() * k_num_double_in_sim_d256 * 2;
     }
     equal_t_ptr = (float*)(equaled_buffer_temp_transposed_);
-    int8_t* demod_ptr = demod_buffers_[frame_slot][symbol_idx_ul][ue_id] +
+    int8_t* demod_ptr = demod_buffers_[frame_slot][symbol_idx_ul][ss_id] +
                         (cfg_->ModOrderBits(Direction::kUplink) * base_sc_id);
-
-    switch (cfg_->ModOrderBits(Direction::kUplink)) {
-      case (CommsLib::kQpsk):
-        kUplinkHardDemod
-            ? DemodQpskHardLoop(equal_t_ptr,
-                                reinterpret_cast<uint8_t*>(demod_ptr),
-                                max_sc_ite)
-            : DemodQpskSoftSse(equal_t_ptr, demod_ptr, max_sc_ite);
-        break;
-      case (CommsLib::kQaM16):
-        kUplinkHardDemod
-            ? Demod16qamHardAvx2(equal_t_ptr,
-                                 reinterpret_cast<uint8_t*>(demod_ptr),
-                                 max_sc_ite)
-            : Demod16qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
-        break;
-      case (CommsLib::kQaM64):
-        kUplinkHardDemod
-            ? Demod64qamHardAvx2(equal_t_ptr,
-                                 reinterpret_cast<uint8_t*>(demod_ptr),
-                                 max_sc_ite)
-            : Demod64qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
-        break;
-      case (CommsLib::kQaM256):
-        kUplinkHardDemod
-            ? Demod256qamHardAvx2(equal_t_ptr,
-                                  reinterpret_cast<uint8_t*>(demod_ptr),
-                                  max_sc_ite)
-            : Demod256qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
-        break;
-      default:
-        std::printf("Demodulation: modulation type %s not supported!\n",
-                    cfg_->Modulation(Direction::kUplink).c_str());
-    }
+    Demodulate(equal_t_ptr, demod_ptr, max_sc_ite,
+               cfg_->ModOrderBits(Direction::kUplink), kUplinkHardDemod);
     // if hard demod is enabled calculate BER with modulated bits
     if (((kPrintPhyStats || kEnableCsvLog) && kUplinkHardDemod) &&
         (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols())) {
+      size_t ue_id = mac_sched_->ScheduledUeIndex(frame_id, base_sc_id, ss_id);
       phy_stats_->UpdateDecodedBits(
           ue_id, total_data_symbol_idx_ul, frame_slot,
           max_sc_ite * cfg_->ModOrderBits(Direction::kUplink));

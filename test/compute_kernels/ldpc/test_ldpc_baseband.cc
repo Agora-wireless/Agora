@@ -305,17 +305,8 @@ int main(int argc, char* argv[]) {
         auto* equal_t_ptr =
             (float*)(equalized_data_all_symbols[i - data_sym_start] +
                      j * cfg->OfdmDataNum());
-        switch (cfg->ModOrderBits(dir)) {
-          case (4):
-            Demod16qamSoftAvx2(equal_t_ptr, demod_ptr, cfg->OfdmDataNum());
-            break;
-          case (6):
-            Demod64qamSoftAvx2(equal_t_ptr, demod_ptr, cfg->OfdmDataNum());
-            break;
-          default:
-            std::printf("Demodulation: modulation type %s not supported!\n",
-                        cfg->Modulation(dir).c_str());
-        }
+        Demodulate(equal_t_ptr, demod_ptr, cfg->OfdmDataNum(),
+                   cfg->ModOrderBits(dir), false);
       }
     }
 

@@ -428,7 +428,7 @@ void RadioSocket::Flush() {
 
   const auto start_flush = std::chrono::system_clock::now();
   last_rx_time = start_flush;
-  total_elapsed_seconds = last_rx_time - last_rx_time;
+  total_elapsed_seconds = std::chrono::duration<float>::zero();
   rx_elapsed_seconds = total_elapsed_seconds;
 
   while ((rx_elapsed_seconds.count() < kRxTimeoutSec) &&
