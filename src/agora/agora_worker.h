@@ -13,15 +13,16 @@
 #include "agora_buffer.h"
 #include "config.h"
 #include "csv_logger.h"
+#include "mac_scheduler.h"
 #include "mat_logger.h"
 #include "phy_stats.h"
 #include "stats.h"
 
 class AgoraWorker {
  public:
-  explicit AgoraWorker(Config* cfg, Stats* stats, PhyStats* phy_stats,
-                       MessageInfo* message, AgoraBuffer* buffer,
-                       FrameInfo* frame);
+  explicit AgoraWorker(Config* cfg, MacScheduler* mac_sched, Stats* stats,
+                       PhyStats* phy_stats, MessageInfo* message,
+                       AgoraBuffer* buffer, FrameInfo* frame);
   ~AgoraWorker();
 
  private:
@@ -33,6 +34,7 @@ class AgoraWorker {
   Config* const config_;
   std::vector<std::thread> workers_;
 
+  MacScheduler* mac_sched_;
   Stats* stats_;
   PhyStats* phy_stats_;
   MessageInfo* message_;

@@ -16,6 +16,7 @@
 #include "dodecode_client.h"
 #include "doencode.h"
 #include "doifft_client.h"
+#include "mac_scheduler.h"
 #include "message.h"
 #include "mkl_dfti.h"
 #include "simd_types.h"
@@ -24,8 +25,8 @@
 class UeWorker {
  public:
   explicit UeWorker(
-      size_t tid, Config& config, Stats& shared_stats,
-      PhyStats& shared_phy_stats,
+      size_t tid, Config& config, MacScheduler& mac_scheduler,
+      Stats& shared_stats, PhyStats& shared_phy_stats,
       moodycamel::ConcurrentQueue<EventData>& notify_queue,
       moodycamel::ConcurrentQueue<EventData>& work_queue,
       moodycamel::ProducerToken& work_producer, Table<int8_t>& ul_bits_buffer,
@@ -130,6 +131,7 @@ class UeWorker {
 
   // Shared Objects
   Config& config_;
+  MacScheduler& mac_sched_;
   Stats& stats_;
   PhyStats& phy_stats_;
 

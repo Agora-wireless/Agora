@@ -722,6 +722,54 @@ std::vector<std::complex<float>> CommsLib::Modulate(
   return out;
 }
 
+std::vector<std::vector<size_t>> CommsLib::GetAvailableMcs() {
+  std::vector<std::vector<size_t>> available_mcs;
+  available_mcs.resize(1 + kMaxModType / 2);
+  for (size_t i = 0; i < sizeof(kMCS) / sizeof(kMCS[0]); i++) {
+    size_t mod_order_bits = GetModOrderBits(i);
+    available_mcs.at(mod_order_bits / 2).push_back(GetCodeRate(i));
+  }
+  return available_mcs;
+}
+
+size_t CommsLib::GetMcsIndex(size_t in_mod_order, size_t in_code_rate) {
+  auto mcs_vec = CommsLib::GetAvailableMcs();
+  size_t mcs_index = 0;
+  for (size_t i = 0; i < in_mod_order / 2; i++) {
+    mcs_index += mcs_vec.at(i).size();
+  }
+  auto code_vec = mcs_vec.at(in_mod_order / 2);
+
+  if (code_vec.empty()) {
+    throw std::invalid_argument("Input vector is empty.");
+  }
+
+  if (in_code_rate <= code_vec.front()) {
+    return mcs_index;
+  }
+
+  if (in_code_rate >= code_vec.back()) {
+    return mcs_index + code_vec.size() - 1;
+  }
+
+  auto lower_bound_iter =
+      std::lower_bound(code_vec.begin(), code_vec.end(), in_code_rate);
+
+  if (*lower_bound_iter == in_code_rate) {
+    return mcs_index + lower_bound_iter - code_vec.begin();
+    ;
+  }
+
+  auto prev_element = lower_bound_iter - 1;
+
+  // Return the closest element
+  auto closest_element =
+      (in_code_rate - *prev_element <= *lower_bound_iter - in_code_rate)
+          ? prev_element
+          : lower_bound_iter;
+  return mcs_index + closest_element - code_vec.begin();
+}
+
 std::vector<std::complex<float>> CommsLib::SeqCyclicShift(
     const std::vector<std::complex<float>>& in, float alpha) {
   std::vector<std::complex<float>> out(in.size(), 0);

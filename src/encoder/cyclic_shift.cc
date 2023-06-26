@@ -147,8 +147,7 @@ inline __m256i CycleBitShift144to256(__m256i data, int16_t cyc_shift,
   if (zc >= 256) {
     e0 = 0xffffffffffffffff;
     e1 = 0xffffffffffffffff;
-  }
-  if (zc >= 192) {
+  } else if (zc >= 192) {
     e0 = 0xffffffffffffffff;
     e1 = (1UL << (zc - 192)) - 1;
   } else if (zc >= 128) {

@@ -1,0 +1,34 @@
+{
+    "bs_radio_num": 16,
+    "ue_radio_num": 2,
+    "frame_schedule": [
+        "BSPUUUUUGGDDDDD"
+    ],
+    "sample_rate" : 1e6,
+    "ul_mcs": {
+      "mcs_index" : 10 /*16QAM, 340/1024*/
+    },
+    "dl_mcs": {
+      "mcs_index" : 10 /*16QAM, 340/1024*/
+    },
+    "fft_size": 512,
+    "ofdm_data_num": 304,
+    "client_ul_pilot_syms": 2,
+    "client_dl_pilot_syms": 1,
+    "demul_block_size": 64,
+    "freq_orthogonal_pilot": true,
+    "ofdm_pilot_spacing" : 12,
+    "fft_block_size": 2,
+    /* Compute configuration */
+    "bs_server_port": 8100,
+    "bs_rru_port": 8200,
+    "core_offset": 5,
+    "exclude_cores": [
+        0
+    ],
+    "ue_core_offset": 1,
+    "worker_thread_num": 12,
+    "socket_thread_num": 2,
+    "ue_worker_thread_num": 2,
+    "ue_socket_thread_num": 1
+}

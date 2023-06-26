@@ -44,7 +44,6 @@ void InitModulationTable(Table<complex_float>& mod_table, size_t mod_order) {
     mod_table.Malloc(1, pow(2, kMaxModType),
                      Agora_memory::Alignment_t::kAlign32);
   }
-  // mod_table.malloc(pow(2, kMaxModType), 2, 32);
   switch (mod_order) {
     case 4:
       InitQpskTable(mod_table);
@@ -59,7 +58,8 @@ void InitModulationTable(Table<complex_float>& mod_table, size_t mod_order) {
       InitQam256Table(mod_table);
       break;
     default: {
-      std::printf("Modulation order not supported, use default value 4\n");
+      std::printf("Modulation order %zu not supported, use default value 16\n",
+                  mod_order);
       InitQam16Table(mod_table);
     }
   }
@@ -2749,3 +2749,36 @@ void Demod256qamSoftAvx512(const float* vec_in, int8_t* llr, int num) {
                       num - next_start);
 }
 #endif
+
+void Demodulate(float* equal_ptr, int8_t* demod_ptr, size_t data_num,
+                size_t mod, bool hard_demod) {
+  switch (mod) {
+    case 2:
+      hard_demod
+          ? DemodQpskHardLoop(equal_ptr, reinterpret_cast<uint8_t*>(demod_ptr),
+                              data_num)
+          : DemodQpskSoftSse(equal_ptr, demod_ptr, data_num);
+      break;
+    case 4:
+      hard_demod
+          ? Demod16qamHardAvx2(equal_ptr, reinterpret_cast<uint8_t*>(demod_ptr),
+                               data_num)
+          : Demod16qamSoftAvx2(equal_ptr, demod_ptr, data_num);
+      break;
+    case 6:
+      hard_demod
+          ? Demod64qamHardAvx2(equal_ptr, reinterpret_cast<uint8_t*>(demod_ptr),
+                               data_num)
+          : Demod64qamSoftAvx2(equal_ptr, demod_ptr, data_num);
+      break;
+    case 8:
+      hard_demod
+          ? Demod256qamHardAvx2(equal_ptr,
+                                reinterpret_cast<uint8_t*>(demod_ptr), data_num)
+          : Demod256qamSoftAvx2(equal_ptr, demod_ptr, data_num);
+      break;
+    default:
+      std::printf("Demodulation: modulation type %s not supported!\n",
+                  MapModToStr(mod).c_str());
+  }
+}

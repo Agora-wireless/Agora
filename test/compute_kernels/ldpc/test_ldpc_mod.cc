@@ -153,20 +153,8 @@ int main(int argc, char* argv[]) {
         modulated_codewords[i][j].re = modulated_codewords[i][j].re + noise.re;
         modulated_codewords[i][j].im = modulated_codewords[i][j].im + noise.im;
       }
-
-      switch (cfg->ModOrderBits(dir)) {
-        case (4):
-          Demod16qamSoftAvx2((float*)modulated_codewords[i],
-                             demod_data_all_symbols[i], cfg->OfdmDataNum());
-          break;
-        case (6):
-          Demod64qamSoftAvx2((float*)modulated_codewords[i],
-                             demod_data_all_symbols[i], cfg->OfdmDataNum());
-          break;
-        default:
-          std::printf("Demodulation: modulation type %s not supported!\n",
-                      cfg->Modulation(dir).c_str());
-      }
+      Demodulate((float*)modulated_codewords[i], demod_data_all_symbols[i],
+                 cfg->OfdmDataNum(), cfg->ModOrderBits(dir), false);
     }
 
     const LDPCconfig& ldpc_config = cfg->LdpcConfig(dir);
