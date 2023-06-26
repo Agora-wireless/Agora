@@ -696,20 +696,18 @@ Config::Config(std::string jsonfilename)
 
   if (ul_ldpc_input_min >
       (ul_num_bytes_per_cb_ + ul_num_padding_bytes_per_cb_)) {
-    ul_num_padding_bytes_per_cb_ =
+    // Can cause a lot of wasted space, specifically the second argument of the max
+    const size_t increased_padding =
         Roundup<64>(ul_ldpc_sugg_input) - ul_num_bytes_per_cb_;
-    AGORA_LOG_WARN(
-        "LDPC required Input Buffer size exceeds uplink code block size!\n"
-        "uplink CB Bytes %zu, Added CB Padding %zu, LDPC Input Min for zc "
-        "64:256: %zu, Suggested Input Size %zu, Actual Size %zu\n",
-        ul_ldpc_config_.NumCbLen() / 8, ul_num_padding_bytes_per_cb_,
-        ul_ldpc_input_min, ul_ldpc_sugg_input,
-        ul_num_padding_bytes_per_cb_ + ul_num_bytes_per_cb_);
-  }
 
-  //RtAssert(
-  //    ul_ldpc_input_min < (ul_num_bytes_per_cb_ + ul_num_padding_bytes_per_cb_),
-  //    "LDPC required Input Buffer size exceeds uplink cb size!");
+    AGORA_LOG_WARN(
+        "LDPC required Input Buffer size exceeds uplink code block size!, "
+        "Increased cb padding from %zu to %zu uplink CB Bytes %zu, LDPC "
+        "Input Min for zc 64:256: %zu\n",
+        ul_num_padding_bytes_per_cb_, increased_padding, ul_num_bytes_per_cb_,
+        ul_ldpc_input_min);
+    ul_num_padding_bytes_per_cb_ = increased_padding;
+  }
 
   // Smallest over the air packet structure
   RtAssert(this->frame_.NumULSyms() == 0 ||
@@ -752,22 +750,17 @@ Config::Config(std::string jsonfilename)
   if (dl_ldpc_input_min >
       (dl_num_bytes_per_cb_ + dl_num_padding_bytes_per_cb_)) {
     // Can cause a lot of wasted space, specifically the second argument of the max
-    dl_num_padding_bytes_per_cb_ =
+    const size_t increased_padding =
         Roundup<64>(dl_ldpc_sugg_input) - dl_num_bytes_per_cb_;
-    AGORA_LOG_WARN(
-        "LDPC required Input Buffer size exceeds downlink code block size!\n"
-        "Downlink CB Bytes %zu, Added CB Padding %zu, LDPC Input Min for zc "
-        "64:256: %zu, Suggested Input Size %zu, Actual Size %zu\n",
-        dl_ldpc_config_.NumCbLen() / 8, dl_num_padding_bytes_per_cb_,
-        dl_ldpc_input_min,
-        LdpcEncodingInputBufSize(dl_ldpc_config_.BaseGraph(),
-                                 dl_ldpc_config_.ExpansionFactor()),
-        dl_num_padding_bytes_per_cb_ + dl_num_bytes_per_cb_);
-  }
 
-  //RtAssert(
-  //    dl_ldpc_input_min < (dl_num_bytes_per_cb_ + dl_num_padding_bytes_per_cb_),
-  //    "LDPC required Input Buffer size exceeds downlink cb size!");
+    AGORA_LOG_WARN(
+        "LDPC required Input Buffer size exceeds downlink code block size!, "
+        "Increased cb padding from %zu to %zu Downlink CB Bytes %zu, LDPC "
+        "Input Min for zc 64:256: %zu\n",
+        dl_num_padding_bytes_per_cb_, increased_padding, dl_num_bytes_per_cb_,
+        dl_ldpc_input_min);
+    dl_num_padding_bytes_per_cb_ = increased_padding;
+  }
 
   this->running_.store(true);
   /* 12 bit samples x2 for I + Q */
@@ -1002,9 +995,8 @@ void Config::UpdateCtrlMCS() {
     dl_bcast_mod_order_bits_ = GetModOrderBits(dl_bcast_mcs_index);
     const size_t dl_bcast_code_rate = GetCodeRate(dl_bcast_mcs_index);
     const size_t bcast_base_graph = 1;
-    //const size_t dl_bcast_code_rate = 340;
-    //dl_bcast_mod_order_ = 16;
-    //dl_bcast_mod_order_bits_ = 4;
+    dl_bcast_mod_order_ = static_cast<size_t>(pow(2, dl_bcast_mod_order_bits_));
+
     const int16_t max_decoder_iter = 5;
     size_t bcast_zc =
         SelectZc(bcast_base_graph, dl_bcast_code_rate, dl_bcast_mod_order_bits_,
@@ -1755,9 +1747,9 @@ void Config::GenBroadcastSlots(
   assert(bcast_iq_samps.size() == this->frame_.NumDlControlSyms());
   assert(ctrl_msg.size() == this->frame_.NumDlControlSyms());
 
-  int num_bcast_bytes = dl_bcast_ldpc_config_.NumCbLen() / 8;
-  int num_bcast_bytes_padded = Roundup<64>(num_bcast_bytes);
-  int num_padding_bytes = num_bcast_bytes_padded - num_bcast_bytes;
+  const int num_bcast_bytes = dl_bcast_ldpc_config_.NumCbLen() / 8;
+  const int num_bcast_bytes_padded = Roundup<64>(num_bcast_bytes);
+  const int num_padding_bytes = num_bcast_bytes_padded - num_bcast_bytes;
   int8_t* bcast_bits_buffer =
       static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::kAlign64, num_bcast_bytes_padded));

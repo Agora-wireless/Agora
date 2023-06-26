@@ -44,7 +44,6 @@ void InitModulationTable(Table<complex_float>& mod_table, size_t mod_order) {
     mod_table.Malloc(1, pow(2, kMaxModType),
                      Agora_memory::Alignment_t::kAlign32);
   }
-  // mod_table.malloc(pow(2, kMaxModType), 2, 32);
   switch (mod_order) {
     case 4:
       InitQpskTable(mod_table);
@@ -59,7 +58,8 @@ void InitModulationTable(Table<complex_float>& mod_table, size_t mod_order) {
       InitQam256Table(mod_table);
       break;
     default: {
-      std::printf("Modulation order not supported, use default value 4\n");
+      std::printf("Modulation order %zu not supported, use default value 16\n",
+                  mod_order);
       InitQam16Table(mod_table);
     }
   }
