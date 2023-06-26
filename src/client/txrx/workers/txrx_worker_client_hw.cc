@@ -266,16 +266,28 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
                                    first_ant_id + ch);
               result_packets.push_back(raw_pkt);
 
+              if (Configuration()->GetSymbolType(global_symbol_id) ==
+                  SymbolType::kControl) {
+                size_t ctrl_frame_id = Configuration()->DecodeBroadcastSlots(
+                    raw_pkt
+                        ->data_);  // put in checks to make sure there is no decoding error
+                if (ctrl_frame_id != global_frame_id) {
+                  AGORA_LOG_ERROR(
+                      "RecvEnqueue: Ctrl channel frame_id mismatch error!\n");
+                  global_frame_id = ctrl_frame_id;
+                }
+                break;
+              } else {
+                // Push kPacketRX event into the queue.
+                const EventData rx_message(EventType::kPacketRX,
+                                           rx_tag_t(*rx_packet).tag_);
+                NotifyComplete(rx_message);
+              }
               AGORA_LOG_FRAME(
                   "TxRxWorkerClientHw [%zu]: Rx Downlink (Frame %zu, Symbol "
                   "%zu, Ant %zu) from Radio %zu at time %lld\n",
                   tid_, global_frame_id, global_symbol_id, first_ant_id + ch,
                   radio_id, receive_time);
-
-              // Push kPacketRX event into the queue.
-              const EventData rx_message(EventType::kPacketRX,
-                                         rx_tag_t(*rx_packet).tag_);
-              NotifyComplete(rx_message);
             }
           }  // end is RxSymbol
         }    // sample offset <= 0
@@ -493,6 +505,7 @@ bool TxRxWorkerClientHw::IsRxSymbol(size_t symbol_id) {
   bool is_rx;
 
   if ((symbol_type == SymbolType::kBeacon) ||
+      (symbol_type == SymbolType::kControl) ||
       (symbol_type == SymbolType::kDL)) {
     is_rx = true;
   } else {

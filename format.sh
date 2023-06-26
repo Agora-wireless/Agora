@@ -5,8 +5,8 @@ clang-format-11 -i src/agora/txrx/*.h
 clang-format-11 -i src/agora/txrx/workers/*.cc
 clang-format-11 -i src/agora/txrx/workers/*.h
 
-clang-format-11 -i src/agora/radio/*.cc
-clang-format-11 -i src/agora/radio/*.h
+clang-format-11 -i src/radio/*.cc
+clang-format-11 -i src/radio/*.h
 
 clang-format-11 -i src/agora/*.cc
 clang-format-11 -i src/agora/*.h

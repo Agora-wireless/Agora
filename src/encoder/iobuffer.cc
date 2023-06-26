@@ -124,14 +124,13 @@ void Adapter64to256(int8_t* ptr_buff_0, int8_t* ptr_buff_1, uint16_t zc_size,
 
   // __m256d, and __m256i local and global data to 32-byte boundaries on the
   // stack
-  __m256i bit_mask;
   __m256i x0;
   __m256i x1;
-  int64_t e0 = 0xffffffffffffffff;
+  const int64_t e0 = 0xffffffffffffffff;
   int64_t e1;
   int64_t e2;
   int64_t e3;
-  int16_t byte_num = zc_size >> 3;  // Bits to bytes (ie /8)
+  const int16_t byte_num = zc_size >> 3;  // Bits to bytes (ie /8)
 
   if (zc_size >= 256) {
     e1 = 0xffffffffffffffff;
@@ -150,20 +149,20 @@ void Adapter64to256(int8_t* ptr_buff_0, int8_t* ptr_buff_1, uint16_t zc_size,
     e2 = 0;
     e3 = 0;
   }
-  bit_mask = _mm256_set_epi64x(e3, e2, e1, e0);
+  const __m256i bit_mask = _mm256_set_epi64x(e3, e2, e1, e0);
 
   int8_t** read_buffer = nullptr;
   int8_t** write_buffer = nullptr;
 
   int8_t* p_buff_0 = ptr_buff_0;
   int8_t* p_buff_1 = ptr_buff_1;
+  const size_t sg_ops = (cb_len_bits / zc_size);
 
   if (kPrintAdapterDebug) {
     std::printf(
         "Adapter64to256 scatter / gather %d, cb length: %d, zc_size: %d, "
-        "iterations %d\n",
-        static_cast<int>(direct == 1), cb_len_bits, zc_size,
-        (cb_len_bits / zc_size));
+        "iterations %zu, input increment %d\n",
+        static_cast<int>(direct == 1), cb_len_bits, zc_size, sg_ops, byte_num);
   }
 
   // scatter
@@ -178,7 +177,7 @@ void Adapter64to256(int8_t* ptr_buff_0, int8_t* ptr_buff_1, uint16_t zc_size,
   }
 
   // Do the scatter / gather
-  for (size_t i = 0; i < (cb_len_bits / zc_size); i++) {
+  for (size_t i = 0; i < sg_ops; i++) {
     x0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(*read_buffer));
     x1 = _mm256_and_si256(x0, bit_mask);
     _mm256_storeu_si256(reinterpret_cast<__m256i*>(*write_buffer), x1);

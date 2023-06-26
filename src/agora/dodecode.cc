@@ -17,10 +17,11 @@ DoDecode::DoDecode(
     Config* in_config, int in_tid,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffers,
-    PhyStats* in_phy_stats, Stats* in_stats_manager)
+    MacScheduler* mac_sched, PhyStats* in_phy_stats, Stats* in_stats_manager)
     : Doer(in_config, in_tid),
       demod_buffers_(demod_buffers),
       decoded_buffers_(decoded_buffers),
+      mac_sched_(mac_sched),
       phy_stats_(in_phy_stats),
       scrambler_(std::make_unique<AgoraScrambler::Scrambler>()) {
   duration_stat_ = in_stats_manager->GetDurationStat(DoerType::kDecode, in_tid);
@@ -39,7 +40,8 @@ EventData DoDecode::Launch(size_t tag) {
   const size_t symbol_offset =
       cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
   const size_t cur_cb_id = (cb_id % ldpc_config.NumBlocksInSymbol());
-  const size_t ue_id = (cb_id / ldpc_config.NumBlocksInSymbol());
+  const size_t sched_ue_id = (cb_id / ldpc_config.NumBlocksInSymbol());
+  const size_t ue_id = mac_sched_->ScheduledUeIndex(frame_id, 0, sched_ue_id);
   const size_t frame_slot = (frame_id % kFrameWnd);
   const size_t num_bytes_per_cb = cfg_->NumBytesPerCb(Direction::kUplink);
   if (kDebugPrintInTask == true) {
@@ -71,9 +73,10 @@ EventData DoDecode::Launch(size_t tag) {
   ldpc_decoder_5gnr_response.numMsgBits = num_msg_bits;
   ldpc_decoder_5gnr_response.varNodes = resp_var_nodes_;
 
-  int8_t* llr_buffer_ptr = demod_buffers_[frame_slot][symbol_idx_ul][ue_id] +
-                           (cfg_->ModOrderBits(Direction::kUplink) *
-                            (ldpc_config.NumCbCodewLen() * cur_cb_id));
+  int8_t* llr_buffer_ptr =
+      demod_buffers_[frame_slot][symbol_idx_ul][sched_ue_id] +
+      (cfg_->ModOrderBits(Direction::kUplink) *
+       (ldpc_config.NumCbCodewLen() * cur_cb_id));
 
   uint8_t* decoded_buffer_ptr =
       (uint8_t*)decoded_buffers_[frame_slot][symbol_idx_ul][ue_id] +
