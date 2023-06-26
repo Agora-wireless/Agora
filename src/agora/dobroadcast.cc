@@ -16,15 +16,14 @@ DoBroadcast::DoBroadcast(Config* in_config, int in_tid,
     : Doer(in_config, in_tid), dl_socket_buffer_(in_dl_socket_buffer) {
   duration_stat_ =
       in_stats_manager->GetDurationStat(DoerType::kBroadcast, in_tid);
-  for (size_t i = 0; i < TX_FRAME_DELTA; i++) {
-    GenerateBroadcastSymbols(i);
-  }
 }
 
 DoBroadcast::~DoBroadcast() = default;
 
 void DoBroadcast::GenerateBroadcastSymbols(size_t frame_id) {
   const size_t num_control_syms = cfg_->Frame().NumDlControlSyms();
+  RtAssert(num_control_syms > 0,
+           "DoBroadcast: No downlink control symbols are scheduled!");
   std::vector<std::complex<int16_t>*> bcast_iq_samps(num_control_syms);
   std::vector<size_t> ctrl_data(num_control_syms);
   for (size_t symbol_idx_dl = 0; symbol_idx_dl < num_control_syms;
@@ -38,17 +37,16 @@ void DoBroadcast::GenerateBroadcastSymbols(size_t frame_id) {
 
     const size_t total_symbol_idx =
         cfg_->GetTotalSymbolIdxDl(frame_id, symbol_id);
-    const size_t offset = (total_symbol_idx * cfg_->BsAntNum()) +
-                          cfg_->BeaconAnt();  // TODO: change to BroadcastAnt()
+    ///\todo change to BroadcastAnt()
+    const size_t offset =
+        (total_symbol_idx * cfg_->BsAntNum()) + cfg_->BeaconAnt();
 
     auto* pkt = reinterpret_cast<Packet*>(
         &dl_socket_buffer_[offset * cfg_->DlPacketLength()]);
     bcast_iq_samps.at(symbol_idx_dl) =
         reinterpret_cast<std::complex<int16_t>*>(pkt->data_);
-    ctrl_data.at(symbol_idx_dl) =
-        frame_id + (kUseArgos
-                        ? TX_FRAME_DELTA
-                        : 0);  // TODO: later ctrl data might include other info
+    ///\todo: later ctrl data might include other info
+    ctrl_data.at(symbol_idx_dl) = frame_id + (kUseArgos ? TX_FRAME_DELTA : 0);
   }
   cfg_->GenBroadcastSlots(bcast_iq_samps, ctrl_data);
 

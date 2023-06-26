@@ -123,7 +123,9 @@ void Agora::SendSnrReport(EventType event_type, size_t frame_id,
 
 void Agora::ScheduleDownlinkProcessing(size_t frame_id) {
   // Schedule broadcast symbols generation
-  ScheduleBroadCastSymbols(EventType::kBroadcast, frame_id);
+  if (config_->Frame().NumDlControlSyms() > 0) {
+    ScheduleBroadCastSymbols(EventType::kBroadcast, frame_id);
+  }
 
   // Schedule beamformed pilot symbols mapping
   size_t num_pilot_symbols = config_->Frame().ClientDlPilotSymbols();

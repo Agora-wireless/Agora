@@ -314,7 +314,6 @@ int main(int argc, char* argv[]) {
         auto* equal_t_ptr =
             (float*)(equalized_data_all_symbols[i - data_sym_start] +
                      j * cfg->OfdmDataNum());
-
         Demodulate(
             equal_t_ptr, demod_ptr,
             cfg->LdpcConfig(dir).NumCbCodewLen() / cfg->ModOrderBits(dir),

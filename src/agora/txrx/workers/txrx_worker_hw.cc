@@ -334,7 +334,7 @@ void TxRxWorkerHw::TxBeaconHw(size_t frame_id, size_t radio_id,
 void TxRxWorkerHw::TxBcastSymbolsHw(size_t frame_id, size_t radio_id,
                                     long long time0) {
   RtAssert(Configuration()->Frame().NumDlControlSyms() > 0,
-           "Number of broadcast symbols > 0 when TxBcastSymbolHw was called");
+           "Number of broadcast symbols = 0 when TxBcastSymbolHw was called");
 
   //We can just point the tx to the same zeros location, no need to make more
   std::vector<const void*> tx_buffs(Configuration()->NumChannels(),
@@ -540,6 +540,10 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
         // Schedule beacon in the future
         if (Configuration()->HwFramer() == false) {
           TxBeaconHw(tx_frame_id, radio_id, time0);
+        }
+
+        if (Configuration()->Frame().NumDlControlSyms() > 0) {
+          TxBcastSymbolsHw(tx_frame_id, radio_id, time0);
         }
 
         if (Configuration()->Frame().IsRecCalEnabled()) {

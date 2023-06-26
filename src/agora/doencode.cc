@@ -25,24 +25,23 @@ DoEncode::DoEncode(Config* in_config, int in_tid, Direction dir,
       mod_bits_buffer_(in_mod_bits_buffer),
       mac_sched_(mac_sched),
       scrambler_(std::make_unique<AgoraScrambler::Scrambler>()) {
+  const auto bg = cfg_->LdpcConfig(dir).BaseGraph();
+  const auto zc = cfg_->LdpcConfig(dir).ExpansionFactor();
+
   duration_stat_ = in_stats_manager->GetDurationStat(DoerType::kEncode, in_tid);
   parity_buffer_ = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::kAlign64,
-      LdpcEncodingParityBufSize(cfg_->LdpcConfig(dir).BaseGraph(),
-                                cfg_->LdpcConfig(dir).ExpansionFactor())));
+      Agora_memory::Alignment_t::kAlign64, LdpcEncodingParityBufSize(bg, zc)));
   assert(parity_buffer_ != nullptr);
   encoded_buffer_temp_ = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::kAlign64,
-      LdpcEncodingEncodedBufSize(cfg_->LdpcConfig(dir).BaseGraph(),
-                                 cfg_->LdpcConfig(dir).ExpansionFactor())));
+      Agora_memory::Alignment_t::kAlign64, LdpcEncodingEncodedBufSize(bg, zc)));
   assert(encoded_buffer_temp_ != nullptr);
 
-  const size_t scrambler_buffer_bytes =
+  scrambler_buffer_bytes_ =
       cfg_->NumBytesPerCb(dir) + cfg_->NumPaddingBytesPerCb(dir);
 
   scrambler_buffer_ = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::kAlign64, scrambler_buffer_bytes));
-  std::memset(scrambler_buffer_, 0u, scrambler_buffer_bytes);
+      Agora_memory::Alignment_t::kAlign64, scrambler_buffer_bytes_));
+  std::memset(scrambler_buffer_, 0u, scrambler_buffer_bytes_);
 
   assert(scrambler_buffer_ != nullptr);
 }
@@ -55,11 +54,11 @@ DoEncode::~DoEncode() {
 
 EventData DoEncode::Launch(size_t tag) {
   const LDPCconfig& ldpc_config = cfg_->LdpcConfig(dir_);
-  size_t frame_id = gen_tag_t(tag).frame_id_;
-  size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  size_t cb_id = gen_tag_t(tag).cb_id_;
-  size_t cur_cb_id = cb_id % ldpc_config.NumBlocksInSymbol();
-  size_t sched_ue_id = cb_id / ldpc_config.NumBlocksInSymbol();
+  const size_t frame_id = gen_tag_t(tag).frame_id_;
+  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
+  const size_t cb_id = gen_tag_t(tag).cb_id_;
+  const size_t cur_cb_id = cb_id % ldpc_config.NumBlocksInSymbol();
+  const size_t sched_ue_id = cb_id / ldpc_config.NumBlocksInSymbol();
 
   size_t start_tsc = GetTime::WorkerRdtsc();
 
@@ -116,14 +115,14 @@ EventData DoEncode::Launch(size_t tag) {
 
   int8_t* ldpc_input = tx_data_ptr;
   const size_t num_bytes_per_cb = cfg_->NumBytesPerCb(dir_);
-  const size_t num_padding_bytes_per_cb = cfg_->NumPaddingBytesPerCb(dir_);
 
   if (this->cfg_->ScrambleEnabled()) {
     scrambler_->Scramble(scrambler_buffer_, ldpc_input, num_bytes_per_cb);
     ldpc_input = scrambler_buffer_;
   }
-  if (num_padding_bytes_per_cb > 0) {
-    std::memset(&ldpc_input[num_bytes_per_cb], 0u, num_padding_bytes_per_cb);
+  if (scrambler_buffer_bytes_ > num_bytes_per_cb) {
+    std::memset(&ldpc_input[num_bytes_per_cb], 0u,
+                scrambler_buffer_bytes_ - num_bytes_per_cb);
   }
 
   if (kDebugTxData) {

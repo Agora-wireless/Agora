@@ -698,6 +698,30 @@ Config::Config(std::string jsonfilename)
   ul_data_bytes_num_persymbol_ =
       ul_num_bytes_per_cb_ * ul_ldpc_config_.NumBlocksInSymbol();
   ul_mac_packet_length_ = ul_data_bytes_num_persymbol_;
+
+  //((cb_len_bits / zc_size) - 1) * (zc_size / 8) + kProcBytes(32)
+  const size_t ul_ldpc_input_min =
+      (((ul_ldpc_config_.NumCbLen() / ul_ldpc_config_.ExpansionFactor()) - 1) *
+           (ul_ldpc_config_.ExpansionFactor() / 8) +
+       32);
+  const size_t ul_ldpc_sugg_input = LdpcEncodingInputBufSize(
+      ul_ldpc_config_.BaseGraph(), ul_ldpc_config_.ExpansionFactor());
+
+  if (ul_ldpc_input_min >
+      (ul_num_bytes_per_cb_ + ul_num_padding_bytes_per_cb_)) {
+    // Can cause a lot of wasted space, specifically the second argument of the max
+    const size_t increased_padding =
+        Roundup<64>(ul_ldpc_sugg_input) - ul_num_bytes_per_cb_;
+
+    AGORA_LOG_WARN(
+        "LDPC required Input Buffer size exceeds uplink code block size!, "
+        "Increased cb padding from %zu to %zu uplink CB Bytes %zu, LDPC "
+        "Input Min for zc 64:256: %zu\n",
+        ul_num_padding_bytes_per_cb_, increased_padding, ul_num_bytes_per_cb_,
+        ul_ldpc_input_min);
+    ul_num_padding_bytes_per_cb_ = increased_padding;
+  }
+
   // Smallest over the air packet structure
   RtAssert(this->frame_.NumULSyms() == 0 ||
                ul_mac_packet_length_ > sizeof(MacPacketHeaderPacked),
@@ -727,6 +751,29 @@ Config::Config(std::string jsonfilename)
   dl_mac_data_bytes_num_perframe_ =
       dl_mac_data_length_max_ * dl_mac_packets_perframe_;
   dl_mac_bytes_num_perframe_ = dl_mac_packet_length_ * dl_mac_packets_perframe_;
+
+  //((cb_len_bits / zc_size) - 1) * (zc_size / 8) + kProcBytes(32)
+  const size_t dl_ldpc_input_min =
+      (((dl_ldpc_config_.NumCbLen() / dl_ldpc_config_.ExpansionFactor()) - 1) *
+           (dl_ldpc_config_.ExpansionFactor() / 8) +
+       32);
+  const size_t dl_ldpc_sugg_input = LdpcEncodingInputBufSize(
+      dl_ldpc_config_.BaseGraph(), dl_ldpc_config_.ExpansionFactor());
+
+  if (dl_ldpc_input_min >
+      (dl_num_bytes_per_cb_ + dl_num_padding_bytes_per_cb_)) {
+    // Can cause a lot of wasted space, specifically the second argument of the max
+    const size_t increased_padding =
+        Roundup<64>(dl_ldpc_sugg_input) - dl_num_bytes_per_cb_;
+
+    AGORA_LOG_WARN(
+        "LDPC required Input Buffer size exceeds downlink code block size!, "
+        "Increased cb padding from %zu to %zu Downlink CB Bytes %zu, LDPC "
+        "Input Min for zc 64:256: %zu\n",
+        dl_num_padding_bytes_per_cb_, increased_padding, dl_num_bytes_per_cb_,
+        dl_ldpc_input_min);
+    dl_num_padding_bytes_per_cb_ = increased_padding;
+  }
 
   this->running_.store(true);
   /* 12 bit samples x2 for I + Q */
@@ -842,11 +889,9 @@ inline size_t SelectZc(size_t base_graph, size_t code_rate,
   if (zc == SIZE_MAX) {
     AGORA_LOG_WARN(
         "Exceeded possible range of LDPC lifting Zc for " + dir +
-            "! Setting "
-            "lifting size to max possible value(%zu).\nThis may lead to too "
-            "many "
-            "unused subcarriers. For better use of the PHY resources, you may "
-            "reduce your coding or modulation rate.\n",
+            "! Setting lifting size to max possible value(%zu).\nThis may lead "
+            "to too many unused subcarriers. For better use of the PHY "
+            "resources, you may reduce your coding or modulation rate.\n",
         kMaxSupportedZc);
     zc = kMaxSupportedZc;
   }
@@ -1643,8 +1688,8 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
     if (j % ofdm_pilot_spacing_ == 0) {
       csi_buff.at(j) = (bcast_buff_complex[sc_id] / arma::cx_float(p.re, p.im));
     } else {
-      csi_buff.at(j) = csi_buff.at(
-          j - 1);  // TODO: Not correct when 0th subcarrier is not pilot
+      ///\todo not correct when 0th subcarrier is not pilot
+      csi_buff.at(j) = csi_buff.at(j - 1);
       if (j % ofdm_pilot_spacing_ == 1) {
         phase_shift += arg((bcast_buff_complex[sc_id] / csi_buff.at(j)) *
                            arma::cx_float(p.re, -p.im));
@@ -1686,7 +1731,7 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
 void Config::GenBroadcastSlots(
     std::vector<std::complex<int16_t>*>& bcast_iq_samps,
     std::vector<size_t> ctrl_msg) {
-  // TODO: Enable a vector of bytes to TX'edd in each symbol
+  ///\todo enable a vector of bytes to TX'ed in each symbol
   assert(bcast_iq_samps.size() == this->frame_.NumDlControlSyms());
   size_t start_tsc = GetTime::WorkerRdtsc();
 
