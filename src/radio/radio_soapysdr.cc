@@ -791,6 +791,8 @@ void RadioSoapySdr::ConfigureTddModeBs(bool is_ref_radio) {
       sched.replace(s, 1, "R");
     } else if (c == 'D') {
       sched.replace(s, 1, "T");
+    } else if (c == 'S') {
+      sched.replace(s, 1, "T");
     } else if (c != 'B') {
       sched.replace(s, 1, "G");
     }
@@ -865,6 +867,8 @@ void RadioSoapySdr::ConfigureTddModeUe() {
     } else if (c == 'U') {
       tdd_sched.replace(s, 1, "T");
     } else if (c == 'D') {
+      tdd_sched.replace(s, 1, "R");
+    } else if (c == 'S') {
       tdd_sched.replace(s, 1, "R");
     } else if (c != 'P') {
       tdd_sched.replace(s, 1, "G");

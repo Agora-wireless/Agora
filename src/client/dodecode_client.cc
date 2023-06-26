@@ -19,10 +19,11 @@ DoDecodeClient::DoDecodeClient(
     Config* in_config, int in_tid,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffers,
-    PhyStats* in_phy_stats, Stats* in_stats_manager)
+    MacScheduler* mac_sched, PhyStats* in_phy_stats, Stats* in_stats_manager)
     : Doer(in_config, in_tid),
       demod_buffers_(demod_buffers),
       decoded_buffers_(decoded_buffers),
+      mac_sched_(mac_sched),
       phy_stats_(in_phy_stats),
       scrambler_(std::make_unique<AgoraScrambler::Scrambler>()) {
   duration_stat_ = in_stats_manager->GetDurationStat(DoerType::kDecode, in_tid);

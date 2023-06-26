@@ -372,9 +372,9 @@ include_directories(
   src/common/loggers
   src/recorder
   src/mac/
+  src/radio
+  src/radio/radio_set
   src/agora/
-  src/agora/radio
-  src/agora/radio/radio_set
   src/agora/txrx
   src/agora/txrx/workers
   src/client
@@ -412,13 +412,14 @@ set(COMMON_SOURCES
   src/common/crc.cc
   src/common/memory_manage.cc
   src/common/scrambler.cc
-  src/agora/radio/radio.cc
-  src/agora/radio/radio_soapysdr.cc
-  src/agora/radio/radio_data_plane.cc
-  src/agora/radio/radio_socket.cc
-  src/agora/radio/radio_data_plane_soapy.cc
-  src/agora/radio/radio_data_plane_socket.cc
-  src/agora/radio/radio_set/radio_set.cc
+  src/radio/radio.cc
+  src/radio/radio_soapysdr.cc
+  src/radio/radio_data_plane.cc
+  src/radio/radio_socket.cc
+  src/radio/radio_data_plane_soapy.cc
+  src/radio/radio_data_plane_socket.cc
+  src/radio/radio_set/radio_set.cc
+  src/mac/mac_scheduler.cc
   src/common/ipc/udp_comm.cc
   src/common/ipc/network_utils.cc
   src/common/loggers/csv_logger.cc
@@ -448,11 +449,12 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/agora_worker.cc
   src/agora/dofft.cc
   src/agora/doifft.cc
+  src/agora/dobroadcast.cc
   src/agora/dobeamweights.cc
   src/agora/dodemul.cc
   src/agora/doprecode.cc
   src/agora/dodecode.cc
-  src/agora/radio/radio_set/radio_set_bs.cc
+  src/radio/radio_set/radio_set_bs.cc
   src/mac/mac_thread_basestation.cc
   src/agora/txrx/packet_txrx_sim.cc
   src/agora/txrx/packet_txrx_radio.cc
@@ -463,9 +465,9 @@ add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
 set(CLIENT_SOURCES
   ${PUREUHD_SOURCES_CLIENT}
+  src/radio/radio_set/radio_set_ue.cc
   src/client/doifft_client.cc
   src/client/dodecode_client.cc
-  src/client/radio_set_ue.cc
   src/client/ue_worker.cc
   src/client/phy-ue.cc
   src/client/txrx/packet_txrx_client_sim.cc
@@ -491,10 +493,10 @@ add_executable(agora
 target_link_libraries(agora ${COMMON_LIBS})
 
 add_executable(calibrate
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/calibrate_main.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/radio_set_calibrate.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/radio_calibrate_digital.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/radio_calibrate_analog.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/radio/radio_set/calibrate_main.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/radio/radio_set/radio_set_calibrate.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/radio/radio_set/radio_calibrate_digital.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/radio/radio_set/radio_calibrate_analog.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(calibrate ${COMMON_LIBS})
 target_compile_definitions(calibrate PRIVATE CALIBRATE)
@@ -582,7 +584,7 @@ endforeach()
 set(UNIT_TESTS test_armadillo test_datatype_conversion test_udp_client_server
   test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
   test_ptr_grid test_avx512_complex_mul test_scrambler
-  test_256qam_demod)
+  test_256qam_demod test_ctrl_channel)
 
 foreach(test_name IN LISTS UNIT_TESTS)
   add_executable(${test_name}

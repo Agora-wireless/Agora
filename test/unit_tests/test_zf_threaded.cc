@@ -62,7 +62,7 @@ void MasterToWorkerDynamicWorker(
     Table<complex_float>& calib_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices,
-    PhyStats* phy_stats, Stats* stats) {
+    MacScheduler* mac_sched, PhyStats* phy_stats, Stats* stats) {
   PinToCoreWithOffset(ThreadType::kWorker, cfg->CoreOffset() + 1, worker_id);
 
   // Wait for all threads (including master) to start runnung
@@ -74,7 +74,7 @@ void MasterToWorkerDynamicWorker(
   auto compute_beam = std::make_unique<DoBeamWeights>(
       cfg, worker_id, csi_buffers, calib_dl_buffer, calib_ul_buffer,
       calib_dl_msum_buffer, calib_ul_msum_buffer, calib_buffer,
-      ul_beam_matrices, dl_beam_matrices, phy_stats, stats);
+      ul_beam_matrices, dl_beam_matrices, mac_sched, phy_stats, stats);
 
   size_t start_tsc = GetTime::Rdtsc();
   size_t num_tasks = 0;
@@ -142,6 +142,8 @@ TEST(TestZF, VaryingConfig) {
 
   calib_buffer.RandAllocCxFloat(kFrameWnd, kMaxDataSCs * kMaxAntennas,
                                 Agora_memory::Alignment_t::kAlign64);
+
+  auto mac_sched = std::make_unique<MacScheduler>(cfg.get());
   auto phy_stats = std::make_unique<PhyStats>(cfg.get(), Direction::kUplink);
   auto stats = std::make_unique<Stats>(cfg.get());
 
@@ -150,13 +152,14 @@ TEST(TestZF, VaryingConfig) {
                        std::ref(event_queue), std::ref(complete_task_queue));
 
   for (size_t i = 0; i < kNumWorkers; i++) {
-    threads.emplace_back(
-        MasterToWorkerDynamicWorker, cfg.get(), i, std::ref(event_queue),
-        std::ref(complete_task_queue), ptoks[i], std::ref(csi_buffers),
-        std::ref(calib_dl_buffer), std::ref(calib_ul_buffer),
-        std::ref(calib_dl_msum_buffer), std::ref(calib_ul_msum_buffer),
-        std::ref(calib_buffer), std::ref(ul_beam_matrices),
-        std::ref(dl_beam_matrices), phy_stats.get(), stats.get());
+    threads.emplace_back(MasterToWorkerDynamicWorker, cfg.get(), i,
+                         std::ref(event_queue), std::ref(complete_task_queue),
+                         ptoks[i], std::ref(csi_buffers),
+                         std::ref(calib_dl_buffer), std::ref(calib_ul_buffer),
+                         std::ref(calib_dl_msum_buffer),
+                         std::ref(calib_ul_msum_buffer), std::ref(calib_buffer),
+                         std::ref(ul_beam_matrices), std::ref(dl_beam_matrices),
+                         mac_sched.get(), phy_stats.get(), stats.get());
   }
   for (auto& thread : threads) {
     thread.join();

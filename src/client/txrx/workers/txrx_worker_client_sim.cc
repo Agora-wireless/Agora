@@ -114,11 +114,22 @@ std::vector<Packet*> TxRxWorkerClientSim::RecvEnqueue(size_t interface_id) {
           "TxRxWorkerClientSim[%zu]: Received frame %d, symbol %d, ant %d\n",
           tid_, pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
     }
-    // Push kPacketRX event into the queue.
-    const EventData rx_message(EventType::kPacketRX,
-                               rx_tag_t(rx_placement).tag_);
-    NotifyComplete(rx_message);
-    rx_packets.push_back(pkt);
+    size_t symbol_id = pkt->symbol_id_;
+    if (Configuration()->GetSymbolType(symbol_id) == SymbolType::kControl) {
+      size_t ctrl_frame_id = Configuration()->DecodeBroadcastSlots(pkt->data_);
+      if (ctrl_frame_id != pkt->frame_id_) {
+        AGORA_LOG_ERROR(
+            "RecvEnqueue: Ctrl channel frame_id mismatch error (%zu/%zu)!\n",
+            ctrl_frame_id, pkt->frame_id_);
+      }
+      ReturnRxPacket(rx_placement);
+    } else {
+      // Push kPacketRX event into the queue.
+      const EventData rx_message(EventType::kPacketRX,
+                                 rx_tag_t(rx_placement).tag_);
+      NotifyComplete(rx_message);
+      rx_packets.push_back(pkt);
+    }
   } else if (0 > rx_bytes) {
     AGORA_LOG_ERROR("RecvEnqueue: Udp Recv failed with error\n");
     throw std::runtime_error("TxRxWorkerClientSim: recv failed");

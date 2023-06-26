@@ -114,7 +114,7 @@ class ChSimWorkerStorage {
 
 class ChSimRxBuffer {
  public:
-  enum ChSimRxType { kRxTypePilotUl, kRxTypeBeaconDl };
+  enum ChSimRxType { kRxTypePilotUl, kRxTypeBcastDl };
   ChSimRxBuffer(ChSimRxType type, const Config* cfg, size_t max_frames,
                 size_t max_symbols, size_t max_antennas,
                 size_t symbol_size_bytes)
@@ -153,7 +153,7 @@ class ChSimRxBuffer {
   inline size_t GetSymbolIdx(size_t symbol_id) const {
     if (type_ == ChSimRxType::kRxTypePilotUl) {
       return cfg_->GetPilotUlIdx(symbol_id);
-    } else if (type_ == ChSimRxType::kRxTypeBeaconDl) {
+    } else if (type_ == ChSimRxType::kRxTypeBcastDl) {
       return cfg_->GetBeaconDlIdx(symbol_id);
     } else {
       return SIZE_MAX;
