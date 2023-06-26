@@ -330,10 +330,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       for (size_t j = this->cfg_->OfdmDataStart();
            j < this->cfg_->OfdmDataStop();
            j += this->cfg_->PilotScGroupSize()) {
-        pilots_f_ue.at(i + j) = pilot_fd.at(i + j); // not sure if this fixes the freq orthogonal pilot issue too.
+        pilots_f_ue.at(i + j) = pilot_fd.at(i + j); 
       }
       // Load pilots
-      std::memcpy(tx_data_all_symbols[pilot_sym_id] +
+      std::memcpy(tx_data_all_symbols[pilot_sym_id] + // not sure if this fixes the freq orthogonal pilot issue too.
                       (i * this->cfg_->OfdmCaNum()),
                   &pilots_f_ue.at(0),
                   (this->cfg_->OfdmCaNum() * sizeof(complex_float)));
