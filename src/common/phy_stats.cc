@@ -151,8 +151,8 @@ void PhyStats::PrintPhyStats() {
       size_t total_bit_errors(0);
       size_t total_decoded_blocks(0);
       size_t total_block_errors(0);
-      size_t true_total_block_errors(0);
-      size_t true_total_decoded_bits(0);
+      [[maybe_unused]] size_t true_total_block_errors(0);
+      [[maybe_unused]] size_t true_total_decoded_bits(0);
       size_t true_total_bit_errors(0);
 
       for (size_t i = 0u; i < task_buffer_symbol_num; i++) {

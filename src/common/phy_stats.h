@@ -52,6 +52,7 @@ class PhyStats {
   void UpdateDlPilotSnr(size_t frame_id, size_t symbol_id, size_t ant_id,
                         complex_float* fft_data);
   void PrintUlSnrStats(size_t frame_id);
+  void PrintDlSnrStats(size_t frame_id, const arma::uvec& ue_list);
   void PrintDlSnrStats(size_t frame_id);
   void RecordPilotSnr(size_t frame_id);
   void UpdateCalibPilotSnr(size_t frame_id, size_t calib_sym_id, size_t ant_id,
