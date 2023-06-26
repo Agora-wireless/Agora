@@ -324,22 +324,24 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
   if (this->cfg_->FreqOrthogonalPilot()) {
     for (size_t i = 0; i < this->cfg_->UeAntNum(); i++) {
+      const size_t pilot_sym_id = this->cfg_->Frame().GetPilotSymbol(i);
       std::vector<complex_float> pilots_f_ue(
           this->cfg_->OfdmCaNum());  // Zeroed
       for (size_t j = this->cfg_->OfdmDataStart();
            j < this->cfg_->OfdmDataStop();
            j += this->cfg_->PilotScGroupSize()) {
-        pilots_f_ue.at(i + j) = pilot_fd.at(i + j);
+        pilots_f_ue.at(i + j) = pilot_fd.at(i + j); // not sure if this fixes the freq orthogonal pilot issue too.
       }
       // Load pilots
-      std::memcpy(tx_data_all_symbols[this->cfg_->Frame().NumBeaconSyms()] +
+      std::memcpy(tx_data_all_symbols[pilot_sym_id] +
                       (i * this->cfg_->OfdmCaNum()),
                   &pilots_f_ue.at(0),
                   (this->cfg_->OfdmCaNum() * sizeof(complex_float)));
     }
   } else {
     for (size_t i = 0; i < this->cfg_->UeAntNum(); i++) {
-      std::memcpy(tx_data_all_symbols[i + this->cfg_->Frame().NumBeaconSyms()] +
+      const size_t pilot_sym_id = this->cfg_->Frame().GetPilotSymbol(i);
+      std::memcpy(tx_data_all_symbols[pilot_sym_id] +
                       i * this->cfg_->OfdmCaNum(),
                   &pilot_fd.at(0),
                   (this->cfg_->OfdmCaNum() * sizeof(complex_float)));
