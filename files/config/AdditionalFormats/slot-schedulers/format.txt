@@ -1,2 +1,0 @@
-each "slot scheduler" should correspond to 2 slots out of a 10 slot frame 
-utilizing 140 symbols as per the corresponding standard 5G NR format.

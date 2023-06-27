@@ -26,7 +26,7 @@
 using json = nlohmann::json;
 
 static constexpr size_t kMacAlignmentBytes = 64u;
-static constexpr bool kDebugPrintConfiguration = true;
+static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
 
