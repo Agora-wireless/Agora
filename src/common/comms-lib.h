@@ -105,7 +105,9 @@ class CommsLib {
       const std::vector<std::complex<float>>& in);
   static std::vector<complex_float> FFTShift(
       const std::vector<complex_float>& in);
-  static void FFTShift(complex_float* in, int fft_size);
+
+  static void FFTShift(complex_float* inout, complex_float* tmp, int fft_size);
+  static void FFTShift(complex_float* inout, int fft_size);
 
   static float ComputeOfdmSnr(const std::vector<std::complex<float>>& data_t,
                               size_t data_start_index, size_t data_stop_index);

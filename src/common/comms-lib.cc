@@ -572,12 +572,26 @@ MKL_LONG CommsLib::FFT(complex_float* in_out, int fft_size) {
   return status;
 }
 
-void CommsLib::FFTShift(complex_float* in, int fft_size) {
+/* \brief fftshifts the input memory and places the result in the same memory
+ *        Use this version to prevent the memory allocation.  
+ * \param complex_float* inout pre shifted fft input, shifted fft output
+ * \param complex_float* tmp must be fft_size / 2 large and used for scratch memory
+ * \param int fft_size size of the fft
+ */
+void CommsLib::FFTShift(complex_float* inout, complex_float* tmp,
+                        int fft_size) {
+  std::memcpy(tmp, inout + (fft_size / 2), sizeof(float) * fft_size);
+  std::memcpy(inout + (fft_size / 2), inout, sizeof(float) * fft_size);
+  std::memcpy(inout, tmp, sizeof(float) * fft_size);
+}
+
+/* \brief fftshifts the input memory and places the result in the same memory 
+ * \param complex_float* inout pre shifted fft input, shifted fft output
+ * \param int fft_size size of the fft
+ */
+void CommsLib::FFTShift(complex_float* inout, int fft_size) {
   std::vector<complex_float> tmp_fft(fft_size / 2);
-  auto* tmp = reinterpret_cast<complex_float*>(tmp_fft.data());
-  std::memcpy(tmp, in + fft_size / 2, sizeof(float) * fft_size);
-  std::memcpy(in + fft_size / 2, in, sizeof(float) * fft_size);
-  std::memcpy(in, tmp, sizeof(float) * fft_size);
+  FFTShift(inout, tmp_fft.data(), fft_size);
 }
 
 std::vector<std::complex<float>> CommsLib::FFTShift(
