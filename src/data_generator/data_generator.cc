@@ -294,6 +294,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
                              Agora_memory::Alignment_t::kAlign64);
 
   if (this->cfg_->FreqOrthogonalPilot()) {
+    const size_t pilot_sym_idx = this->cfg_->Frame().GetPilotSymbol(0);
+    RtAssert(this->cfg_->Frame().NumPilotSyms() == 1,
+             "Number of pilot symbols must be 1");
     for (size_t i = 0; i < this->cfg_->UeAntNum(); i++) {
       std::vector<complex_float> pilots_f_ue(
           this->cfg_->OfdmCaNum());  // Zeroed
@@ -303,17 +306,17 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pilots_f_ue.at(i + j) = pilot_fd.at(i + j);
       }
       // Load pilots
-      std::memcpy(tx_data_all_symbols[this->cfg_->Frame().NumBeaconSyms()] +
-                      (i * this->cfg_->OfdmCaNum()),
-                  &pilots_f_ue.at(0),
-                  (this->cfg_->OfdmCaNum() * sizeof(complex_float)));
+      std::memcpy(
+          tx_data_all_symbols[pilot_sym_idx] + (i * this->cfg_->OfdmCaNum()),
+          &pilots_f_ue.at(0),
+          (this->cfg_->OfdmCaNum() * sizeof(complex_float)));
     }
   } else {
     for (size_t i = 0; i < this->cfg_->UeAntNum(); i++) {
-      std::memcpy(tx_data_all_symbols[i + this->cfg_->Frame().NumBeaconSyms()] +
-                      i * this->cfg_->OfdmCaNum(),
-                  &pilot_fd.at(0),
-                  (this->cfg_->OfdmCaNum() * sizeof(complex_float)));
+      const size_t pilot_sym_idx = this->cfg_->Frame().GetPilotSymbol(i);
+      std::memcpy(
+          tx_data_all_symbols[pilot_sym_idx] + i * this->cfg_->OfdmCaNum(),
+          &pilot_fd.at(0), (this->cfg_->OfdmCaNum() * sizeof(complex_float)));
     }
   }
 
@@ -328,7 +331,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
                     ue_specific_pilot[j],
                     this->cfg_->OfdmDataNum() * sizeof(complex_float));
       } else {
-        size_t k = i - this->cfg_->Frame().ClientUlPilotSymbols();
+        const size_t k = i - this->cfg_->Frame().ClientUlPilotSymbols();
         std::memcpy(
             tx_data_all_symbols[data_sym_id] + (j * this->cfg_->OfdmCaNum()),
             &pre_ifft_data_syms.at(k * this->cfg_->UeAntNum() + j).at(0),

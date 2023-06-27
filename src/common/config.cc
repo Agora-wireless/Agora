@@ -1672,8 +1672,8 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
   CommsLib::FFTShift(bcast_fft_buff, ofdm_ca_num_);
   auto* bcast_buff_complex = reinterpret_cast<arma::cx_float*>(bcast_fft_buff);
 
-  size_t sc_num = GetOFDMCtrlNum();
-  size_t ctrl_sc_num =
+  const size_t sc_num = GetOFDMCtrlNum();
+  const size_t ctrl_sc_num =
       dl_bcast_ldpc_config_.NumCbCodewLen() / dl_bcast_mod_order_bits_;
   std::vector<arma::cx_float> csi_buff(ofdm_data_num_);
   arma::cx_float* eq_buff =
@@ -1711,7 +1711,7 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
   Demodulate(reinterpret_cast<float*>(&eq_buff[0]), demod_buff_ptr,
              2 * ctrl_sc_num, dl_bcast_mod_order_bits_, false);
 
-  int num_bcast_bytes = BitsToBytes(dl_bcast_ldpc_config_.NumCbLen());
+  const int num_bcast_bytes = BitsToBytes(dl_bcast_ldpc_config_.NumCbLen());
   std::vector<uint8_t> decode_buff(num_bcast_bytes, 0u);
 
   DataGenerator::GetDecodedData(demod_buff_ptr, &decode_buff.at(0),
@@ -1720,7 +1720,7 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
   FreeBuffer1d(&bcast_fft_buff);
   FreeBuffer1d(&eq_buff);
   FreeBuffer1d(&demod_buff_ptr);
-  double duration =
+  const double duration =
       GetTime::CyclesToUs(GetTime::WorkerRdtsc() - start_tsc, freq_ghz_);
   if (kDebugPrintInTask) {
     std::printf("DecodeBroadcast completed in %2.2f us\n", duration);
@@ -1733,7 +1733,7 @@ void Config::GenBroadcastSlots(
     std::vector<size_t> ctrl_msg) {
   ///\todo enable a vector of bytes to TX'ed in each symbol
   assert(bcast_iq_samps.size() == this->frame_.NumDlControlSyms());
-  size_t start_tsc = GetTime::WorkerRdtsc();
+  const size_t start_tsc = GetTime::WorkerRdtsc();
 
   int num_bcast_bytes = BitsToBytes(dl_bcast_ldpc_config_.NumCbLen());
   std::vector<int8_t> bcast_bits_buffer(num_bcast_bytes, 0);
@@ -1744,7 +1744,7 @@ void Config::GenBroadcastSlots(
   for (size_t i = 0; i < this->frame_.NumDlControlSyms(); i++) {
     std::memcpy(bcast_bits_buffer.data(), ctrl_msg.data(), sizeof(size_t));
 
-    auto coded_bits_ptr = DataGenerator::GenCodeblock(
+    const auto coded_bits_ptr = DataGenerator::GenCodeblock(
         dl_bcast_ldpc_config_, &bcast_bits_buffer.at(0), num_bcast_bytes,
         scramble_enabled_);
 
@@ -1764,7 +1764,7 @@ void Config::GenBroadcastSlots(
                       dl_bcast_scale);
   }
   dl_bcast_mod_table.Free();
-  double duration =
+  const double duration =
       GetTime::CyclesToUs(GetTime::WorkerRdtsc() - start_tsc, freq_ghz_);
   if (kDebugPrintInTask) {
     std::printf("GenBroadcast completed in %2.2f us\n", duration);
