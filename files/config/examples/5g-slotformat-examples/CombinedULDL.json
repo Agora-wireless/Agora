@@ -8,11 +8,11 @@
         "ref_ant": 0,
         "external_ref_node": false,
         "channel": "A",
-        "sample_rate": 5e6,
+        "sample_rate": 15.36e6,
         "demul_block_size": 48,
         "cp_size": 128,
-        "fft_size": 2048,
-        "ofdm_data_num": 768,
+        "fft_size": 1024,
+        "ofdm_data_num": 304,
         "channel_bandwidth": 20e6,
         "ofdm_pilot_spacing": 16,
         /*  (fft_size - ofdm_data_num_) / 2 */
@@ -85,6 +85,6 @@
         "core_offset": 12,
         "worker_thread_num": 30,
         "socket_thread_num": 4,
-        "max_frame": 9600
+        "max_frame": 100
       }
       

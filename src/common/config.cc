@@ -46,15 +46,17 @@ static const size_t kFlexibleSlotFormatIdx = 2;
 static const size_t kSubframesPerFrame = 10;
 
 
-//Version of 5G function that handles explicit frame_schedule
 
-std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size, double sampling_rate, double CBW,
-std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table, std::vector<std::string> flex_formats);
+std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub,
+ size_t fft_size, double sampling_rate, double CBW,
+std::string frame_schedule, size_t user_num, std::map<int,
+ std::string> format_table, std::vector<std::string> flex_formats);
 
-// Form the beacon subframe based on the specified 5G slot / subframe format
-std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, std::string> format_table);
-// Expand the slot configuration to a symbols configuration
-std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table, std::vector<std::string> flex_formats);
+std::string formBeaconSubframe(int format_num, size_t user_num, 
+ std::map<int, std::string> format_table);
+
+std::string formFrame(std::string frame_schedule, size_t user_num, 
+ std::map<int, std::string> format_table, std::vector<std::string> flex_formats);
 
 Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -76,7 +78,6 @@ Config::Config(std::string jsonfilename)
   Are represented here by a guard symbol G. Also, format 2 is
   handled separately and so is not included in this table.
   */ 
-
   format_table[0] = "DDDDDDDDDDDDDD";
   format_table[1] = "UUUUUUUUUUUUUU";
   format_table[3] = "DDDDDDDDDDDDDG";
@@ -284,11 +285,11 @@ Config::Config(std::string jsonfilename)
     client_rx_gain_b_.assign(gain_rx_json_b.begin(), gain_rx_json_b.end());
   }
 
-  //0 is currently the only suported numerology.
+  //0 is currently the only suported 5G numerology.
   numerology = tdd_conf.value("numerology", 0);
   RtAssert(numerology == 0, "Numerology not equal to zero.\n");
 
-  CBW = tdd_conf.value("channel_bandwidth", 0); // 0 means no CBW specified.
+  CBW = tdd_conf.value("channel_bandwidth", 0);
   rate_ = tdd_conf.value("sample_rate", 5e6);
   nco_ = tdd_conf.value("nco_frequency", 0.75 * rate_);
   bw_filter_ = rate_ + 2 * nco_;
@@ -596,9 +597,6 @@ Config::Config(std::string jsonfilename)
            "Number of UL pilot symbol exceeds number of UL symbols!");
 
   frame_.SetClientPilotSyms(client_ul_pilot_syms, client_dl_pilot_syms);
-
-  std::cout << "Num pilot syms: " << frame_.NumPilotSyms() << ".\n" << std::flush;
-
 
   if ((freq_orthogonal_pilot_ == false) &&
       (ue_ant_num_ != frame_.NumPilotSyms())) {
@@ -1757,22 +1755,12 @@ void Config::Print() const {
   }
 }
 
-/**
- * Requires: numerology
- *           num_ofdm_data_sub
- *           fft_size
- *           sampling_rate
- *           CBW: Channel bandwidth
- *           frame_schedule
- *           user_num
- *           format_table
- *           flex_formats
- *            .
- * 
+/** 
  * Effects: Verifies that the passed specs are 5G compliant and compatible
  *          with eachother and returns a 5G formated frame.
 */
-std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size, double sampling_rate, double CBW,
+std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub,
+ size_t fft_size, double sampling_rate, double CBW,
  std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table, std::vector<std::string> flex_formats) {
   double GB; //Guardband.
   double TBW; //Transmission bandwidth.
@@ -1789,11 +1777,14 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size
 
   RtAssert(CBW != 0, "Channel Bandwidth isn't specified!\n");
 
-  RtAssert(num_symbols <= kMaxSymbols, "Number of symbols exceeded "+ std::to_string(kMaxSymbols) + " symbols.\n");
+  RtAssert(num_symbols <= kMaxSymbols, "Number of symbols exceeded " +
+   std::to_string(kMaxSymbols) + " symbols.\n");
 
-  RtAssert(!(num_ofdm_data_sub % 16), "The given number of ofdm data subcarriers is not divisible by 16.\n");
+  RtAssert(!(num_ofdm_data_sub % 16), "The given number of ofdm data "
+   "subcarriers is not divisible by 16.\n");
 
-  RtAssert(fft_size > num_ofdm_data_sub, "The fft_size is smaller than the number of subcarriers.\n");
+  RtAssert(fft_size > num_ofdm_data_sub, "The fft_size is smaller than the "
+   "number of subcarriers.\n");
 
   for (size_t i = 0; i < valid_ffts.size(); i++) {
     if (fft_size == valid_ffts.at(i)) {
@@ -1816,29 +1807,20 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub, size_t fft_size
   */ 
 
   TBW = num_ofdm_data_sub * scs;
-
-    //CBW must be in MHz and SCS must be in Khz
+  //CBW must be in MHz and SCS must be in Khz
   GB = (1e3) * (1000 * (CBW / 1e6) - (num_ofdm_data_sub + 1) * (scs / 1e3)) / 2;
-  
   RtAssert(CBW > TBW + 2*GB, "Specified CBW is smaller than required theoretical value.\n");
-
   frame_schedule = formFrame(frame_schedule, user_num, format_table, flex_formats);
 
   return frame_schedule;
 }
 
 /**
- * Requires: A valid format number specifying the 5G NR slot format to use,
- * a valid user num less than 13 representing the number of users (and 
- * hence pilot symbols) needed by the subframe and a slot format_table.
- * 
  * Effects: Generates a subframe that transmits a beacon symbol and as many
  * pilot symbols as there are users.
 */
-
 std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, std::string> format_table) {
   std::string subframe = format_table[format_num];
-
   size_t pilot_num = 0;
 
   RtAssert(subframe.at(0) == 'D', "First symbol of selected format doesn't start with a downlink symbol.");
@@ -1850,43 +1832,34 @@ std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, st
 
   //Add in the pilot symbols.
   for (unsigned int i = 2; i < subframe.size(); i++) {
-
-    /*
-     Break once user_num many pilot_nums have been put in the beacon subframe.
-    */
+    // Break once user_num many pilot_nums have been put in the beacon subframe.
     if (pilot_num >= user_num) {
       break;
     }
-
     /*
     If the last symbol of the first slot is a D and this D is not overwritten
-    by a pilot and the first symbols of the next slot is a U we might get a DU 
-    pair which could cause an error.
+    by a pilot and the first symbol of the next slot is a U we might get a DU 
+    pair in the frame which could cause a problem.
     */
     subframe.replace(i, 1, "P");
     pilot_num++;
-
   }
   return subframe;
 }
 
 
 /**
- * Requires: frame_schedule
- *           user_num
- *           format_table
- *           flex_formats
- *            .
- * 
  * Effects: Builds a symbol based frame which Agora is built to handle from the 
  *          slot format based frame given in the frame schedule.
 */
-std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table, std::vector<std::string> flex_formats) {
+std::string formFrame(std::string frame_schedule, size_t user_num,std::map<int,
+ std::string> format_table, std::vector<std::string> flex_formats) {
   std::string frame;
   std::string temp = "";
   int subframes[kSubframesPerFrame]; // Update this hardcoded value to a var.
   int subframe_idx = 0;
-  
+  size_t flex_format_idx = 0;
+
   for (unsigned int i = 0; i < frame_schedule.size(); i++) {
 
     // Throw an error if the input frame schedule has more than 10 subframes.
@@ -1913,40 +1886,30 @@ std::string formFrame(std::string frame_schedule, size_t user_num, std::map<int,
 
     if (i == frame_schedule.size()-1) {
       subframes[subframe_idx] = std::stoi(temp);
-  
     }
-      
   }
 
   // Create the frame based on the format nums in the subframe array.
-
   frame += formBeaconSubframe(subframes[0], user_num, format_table);
-
-  size_t flex_format_idx = 0;
 
   for (size_t i = 1; i < kSubframesPerFrame; i++) {  
     try {
       if (subframes[i] == kFlexibleSlotFormatIdx) {
         frame += flex_formats.at(flex_format_idx);
         flex_format_idx++;
-        
-
       } else {
         frame += format_table.at(subframes[i]);
       }
-      
+ 
     } catch (std::out_of_range &e) {
-
       std::string error_message = "User specified a non supported subframe "
       "format.\nCurrently supported subframe formats are:";
 
       for (auto format = format_table.begin(); format != format_table.end(); format++) {
         error_message += std::to_string(format->first) + " " + format->second + ".\n";
       }
-
       throw std::runtime_error(error_message);
     }
-    
   }
   return frame;
 }

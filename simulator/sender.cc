@@ -549,33 +549,22 @@ uint64_t Sender::GetTicksForFrame(size_t frame_id) const {
 }
 
 void Sender::InitIqFromFile(const std::string& filename) {
-  std::cout << "Inside InitIQFromFile\n" << std::flush;
   const size_t packets_per_frame =
       cfg_->Frame().NumTotalSyms() * cfg_->BsAntNum();
   iq_data_short_.Calloc(packets_per_frame, (cfg_->SampsPerSymbol()) * 2,
                         Agora_memory::Alignment_t::kAlign64);
-  std::cout << "Defined packets per frame\n" << std::flush;
 
   Table<float> iq_data_float;
   iq_data_float.Calloc(packets_per_frame, (cfg_->SampsPerSymbol()) * 2,
                        Agora_memory::Alignment_t::kAlign64);
-
-  std::cout << "iq_data_float\n" << std::flush;
-
   FILE* fp = std::fopen(filename.c_str(), "rb");
   RtAssert(fp != nullptr, "Failed to open IQ data file");
-
-  std::cout << "opened file\n" << std::flush;
 
 
   for (size_t i = 0; i < packets_per_frame; i++) {
     const size_t expected_count = (cfg_->SampsPerSymbol()) * 2;
     const size_t actual_count =
         std::fread(iq_data_float[i], sizeof(float), expected_count, fp);
-
-        
-
-        //std::cout << "doing packet" << i <<  "\n" << std::flush;
 
     if (expected_count != actual_count) {
       std::fprintf(
@@ -586,13 +575,11 @@ void Sender::InitIqFromFile(const std::string& filename) {
       throw std::runtime_error("Sender: Failed to read IQ data file");
     }
     if (kUse12BitIQ) {
-      //std::cout << "kUse12BitIQ.\n";
       // Adapt 32-bit IQ samples to 24-bit to reduce network throughput
       ConvertFloatTo12bitIq(iq_data_float[i],
                             reinterpret_cast<uint8_t*>(iq_data_short_[i]),
                             expected_count);
     } else {
-      //std::cout << "In the else statement.\n";
       SimdConvertFloatToShort(iq_data_float[i], iq_data_short_[i],
                               expected_count);
     }
@@ -625,7 +612,6 @@ void Sender::WriteStatsToFile(size_t tx_frame_count) const {
 
 void Sender::RunFft(Packet* pkt, complex_float* fft_inout,
                     DFTI_DESCRIPTOR_HANDLE mkl_handle) const {
-  //std::cout << "In RunFFT.\n" << std::flush;
   // pkt->data has (cp_len + ofdm_ca_num) unsigned short samples. After FFT,
   // we'll remove the cyclic prefix and have ofdm_ca_num() short samples left.
   SimdConvertShortToFloat(&pkt->data_[2 * cfg_->CpLen()],

@@ -216,16 +216,9 @@ EventData DoFFT::Launch(size_t tag) {
     // TODO 1. allow pilot sc group size different than kTransposeBlockSize
     // TODO 2. potential use of multiple pilot symbols
     // TODO 3. interpolation of CSI in gap subcarriers
-
-    if (cfg_->FreqOrthogonalPilot()) {
-      std::cout<<"Freq Orthagonal Pilot is true.\n";
-    }
-
-
     if (cfg_->FreqOrthogonalPilot() &&
         pilot_symbol_id == cfg_->Frame().NumPilotSyms() - 1) {
 
-      std::cout<<"This is probably the issue\n" << std::flush;
       const size_t num_blocks = cfg_->OfdmDataNum() / kTransposeBlockSize;
       for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
         const size_t block_base_offset =

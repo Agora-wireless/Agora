@@ -323,16 +323,11 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
                              Agora_memory::Alignment_t::kAlign64);
 
   if (this->cfg_->FreqOrthogonalPilot()) {
-    std::cout<<"In freq orthagonal pilot!\n" << std::flush;
     const size_t pilot_sym_id = cfg_->Frame().GetPilotSymbol(0);
     RtAssert(this->cfg_->Frame().NumPilotSyms() == 1, 
     "Number of Pilot Symbols assumed to be 1.");
 
-    std::cout<<"Number of UE Ant Num: " << std::to_string(this->cfg_->UeAntNum()) << std::endl << std::flush;
     for (size_t i = 0; i < this->cfg_->UeAntNum(); i++) {
-      std::cout<<"Getting pilot symbol" << std::endl << std::flush;
-      std::cout<<"Pilot symbol ID " << std::to_string(pilot_sym_id) << std::endl << std::flush;
-
       std::vector<complex_float> pilots_f_ue(
           this->cfg_->OfdmCaNum());  // Zeroed
       for (size_t j = this->cfg_->OfdmDataStart();
@@ -341,9 +336,6 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pilots_f_ue.at(i + j) = pilot_fd.at(i + j); 
       }
       
-      std::cout<<"In freq orthagonal pilot 2!\n" << std::flush;
-      std::cout<<"i: " << std::to_string(i) << std::endl << std::flush;
-
       // Load pilots
       std::memcpy(tx_data_all_symbols[pilot_sym_id] +
                       (i * this->cfg_->OfdmCaNum()),
@@ -359,9 +351,6 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
                   (this->cfg_->OfdmCaNum() * sizeof(complex_float)));
     }
   }
-
-  std::cout<<"Outside of freq orthagonal pilot!\n" << std::flush;
-
 
   // Populate the UL symbols
   for (size_t i = 0; i < this->cfg_->Frame().NumULSyms(); i++) {
