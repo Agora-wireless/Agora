@@ -12,3 +12,26 @@ make -j`nproc`
 sudo make install
 cd ../..
 sudo ldconfig
+
+#SoapyRemote
+git clone --branch soapy-remote-0.5.2 --depth 1 --single-branch https://github.com/pothosware/SoapyRemote.git
+cd SoapyRemote
+mkdir -p build
+cd build
+cmake ../
+make -j`nproc`
+sudo make install
+cd ../..
+sudo ldconfig
+
+#Iris drivers
+git clone --branch bypass-socket-mod --depth 1 --single-branch https://github.com/Agora-wireless/sklk-soapyiris.git
+cd sklk-soapyiris
+mkdir -p build
+cd build
+cmake ../
+make -j`nproc`
+sudo make install
+cd ../..
+sudo ldconfig
+
