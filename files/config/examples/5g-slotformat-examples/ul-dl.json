@@ -82,7 +82,7 @@
         "bs_mac_tx_port": 9170,
         "ue_mac_rx_port": 8080,
         "ue_mac_tx_port": 8180,
-        "core_offset": 12,
+        "core_offset": 6,
         "worker_thread_num": 30,
         "socket_thread_num": 4,
         "max_frame": 9600

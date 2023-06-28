@@ -4,7 +4,7 @@
         "cells": 1,
         "bs_radio_num": 8,
         "ue_radio_num": 8,  
-        "sample_rate": 5e6,
+        "sample_rate": 15.36e6,
         "demul_block_size": 48,
         "cp_size": 128,
         "fft_size": 1024,
@@ -78,9 +78,9 @@
         "bs_mac_tx_port": 9170,
         "ue_mac_rx_port": 8080,
         "ue_mac_tx_port": 8180,
-        "core_offset": 4,
+        "core_offset": 6,
         "worker_thread_num": 24,
         "socket_thread_num": 4,
-        "max_frame": 1000
+        "max_frame": 9600
       }
       
