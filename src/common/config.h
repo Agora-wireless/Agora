@@ -602,11 +602,18 @@ class Config {
   }
 
   inline size_t GetOFDMDataIndex(size_t sc_id) const {
-    return symbol_data_id_.at(sc_id);
+    return dl_symbol_data_id_.at(sc_id);
+  }
+
+  inline size_t GetOFDMCtrlIndex(size_t sc_id) const {
+    return dl_symbol_ctrl_id_.at(sc_id);
   }
 
   inline bool IsDataSubcarrier(size_t sc_id) const {
-    return symbol_map_.at(sc_id) == SubcarrierType::kData;
+    return dl_symbol_map_.at(sc_id) == SubcarrierType::kData;
+  }
+  inline bool IsControlSubcarrier(size_t sc_id) const {
+    return control_symbol_map_.at(sc_id) == SubcarrierType::kData;
   }
   inline const std::string& ConfigFilename() const { return config_filename_; }
   inline const std::string& TraceFilename() const { return trace_file_; }
@@ -674,13 +681,9 @@ class Config {
 
   std::string ul_modulation_;  // Modulation order as a string, e.g., "16QAM"
   size_t
-      ul_mod_order_;  // Modulation order (e.g., 4: QPSK, 16: 16QAM, 64: 64QAM)
-  size_t
       ul_mod_order_bits_;  // Number of binary bits used for a modulation order
   std::string dl_modulation_;
-  size_t dl_mod_order_;
   size_t dl_mod_order_bits_;
-  size_t dl_bcast_mod_order_;
   size_t dl_bcast_mod_order_bits_;
 
   // Modulation lookup table for mapping binary bits to constellation points
@@ -707,8 +710,11 @@ class Config {
 
   size_t dl_packet_length_;  // HAS_TIME & END_BURST, fixme
 
-  std::vector<SubcarrierType> symbol_map_;
-  std::vector<size_t> symbol_data_id_;
+  std::vector<SubcarrierType> ul_symbol_map_;
+  std::vector<SubcarrierType> dl_symbol_map_;
+  std::vector<SubcarrierType> control_symbol_map_;
+  std::vector<size_t> dl_symbol_data_id_;
+  std::vector<size_t> dl_symbol_ctrl_id_;
 
   Table<int8_t> dl_bits_;
   Table<int8_t> ul_bits_;

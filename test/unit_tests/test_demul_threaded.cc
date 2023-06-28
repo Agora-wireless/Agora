@@ -14,8 +14,8 @@ static constexpr size_t kNumWorkers = 14;
 static constexpr size_t kMaxTestNum = 100;
 static constexpr size_t kMaxItrNum = (1 << 30);
 static constexpr size_t kModTestNum = 3;
-static constexpr size_t kModBitsNums[kModTestNum] = {4, 6, 4};
-static constexpr double kCodeRate[kModTestNum] = {0.333, 0.333, 0.666};
+static constexpr size_t kModBitsNums[kModTestNum] = {4, 6, 2};
+static constexpr size_t kMCSIndeces[kModTestNum] = {10, 17, 5};
 static constexpr size_t kFrameOffsets[kModTestNum] = {0, 20, 30};
 // A spinning barrier to synchronize the start of worker threads
 static std::atomic<size_t> num_workers_ready_atomic;
@@ -31,8 +31,7 @@ void MasterToWorkerDynamicMaster(
 
   for (size_t bs_ant_idx = 0; bs_ant_idx < kModTestNum; bs_ant_idx++) {
     nlohmann::json msc_params = cfg->MCSParams(Direction::kUplink);
-    msc_params["modulation"] = MapModToStr(kModBitsNums[bs_ant_idx]);
-    msc_params["code_rate"] = kCodeRate[bs_ant_idx];
+    msc_params["mcs_index"] = kMCSIndeces[bs_ant_idx];
     cfg->UpdateUlMCS(msc_params);
     for (size_t i = 0; i < kMaxTestNum; i++) {
       uint32_t frame_id =

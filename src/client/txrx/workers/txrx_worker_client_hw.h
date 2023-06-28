@@ -35,8 +35,8 @@ class TxRxWorkerClientHw : public TxRxWorker {
  private:
   size_t DoTx(const long long time0);
   std::vector<Packet*> DoRx(size_t interface_id, size_t& global_frame_id,
-                            size_t& global_symbol_id, long long& receive_time,
-                            ssize_t& sample_offset);
+                            size_t& global_symbol_id, size_t& local_frame_id,
+                            long long& receive_time, ssize_t& sample_offset);
 
   ssize_t SyncBeacon(size_t local_interface, size_t sample_window);
   ssize_t FindSyncBeacon(const std::complex<int16_t>* check_data,

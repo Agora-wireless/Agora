@@ -27,7 +27,7 @@ static double bench_mod_16qam(unsigned iterations, unsigned mode) {
   int* input;
   complex_float* output_mod;
   Table<complex_float> mod_table;
-  InitModulationTable(mod_table, 16);
+  InitModulationTable(mod_table, 4);
   uint8_t* output_demod_loop;
   uint8_t* output_demod_sse;
   uint8_t* output_demod_avx2;
@@ -138,7 +138,7 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode) {
   complex_float* output_mod;
 
   Table<complex_float> mod_table;
-  InitModulationTable(mod_table, 64);
+  InitModulationTable(mod_table, 6);
   unsigned int num = 100;
   uint8_t* output_demod_loop;
   uint8_t* output_demod_sse;
@@ -280,7 +280,7 @@ static double bench_mod_256qam(unsigned iterations, unsigned mode) {
 #endif
   int gray_mapping[16][16];
 
-  InitModulationTable(mod_table, 256);
+  InitModulationTable(mod_table, 8);
   for (int i = 0; i < 256; i++) {
     int re = (int)(mod_table[0][i].re * sqrt(170) / 2 + 8);
     int im = (int)(mod_table[0][i].im * sqrt(170) / 2 + 8);

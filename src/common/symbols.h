@@ -282,7 +282,7 @@ static const std::map<char, SymbolType> kSymbolMap = {
     {'L', SymbolType::kCalUL},  {'P', SymbolType::kPilot},
     {'U', SymbolType::kUL},     {'S', SymbolType::kControl}};
 
-enum class SubcarrierType { kNull, kDMRS, kData };
+enum class SubcarrierType { kNull, kDMRS, kPTRS, kData };
 
 // Maximum number of symbols per frame allowed by Agora
 static constexpr size_t kMaxSymbols = 70;
