@@ -12,6 +12,7 @@
 #include "common_typedef_sdk.h"
 #include "concurrentqueue.h"
 #include "config.h"
+#include "mac_scheduler.h"
 #include "memory_manage.h"
 #include "message.h"
 #include "symbols.h"
@@ -52,6 +53,9 @@ class AgoraBuffer {
   inline Table<complex_float>& GetCalibDlMsum() {
     return calib_dl_msum_buffer_;
   }
+  inline Table<std::complex<int16_t>> GetDlBcastSignal() {
+    return dl_bcast_socket_buffer_;
+  }
   inline Table<int8_t>& GetDlModBits() { return dl_mod_bits_buffer_; }
   inline Table<int8_t>& GetDlBits() { return dl_bits_buffer_; }
   inline Table<int8_t>& GetDlBitsStatus() { return dl_bits_buffer_status_; }
@@ -85,6 +89,7 @@ class AgoraBuffer {
   Table<int8_t> dl_mod_bits_buffer_;
   Table<int8_t> dl_bits_buffer_;
   Table<int8_t> dl_bits_buffer_status_;
+  Table<std::complex<int16_t>> dl_bcast_socket_buffer_;
 
   Table<char> ul_socket_buffer_;
   char* dl_socket_buffer_;

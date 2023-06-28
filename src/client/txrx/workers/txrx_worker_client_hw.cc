@@ -115,6 +115,7 @@ void TxRxWorkerClientHw::DoTxRx() {
 
   size_t rx_frame_id = 0;
   size_t rx_symbol_id = 0;
+  size_t local_frame_id = 0;
   long long rx_time = 0;
   ssize_t rx_adjust_samples = 0;
 
@@ -130,7 +131,7 @@ void TxRxWorkerClientHw::DoTxRx() {
     const size_t tx_status = DoTx(time0);
     if (tx_status == 0) {
       const auto rx_pkts = DoRx(local_interface, rx_frame_id, rx_symbol_id,
-                                rx_time, rx_adjust_samples);
+                                local_frame_id, rx_time, rx_adjust_samples);
       if (rx_pkts.size() == channels_per_interface_) {
         if (kDebugPrintInTask) {
           AGORA_LOG_INFO(
@@ -164,11 +165,9 @@ void TxRxWorkerClientHw::DoTxRx() {
 // global_symbol_id in - symbol id of the last rx packet
 //                 out - symbol id of the current rx packet
 //
-std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
-                                              size_t& global_frame_id,
-                                              size_t& global_symbol_id,
-                                              long long& receive_time,
-                                              ssize_t& sample_offset) {
+std::vector<Packet*> TxRxWorkerClientHw::DoRx(
+    size_t interface_id, size_t& global_frame_id, size_t& global_symbol_id,
+    size_t& local_frame_id, long long& receive_time, ssize_t& sample_offset) {
   const size_t radio_id = interface_id + interface_offset_;
   const size_t first_ant_id = radio_id * channels_per_interface_;
   std::vector<Packet*> result_packets;
@@ -266,16 +265,34 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
                                    first_ant_id + ch);
               result_packets.push_back(raw_pkt);
 
+              if (Configuration()->GetSymbolType(global_symbol_id) ==
+                  SymbolType::kControl) {
+                size_t ctrl_frame_id =
+                    Configuration()->DecodeBroadcastSlots(raw_pkt->data_);
+                if (ctrl_frame_id != global_frame_id) {
+                  AGORA_LOG_WARN(
+                      "RecvEnqueue: Ctrl channel frame_id %zu/%zu mismatch "
+                      "error!\n",
+                      ctrl_frame_id, global_frame_id);
+                  // if received two consecutive frame_ids in the control channel
+                  if (ctrl_frame_id == local_frame_id + 1) {
+                    global_frame_id = ctrl_frame_id;
+                  }
+                  local_frame_id = ctrl_frame_id;
+                }
+                rx_packet->Free();
+                break;
+              } else {
+                // Push kPacketRX event into the queue.
+                const EventData rx_message(EventType::kPacketRX,
+                                           rx_tag_t(*rx_packet).tag_);
+                NotifyComplete(rx_message);
+              }
               AGORA_LOG_FRAME(
                   "TxRxWorkerClientHw [%zu]: Rx Downlink (Frame %zu, Symbol "
                   "%zu, Ant %zu) from Radio %zu at time %lld\n",
                   tid_, global_frame_id, global_symbol_id, first_ant_id + ch,
                   radio_id, receive_time);
-
-              // Push kPacketRX event into the queue.
-              const EventData rx_message(EventType::kPacketRX,
-                                         rx_tag_t(*rx_packet).tag_);
-              NotifyComplete(rx_message);
             }
           }  // end is RxSymbol
         }    // sample offset <= 0
@@ -493,6 +510,7 @@ bool TxRxWorkerClientHw::IsRxSymbol(size_t symbol_id) {
   bool is_rx;
 
   if ((symbol_type == SymbolType::kBeacon) ||
+      (symbol_type == SymbolType::kControl) ||
       (symbol_type == SymbolType::kDL)) {
     is_rx = true;
   } else {
@@ -746,10 +764,11 @@ long long TxRxWorkerClientHw::EstablishTime0(size_t local_interface) {
   //Set initial frame and symbol to max value so we start at 0
   size_t frame_id = SIZE_MAX;
   size_t symbol_id = Configuration()->Frame().NumTotalSyms() - 1;
+  size_t rx_frame_id = SIZE_MAX;
   //Establish time0 from symbol = 0 (beacon), frame 0
   while (Configuration()->Running() && (time0 == 0)) {
-    const auto rx_pkts =
-        DoRx(local_interface, frame_id, symbol_id, rx_time, adjust_samples);
+    const auto rx_pkts = DoRx(local_interface, frame_id, symbol_id, rx_frame_id,
+                              rx_time, adjust_samples);
     if (rx_pkts.size() == channels_per_interface_) {
       time0 = rx_time;
 

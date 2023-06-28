@@ -98,7 +98,7 @@ class ChannelSim {
   std::vector<std::thread> task_threads_;
 
   size_t ul_data_plus_pilot_symbols_;
-  size_t dl_data_plus_beacon_symbols_;
+  size_t dl_data_plus_bcast_symbols_;
   size_t payload_length_;
 
   size_t bs_thread_num_;

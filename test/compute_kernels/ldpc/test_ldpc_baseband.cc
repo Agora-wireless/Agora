@@ -51,7 +51,7 @@ int main(int argc, char* argv[]) {
   const DataGenerator::Profile profile =
       FLAGS_profile == "123" ? DataGenerator::Profile::kProfile123
                              : DataGenerator::Profile::kRandom;
-  DataGenerator data_generator(cfg.get(), 0 /* RNG seed */, profile);
+  DataGenerator data_generator(cfg.get(), seed, profile);
 
   std::printf(
       "DataGenerator: Config file: %s, data profile = %s\n",
@@ -63,6 +63,11 @@ int main(int argc, char* argv[]) {
 
   std::printf("DataGenerator: Generating encoded and modulated data\n");
   srand(time(nullptr));
+
+  std::vector<complex_float> pilot_fd =
+      data_generator.GetCommonPilotFreqDomain();
+  Table<complex_float> ue_specific_pilot =
+      data_generator.GetUeSpecificPilotFreqDomain();
 
   // Step 1: Generate the information buffers and LDPC-encoded buffers for
   // uplink
@@ -87,10 +92,11 @@ int main(int argc, char* argv[]) {
     std::vector<std::vector<int8_t>> information(num_codeblocks);
     std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
     for (size_t i = 0; i < num_codeblocks; i++) {
-      data_generator.GenRawData(dir, information.at(i),
+      data_generator.GenRawData(cfg->LdpcConfig(dir), information.at(i),
                                 i % cfg->UeAntNum() /* UE ID */);
-      std::memcpy(input_ptr, information.at(i).data(), input_size);
-      data_generator.GenCodeblock(dir, input_ptr, encoded_codewords.at(i));
+      encoded_codewords.at(i) = DataGenerator::GenCodeblock(
+          cfg->LdpcConfig(dir), &information.at(i).at(0),
+          information.at(i).size());
     }
 
     // Save uplink information bytes to file
@@ -121,11 +127,15 @@ int main(int argc, char* argv[]) {
         for (size_t j = 0; j < num_symbols_per_cb; j++) {
           size_t num_bits =
               ((j + 1) < num_symbols_per_cb) ? bits_per_symbol : remaining_bits;
+          auto ofdm_symbol = DataGenerator::GetModulation(
+              &encoded_codewords[ue_id * num_cbs_per_ue + i][offset],
+              cfg->ModTable(dir), num_bits, cfg->OfdmDataNum(),
+              cfg->ModOrderBits(dir));
           modulated_codewords[ue_id * cfg->Frame().NumDataSyms() +
                               i * num_symbols_per_cb + j] =
-              data_generator.GetModulation(
-                  &encoded_codewords[ue_id * num_cbs_per_ue + i][offset],
-                  num_bits);
+              DataGenerator::MapOFDMSymbol(cfg.get(), ofdm_symbol,
+                                           ue_specific_pilot[ue_id],
+                                           SymbolType::kUL);
           remaining_bits -= bits_per_symbol;
           offset += BitsToBytes(bits_per_symbol);
         }
@@ -141,11 +151,9 @@ int main(int argc, char* argv[]) {
     std::vector<std::vector<complex_float>> pre_ifft_data_syms(
         cfg->UeAntNum() * cfg->Frame().NumDataSyms());
     for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
-      pre_ifft_data_syms[i] = data_generator.BinForIfft(modulated_codewords[i]);
+      pre_ifft_data_syms[i] =
+          DataGenerator::BinForIfft(cfg.get(), modulated_codewords[i]);
     }
-
-    std::vector<complex_float> pilot_fd =
-        data_generator.GetCommonPilotFreqDomain();
 
     // Put pilot and data symbols together
     Table<complex_float> tx_data_all_symbols;
@@ -271,9 +279,9 @@ int main(int argc, char* argv[]) {
                                       cfg->OfdmDataNum() * cfg->UeAntNum(),
                                       Agora_memory::Alignment_t::kAlign64);
     Table<int8_t> demod_data_all_symbols;
-    demod_data_all_symbols.Calloc(
-        cfg->UeAntNum(), cfg->OfdmDataNum() * cfg->Frame().NumDataSyms() * 8,
-        Agora_memory::Alignment_t::kAlign64);
+    demod_data_all_symbols.Calloc(num_codeblocks,
+                                  cfg->LdpcConfig(dir).NumCbCodewLen(),
+                                  Agora_memory::Alignment_t::kAlign64);
     for (size_t i = data_sym_start; i < cfg->Frame().NumTotalSyms(); i++) {
       arma::cx_fmat mat_rx_data(
           reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
@@ -295,66 +303,33 @@ int main(int argc, char* argv[]) {
 
       mat_equalized_data = mat_equalized_data.st();
 
+      size_t symbol_id = i - data_sym_start;
       for (size_t j = 0; j < cfg->UeAntNum(); j++) {
-        size_t cb_id = (i - data_sym_start) / num_symbols_per_cb;
-        size_t symbol_id_in_cb = (i - data_sym_start) % num_symbols_per_cb;
-        auto* demod_ptr = demod_data_all_symbols[j] +
-                          (cb_id * num_symbols_per_cb * 8 +
-                           symbol_id_in_cb * cfg->ModOrderBits(dir)) *
-                              cfg->OfdmDataNum();
+        size_t cb_id = symbol_id / num_symbols_per_cb;
+        size_t symbol_id_in_cb = symbol_id % num_symbols_per_cb;
+        size_t offset = j * num_cbs_per_ue + cb_id;
+        auto* demod_ptr =
+            demod_data_all_symbols[offset] +
+            symbol_id_in_cb * cfg->OfdmDataNum() * cfg->ModOrderBits(dir);
         auto* equal_t_ptr =
             (float*)(equalized_data_all_symbols[i - data_sym_start] +
                      j * cfg->OfdmDataNum());
-        switch (cfg->ModOrderBits(dir)) {
-          case (4):
-            Demod16qamSoftAvx2(equal_t_ptr, demod_ptr, cfg->OfdmDataNum());
-            break;
-          case (6):
-            Demod64qamSoftAvx2(equal_t_ptr, demod_ptr, cfg->OfdmDataNum());
-            break;
-          default:
-            std::printf("Demodulation: modulation type %s not supported!\n",
-                        cfg->Modulation(dir).c_str());
-        }
+        Demodulate(
+            equal_t_ptr, demod_ptr,
+            cfg->LdpcConfig(dir).NumCbCodewLen() / cfg->ModOrderBits(dir),
+            cfg->ModOrderBits(dir), false);
       }
     }
 
     const LDPCconfig& ldpc_config = cfg->LdpcConfig(dir);
-
-    struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
-    struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {};
-
-    // Decoder setup
-    ldpc_decoder_5gnr_request.numChannelLlrs = ldpc_config.NumCbCodewLen();
-    ldpc_decoder_5gnr_request.numFillerBits = 0;
-    ldpc_decoder_5gnr_request.maxIterations = ldpc_config.MaxDecoderIter();
-    ldpc_decoder_5gnr_request.enableEarlyTermination =
-        ldpc_config.EarlyTermination();
-    ldpc_decoder_5gnr_request.Zc = ldpc_config.ExpansionFactor();
-    ldpc_decoder_5gnr_request.baseGraph = ldpc_config.BaseGraph();
-    ldpc_decoder_5gnr_request.nRows = ldpc_config.NumRows();
-    ldpc_decoder_5gnr_response.numMsgBits = ldpc_config.NumCbLen();
-    auto* resp_var_nodes = static_cast<int16_t*>(
-        Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
-                                         1024 * 1024 * sizeof(int16_t)));
-    ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
-
     Table<uint8_t> decoded_codewords;
     decoded_codewords.Calloc(num_codeblocks, cfg->OfdmDataNum(),
                              Agora_memory::Alignment_t::kAlign64);
     double freq_ghz = GetTime::MeasureRdtscFreq();
     size_t start_tsc = GetTime::WorkerRdtsc();
-    for (size_t i = 0; i < cfg->UeAntNum(); i++) {
-      for (size_t j = 0; j < num_cbs_per_ue; j++) {
-        ldpc_decoder_5gnr_request.varNodes =
-            demod_data_all_symbols[i] +
-            j * cfg->OfdmDataNum() * 8 * num_symbols_per_cb;
-        ldpc_decoder_5gnr_response.compactedMessageBytes =
-            decoded_codewords[i * num_cbs_per_ue + j];
-        bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
-                                &ldpc_decoder_5gnr_response);
-      }
-    }
+    DataGenerator::GetDecodedDataBatch(
+        demod_data_all_symbols, decoded_codewords, ldpc_config, num_codeblocks,
+        ldpc_config.NumCbLen() / 8);
 
     size_t duration = GetTime::WorkerRdtsc() - start_tsc;
     std::printf("Decoding of %zu blocks takes %.2f us per block\n",
@@ -397,7 +372,6 @@ int main(int argc, char* argv[]) {
         1.f * error_num / total, block_error_num, num_codeblocks,
         1.f * block_error_num / num_codeblocks);
 
-    std::free(resp_var_nodes);
     demod_data_all_symbols.Free();
     equalized_data_all_symbols.Free();
     precoder.Free();
@@ -408,6 +382,7 @@ int main(int argc, char* argv[]) {
     csi_matrices_data.Free();
     decoded_codewords.Free();
   }
+  ue_specific_pilot.Free();
   delete[] input_ptr;
   return 0;
 }

@@ -11,6 +11,7 @@
 #include "common_typedef_sdk.h"
 #include "config.h"
 #include "doer.h"
+#include "mac_scheduler.h"
 #include "mat_logger.h"
 #include "memory_manage.h"
 #include "message.h"
@@ -29,7 +30,7 @@ class DoBeamWeights : public Doer {
       Table<complex_float>& calib_buffer,
       PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_,
       PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_,
-      PhyStats* in_phy_stats, Stats* stats_manager);
+      MacScheduler* mac_sched, PhyStats* in_phy_stats, Stats* stats_manager);
   ~DoBeamWeights() override;
 
   /**
@@ -79,6 +80,7 @@ class DoBeamWeights : public Doer {
   complex_float* calib_gather_buffer_;
   std::unique_ptr<arma::cx_fvec> calib_sc_vec_ptr_;
 
+  MacScheduler* mac_sched_;
   PhyStats* phy_stats_;
   arma::uvec ext_ref_id_;
   size_t num_ext_ref_;

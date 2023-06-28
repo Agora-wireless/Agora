@@ -5,6 +5,7 @@
 #include "radio_set_calibrate.h"
 
 #include <thread>
+#include <utility>
 
 #include "SoapySDR/Formats.h"
 #include "SoapySDR/Logger.hpp"
@@ -16,7 +17,7 @@ static constexpr size_t kHubMissingWaitMs = 100;
 
 RadioSetCalibrate::RadioSetCalibrate(Config* cfg, std::string calibration_type)
     : cfg_(cfg),
-      calibration_type_(calibration_type),
+      calibration_type_(std::move(calibration_type)),
       num_radios_initialized_(0) {
   SoapySDR::Kwargs args;
   SoapySDR::Kwargs sargs;

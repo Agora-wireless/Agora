@@ -572,10 +572,26 @@ MKL_LONG CommsLib::FFT(complex_float* in_out, int fft_size) {
   return status;
 }
 
-void CommsLib::FFTShift(complex_float* in, complex_float* tmp, int fft_size) {
-  std::memcpy(tmp, in + fft_size / 2, sizeof(float) * fft_size);
-  std::memcpy(in + fft_size / 2, in, sizeof(float) * fft_size);
-  std::memcpy(in, tmp, sizeof(float) * fft_size);
+/* \brief fftshifts the input memory and places the result in the same memory
+ *        Use this version to prevent the memory allocation.  
+ * \param complex_float* inout pre shifted fft input, shifted fft output
+ * \param complex_float* tmp must be fft_size / 2 large and used for scratch memory
+ * \param int fft_size size of the fft
+ */
+void CommsLib::FFTShift(complex_float* inout, complex_float* tmp,
+                        int fft_size) {
+  std::memcpy(tmp, inout + (fft_size / 2), sizeof(float) * fft_size);
+  std::memcpy(inout + (fft_size / 2), inout, sizeof(float) * fft_size);
+  std::memcpy(inout, tmp, sizeof(float) * fft_size);
+}
+
+/* \brief fftshifts the input memory and places the result in the same memory 
+ * \param complex_float* inout pre shifted fft input, shifted fft output
+ * \param int fft_size size of the fft
+ */
+void CommsLib::FFTShift(complex_float* inout, int fft_size) {
+  std::vector<complex_float> tmp_fft(fft_size / 2);
+  FFTShift(inout, tmp_fft.data(), fft_size);
 }
 
 std::vector<std::complex<float>> CommsLib::FFTShift(
@@ -720,6 +736,54 @@ std::vector<std::complex<float>> CommsLib::Modulate(
     std::cout << "Modulation Type " << type << " not supported!" << std::endl;
   }
   return out;
+}
+
+std::vector<std::vector<size_t>> CommsLib::GetAvailableMcs() {
+  std::vector<std::vector<size_t>> available_mcs;
+  available_mcs.resize(1 + kMaxModType / 2);
+  for (size_t i = 0; i < sizeof(kMCS) / sizeof(kMCS[0]); i++) {
+    size_t mod_order_bits = GetModOrderBits(i);
+    available_mcs.at(mod_order_bits / 2).push_back(GetCodeRate(i));
+  }
+  return available_mcs;
+}
+
+size_t CommsLib::GetMcsIndex(size_t in_mod_order, size_t in_code_rate) {
+  auto mcs_vec = CommsLib::GetAvailableMcs();
+  size_t mcs_index = 0;
+  for (size_t i = 0; i < in_mod_order / 2; i++) {
+    mcs_index += mcs_vec.at(i).size();
+  }
+  auto code_vec = mcs_vec.at(in_mod_order / 2);
+
+  if (code_vec.empty()) {
+    throw std::invalid_argument("Input vector is empty.");
+  }
+
+  if (in_code_rate <= code_vec.front()) {
+    return mcs_index;
+  }
+
+  if (in_code_rate >= code_vec.back()) {
+    return mcs_index + code_vec.size() - 1;
+  }
+
+  auto lower_bound_iter =
+      std::lower_bound(code_vec.begin(), code_vec.end(), in_code_rate);
+
+  if (*lower_bound_iter == in_code_rate) {
+    return mcs_index + lower_bound_iter - code_vec.begin();
+    ;
+  }
+
+  auto prev_element = lower_bound_iter - 1;
+
+  // Return the closest element
+  auto closest_element =
+      (in_code_rate - *prev_element <= *lower_bound_iter - in_code_rate)
+          ? prev_element
+          : lower_bound_iter;
+  return mcs_index + closest_element - code_vec.begin();
 }
 
 std::vector<std::complex<float>> CommsLib::SeqCyclicShift(

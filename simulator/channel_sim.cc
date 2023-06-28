@@ -76,14 +76,14 @@ ChannelSim::ChannelSim(const Config* const config, size_t bs_thread_num,
       channel_snr_(in_chan_snr) {
   // initialize parameters from config
   ::srand(time(nullptr));
-  dl_data_plus_beacon_symbols_ =
-      cfg_->Frame().NumDLSyms() + cfg_->Frame().NumBeaconSyms();
+  dl_data_plus_bcast_symbols_ =
+      cfg_->Frame().NumDLSyms() + cfg_->Frame().NumDlBcastSyms();
   ul_data_plus_pilot_symbols_ =
       cfg_->Frame().NumULSyms() + cfg_->Frame().NumPilotSyms();
 
   rx_buffer_bs_ = std::make_unique<ChSimRxBuffer>(
-      ChSimRxBuffer::ChSimRxType::kRxTypeBeaconDl, cfg_, kFrameWnd,
-      dl_data_plus_beacon_symbols_, cfg_->BsAntNum(), cfg_->PacketLength());
+      ChSimRxBuffer::ChSimRxType::kRxTypeBcastDl, cfg_, kFrameWnd,
+      dl_data_plus_bcast_symbols_, cfg_->BsAntNum(), cfg_->PacketLength());
 
   rx_buffer_ue_ = std::make_unique<ChSimRxBuffer>(
       ChSimRxBuffer::ChSimRxType::kRxTypePilotUl, cfg_, kFrameWnd,
@@ -93,7 +93,7 @@ ChannelSim::ChannelSim(const Config* const config, size_t bs_thread_num,
   ue_comm_.resize(user_socket_num_);
 
   task_queue_bs_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * dl_data_plus_beacon_symbols_ * cfg_->BsAntNum() *
+      kFrameWnd * dl_data_plus_bcast_symbols_ * cfg_->BsAntNum() *
       kDefaultQueueSize);
   task_queue_user_ = moodycamel::ConcurrentQueue<EventData>(
       kFrameWnd * ul_data_plus_pilot_symbols_ * cfg_->UeAntNum() *
@@ -118,8 +118,8 @@ ChannelSim::ChannelSim(const Config* const config, size_t bs_thread_num,
   }
 
   ue_rx_.Init(ul_data_plus_pilot_symbols_, cfg_->UeAntNum());
-  ue_tx_.Init(dl_data_plus_beacon_symbols_);
-  bs_rx_.Init(dl_data_plus_beacon_symbols_, cfg_->BsAntNum());
+  ue_tx_.Init(dl_data_plus_bcast_symbols_);
+  bs_rx_.Init(dl_data_plus_bcast_symbols_, cfg_->BsAntNum());
   bs_tx_.Init(ul_data_plus_pilot_symbols_);
 }
 
@@ -181,6 +181,7 @@ void ChannelSim::Run() {
           switch (symbol_type) {
             //Rx from base station
             case SymbolType::kBeacon:
+            case SymbolType::kControl:
             case SymbolType::kDL: {
               const bool last_antenna =
                   bs_rx_.CompleteTask(frame_id, symbol_id);
@@ -203,7 +204,7 @@ void ChannelSim::Run() {
                   AGORA_LOG_INFO(
                       "(Frame %zu): Finished downlink reception    of %zu "
                       "symbols in %.3fmS\n",
-                      frame_id, dl_data_plus_beacon_symbols_,
+                      frame_id, dl_data_plus_bcast_symbols_,
                       bs_rx_.GetTaskTotalTimeMs(frame_id));
                 }
               }
@@ -257,6 +258,7 @@ void ChannelSim::Run() {
           switch (symbol_type) {
             //Tx to ue
             case SymbolType::kBeacon:
+            case SymbolType::kControl:
             case SymbolType::kDL: {
               const bool last_symbol = ue_tx_.CompleteTask(frame_id);
               AGORA_LOG_SYMBOL(
@@ -271,7 +273,7 @@ void ChannelSim::Run() {
                   AGORA_LOG_INFO(
                       "(Frame %zu): Finished downlink transmission of %zu "
                       "symbols in %.3fmS (rx to tx), %.3fmS (tx to tx)\n",
-                      frame_id, dl_data_plus_beacon_symbols_,
+                      frame_id, dl_data_plus_bcast_symbols_,
                       (GetTime::GetTimeUs() -
                        bs_rx_.GetTaskEndTimeUs(frame_id)) /
                           1000.0f,

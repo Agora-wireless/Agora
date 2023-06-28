@@ -1,0 +1,72 @@
+#--Disable inteloneapi python
+echo -e 'intelpython=exclude' | sudo tee /opt/intel/oneapi/renew-config.txt
+source /opt/intel/oneapi/setvars.sh --force --config="/opt/intel/oneapi/renew-config.txt"
+
+#Automate the intel variables
+#Intel env vars
+echo -e '#!/usr/bin/bash\nsource /opt/intel/oneapi/setvars.sh --config="/opt/intel/oneapi/renew-config.txt"' | sudo tee /etc/profile.d/10-inteloneapivars.sh
+#non-login consoles
+echo -e '\n#Gen intel env vars\nsource /opt/intel/oneapi/setvars.sh --config="/opt/intel/oneapi/renew-config.txt"' | sudo tee -a /etc/bash.bashrc
+
+#--Build FlexRan FEC
+cd /opt/FlexRAN-FEC-SDK-19-04/sdk
+sudo rm -rf build-avx*
+
+WIRELESS_SDK_TARGET_ISA="avx512"
+export WIRELESS_SDK_TARGET_ISA
+./create-makefiles-linux.sh
+cd build-avx512-icc
+make -j
+sudo make install
+
+WIRELESS_SDK_TARGET_ISA="avx2"
+export WIRELESS_SDK_TARGET_ISA
+./create-makefiles-linux.sh
+cd build-avx2-icc
+make -j
+
+sudo ldconfig
+
+#--Increase socket buffer sizes
+#Make the soapy settings a lower priority
+sudo mv /usr/local/lib/sysctl.d/SoapySDRServer.conf /usr/local/lib/sysctl.d/98-SoapySDRServer.conf
+#Ethernet buffer sizes
+echo -e '# Ethernet transport tuning\n# Socket Rx Buffer Max Size\nnet.core.rmem_max=536870912\n#Socket Send Buffer Max Size\nnet.core.wmem_max=536870912' | sudo tee /etc/sysctl.d/99-agora.conf
+sudo sysctl --load /etc/sysctl.d/99-agora.conf
+
+#--Grub setting for dpdk and isolation
+#Modify the grub file to isolate the cpu cores turn off multithreading, cpu mitigations, and sets hugepage support, iommu enabled for dpdk vfio.
+global_options="default_hugepagesz=1G hugepagesz=1G hugepages=4 mitigations=off nosmt intel_iommu=on iommu=pt cpufreq.default_governor=performance"
+#d840 specific cpu setup
+isolcpus_d840="isolcpus=1-3,5-7,9-11,13-15,17-19,21-23,25-27,29-31,33-35,37-39,41-43,45-47,49-51,53-55,57-59,61-63"
+irqaffinity_d840="irqaffinity=0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60"
+#d740 specific cpu setup
+isolcpus_d740="isolcpus=1,3,5,7,9,11,13,15,17,19,21,23"
+irqaffinity_d740="irqaffinity=0,2,4,6,8,10,12,14,16,18,20,22"
+
+#--Disable turbo boost (20.04)
+#create service to disable turbo boost
+echo "[Unit]
+Description=Disable Turbo Boost on Intel CPU
+ 
+[Service]
+ExecStart=/bin/sh -c \"/usr/bin/echo 1 > \
+/sys/devices/system/cpu/intel_pstate/no_turbo\"
+ExecStop=/bin/sh -c \"/usr/bin/echo 0 > \
+/sys/devices/system/cpu/intel_pstate/no_turbo\"
+RemainAfterExit=yes
+ 
+[Install]
+WantedBy=sysinit.target" | sudo tee /etc/systemd/system/disable-turbo-boost.service
+#reload
+sudo systemctl daemon-reload
+#disable turbo
+sudo systemctl start disable-turbo-boost
+sudo systemctl enable disable-turbo-boost
+
+
+#--remove ondemand cpu freq scaling
+sudo systemctl disable ondemand
+
+
+

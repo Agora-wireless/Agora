@@ -530,10 +530,21 @@ void Stats::PrintPerFrameDone(PrintType print_type, size_t frame_id) const {
         break;
       case (PrintType::kPacketTX):
         AGORA_LOG_INFO(
-            "Main [frame %zu + %.2f ms]: Completed TX (%zu DL symbols)\n",
+            "Main [frame %zu + %.2f ms]: Completed TX (%zu DL Control & %zu DL "
+            "Data symbols)\n",
             frame_id,
             MasterGetDeltaMs(TsType::kTXDone, TsType::kFirstSymbolRX, frame_id),
+            this->config_->Frame().NumDlControlSyms(),
             this->config_->Frame().NumDLSyms());
+        break;
+      case (PrintType::kBroadcast):
+        AGORA_LOG_INFO(
+            "Main [frame %zu + %.2f ms]: Completed Generating (%zu DL Control "
+            "symbols)\n",
+            frame_id,
+            MasterGetDeltaMs(TsType::kBroadcastDone, TsType::kFirstSymbolRX,
+                             frame_id),
+            this->config_->Frame().NumDlControlSyms());
         break;
       case (PrintType::kPacketToMac):
         AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed MAC TX \n",

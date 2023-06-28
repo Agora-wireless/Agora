@@ -8,6 +8,7 @@
 #include "concurrent_queue_wrapper.h"
 #include "csv_logger.h"
 #include "dobeamweights.h"
+#include "dobroadcast.h"
 #include "dodecode.h"
 #include "dodemul.h"
 #include "doencode.h"
@@ -16,11 +17,12 @@
 #include "doprecode.h"
 #include "logger.h"
 
-AgoraWorker::AgoraWorker(Config* cfg, Stats* stats, PhyStats* phy_stats,
-                         MessageInfo* message, AgoraBuffer* buffer,
-                         FrameInfo* frame)
+AgoraWorker::AgoraWorker(Config* cfg, MacScheduler* mac_sched, Stats* stats,
+                         PhyStats* phy_stats, MessageInfo* message,
+                         AgoraBuffer* buffer, FrameInfo* frame)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
       config_(cfg),
+      mac_sched_(mac_sched),
       stats_(stats),
       phy_stats_(phy_stats),
       message_(message),
@@ -54,8 +56,8 @@ void AgoraWorker::WorkerThread(int tid) {
       config_, tid, buffer_->GetCsi(), buffer_->GetCalibDl(),
       buffer_->GetCalibUl(), buffer_->GetCalibDlMsum(),
       buffer_->GetCalibUlMsum(), buffer_->GetCalib(),
-      buffer_->GetUlBeamMatrix(), buffer_->GetDlBeamMatrix(), phy_stats_,
-      stats_);
+      buffer_->GetUlBeamMatrix(), buffer_->GetDlBeamMatrix(), mac_sched_,
+      phy_stats_, stats_);
 
   auto compute_fft = std::make_unique<DoFFT>(
       config_, tid, buffer_->GetFft(), buffer_->GetCsi(), buffer_->GetCalibDl(),
@@ -67,22 +69,26 @@ void AgoraWorker::WorkerThread(int tid) {
 
   auto compute_precode = std::make_unique<DoPrecode>(
       config_, tid, buffer_->GetDlBeamMatrix(), buffer_->GetIfft(),
-      buffer_->GetDlModBits(), stats_);
+      buffer_->GetDlModBits(), mac_sched_, stats_);
 
   auto compute_encoding = std::make_unique<DoEncode>(
       config_, tid, Direction::kDownlink,
       (kEnableMac == true) ? buffer_->GetDlBits() : config_->DlBits(),
-      (kEnableMac == true) ? kFrameWnd : 1, buffer_->GetDlModBits(), stats_);
+      (kEnableMac == true) ? kFrameWnd : 1, buffer_->GetDlModBits(), mac_sched_,
+      stats_);
 
   // Uplink workers
-  auto compute_decoding =
-      std::make_unique<DoDecode>(config_, tid, buffer_->GetDemod(),
-                                 buffer_->GetDecod(), phy_stats_, stats_);
+  auto compute_decoding = std::make_unique<DoDecode>(
+      config_, tid, buffer_->GetDemod(), buffer_->GetDecod(), mac_sched_,
+      phy_stats_, stats_);
 
   auto compute_demul = std::make_unique<DoDemul>(
       config_, tid, buffer_->GetFft(), buffer_->GetUlBeamMatrix(),
       buffer_->GetUeSpecPilot(), buffer_->GetEqual(), buffer_->GetDemod(),
-      phy_stats_, stats_);
+      mac_sched_, phy_stats_, stats_);
+
+  auto compute_bcast = std::make_unique<DoBroadcast>(
+      config_, tid, buffer_->GetDlSocket(), stats_);
 
   std::vector<Doer*> computers_vec;
   std::vector<EventType> events_vec;
@@ -97,6 +103,11 @@ void AgoraWorker::WorkerThread(int tid) {
     computers_vec.push_back(compute_demul.get());
     events_vec.push_back(EventType::kDecode);
     events_vec.push_back(EventType::kDemul);
+  }
+
+  if (config_->Frame().NumDlControlSyms() > 0) {
+    computers_vec.push_back(compute_bcast.get());
+    events_vec.push_back(EventType::kBroadcast);
   }
 
   if (config_->Frame().NumDLSyms() > 0) {

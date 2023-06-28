@@ -46,13 +46,14 @@ TEST(TestZF, Perf) {
   calib_buffer.RandAllocCxFloat(kFrameWnd, cfg->OfdmDataNum() * cfg->BsAntNum(),
                                 Agora_memory::Alignment_t::kAlign64);
 
+  auto mac_sched = std::make_unique<MacScheduler>(cfg.get());
   auto phy_stats = std::make_unique<PhyStats>(cfg.get(), Direction::kUplink);
   auto stats = std::make_unique<Stats>(cfg.get());
 
   auto compute_zf = std::make_unique<DoBeamWeights>(
       cfg.get(), tid, csi_buffers, calib_dl_buffer, calib_ul_buffer,
       calib_dl_msum_buffer, calib_ul_msum_buffer, calib_buffer, ul_zf_matrices,
-      dl_zf_matrices, phy_stats.get(), stats.get());
+      dl_zf_matrices, mac_sched.get(), phy_stats.get(), stats.get());
 
   FastRand fast_rand;
   size_t start_tsc = GetTime::Rdtsc();

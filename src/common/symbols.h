@@ -58,6 +58,7 @@ enum class EventType : int {
   kSNRReport,    // Signal new SNR measurement from PHY to MAC
   kRANUpdate,    // Signal new RAN config to Agora
   kRBIndicator,  // Signal RB schedule to UEs
+  kBroadcast,    // Signal generation of new broadcast symbols
   kThreadTermination
 };
 
@@ -73,6 +74,7 @@ enum class DoerType : size_t {
   kDecode,
   kEncode,
   kIFFT,
+  kBroadcast,
   kPrecode,
   kRC
 };
@@ -103,6 +105,7 @@ enum class PrintType : int {
   kBeam,
   kDemul,
   kIFFT,
+  kBroadcast,
   kPrecode,
   kPacketTXFirst,
   kPacketTX,
@@ -264,6 +267,7 @@ static inline std::string ThreadTypeStr(ThreadType thread_type) {
 
 enum class SymbolType {
   kBeacon,
+  kControl,
   kUL,
   kDL,
   kPilot,
@@ -276,9 +280,9 @@ static const std::map<char, SymbolType> kSymbolMap = {
     {'B', SymbolType::kBeacon}, {'C', SymbolType::kCalDL},
     {'D', SymbolType::kDL},     {'G', SymbolType::kGuard},
     {'L', SymbolType::kCalUL},  {'P', SymbolType::kPilot},
-    {'U', SymbolType::kUL}};
+    {'U', SymbolType::kUL},     {'S', SymbolType::kControl}};
 
-enum class SubcarrierType { kNull, kDMRS, kData };
+enum class SubcarrierType { kNull, kDMRS, kPTRS, kData };
 
 // Maximum number of symbols per frame allowed by Agora
 static constexpr size_t kMaxSymbols = 140;
@@ -299,6 +303,10 @@ static constexpr size_t kMaxChannels = 2;
 // support only lower modulation orders (e.g., up to QAM64), but using 8 here
 // helps reduce false cache line sharing.
 static constexpr size_t kMaxModType = 8;
+
+// An arbitrary setting for default Mcs for Data symbols
+// 16QAM modulation and 340/1024 code rate
+static constexpr size_t kDefaultMcsIndex = 10;
 
 // Number of cellular frames tracked by Agora stats
 static constexpr size_t kNumStatsFrames = 10000;

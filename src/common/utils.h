@@ -87,17 +87,17 @@ class Utils {
   static void PrintMat(const arma::cx_fmat& c, const std::string& ss);
   static void SaveMat(const arma::cx_fmat& c, const std::string& filename,
                       const std::string& ss, const bool append);
-  static void WriteVector(const std::string filename, const std::string desc,
-                          const std::vector<int> vec_data);
-  static std::vector<int> ReadVector(const std::string filename,
+  static void WriteVector(const std::string& filename, const std::string& desc,
+                          const std::vector<int>& vec_data);
+  static std::vector<int> ReadVector(const std::string& filename,
                                      const bool skip_line);
   static void WriteVectorOfComplex(
-      const std::string filename, const std::string desc,
-      const std::array<std::vector<std::complex<double>>, kMaxChannels>
+      const std::string& filename, const std::string& desc,
+      const std::array<std::vector<std::complex<double>>, kMaxChannels>&
           vec_data);
   static std::array<std::vector<std::complex<double>>, kMaxChannels>
-  ReadVectorOfComplex(const std::string filename, const bool skip_line,
-                      const std::vector<size_t> present_channels);
+  ReadVectorOfComplex(const std::string& filename, const bool skip_line,
+                      const std::vector<size_t>& present_channels);
 };
 
 /// roundup<N>(x) returns x rounded up to the next multiple of N. N must be
