@@ -565,7 +565,6 @@ void Sender::InitIqFromFile(const std::string& filename) {
     const size_t expected_count = (cfg_->SampsPerSymbol()) * 2;
     const size_t actual_count =
         std::fread(iq_data_float[i], sizeof(float), expected_count, fp);
-
     if (expected_count != actual_count) {
       std::fprintf(
           stderr,
@@ -586,9 +585,6 @@ void Sender::InitIqFromFile(const std::string& filename) {
   }
   std::fclose(fp);
   iq_data_float.Free();
-
-    std::cout << "operated on file\n" << std::flush;
-
 }
 
 void Sender::CreateWorkerThreads(size_t num_workers) {

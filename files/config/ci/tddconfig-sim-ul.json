@@ -2,7 +2,7 @@
     "bs_radio_num": 8,
     "ue_radio_num": 8,
     "frame_schedule": [
-        "GGPUUUUUUUUUUUUU"
+        "PUUUUUUUUUUUUU"
     ],
     "ul_mcs" : {
       "modulation": "64QAM",
@@ -20,6 +20,5 @@
         0
     ],
     "worker_thread_num": 22,
-    "socket_thread_num": 1,
-    "max_frame": 10
+    "socket_thread_num": 1
 }

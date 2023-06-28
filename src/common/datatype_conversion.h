@@ -13,7 +13,7 @@
 
 #include "utils.h"
 
-#define DATATYPE_MEMORY_CHECK
+//#define DATATYPE_MEMORY_CHECK
 //Needs to be a factor of 2?
 static constexpr float kShrtFltConvFactor = 32768.0f;
 

@@ -544,12 +544,10 @@ Config::Config(std::string jsonfilename)
   } else {
 
     json jframes = tdd_conf.value("frame_schedule", json::array());
-    
     std::vector<std::string> flex_formats = tdd_conf.value("flex_formats", json::array());
 
     // Only allow 1 unique frame type
     assert(jframes.size() == 1);
-
     std::string frame = jframes.at(0).get<std::string>();
 
     /*
@@ -717,17 +715,19 @@ Config::Config(std::string jsonfilename)
 
   fft_in_rru_ = tdd_conf.value("fft_in_rru", false);
 
-  
-
-
   samps_per_symbol_ =
       ofdm_tx_zero_prefix_ + ofdm_ca_num_ + cp_len_ + ofdm_tx_zero_postfix_;
 
-  //Assert that the samps per symbol is divisable by 8.
-  //TODO: include a check for is samps per symbols is divisable by 16 if AVX-512
-  //is being used.
-  RtAssert(samps_per_symbol_ % 8 == 0,
-             "samps_per_symbol_ = " + std::to_string(samps_per_symbol_) + "is not divisible by 8.\n");
+
+  #ifdef __AVX512F__
+    RtAssert(samps_per_symbol_ % 16 == 0,
+             "samps_per_symbol_ = " + std::to_string(samps_per_symbol_) + 
+             "is not divisible by 16.\n");
+  #else
+    RtAssert(samps_per_symbol_ % 8 == 0,
+             "samps_per_symbol_ = " + std::to_string(samps_per_symbol_) + 
+             "is not divisible by 8.\n");
+  
   packet_length_ =
       Packet::kOffsetOfData + ((kUse12BitIQ ? 3 : 4) * samps_per_symbol_);
   dl_packet_length_ = Packet::kOffsetOfData + (samps_per_symbol_ * 4);
