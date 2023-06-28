@@ -15,6 +15,7 @@
 
 #include "comms-constants.inc"
 #include "comms-lib.h"
+#include "data_generator.h"
 #include "datatype_conversion.h"
 #include "gettime.h"
 #include "logger.h"
@@ -32,7 +33,7 @@ static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
 static constexpr size_t kShortIdLen = 3;
 static constexpr size_t kVarNodesSize = 1024 * 1024 * sizeof(int16_t);
-static constexpr size_t kControlMCS = 5;  // QPSK, 308/1024
+static constexpr size_t kControlMCS = 5;  // QPSK, 379/1024
 
 /// Print the I/Q samples in the pilots
 static constexpr bool kDebugPrintPilot = false;
@@ -322,17 +323,29 @@ Config::Config(std::string jsonfilename)
   ofdm_data_stop_ = ofdm_data_start_ + ofdm_data_num_;
 
   // Build subcarrier map for data ofdm symbols
-  symbol_map_.resize(ofdm_data_num_);
+  ul_symbol_map_.resize(ofdm_data_num_, SubcarrierType::kData);
+  dl_symbol_map_.resize(ofdm_data_num_);
+  control_symbol_map_.resize(ofdm_data_num_);
   // Maps subcarrier index to data index
-  symbol_data_id_.resize(ofdm_data_num_, 0);
+  dl_symbol_data_id_.resize(ofdm_data_num_, 0);
+  dl_symbol_ctrl_id_.resize(ofdm_data_num_, 0);
   size_t data_idx = 0;
+  size_t ctrl_idx = 0;
   for (size_t i = 0; i < ofdm_data_num_; i++) {
     if (i % ofdm_pilot_spacing_ == 0) {  // TODO: make this index configurable
-      symbol_map_.at(i) = SubcarrierType::kDMRS;
+      dl_symbol_map_.at(i) = SubcarrierType::kDMRS;
+      control_symbol_map_.at(i) = SubcarrierType::kDMRS;
     } else {
-      symbol_map_.at(i) = SubcarrierType::kData;
-      symbol_data_id_.at(i) = data_idx;
+      dl_symbol_map_.at(i) = SubcarrierType::kData;
+      dl_symbol_data_id_.at(i) = data_idx;
       data_idx++;
+      if (i % ofdm_pilot_spacing_ == 1) {
+        control_symbol_map_.at(i) = SubcarrierType::kPTRS;
+      } else {
+        control_symbol_map_.at(i) = SubcarrierType::kData;
+        dl_symbol_ctrl_id_.at(i) = ctrl_idx;
+        ctrl_idx++;
+      }
     }
   }
 
@@ -838,6 +851,7 @@ Config::Config(std::string jsonfilename)
         "%zu frame(s) using %zu symbols per frame\n",
         RecipCalFrameCnt(), frame_.NumDLCalSyms());
   }
+
   Print();
 }
 
@@ -912,9 +926,9 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
     ul_mod_order_bits_ = GetModOrderBits(ul_mcs_index_);
     ul_modulation_ = MapModToStr(ul_mod_order_bits_);
     ul_code_rate_ = GetCodeRate(ul_mcs_index_);
+    ul_modulation_ = MapModToStr(ul_mod_order_bits_);
   }
-  ul_mod_order_ = static_cast<size_t>(pow(2, ul_mod_order_bits_));
-  InitModulationTable(this->ul_mod_table_, ul_mod_order_);
+  InitModulationTable(this->ul_mod_table_, ul_mod_order_bits_);
 
   // TODO: find the optimal base_graph
   uint16_t base_graph = ul_mcs.value("base_graph", 1);
@@ -964,9 +978,9 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
     dl_mod_order_bits_ = GetModOrderBits(dl_mcs_index_);
     dl_modulation_ = MapModToStr(dl_mod_order_bits_);
     dl_code_rate_ = GetCodeRate(dl_mcs_index_);
+    dl_modulation_ = MapModToStr(dl_mod_order_bits_);
   }
-  dl_mod_order_ = static_cast<size_t>(pow(2, dl_mod_order_bits_));
-  InitModulationTable(this->dl_mod_table_, dl_mod_order_);
+  InitModulationTable(this->dl_mod_table_, dl_mod_order_bits_);
 
   // TODO: find the optimal base_graph
   uint16_t base_graph = dl_mcs.value("base_graph", 1);
@@ -997,12 +1011,12 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
 
 void Config::UpdateCtrlMCS() {
   if (this->frame_.NumDlControlSyms() > 0) {
-    const size_t dl_bcast_mcs_index = 10;
+    const size_t dl_bcast_mcs_index = kControlMCS;
+    const size_t bcast_base_graph =
+        1;  // TODO: For MCS < 5, base_graph 1 doesn't work
     dl_bcast_mod_order_bits_ = GetModOrderBits(dl_bcast_mcs_index);
     const size_t dl_bcast_code_rate = GetCodeRate(dl_bcast_mcs_index);
-    const size_t bcast_base_graph = 1;
-    dl_bcast_mod_order_ = static_cast<size_t>(pow(2, dl_bcast_mod_order_bits_));
-
+    std::string dl_bcast_modulation = MapModToStr(dl_bcast_mod_order_bits_);
     const int16_t max_decoder_iter = 5;
     size_t bcast_zc =
         SelectZc(bcast_base_graph, dl_bcast_code_rate, dl_bcast_mod_order_bits_,
@@ -1034,7 +1048,7 @@ void Config::UpdateCtrlMCS() {
         "%d "
         "information "
         "bits per encoding, %d bits per encoded code word, decoder "
-        "iterations: %d, code rate %.3f (nRows = %zu), modulation QPSK\n",
+        "iterations: %d, code rate %.3f (nRows = %zu), modulation %s\n",
         dl_bcast_ldpc_config_.ExpansionFactor(),
         dl_bcast_ldpc_config_.NumBlocksInSymbol(),
         dl_bcast_ldpc_config_.NumCbLen(), dl_bcast_ldpc_config_.NumCbCodewLen(),
@@ -1042,7 +1056,7 @@ void Config::UpdateCtrlMCS() {
         1.f * LdpcNumInputCols(dl_bcast_ldpc_config_.BaseGraph()) /
             (LdpcNumInputCols(dl_bcast_ldpc_config_.BaseGraph()) - 2 +
              dl_bcast_ldpc_config_.NumRows()),
-        dl_bcast_ldpc_config_.NumRows());
+        dl_bcast_ldpc_config_.NumRows(), dl_bcast_modulation.c_str());
   }
 }
 
@@ -1640,6 +1654,9 @@ void Config::GenData() {
     }
   }
 
+  if (pilot_ifft_ != nullptr) {
+    FreeBuffer1d(&pilot_ifft_);
+  }
   delete[](ul_temp_parity_buffer);
   delete[](dl_temp_parity_buffer);
   ul_iq_ifft.Free();
@@ -1649,6 +1666,7 @@ void Config::GenData() {
 }
 
 size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
+  size_t start_tsc = GetTime::WorkerRdtsc();
   size_t delay_offset = (ofdm_rx_zero_prefix_client_ + cp_len_) * 2;
   complex_float* bcast_fft_buff = static_cast<complex_float*>(
       Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
@@ -1657,18 +1675,16 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
                           reinterpret_cast<float*>(bcast_fft_buff),
                           ofdm_ca_num_ * 2);
   CommsLib::FFT(bcast_fft_buff, ofdm_ca_num_);
-  std::vector<complex_float> temp_fft_buf(ofdm_ca_num_);
-  auto* temp_buff = reinterpret_cast<complex_float*>(temp_fft_buf.data());
-  auto* fft_buff_complex = reinterpret_cast<complex_float*>(bcast_fft_buff);
-  CommsLib::FFTShift(fft_buff_complex, temp_buff, ofdm_ca_num_);
-  auto* bcast_buff_complex =
-      reinterpret_cast<arma::cx_float*>(fft_buff_complex);
+  CommsLib::FFTShift(bcast_fft_buff, ofdm_ca_num_);
+  auto* bcast_buff_complex = reinterpret_cast<arma::cx_float*>(bcast_fft_buff);
 
-  size_t ctrl_sc_num = this->GetOFDMCtrlNum();
+  const size_t sc_num = GetOFDMCtrlNum();
+  const size_t ctrl_sc_num =
+      dl_bcast_ldpc_config_.NumCbCodewLen() / dl_bcast_mod_order_bits_;
   std::vector<arma::cx_float> csi_buff(ofdm_data_num_);
-  arma::cx_float* eq_buff = static_cast<arma::cx_float*>(
-      Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
-                                       ctrl_sc_num * sizeof(float) * 2));
+  arma::cx_float* eq_buff =
+      static_cast<arma::cx_float*>(Agora_memory::PaddedAlignedAlloc(
+          Agora_memory::Alignment_t::kAlign64, sc_num * sizeof(float) * 2));
 
   // estimate channel from pilot subcarriers
   float phase_shift = 0;
@@ -1678,6 +1694,7 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
     if (j % ofdm_pilot_spacing_ == 0) {
       csi_buff.at(j) = (bcast_buff_complex[sc_id] / arma::cx_float(p.re, p.im));
     } else {
+      ///\todo not correct when 0th subcarrier is not pilot
       csi_buff.at(j) = csi_buff.at(j - 1);
       if (j % ofdm_pilot_spacing_ == 1) {
         phase_shift += arg((bcast_buff_complex[sc_id] / csi_buff.at(j)) *
@@ -1686,168 +1703,78 @@ size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {
     }
   }
   phase_shift /= this->GetOFDMPilotNum();
-  size_t data_idx = 0;
   for (size_t j = 0; j < ofdm_data_num_; j++) {
     size_t sc_id = j + ofdm_data_start_;
-    if (j % ofdm_pilot_spacing_ != 0 && j % ofdm_pilot_spacing_ != 1) {
-      eq_buff[data_idx++] = (bcast_buff_complex[sc_id] / csi_buff.at(j)) *
-                            exp(arma::cx_float(0, -phase_shift));
+    if (this->IsControlSubcarrier(j) == true) {
+      eq_buff[GetOFDMCtrlIndex(j)] =
+          (bcast_buff_complex[sc_id] / csi_buff.at(j)) *
+          exp(arma::cx_float(0, -phase_shift));
     }
   }
   int8_t* demod_buff_ptr = static_cast<int8_t*>(
       Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
                                        dl_bcast_mod_order_bits_ * ctrl_sc_num));
-  Demodulate(reinterpret_cast<float*>(&eq_buff[0]), demod_buff_ptr, ctrl_sc_num,
-             dl_bcast_mod_order_bits_, false);
+  Demodulate(reinterpret_cast<float*>(&eq_buff[0]), demod_buff_ptr,
+             2 * ctrl_sc_num, dl_bcast_mod_order_bits_, false);
 
-  // Decoder setup
-  int16_t num_filler_bits = 0;
-  int16_t num_channel_llrs = dl_bcast_ldpc_config_.NumCbCodewLen();
-  struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
-  struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {};
-  ldpc_decoder_5gnr_request.numChannelLlrs = num_channel_llrs;
-  ldpc_decoder_5gnr_request.numFillerBits = num_filler_bits;
-  ldpc_decoder_5gnr_request.maxIterations =
-      dl_bcast_ldpc_config_.MaxDecoderIter();
-  ldpc_decoder_5gnr_request.enableEarlyTermination =
-      dl_bcast_ldpc_config_.EarlyTermination();
-  ldpc_decoder_5gnr_request.Zc = dl_bcast_ldpc_config_.ExpansionFactor();
-  ldpc_decoder_5gnr_request.baseGraph = dl_bcast_ldpc_config_.BaseGraph();
-  ldpc_decoder_5gnr_request.nRows = dl_bcast_ldpc_config_.NumRows();
+  const int num_bcast_bytes = BitsToBytes(dl_bcast_ldpc_config_.NumCbLen());
+  std::vector<uint8_t> decode_buff(num_bcast_bytes, 0u);
 
-  int num_msg_bits = dl_bcast_ldpc_config_.NumCbLen() - num_filler_bits;
-  ldpc_decoder_5gnr_response.numMsgBits = num_msg_bits;
-  int16_t* resp_var_nodes =
-      static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::kAlign64, kVarNodesSize));
-  ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
-
-  int num_bcast_bytes = BitsToBytes(dl_bcast_ldpc_config_.NumCbLen());
-  std::vector<uint8_t> decode_buff(num_bcast_bytes);
-
-  ldpc_decoder_5gnr_request.varNodes = demod_buff_ptr;
-  ldpc_decoder_5gnr_response.compactedMessageBytes =
-      static_cast<uint8_t*>(decode_buff.data());
-
-  bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
-                          &ldpc_decoder_5gnr_response);
-
-  if (scramble_enabled_) {
-    std::unique_ptr<AgoraScrambler::Scrambler> scrambler =
-        std::make_unique<AgoraScrambler::Scrambler>();
-
-    scrambler->Descramble(static_cast<uint8_t*>(decode_buff.data()),
-                          num_bcast_bytes);
-  }
+  DataGenerator::GetDecodedData(demod_buff_ptr, &decode_buff.at(0),
+                                dl_bcast_ldpc_config_, num_bcast_bytes,
+                                scramble_enabled_);
   FreeBuffer1d(&bcast_fft_buff);
   FreeBuffer1d(&eq_buff);
   FreeBuffer1d(&demod_buff_ptr);
-  FreeBuffer1d(&resp_var_nodes);
-
+  const double duration =
+      GetTime::CyclesToUs(GetTime::WorkerRdtsc() - start_tsc, freq_ghz_);
+  if (kDebugPrintInTask) {
+    std::printf("DecodeBroadcast completed in %2.2f us\n", duration);
+  }
   return (reinterpret_cast<size_t*>(decode_buff.data()))[0];
 }
 
 void Config::GenBroadcastSlots(
     std::vector<std::complex<int16_t>*>& bcast_iq_samps,
     std::vector<size_t> ctrl_msg) {
+  ///\todo enable a vector of bytes to TX'ed in each symbol
   assert(bcast_iq_samps.size() == this->frame_.NumDlControlSyms());
-  assert(ctrl_msg.size() == this->frame_.NumDlControlSyms());
+  const size_t start_tsc = GetTime::WorkerRdtsc();
 
-  const int num_bcast_bytes = dl_bcast_ldpc_config_.NumCbLen() / 8;
-  const int num_bcast_bytes_padded = Roundup<64>(num_bcast_bytes);
-  const int num_padding_bytes = num_bcast_bytes_padded - num_bcast_bytes;
-  int8_t* bcast_bits_buffer =
-      static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::kAlign64, num_bcast_bytes_padded));
-  std::memset(bcast_bits_buffer, 0u, num_bcast_bytes_padded);
-
-  const size_t dl_bcast_encoded_bytes =
-      BitsToBytes(this->dl_bcast_ldpc_config_.NumCbCodewLen());
-
-  SimdAlignByteVector dl_bcast_scramble_buffer(num_bcast_bytes_padded,
-                                               std::byte(0));
-
-  Table<int8_t> dl_bcast_encoded_bits;
-  dl_bcast_encoded_bits.Calloc(this->frame_.NumDlControlSyms(),
-                               dl_bcast_encoded_bytes,
-                               Agora_memory::Alignment_t::kAlign64);
-  Table<int8_t> dl_bcast_mod_bits;
-  dl_bcast_mod_bits.Calloc(this->frame_.NumDlControlSyms(),
-                           this->GetOFDMCtrlNum(),
-                           Agora_memory::Alignment_t::kAlign32);
-  auto* dl_bcast_parity_buffer =
-      static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::kAlign64,
-          LdpcEncodingEncodedBufSize(
-              this->dl_bcast_ldpc_config_.BaseGraph(),
-              this->dl_bcast_ldpc_config_.ExpansionFactor())));
+  int num_bcast_bytes = BitsToBytes(dl_bcast_ldpc_config_.NumCbLen());
+  std::vector<int8_t> bcast_bits_buffer(num_bcast_bytes, 0);
 
   Table<complex_float> dl_bcast_mod_table;
-  InitModulationTable(dl_bcast_mod_table, dl_bcast_mod_order_);
-  int8_t* ldpc_input = nullptr;
-  Table<complex_float> dl_bcast_iq_f;
-  dl_bcast_iq_f.Calloc(this->frame_.NumDlControlSyms(), ofdm_data_num_,
-                       Agora_memory::Alignment_t::kAlign64);
-  Table<complex_float> dl_bcast_iq_ifft;
-  dl_bcast_iq_ifft.Calloc(this->frame_.NumDlControlSyms(), ofdm_ca_num_,
-                          Agora_memory::Alignment_t::kAlign64);
-  auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
+  InitModulationTable(dl_bcast_mod_table, dl_bcast_mod_order_bits_);
+
   for (size_t i = 0; i < this->frame_.NumDlControlSyms(); i++) {
-    const int8_t* tmp =
-        static_cast<const int8_t*>(static_cast<const void*>(&ctrl_msg.at(i)));
+    std::memcpy(bcast_bits_buffer.data(), ctrl_msg.data(), sizeof(size_t));
 
-    std::memcpy(bcast_bits_buffer, tmp, sizeof(size_t));
+    const auto coded_bits_ptr = DataGenerator::GenCodeblock(
+        dl_bcast_ldpc_config_, &bcast_bits_buffer.at(0), num_bcast_bytes,
+        scramble_enabled_);
 
-    int8_t* coded_bits_ptr = dl_bcast_encoded_bits[i];
-
-    if (scramble_enabled_) {
-      scrambler->Scramble(dl_bcast_scramble_buffer.data(), bcast_bits_buffer,
-                          num_bcast_bytes);
-      ldpc_input = reinterpret_cast<int8_t*>(dl_bcast_scramble_buffer.data());
-    } else {
-      ldpc_input = bcast_bits_buffer;
-    }
-    if (num_padding_bytes > 0) {
-      std::memset(&ldpc_input[num_bcast_bytes], 0u, num_padding_bytes);
-    }
-
-    LdpcEncodeHelper(dl_bcast_ldpc_config_.BaseGraph(),
-                     dl_bcast_ldpc_config_.ExpansionFactor(),
-                     dl_bcast_ldpc_config_.NumRows(), coded_bits_ptr,
-                     dl_bcast_parity_buffer, ldpc_input);
-    int8_t* mod_input_ptr = dl_bcast_mod_bits[i];
-    AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
-                    reinterpret_cast<uint8_t*>(mod_input_ptr),
-                    dl_bcast_encoded_bytes, dl_bcast_mod_order_bits_);
-    size_t data_idx = 0;
-    for (size_t j = 0; j < ofdm_data_num_; j++) {
-      size_t sc = j + ofdm_data_start_;
-      if (j % ofdm_pilot_spacing_ != 0 && j % ofdm_pilot_spacing_ != 1) {
-        dl_bcast_iq_f[i][j] =
-            ModSingleUint8(mod_input_ptr[data_idx++], dl_bcast_mod_table);
-      } else {
-        dl_bcast_iq_f[i][j] = pilots_[j];
-      }
-      // FFT Shift
-      const size_t k = sc >= ofdm_ca_num_ / 2 ? sc - ofdm_ca_num_ / 2
-                                              : sc + ofdm_ca_num_ / 2;
-      dl_bcast_iq_ifft[i][k] = dl_bcast_iq_f[i][j];
-    }
-    CommsLib::IFFT(dl_bcast_iq_ifft[i], ofdm_ca_num_, false);
+    auto modulated_vector =
+        DataGenerator::GetModulation(&coded_bits_ptr[0], dl_bcast_mod_table,
+                                     dl_bcast_ldpc_config_.NumCbCodewLen(),
+                                     ofdm_data_num_, dl_bcast_mod_order_bits_);
+    auto mapped_symbol = DataGenerator::MapOFDMSymbol(
+        this, modulated_vector, pilots_, SymbolType::kControl);
+    auto ofdm_symbol = DataGenerator::BinForIfft(this, mapped_symbol, true);
+    CommsLib::IFFT(&ofdm_symbol[0], ofdm_ca_num_, false);
     // additional 2^2 (6dB) power backoff
     float dl_bcast_scale =
-        2 * CommsLib::FindMaxAbs(dl_bcast_iq_ifft[i], this->ofdm_ca_num_);
-    CommsLib::Ifft2tx(dl_bcast_iq_ifft[i], bcast_iq_samps[i],
-                      this->ofdm_ca_num_, this->ofdm_tx_zero_prefix_,
-                      this->cp_len_, dl_bcast_scale);
+        2 * CommsLib::FindMaxAbs(&ofdm_symbol[0], ofdm_symbol.size());
+    CommsLib::Ifft2tx(&ofdm_symbol[0], bcast_iq_samps[i], this->ofdm_ca_num_,
+                      this->ofdm_tx_zero_prefix_, this->cp_len_,
+                      dl_bcast_scale);
   }
-  FreeBuffer1d(&bcast_bits_buffer);
-  dl_bcast_iq_ifft.Free();
-  dl_bcast_iq_f.Free();
   dl_bcast_mod_table.Free();
-  dl_bcast_mod_bits.Free();
-  dl_bcast_encoded_bits.Free();
-  FreeBuffer1d(&dl_bcast_parity_buffer);
+  const double duration =
+      GetTime::CyclesToUs(GetTime::WorkerRdtsc() - start_tsc, freq_ghz_);
+  if (kDebugPrintInTask) {
+    std::printf("GenBroadcast completed in %2.2f us\n", duration);
+  }
 }
 
 Config::~Config() {
@@ -1859,6 +1786,10 @@ Config::~Config() {
     std::free(pilots_sgn_);
     pilots_sgn_ = nullptr;
   }
+  ue_specific_pilot_t_.Free();
+  ue_specific_pilot_.Free();
+  ue_pilot_ifft_.Free();
+
   ul_mod_table_.Free();
   dl_mod_table_.Free();
   dl_bits_.Free();
@@ -1869,13 +1800,6 @@ Config::~Config() {
   dl_iq_t_.Free();
   ul_iq_f_.Free();
   ul_iq_t_.Free();
-
-  if (pilot_ifft_ != nullptr) {
-    FreeBuffer1d(&pilot_ifft_);
-  }
-  ue_specific_pilot_t_.Free();
-  ue_specific_pilot_.Free();
-  ue_pilot_ifft_.Free();
 }
 
 /* TODO Inspect and document */

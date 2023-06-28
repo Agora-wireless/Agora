@@ -73,7 +73,7 @@ static void Run256QamSoftDemod(void (*demod_func)(const float *, int8_t *, int),
   AllocBuffer1d(&channel_output, num, Agora_memory::Alignment_t::kAlign64, 1);
   AllocBuffer1d(&output_demod, num * 8, Agora_memory::Alignment_t::kAlign64, 1);
   AllocBuffer1d(&output_symbols, num, Agora_memory::Alignment_t::kAlign64, 1);
-  InitModulationTable(mod_table, 256);
+  InitModulationTable(mod_table, 8);
   srand(0);
   runtime = 0.0;
   /*
@@ -190,7 +190,7 @@ TEST(TestDemod256QAM, VerifyCorrectness) {
                 Agora_memory::Alignment_t::kAlign64, 1);
   AllocBuffer1d(&output_demod_check, num * 8,
                 Agora_memory::Alignment_t::kAlign64, 1);
-  InitModulationTable(mod_table, 256);
+  InitModulationTable(mod_table, 8);
   srand(0);
   for (i = 0; i < num; i++) {
     input_symbols[i] = rand() % 256;
