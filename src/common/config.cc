@@ -45,8 +45,6 @@ static const std::string kUlDataFreqPrefix = kExperimentFilepath + "ul_data_f_";
 static const size_t kFlexibleSlotFormatIdx = 2;
 static const size_t kSubframesPerFrame = 10;
 
-
-
 std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub,
  size_t fft_size, double sampling_rate, double CBW,
 std::string frame_schedule, size_t user_num, std::map<int,
@@ -90,7 +88,6 @@ Config::Config(std::string jsonfilename)
   format_table[41] = "DDGGGUUUUUUUUU";
   format_table[45] = "DDDDDDGGUUUUUU";
   format_table[48] = "DGUUUUUDGUUUUU";
-
 
   pilots_ = nullptr;
   pilots_sgn_ = nullptr;
@@ -1814,7 +1811,7 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub,
 std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, std::string> format_table) {
   std::string subframe = format_table[format_num];
   size_t pilot_num = 0;
-  
+
   RtAssert(subframe.at(0) == 'D', "First symbol of selected format doesn't start with a downlink symbol.");
   RtAssert(user_num < 12, "Number of users exceeds pilot symbol limit of 12.");
   //Replace the first symbol with a beacon symbol.
