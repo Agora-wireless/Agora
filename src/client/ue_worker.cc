@@ -211,11 +211,9 @@ void UeWorker::DoFftPilot(size_t tag) {
     DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 
     //// FFT shift the buffer
-    std::vector<complex_float> temp_fft_buf(config_.OfdmCaNum());
-    auto* temp_buff = reinterpret_cast<complex_float*>(temp_fft_buf.data());
     auto* fft_buff_complex =
         reinterpret_cast<complex_float*>(fft_buffer_[fft_buffer_target_id]);
-    CommsLib::FFTShift(fft_buff_complex, temp_buff, config_.OfdmCaNum());
+    CommsLib::FFTShift(fft_buff_complex, config_.OfdmCaNum());
 
     size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
     auto* csi_buffer_ptr =
@@ -298,11 +296,9 @@ void UeWorker::DoFftData(size_t tag) {
     DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 
     //// FFT shift the buffer
-    std::vector<complex_float> temp_fft_buf(config_.OfdmCaNum());
-    auto* temp_buff = reinterpret_cast<complex_float*>(temp_fft_buf.data());
     auto* fft_buff_complex =
         reinterpret_cast<complex_float*>(fft_buffer_[fft_buffer_target_id]);
-    CommsLib::FFTShift(fft_buff_complex, temp_buff, config_.OfdmCaNum());
+    CommsLib::FFTShift(fft_buff_complex, config_.OfdmCaNum());
 
     size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
     auto* csi_buffer_ptr =
@@ -685,9 +681,7 @@ void UeWorker::DoIfft(size_t tag) {
     std::memset(ifft_buff + config_.OfdmDataStop(), 0,
                 sizeof(complex_float) * config_.OfdmDataStart());
 
-    std::vector<complex_float> temp_fft_buf(config_.OfdmCaNum());
-    auto* temp_buff = reinterpret_cast<complex_float*>(temp_fft_buf.data());
-    CommsLib::FFTShift(ifft_buff, temp_buff, config_.OfdmCaNum());
+    CommsLib::FFTShift(ifft_buff, config_.OfdmCaNum());
     CommsLib::IFFT(ifft_buff, config_.OfdmCaNum(), false);
 
     if (kDebugTxMemory) {
