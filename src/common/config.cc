@@ -1814,28 +1814,29 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub,
 std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, std::string> format_table) {
   std::string subframe = format_table[format_num];
   size_t pilot_num = 0;
-
+  
   RtAssert(subframe.at(0) == 'D', "First symbol of selected format doesn't start with a downlink symbol.");
   RtAssert(user_num < 12, "Number of users exceeds pilot symbol limit of 12.");
-
   //Replace the first symbol with a beacon symbol.
   subframe.replace(0, 1, "B");
-  subframe.replace(1, 1, "G");
-
   //Add in the pilot symbols.
-  for (unsigned int i = 2; i < subframe.size(); i++) {
+  for (unsigned int i = 1; i < subframe.size(); i++) {
     // Break once user_num many pilot_nums have been put in the beacon subframe.
     if (pilot_num >= user_num) {
       break;
     }
-    /*
-    If the last symbol of the first slot is a D and this D is not overwritten
-    by a pilot and the first symbol of the next slot is a U we might get a DU 
-    pair in the frame which could cause a problem.
-    */
-    subframe.replace(i, 1, "P");
-    pilot_num++;
+    if (subframe.at(i) == 'U') {
+      subframe.replace(i, 1, "P");
+      pilot_num++;
+    }
   }
+  RtAssert(pilot_num == user_num, "More users specified than the " 
+   "chosen slot format can support.");
+  /*
+  If the last symbol of the first slot is a D and this D is not overwritten
+  by a pilot and the first symbol of the next slot is a U we might get a DU 
+  pair in the frame which could cause a problem.
+  */
   return subframe;
 }
 

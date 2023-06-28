@@ -57,7 +57,7 @@
         /* Frame definition */
         /* 2a explicit frame construction */
         "frame_schedule": [
-          "39,0,0,0,0,0,0,0,0,28"
+          "34,0,0,0,0,0,0,0,0,28"
         ],
         /* For all frame constructions */
         "client_ul_pilot_syms": 0,
