@@ -33,8 +33,6 @@ class DataGenerator {
   explicit DataGenerator(Config* cfg, uint64_t seed = 0,
                          Profile profile = Profile::kRandom);
 
-  void DoDataGeneration(const std::string& directory);
-
   /**
    * @brief                        Generate random Mac payload bit
    * sequence
