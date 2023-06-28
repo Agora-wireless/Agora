@@ -63,7 +63,7 @@
         /* Frame definition */
         /* 2a explicit frame construction */
         "frame_schedule": [
-          "34,1,1,1,1,1,1,1,1,1"
+          "39,1,1,1,1,1,1,1,1,1"
         ],
         /* For all frame constructions */
         "client_ul_pilot_syms": 0,

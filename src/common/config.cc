@@ -603,7 +603,6 @@ Config::Config(std::string jsonfilename)
         "Number of pilot symbols: " + std::to_string(frame_.NumPilotSyms()) +
             " does not match number of UEs: " + std::to_string(ue_ant_num_));
   }
-
   if ((freq_orthogonal_pilot_ == false) && (ue_radio_id_.empty() == true) &&
       (tdd_conf.find("ue_radio_num") == tdd_conf.end())) {
     ue_num_ = frame_.NumPilotSyms();
@@ -718,7 +717,6 @@ Config::Config(std::string jsonfilename)
   samps_per_symbol_ =
       ofdm_tx_zero_prefix_ + ofdm_ca_num_ + cp_len_ + ofdm_tx_zero_postfix_;
 
-
   #ifdef __AVX512F__
     RtAssert(samps_per_symbol_ % 16 == 0,
              "samps_per_symbol_ = " + std::to_string(samps_per_symbol_) + 
@@ -727,6 +725,7 @@ Config::Config(std::string jsonfilename)
     RtAssert(samps_per_symbol_ % 8 == 0,
              "samps_per_symbol_ = " + std::to_string(samps_per_symbol_) + 
              "is not divisible by 8.\n");
+  #endif
   
   packet_length_ =
       Packet::kOffsetOfData + ((kUse12BitIQ ? 3 : 4) * samps_per_symbol_);
@@ -1772,17 +1771,13 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub,
   
   //This is kind of a hack, but it's faster and simpler than calculating.
   std::vector<size_t> valid_ffts{512, 1024, 1536, 2048};
-  
   scs = (15e3) * num_slots;
 
   RtAssert(CBW != 0, "Channel Bandwidth isn't specified!\n");
-
   RtAssert(num_symbols <= kMaxSymbols, "Number of symbols exceeded " +
    std::to_string(kMaxSymbols) + " symbols.\n");
-
   RtAssert(!(num_ofdm_data_sub % 16), "The given number of ofdm data "
    "subcarriers is not divisible by 16.\n");
-
   RtAssert(fft_size > num_ofdm_data_sub, "The fft_size is smaller than the "
    "number of subcarriers.\n");
 
@@ -1793,9 +1788,7 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub,
   }
 
   RtAssert(fft_is_valid, "Specified fft_size is not a valid fft size,\n");
-
   min_sampling_rate = scs*(fft_size); 
-
   if (min_sampling_rate < sampling_rate) {
     AGORA_LOG_WARN("Specified sampling rate %f is larger than the minimum"
     "required sampling rate of %f.\n", sampling_rate, min_sampling_rate);
@@ -1805,7 +1798,6 @@ std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub,
   Calculate channel bandwidth based on the specified parameters and
   verify that the specified channel bandwidth is valid.
   */ 
-
   TBW = num_ofdm_data_sub * scs;
   //CBW must be in MHz and SCS must be in Khz
   GB = (1e3) * (1000 * (CBW / 1e6) - (num_ofdm_data_sub + 1) * (scs / 1e3)) / 2;
@@ -1868,13 +1860,11 @@ std::string formFrame(std::string frame_schedule, size_t user_num,std::map<int,
         "Entered frame_schedule has more than 10 subframes."
       );
     }
-
     if (i == frame_schedule.size()-1 && subframe_idx != 9){
       throw std::runtime_error(
         "There are less than 10 frames in the frame schedule."
       );
     }
-   
     if (frame_schedule.at(i) == ',') {   
 
       subframes[subframe_idx] = std::stoi(temp);
@@ -1883,7 +1873,6 @@ std::string formFrame(std::string frame_schedule, size_t user_num,std::map<int,
     } else {
       temp += std::to_string(frame_schedule.at(i) - 48);
     } 
-
     if (i == frame_schedule.size()-1) {
       subframes[subframe_idx] = std::stoi(temp);
     }
@@ -1891,7 +1880,6 @@ std::string formFrame(std::string frame_schedule, size_t user_num,std::map<int,
 
   // Create the frame based on the format nums in the subframe array.
   frame += formBeaconSubframe(subframes[0], user_num, format_table);
-
   for (size_t i = 1; i < kSubframesPerFrame; i++) {  
     try {
       if (subframes[i] == kFlexibleSlotFormatIdx) {
@@ -1900,7 +1888,6 @@ std::string formFrame(std::string frame_schedule, size_t user_num,std::map<int,
       } else {
         frame += format_table.at(subframes[i]);
       }
- 
     } catch (std::out_of_range &e) {
       std::string error_message = "User specified a non supported subframe "
       "format.\nCurrently supported subframe formats are:";

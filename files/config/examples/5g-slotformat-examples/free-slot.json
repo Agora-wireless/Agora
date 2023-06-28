@@ -61,7 +61,7 @@
         /* Frame definition */
         /* 2a explicit frame construction */
         "frame_schedule": [
-          "0,2,0,2,0,27,2,1,1,1"
+          "39,2,0,2,0,27,2,1,1,1"
         ],
         "flex_formats": [
                 "GUDUDUDUDUDUDG",
@@ -87,7 +87,7 @@
         "bs_mac_tx_port": 9170,
         "ue_mac_rx_port": 8080,
         "ue_mac_tx_port": 8180,
-        "core_offset": 12,
+        "core_offset": 4,
         "worker_thread_num": 30,
         "socket_thread_num": 4,
         "max_frame": 9600

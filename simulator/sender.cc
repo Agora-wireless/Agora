@@ -557,9 +557,9 @@ void Sender::InitIqFromFile(const std::string& filename) {
   Table<float> iq_data_float;
   iq_data_float.Calloc(packets_per_frame, (cfg_->SampsPerSymbol()) * 2,
                        Agora_memory::Alignment_t::kAlign64);
+  
   FILE* fp = std::fopen(filename.c_str(), "rb");
   RtAssert(fp != nullptr, "Failed to open IQ data file");
-
 
   for (size_t i = 0; i < packets_per_frame; i++) {
     const size_t expected_count = (cfg_->SampsPerSymbol()) * 2;
