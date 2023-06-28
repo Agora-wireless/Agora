@@ -61,7 +61,7 @@
         /* Frame definition */
         /* 2a explicit frame construction */
         "frame_schedule": [
-          "0,0,0,0,0,27,1,1,1,1"
+          "34,0,0,0,0,27,1,1,1,1"
         ],
         /* For all frame constructions */
         "client_ul_pilot_syms": 0,
@@ -83,7 +83,7 @@
         "ue_mac_rx_port": 8080,
         "ue_mac_tx_port": 8180,
         "core_offset": 6,
-        "worker_thread_num": 30,
+        "worker_thread_num": 24,
         "socket_thread_num": 4,
         "max_frame": 9600
       }

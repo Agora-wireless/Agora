@@ -88,7 +88,7 @@
         "ue_mac_rx_port": 8080,
         "ue_mac_tx_port": 8180,
         "core_offset": 6,
-        "worker_thread_num": 30,
+        "worker_thread_num": 24,
         "socket_thread_num": 4,
         "max_frame": 9600
       }
