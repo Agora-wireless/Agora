@@ -8,9 +8,6 @@
 #include "logger.h"
 #include "version_config.h"
 
-//TESTING 
-#include "channel_models/dataset_model.h"
-
 DEFINE_uint64(bs_threads, 1,
               "Number of threads for handling reception of BS packets");
 DEFINE_uint64(ue_threads, 1,
