@@ -105,26 +105,10 @@ int main(int argc, char* argv[]) {
           directory + kUlDataPrefix + std::to_string(cfg_->OfdmCaNum()) +
           "_ant" + std::to_string(cfg_->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving uplink MAC data to %s\n", filename_input.c_str());
-      auto* fp_input = std::fopen(filename_input.c_str(), "wb");
-      if (fp_input == nullptr) {
-        AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
-        throw std::runtime_error("Failed to create file" + filename_input);
-      } else {
-        for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
-          const auto write_status =
-              std::fwrite(reinterpret_cast<uint8_t*>(ul_mac_info.at(i).data()),
-                          sizeof(uint8_t), num_ul_mac_bytes, fp_input);
-          if (write_status != num_ul_mac_bytes) {
-            AGORA_LOG_ERROR("Wrote %zu out of %zu to file %s\n", write_status,
-                            num_ul_mac_bytes, filename_input.c_str());
-            throw std::runtime_error("Failed to write to file" +
-                                     filename_input);
-          }
-        }
-        const auto close_status = std::fclose(fp_input);
-        if (close_status != 0) {
-          throw std::runtime_error("Failed to close file" + filename_input);
-        }
+      for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
+        Utils::WriteBinaryFile(filename_input, sizeof(uint8_t),
+                               num_ul_mac_bytes, ul_mac_info.at(i).data(),
+                               i != 0);  //Do not append in the first write
       }
 
       if (kPrintUplinkInformationBytes) {
@@ -176,26 +160,10 @@ int main(int argc, char* argv[]) {
           "_ant" + std::to_string(cfg_->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving raw uplink data (using LDPC) to %s\n",
                      filename_input.c_str());
-      auto* fp_input = std::fopen(filename_input.c_str(), "wb");
-      if (fp_input == nullptr) {
-        AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
-        throw std::runtime_error("Failed to create file" + filename_input);
-      } else {
-        for (size_t i = 0; i < num_ul_codeblocks; i++) {
-          const auto write_status = std::fwrite(
-              reinterpret_cast<uint8_t*>(&ul_information.at(i).at(0)),
-              sizeof(uint8_t), ul_cb_bytes, fp_input);
-          if (write_status != ul_cb_bytes) {
-            AGORA_LOG_ERROR("Wrote %zu out of %zu to file %s\n", write_status,
-                            ul_cb_bytes, filename_input.c_str());
-            throw std::runtime_error("Failed to write to file" +
-                                     filename_input);
-          }
-        }
-        const auto close_status = std::fclose(fp_input);
-        if (close_status != 0) {
-          throw std::runtime_error("Failed to close file" + filename_input);
-        }
+      for (size_t i = 0; i < num_ul_codeblocks; i++) {
+        Utils::WriteBinaryFile(filename_input, sizeof(uint8_t), ul_cb_bytes,
+                               ul_information.at(i).data(),
+                               i != 0);  //Do not append in the first write
       }
 
       if (kPrintUplinkInformationBytes) {
@@ -335,25 +303,11 @@ int main(int argc, char* argv[]) {
                                   std::to_string(cfg_->OfdmCaNum()) + "_ant" +
                                   std::to_string(cfg_->BsAntNum()) + ".bin";
   AGORA_LOG_INFO("Saving rx data to %s\n", filename_rx.c_str());
-  auto* fp_rx = std::fopen(filename_rx.c_str(), "wb");
-  if (fp_rx == nullptr) {
-    AGORA_LOG_ERROR("Failed to create file %s\n", filename_rx.c_str());
-    throw std::runtime_error("Failed to create file" + filename_rx);
-  } else {
-    for (size_t i = 0; i < cfg_->Frame().NumTotalSyms(); i++) {
-      const auto* ptr = reinterpret_cast<float*>(rx_data_all_symbols[i]);
-      const auto write_status = std::fwrite(
-          ptr, sizeof(float), cfg_->OfdmCaNum() * cfg_->BsAntNum() * 2, fp_rx);
-      if (write_status != cfg_->OfdmCaNum() * cfg_->BsAntNum() * 2) {
-        AGORA_LOG_ERROR("Write %zu out of %zu to file %s\n", write_status,
-                        num_ul_mac_bytes, filename_rx.c_str());
-        throw std::runtime_error("Failed to write to file" + filename_rx);
-      }
-    }
-    const auto close_status = std::fclose(fp_rx);
-    if (close_status != 0) {
-      throw std::runtime_error("Failed to close file" + filename_rx);
-    }
+  for (size_t i = 0; i < cfg_->Frame().NumTotalSyms(); i++) {
+    Utils::WriteBinaryFile(filename_rx, sizeof(float),
+                           cfg_->OfdmCaNum() * cfg_->BsAntNum() * 2,
+                           reinterpret_cast<void*>(rx_data_all_symbols[i]),
+                           i != 0);  //Do not append in the first write
   }
 
   if (kDebugPrintRxData) {
@@ -407,26 +361,10 @@ int main(int argc, char* argv[]) {
           "_ant" + std::to_string(cfg_->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving downlink MAC data to %s\n",
                      filename_input.c_str());
-      FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
-      if (fp_input == nullptr) {
-        AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
-        throw std::runtime_error("Failed to create file" + filename_input);
-      } else {
-        for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
-          const auto write_status =
-              std::fwrite(reinterpret_cast<uint8_t*>(dl_mac_info.at(i).data()),
-                          sizeof(uint8_t), num_dl_mac_bytes, fp_input);
-          if (write_status != num_dl_mac_bytes) {
-            AGORA_LOG_ERROR("Wrote %zu out of %zu to file %s\n", write_status,
-                            num_dl_mac_bytes, filename_input.c_str());
-            throw std::runtime_error("Failed to write to file" +
-                                     filename_input);
-          }
-        }
-        const auto close_status = std::fclose(fp_input);
-        if (close_status != 0) {
-          throw std::runtime_error("Failed to close file" + filename_input);
-        }
+      for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
+        Utils::WriteBinaryFile(filename_input, sizeof(uint8_t),
+                               num_dl_mac_bytes, dl_mac_info.at(i).data(),
+                               i != 0);  //Do not append in the first write
       }
 
       if (kPrintDownlinkInformationBytes) {
@@ -488,26 +426,10 @@ int main(int argc, char* argv[]) {
           "_ant" + std::to_string(cfg_->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving raw dl data (using LDPC) to %s\n",
                      filename_input.c_str());
-      auto* fp_input = std::fopen(filename_input.c_str(), "wb");
-      if (fp_input == nullptr) {
-        AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
-        throw std::runtime_error("Failed to create file" + filename_input);
-      } else {
-        for (size_t i = 0; i < num_dl_codeblocks; i++) {
-          const auto write_status = std::fwrite(
-              reinterpret_cast<uint8_t*>(&dl_information.at(i).at(0)),
-              sizeof(uint8_t), dl_cb_bytes, fp_input);
-          if (write_status != dl_cb_bytes) {
-            AGORA_LOG_ERROR("Wrote %zu out of %zu to file %s\n", write_status,
-                            dl_cb_bytes, filename_input.c_str());
-            throw std::runtime_error("Failed to write to file" +
-                                     filename_input);
-          }
-        }
-        const auto close_status = std::fclose(fp_input);
-        if (close_status != 0) {
-          throw std::runtime_error("Failed to close file" + filename_input);
-        }
+      for (size_t i = 0; i < num_dl_codeblocks; i++) {
+        Utils::WriteBinaryFile(filename_input, sizeof(uint8_t), dl_cb_bytes,
+                               dl_information.at(i).data(),
+                               i != 0);  //Do not append in the first write
       }
 
       if (kPrintDownlinkInformationBytes == true) {
@@ -539,13 +461,11 @@ int main(int argc, char* argv[]) {
 
     if (kPrintDebugCSI) {
       std::printf("CSI \n");
-      // for (size_t i = 0; i < cfg_->ofdm_ca_num(); i++)
       for (size_t j = 0; j < cfg_->UeAntNum() * cfg_->BsAntNum(); j++) {
         std::printf("%.3f+%.3fi ", csi_matrices[cfg_->OfdmDataStart()][j].re,
                     csi_matrices[cfg_->OfdmDataStart()][j].im);
       }
       std::printf("\nprecoder \n");
-      // for (size_t i = 0; i < cfg_->ofdm_ca_num(); i++)
       for (size_t j = 0; j < cfg_->UeAntNum() * cfg_->BsAntNum(); j++) {
         std::printf("%.3f+%.3fi ", precoder[cfg_->OfdmDataStart()][j].re,
                     precoder[cfg_->OfdmDataStart()][j].im);
@@ -585,9 +505,6 @@ int main(int argc, char* argv[]) {
              k < cfg_->OfdmDataStart() + cfg_->OfdmDataNum(); k++) {
           std::printf("symbol %zu, subcarrier %zu\n", i, k);
           for (size_t j = 0; j < cfg_->UeAntNum(); j++) {
-            // for (int k = cfg_->OfdmDataStart(); k <
-            // cfg_->OfdmDataStart() + cfg_->OfdmDataNum();
-            //      k++) {
             std::printf("%.3f+%.3fi ",
                         dl_mod_data[i][j * cfg_->OfdmCaNum() + k].re,
                         dl_mod_data[i][j * cfg_->OfdmCaNum() + k].im);
@@ -655,47 +572,32 @@ int main(int argc, char* argv[]) {
       }
     }
 
-    std::string filename_dl_tx = directory + kDlTxPrefix +
-                                 std::to_string(cfg_->OfdmCaNum()) + "_ant" +
-                                 std::to_string(cfg_->BsAntNum()) + ".bin";
-    AGORA_LOG_INFO("Saving dl tx data to %s\n", filename_dl_tx.c_str());
-    auto* fp_dl_tx = std::fopen(filename_dl_tx.c_str(), "wb");
-    if (fp_dl_tx == nullptr) {
-      AGORA_LOG_ERROR("Failed to create file %s\n", filename_dl_tx.c_str());
-      throw std::runtime_error("Failed to create file" + filename_dl_tx);
-    } else {
+    {
+      std::string filename_dl_tx = directory + kDlTxPrefix +
+                                   std::to_string(cfg_->OfdmCaNum()) + "_ant" +
+                                   std::to_string(cfg_->BsAntNum()) + ".bin";
+      AGORA_LOG_INFO("Saving dl tx data to %s\n", filename_dl_tx.c_str());
       for (size_t i = 0; i < cfg_->Frame().NumDLSyms(); i++) {
-        const short* ptr = dl_tx_data[i];
-        const auto write_status = std::fwrite(
-            ptr, sizeof(short), cfg_->SampsPerSymbol() * cfg_->BsAntNum() * 2,
-            fp_dl_tx);
-        if (write_status != cfg_->SampsPerSymbol() * cfg_->BsAntNum() * 2) {
-          AGORA_LOG_ERROR("Wrote %zu out of %zu to file %s\n", write_status,
-                          cfg_->SampsPerSymbol() * cfg_->BsAntNum() * 2,
-                          filename_dl_tx.c_str());
-          throw std::runtime_error("Failed to write to file" + filename_dl_tx);
-        }
+        Utils::WriteBinaryFile(filename_dl_tx, sizeof(short),
+                               cfg_->SampsPerSymbol() * cfg_->BsAntNum() * 2,
+                               reinterpret_cast<void*>(dl_tx_data[i]),
+                               i != 0);  //Do not append in the first write
       }
-      const auto close_status = std::fclose(fp_dl_tx);
-      if (close_status != 0) {
-        throw std::runtime_error("Failed to close file" + filename_dl_tx);
-      }
-    }
 
-    if (kPrintDlTxData) {
-      std::printf("rx data\n");
-      for (size_t i = 0; i < 10; i++) {
-        for (size_t j = 0; j < cfg_->OfdmCaNum() * cfg_->BsAntNum(); j++) {
-          if (j % cfg_->OfdmCaNum() == 0) {
-            std::printf("symbol %zu ant %zu\n", i, j / cfg_->OfdmCaNum());
+      if (kPrintDlTxData) {
+        std::printf("rx data\n");
+        for (size_t i = 0; i < 10; i++) {
+          for (size_t j = 0; j < cfg_->OfdmCaNum() * cfg_->BsAntNum(); j++) {
+            if (j % cfg_->OfdmCaNum() == 0) {
+              std::printf("symbol %zu ant %zu\n", i, j / cfg_->OfdmCaNum());
+            }
+            // TODO keep and fix or remove
+            // std::printf("%d+%di ", dl_tx_data[i][j], dl_tx_data[i][j]);
           }
-          // TODO keep and fix or remove
-          // std::printf("%d+%di ", dl_tx_data[i][j], dl_tx_data[i][j]);
         }
+        std::printf("\n");
       }
-      std::printf("\n");
     }
-
     /* Clean Up memory */
     dl_ifft_data.Free();
     dl_tx_data.Free();
