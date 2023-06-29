@@ -542,9 +542,6 @@ add_executable(chsim
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(chsim ${COMMON_LIBS})
 
-#Test
-
-
 add_executable(macuser
      ${MAC_CLIENT_SOURCES}
      ${COMMON_SOURCES})

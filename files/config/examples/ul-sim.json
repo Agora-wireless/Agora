@@ -1,4 +1,5 @@
 {
+  "max_frame": 1,
   "fft_size": 2048,
   "ofdm_data_num": 1200,
   "demul_block_size": 48,

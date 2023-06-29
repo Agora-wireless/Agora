@@ -1,6 +1,7 @@
 {
-  "fft_size": 512,/*1024,512, fft_size > ofdm_data_num, powers of 2...y 64, 128, 256, 512*/ 
-  "ofdm_data_num": 304, // 1 Number of subcarriers
+  "max_frame" : 10,
+  "fft_size": 256,
+  "ofdm_data_num": 128,
   "demul_block_size": 48,
   "ul_mcs" : {
     "code_rate": 0.333
@@ -9,8 +10,8 @@
     "code_rate": 0.333
   },
   "sample_rate" : 1e6,
-  "ue_radio_num": 4,
-  "bs_radio_num": 32,
+  "ue_radio_num": 16,
+  "bs_radio_num": 64,
   "symbol_num_perframe": 24,
   "client_ul_pilot_syms": 2,
   "ul_data_symbol_start": 17,
@@ -22,9 +23,9 @@
   "bs_server_port": 8100,
   "bs_rru_port": 8200,
   "core_offset": 5,
-  "worker_thread_num": 12,
-  "socket_thread_num": 1,
+  "worker_thread_num": 20,
+  "socket_thread_num": 2,
   "ue_core_offset": 1,
-  "ue_worker_thread_num": 2,
-  "ue_socket_thread_num": 1
+  "ue_worker_thread_num": 4,
+  "ue_socket_thread_num": 2
 }
