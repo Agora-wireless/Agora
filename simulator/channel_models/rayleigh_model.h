@@ -4,12 +4,12 @@
 #include "armadillo"
 #include "channel_model.h"
 
+//Flat fading Rayleigh channel model
 class RayleighModel: public ChannelModel {
 
     public:
         RayleighModel( const Config* config ) : ChannelModel( config ) {}
 
-        //Build the channel matrix here
         arma::cx_fmat GetAndUpdateMatrix() override 
         {
 
