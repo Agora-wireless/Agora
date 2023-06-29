@@ -80,7 +80,8 @@ class Utils {
   static std::vector<std::string> Split(const std::string& s, char delimiter);
   static void PrintVector(const std::vector<std::complex<int16_t>>& data);
   static void WriteBinaryFile(const std::string& name, size_t elem_size,
-                              size_t buffer_size, void* buff);
+                              size_t buffer_size, void* buff,
+                              bool append = false);
   static void PrintVec(const arma::cx_fvec& c, const std::string& ss);
   static void SaveVec(const arma::cx_fvec& c, const std::string& filename,
                       const std::string& /*ss*/, const bool /*append*/);

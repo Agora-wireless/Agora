@@ -407,8 +407,8 @@ void Utils::PrintVector(const std::vector<std::complex<int16_t>>& data) {
 }
 
 void Utils::WriteBinaryFile(const std::string& name, size_t elem_size,
-                            size_t buffer_size, void* buff) {
-  auto* f_handle = std::fopen(name.c_str(), "wb");
+                            size_t buffer_size, void* buff, bool append) {
+  auto* f_handle = std::fopen(name.c_str(), append ? "ab" : "wb");
   if (f_handle == nullptr) {
     throw std::runtime_error("Failed to open binary file " + name);
   }
