@@ -177,6 +177,21 @@ std::vector<complex_float> DataGenerator::GetModulation(
   return modulated_codeword;
 }
 
+std::vector<complex_float> DataGenerator::GetModulation(
+    const int8_t* encoded_codeword, uint8_t* modulation_data,
+    Table<complex_float> mod_table, const size_t num_bits,
+    const size_t num_subcarriers, const size_t mod_order_bits) {
+  std::vector<complex_float> modulated_codeword(num_subcarriers);
+
+  AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
+                  modulation_data, BitsToBytes(num_bits), mod_order_bits);
+
+  for (size_t i = 0; i < num_subcarriers; i++) {
+    modulated_codeword[i] = ModSingleUint8(modulation_data[i], mod_table);
+  }
+  return modulated_codeword;
+}
+
 std::vector<complex_float> DataGenerator::MapOFDMSymbol(
     Config* cfg, const std::vector<complex_float>& modulated_codeword,
     complex_float* pilot_seq, SymbolType symbol_type) {

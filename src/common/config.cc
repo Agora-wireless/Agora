@@ -47,6 +47,9 @@ static const std::string kUlDataFilePrefix =
 static const std::string kDlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_dl_data_";
 static const std::string kUlDataFreqPrefix = kExperimentFilepath + "ul_data_f_";
+static const std::string kUlModDataPrefix =
+    kExperimentFilepath + "mod_ul_data_";
+static const std::string kUlTxPrefix = kExperimentFilepath + "ul_ifft_data_";
 
 Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -1224,65 +1227,27 @@ void Config::GenData() {
                   this->samps_per_symbol_ * this->ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
 
-#ifdef GENERATE_DATA
-  for (size_t ue_id = 0; ue_id < this->ue_ant_num_; ue_id++) {
-    for (size_t j = 0; j < num_bytes_per_ue_pad; j++) {
-      int cur_offset = j * ue_ant_num_ + ue_id;
-      for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
-        this->ul_bits_[i][cur_offset] = rand() % mod_order;
-      }
-      for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
-        this->dl_bits_[i][cur_offset] = rand() % mod_order;
-      }
-    }
-  }
-#else
   if (this->frame_.NumUlDataSyms() > 0) {
     const std::string ul_data_file =
         kUlDataFilePrefix + std::to_string(this->ofdm_ca_num_) + "_ant" +
         std::to_string(this->ue_ant_total_) + ".bin";
     AGORA_LOG_SYMBOL("Config: Reading raw ul data from %s\n",
                      ul_data_file.c_str());
-    FILE* fd = std::fopen(ul_data_file.c_str(), "rb");
-    if (fd == nullptr) {
-      AGORA_LOG_ERROR("Failed to open antenna file %s. Error %s.\n",
-                      ul_data_file.c_str(), strerror(errno));
-      throw std::runtime_error("Config: Failed to open antenna file");
-    }
 
+    size_t seek_offset = 0;
     for (size_t i = this->frame_.ClientUlPilotSymbols();
          i < this->frame_.NumULSyms(); i++) {
-      if (std::fseek(fd, (ul_data_bytes_num_persymbol_ * this->ue_ant_offset_),
-                     SEEK_CUR) != 0) {
-        AGORA_LOG_ERROR(
-            " *** Error: failed to seek propertly (pre) into %s file\n",
-            ul_data_file.c_str());
-        RtAssert(false,
-                 "Failed to seek propertly into " + ul_data_file + "file\n");
-      }
+      seek_offset += ul_data_bytes_num_persymbol_ * this->ue_ant_offset_;
       for (size_t j = 0; j < this->ue_ant_num_; j++) {
-        size_t r = std::fread(this->ul_bits_[i] + (j * ul_num_bytes_per_ue_pad),
-                              sizeof(int8_t), ul_data_bytes_num_persymbol_, fd);
-        if (r < ul_data_bytes_num_persymbol_) {
-          AGORA_LOG_ERROR(
-              " *** Error: Uplink bad read from file %s (batch %zu : %zu) "
-              "%zu : %zu\n",
-              ul_data_file.c_str(), i, j, r, ul_data_bytes_num_persymbol_);
-        }
+        Utils::ReadBinaryFile(
+            ul_data_file, sizeof(int8_t), ul_data_bytes_num_persymbol_,
+            seek_offset, this->ul_bits_[i] + (j * ul_num_bytes_per_ue_pad));
+        seek_offset += ul_data_bytes_num_persymbol_ * sizeof(int8_t);
       }
-      if (std::fseek(fd,
-                     ul_data_bytes_num_persymbol_ *
-                         (this->ue_ant_total_ - this->ue_ant_offset_ -
-                          this->ue_ant_num_),
-                     SEEK_CUR) != 0) {
-        AGORA_LOG_ERROR(
-            " *** Error: failed to seek propertly (post) into %s file\n",
-            ul_data_file.c_str());
-        RtAssert(false,
-                 "Failed to seek propertly into " + ul_data_file + "file\n");
-      }
+      seek_offset +=
+          ul_data_bytes_num_persymbol_ *
+          (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_);
     }
-    std::fclose(fd);
   }
 
   if (this->frame_.NumDlDataSyms() > 0) {
@@ -1292,31 +1257,19 @@ void Config::GenData() {
 
     AGORA_LOG_SYMBOL("Config: Reading raw dl data from %s\n",
                      dl_data_file.c_str());
-    FILE* fd = std::fopen(dl_data_file.c_str(), "rb");
-    if (fd == nullptr) {
-      AGORA_LOG_ERROR("Failed to open antenna file %s. Error %s.\n",
-                      dl_data_file.c_str(), strerror(errno));
-      throw std::runtime_error("Config: Failed to open dl antenna file");
-    }
-
+    size_t seek_offset = 0;
     for (size_t i = this->frame_.ClientDlPilotSymbols();
          i < this->frame_.NumDLSyms(); i++) {
       for (size_t j = 0; j < this->ue_ant_num_; j++) {
-        size_t r = std::fread(this->dl_bits_[i] + j * dl_num_bytes_per_ue_pad,
-                              sizeof(int8_t), dl_data_bytes_num_persymbol_, fd);
-        if (r < dl_data_bytes_num_persymbol_) {
-          AGORA_LOG_ERROR(
-              "***Error: Downlink bad read from file %s (batch %zu : %zu) "
-              "\n",
-              dl_data_file.c_str(), i, j);
-        }
+        Utils::ReadBinaryFile(
+            dl_data_file, sizeof(int8_t), dl_data_bytes_num_persymbol_,
+            seek_offset, this->dl_bits_[i] + (j * dl_num_bytes_per_ue_pad));
+        seek_offset += dl_data_bytes_num_persymbol_ * sizeof(int8_t);
       }
     }
-    std::fclose(fd);
   }
-#endif
 
-  auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
+  /*auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
 
   const size_t ul_encoded_bytes_per_block =
       BitsToBytes(this->ul_ldpc_config_.NumCbCodewLen());
@@ -1324,18 +1277,39 @@ void Config::GenData() {
       this->ul_ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
 
   SimdAlignByteVector ul_scramble_buffer(
-      ul_num_bytes_per_cb_ + ul_num_padding_bytes_per_cb_, std::byte(0));
+      ul_num_bytes_per_cb_ + ul_num_padding_bytes_per_cb_, std::byte(0));*/
 
-  int8_t* ldpc_input = nullptr;
-  // Encode uplink bits
+  /*int8_t* ldpc_input = nullptr;
   Table<int8_t> ul_encoded_bits;
   ul_encoded_bits.Malloc(this->frame_.NumULSyms() * ul_num_blocks_per_symbol,
                          ul_encoded_bytes_per_block,
-                         Agora_memory::Alignment_t::kAlign64);
-  ul_mod_bits_.Calloc(this->frame_.NumULSyms(),
-                      Roundup<64>(this->ofdm_data_num_) * this->ue_ant_num_,
-                      Agora_memory::Alignment_t::kAlign32);
-  auto* ul_temp_parity_buffer = new int8_t[LdpcEncodingParityBufSize(
+                         Agora_memory::Alignment_t::kAlign64);*/
+  if (this->frame_.NumUlDataSyms() > 0) {
+    ul_mod_bits_.Calloc(this->frame_.NumULSyms(),
+                        Roundup<64>(this->ofdm_data_num_) * this->ue_ant_num_,
+                        Agora_memory::Alignment_t::kAlign32);
+    const std::string ul_mod_data_file =
+        kUlModDataPrefix + std::to_string(this->ofdm_ca_num_) + "_ant" +
+        std::to_string(this->ue_ant_total_) + ".bin";
+    size_t seek_offset = 0;
+    // \todo assumes one code block per symbol
+    size_t code_block_in_symbol_i = 0;
+    for (size_t i = this->frame_.ClientUlPilotSymbols();
+         i < this->frame_.NumULSyms(); i++) {
+      seek_offset += ofdm_data_num_ * this->ue_ant_offset_;
+      for (size_t j = 0; j < this->ue_ant_num_; j++) {
+        int8_t* ul_mod_data_ptr = GetModBitsBuf(
+            ul_mod_bits_, Direction::kUplink, 0, i, j, code_block_in_symbol_i);
+        Utils::ReadBinaryFile(ul_mod_data_file, sizeof(int8_t), ofdm_data_num_,
+                              seek_offset, ul_mod_data_ptr);
+        seek_offset += ofdm_data_num_;
+      }
+      seek_offset +=
+          ofdm_data_num_ *
+          (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_);
+    }
+  }
+  /*auto* ul_temp_parity_buffer = new int8_t[LdpcEncodingParityBufSize(
       this->ul_ldpc_config_.BaseGraph(),
       this->ul_ldpc_config_.ExpansionFactor())];
 
@@ -1371,14 +1345,33 @@ void Config::GenData() {
                         ul_encoded_bytes_per_block, ul_mod_order_bits_);
       }
     }
-  }
+  }*/
 
   // Generate freq-domain uplink symbols
   Table<complex_float> ul_iq_ifft;
   ul_iq_ifft.Calloc(this->frame_.NumULSyms(),
                     this->ofdm_ca_num_ * this->ue_ant_num_,
                     Agora_memory::Alignment_t::kAlign64);
-  std::vector<FILE*> vec_fp_tx;
+  /*const std::string ul_ifft_data_file =
+      kUlTxPrefix + std::to_string(this->ofdm_ca_num_) + "_ant" +
+      std::to_string(this->ue_ant_total_) + ".bin";
+  size_t seek_offset = 0;
+  for (size_t i = 0;  // this->frame_.ClientUlPilotSymbols();
+       i < this->frame_.NumULSyms(); i++) {
+    seek_offset += ofdm_ca_num_ * this->ue_ant_offset_ * sizeof(complex_float);
+    for (size_t j = 0; j < this->ue_ant_num_; j++) {
+      Utils::ReadBinaryFile(ul_ifft_data_file, sizeof(complex_float),
+                            ofdm_ca_num_, seek_offset,
+                            &ul_iq_ifft[i][j * ofdm_ca_num_]);
+      CommsLib::FFTShift(&ul_iq_ifft[i][j * ofdm_ca_num_], ofdm_ca_num_);
+      seek_offset += ofdm_ca_num_ * sizeof(complex_float);
+    }
+    seek_offset +=
+        ofdm_ca_num_ *
+        (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
+        sizeof(complex_float);
+  }*/
+  /*std::vector<FILE*> vec_fp_tx;
   if (kOutputUlScData) {
     for (size_t i = 0; i < this->ue_num_; i++) {
       const std::string filename_ul_data_f =
@@ -1398,7 +1391,7 @@ void Config::GenData() {
       }
       vec_fp_tx.push_back(fp_tx_f);
     }
-  }
+  }*/
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
     for (size_t u = 0; u < this->ue_ant_num_; u++) {
       const size_t q = u * ofdm_data_num_;
@@ -1417,26 +1410,27 @@ void Config::GenData() {
                                                 : sc + ofdm_ca_num_ / 2;
         ul_iq_ifft[i][u * ofdm_ca_num_ + k] = ul_iq_f_[i][q + j];
       }
-      if (kOutputUlScData) {
-        const auto write_status =
-            std::fwrite(&ul_iq_ifft[i][u * ofdm_ca_num_], sizeof(complex_float),
-                        ofdm_ca_num_, vec_fp_tx.at(u / num_ue_channels_));
-        if (write_status != ofdm_ca_num_) {
-          AGORA_LOG_ERROR("Config: Failed to write ul sc data file\n");
-        }
-      }
+      //if (kOutputUlScData) {
+      //  const auto write_status =
+      //      std::fwrite(&ul_iq_ifft[i][u * ofdm_ca_num_], sizeof(complex_float),
+      //                  ofdm_ca_num_, vec_fp_tx.at(u / num_ue_channels_));
+      //  if (write_status != ofdm_ca_num_) {
+      //    AGORA_LOG_ERROR("Config: Failed to write ul sc data file\n");
+      //  }
+      //}
       CommsLib::IFFT(&ul_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
     }
   }
-  if (kOutputUlScData) {
+  /*if (kOutputUlScData) {
     for (size_t i = 0; i < vec_fp_tx.size(); i++) {
       const auto close_status = std::fclose(vec_fp_tx.at(i));
       if (close_status != 0) {
         AGORA_LOG_ERROR("Config: Failed to close ul sc data file %zu\n", i);
       }
     }
-  }
+  }*/
 
+  auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
   // Encode downlink bits
   const size_t dl_encoded_bytes_per_block =
       BitsToBytes(this->dl_ldpc_config_.NumCbCodewLen());
@@ -1446,6 +1440,7 @@ void Config::GenData() {
   SimdAlignByteVector dl_scramble_buffer(
       dl_num_bytes_per_cb_ + dl_num_padding_bytes_per_cb_, std::byte(0));
 
+  int8_t* ldpc_input = nullptr;
   Table<int8_t> dl_encoded_bits;
   dl_encoded_bits.Malloc(this->frame_.NumDLSyms() * dl_num_blocks_per_symbol,
                          dl_encoded_bytes_per_block,
@@ -1651,12 +1646,12 @@ void Config::GenData() {
   if (pilot_ifft_ != nullptr) {
     FreeBuffer1d(&pilot_ifft_);
   }
-  delete[](ul_temp_parity_buffer);
+  //delete[](ul_temp_parity_buffer);
   delete[](dl_temp_parity_buffer);
   ul_iq_ifft.Free();
   dl_iq_ifft.Free();
   dl_encoded_bits.Free();
-  ul_encoded_bits.Free();
+  //ul_encoded_bits.Free();
 }
 
 size_t Config::DecodeBroadcastSlots(const int16_t* const bcast_iq_samps) {

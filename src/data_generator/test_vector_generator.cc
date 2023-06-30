@@ -28,6 +28,8 @@ static constexpr bool kPrintDownlinkInformationBytes = false;
 ///Output files
 static const std::string kUlDataPrefix = "orig_ul_data_";
 static const std::string kUlLdpcDataPrefix = "LDPC_orig_ul_data_";
+static const std::string kUlModDataPrefix = "mod_ul_data_";
+static const std::string kUlTxPrefix = "ul_ifft_data_";
 static const std::string kDlDataPrefix = "orig_dl_data_";
 static const std::string kDlLdpcDataPrefix = "LDPC_orig_dl_data_";
 static const std::string kRxLdpcPrefix = "LDPC_rx_data_";
@@ -181,15 +183,32 @@ int main(int argc, char* argv[]) {
     }
 
     // Modulate the encoded codewords
-    std::vector<std::vector<complex_float>> ul_modulated_codewords(
+    std::vector<std::vector<uint8_t>> ul_modulated_codewords(num_ul_codeblocks);
+    std::vector<std::vector<complex_float>> ul_modulated_symbols(
         num_ul_codeblocks);
     for (size_t i = 0; i < num_ul_codeblocks; i++) {
+      ul_modulated_codewords.at(i).resize(cfg_->OfdmDataNum());
       auto ofdm_symbol = DataGenerator::GetModulation(
-          &ul_encoded_codewords.at(i)[0], cfg_->ModTable(Direction::kUplink),
+          &ul_encoded_codewords.at(i)[0], &ul_modulated_codewords.at(i).at(0),
+          cfg_->ModTable(Direction::kUplink),
           cfg_->LdpcConfig(Direction::kUplink).NumCbCodewLen(),
           cfg_->OfdmDataNum(), cfg_->ModOrderBits(Direction::kUplink));
-      ul_modulated_codewords.at(i) = DataGenerator::MapOFDMSymbol(
+      ul_modulated_symbols.at(i) = DataGenerator::MapOFDMSymbol(
           cfg_.get(), ofdm_symbol, nullptr, SymbolType::kUL);
+    }
+
+    {
+      const std::string filename_input =
+          directory + kUlModDataPrefix + std::to_string(cfg_->OfdmCaNum()) +
+          "_ant" + std::to_string(cfg_->UeAntNum()) + ".bin";
+      AGORA_LOG_INFO("Saving modulated uplink data to %s\n",
+                     filename_input.c_str());
+      for (size_t i = 0; i < num_ul_codeblocks; i++) {
+        Utils::WriteBinaryFile(filename_input, sizeof(uint8_t),
+                               cfg_->OfdmDataNum(),
+                               ul_modulated_codewords.at(i).data(),
+                               i != 0);  //Do not append in the first write
+      }
     }
 
     // Place modulated uplink data codewords into central IFFT bins
@@ -197,7 +216,7 @@ int main(int argc, char* argv[]) {
     pre_ifft_data_syms.resize(cfg_->UeAntNum() * cfg_->Frame().NumUlDataSyms());
     for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
       pre_ifft_data_syms.at(i) =
-          DataGenerator::BinForIfft(cfg_.get(), ul_modulated_codewords.at(i));
+          DataGenerator::BinForIfft(cfg_.get(), ul_modulated_symbols.at(i));
     }
   }
 
@@ -253,6 +272,20 @@ int main(int argc, char* argv[]) {
                     &pre_ifft_data_syms.at(k * cfg_->UeAntNum() + j).at(0),
                     cfg_->OfdmCaNum() * sizeof(complex_float));
       }
+    }
+  }
+
+  {
+    const std::string filename_tx = directory + kUlTxPrefix +
+                                    std::to_string(cfg_->OfdmCaNum()) + "_ant" +
+                                    std::to_string(cfg_->UeAntNum()) + ".bin";
+    AGORA_LOG_INFO("Saving UL tx data to %s\n", filename_tx.c_str());
+    for (size_t i = 0; i < cfg_->Frame().NumULSyms(); i++) {
+      const size_t sym_id = cfg_->Frame().GetULSymbol(i);
+      Utils::WriteBinaryFile(filename_tx, sizeof(complex_float),
+                             cfg_->OfdmCaNum() * cfg_->UeAntNum(),
+                             tx_data_all_symbols[sym_id],
+                             i != 0);  //Do not append in the first write
     }
   }
 

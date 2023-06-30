@@ -82,6 +82,8 @@ class Utils {
   static void WriteBinaryFile(const std::string& name, size_t elem_size,
                               size_t buffer_size, void* buff,
                               bool append = false);
+  static void ReadBinaryFile(const std::string& name, size_t elem_size,
+                             size_t buffer_size, size_t offset, void* buff);
   static void PrintVec(const arma::cx_fvec& c, const std::string& ss);
   static void SaveVec(const arma::cx_fvec& c, const std::string& filename,
                       const std::string& /*ss*/, const bool /*append*/);
