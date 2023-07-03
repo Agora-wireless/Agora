@@ -14,9 +14,9 @@ AgoraBuffer::AgoraBuffer(Config* const cfg)
                       cfg->BsAntNum() * cfg->SpatialStreamsNum()),
       dl_beam_matrix_(kFrameWnd, cfg->OfdmDataNum(),
                       cfg->SpatialStreamsNum() * cfg->BsAntNum()),
-      demod_buffer_(kFrameWnd, cfg->Frame().NumULSyms(),
+      demod_buffer_(kFrameWnd, cfg->Frame().NumUlDataSyms(),
                     cfg->SpatialStreamsNum(), kMaxModType * cfg->OfdmDataNum()),
-      decoded_buffer_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),
+      decoded_buffer_(kFrameWnd, cfg->Frame().NumUlDataSyms(), cfg->UeAntNum(),
                       cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
                           Roundup<64>(cfg->NumBytesPerCb(Direction::kUplink))) {
   AllocateTables();

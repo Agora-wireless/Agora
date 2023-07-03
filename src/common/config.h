@@ -444,9 +444,17 @@ class Config {
 
   /// Return total number of uplink data symbols of all frames in a buffer
   /// that holds data of kFrameWnd frames
+  inline size_t GetTotalSymbolIdxUl(size_t frame_id,
+                                    size_t symbol_idx_ul) const {
+    return ((frame_id % kFrameWnd) * this->frame_.NumULSyms() + symbol_idx_ul);
+  }
+
+  /// Return total number of uplink data symbols of all frames in a buffer
+  /// that holds data of kFrameWnd frames
   inline size_t GetTotalDataSymbolIdxUl(size_t frame_id,
                                         size_t symbol_idx_ul) const {
-    return ((frame_id % kFrameWnd) * this->frame_.NumULSyms() + symbol_idx_ul);
+    return ((frame_id % kFrameWnd) * this->frame_.NumUlDataSyms() +
+            symbol_idx_ul);
   }
 
   /// Return total number of downlink data symbols of all frames in a buffer

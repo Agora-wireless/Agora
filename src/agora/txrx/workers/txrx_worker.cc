@@ -168,10 +168,9 @@ Packet* TxRxWorker::GetTxPacket(size_t frame, size_t symbol, size_t ant) {
 
 //Returns the location of the tx packet for a given frame / symbol / antenna (uplink / user)
 Packet* TxRxWorker::GetUlTxPacket(size_t frame, size_t symbol, size_t ant) {
-  const size_t data_symbol_idx_ul =
-      Configuration()->Frame().GetULSymbolIdx(symbol);
+  const size_t symbol_idx_ul = Configuration()->Frame().GetULSymbolIdx(symbol);
   const size_t offset =
-      (Configuration()->GetTotalDataSymbolIdxUl(frame, data_symbol_idx_ul) *
+      (Configuration()->GetTotalSymbolIdxUl(frame, symbol_idx_ul) *
        Configuration()->UeAntNum()) +
       ant;
 

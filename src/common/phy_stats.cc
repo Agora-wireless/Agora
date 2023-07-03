@@ -36,7 +36,7 @@ PhyStats::PhyStats(Config* const cfg, Direction dir)
     num_rx_symbols_ = cfg->Frame().NumULSyms();
     num_rxdata_symbols_ = cfg->Frame().NumUlDataSyms();
   }
-  const size_t task_buffer_symbol_num = num_rx_symbols_ * kFrameWnd;
+  const size_t task_buffer_symbol_num = num_rxdata_symbols_ * kFrameWnd;
 
   decoded_bits_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                              Agora_memory::Alignment_t::kAlign64);
@@ -130,7 +130,7 @@ PhyStats::~PhyStats() {
 }
 
 void PhyStats::PrintPhyStats() {
-  const size_t task_buffer_symbol_num = num_rx_symbols_ * kFrameWnd;
+  const size_t task_buffer_symbol_num = num_rxdata_symbols_ * kFrameWnd;
   std::string tx_type;
   if (dir_ == Direction::kDownlink) {
     tx_type = "Downlink";
@@ -138,7 +138,7 @@ void PhyStats::PrintPhyStats() {
     tx_type = "Uplink";
   }
 
-  if (num_rx_symbols_ > 0) {
+  if (num_rxdata_symbols_ > 0) {
     for (size_t ue_id = 0; ue_id < this->config_->UeAntNum(); ue_id++) {
       size_t total_decoded_bits(0);
       size_t total_bit_errors(0);

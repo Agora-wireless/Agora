@@ -918,15 +918,15 @@ void PhyUe::InitializeUplinkBuffers() {
   //    kFrameWnd * ul_symbol_perframe_ * config_->OfdmDataNum();
   // ul_syms_buffer_.Calloc(config_->UeAntNum(), ul_syms_buffer_size_,
   //                       Agora_memory::Alignment_t::kAlign64);
-  const size_t ul_syms_buffer_dim1 = ul_symbol_perframe_ * kFrameWnd;
+  const size_t ul_data_syms_buffer_dim1 = ul_data_symbol_perframe_ * kFrameWnd;
   const size_t ul_syms_buffer_dim2 =
       Roundup<64>(config_->OfdmDataNum()) * config_->UeAntNum();
 
-  ul_syms_buffer_.Calloc(ul_syms_buffer_dim1, ul_syms_buffer_dim2,
+  ul_syms_buffer_.Calloc(ul_data_syms_buffer_dim1, ul_syms_buffer_dim2,
                          Agora_memory::Alignment_t::kAlign64);
 
   // initialize modulation buffer
-  modul_buffer_.Calloc(ul_syms_buffer_dim1,
+  modul_buffer_.Calloc(ul_data_syms_buffer_dim1,
                        config_->OfdmDataNum() * config_->UeAntNum(),
                        Agora_memory::Alignment_t::kAlign64);
 
