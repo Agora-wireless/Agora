@@ -86,13 +86,15 @@ EventData DoDemul::Launch(size_t tag) {
   const size_t base_sc_id = gen_tag_t(tag).sc_id_;
 
   const size_t symbol_idx_ul = this->cfg_->Frame().GetULSymbolIdx(symbol_id);
+  const size_t total_symbol_idx_ul =
+      cfg_->GetTotalSymbolIdxUl(frame_id, symbol_idx_ul);
+  const complex_float* data_buf = data_buffer_[total_symbol_idx_ul];
+
+  const size_t frame_slot = frame_id % kFrameWnd;
   const size_t data_symbol_idx_ul =
       symbol_idx_ul - this->cfg_->Frame().ClientUlPilotSymbols();
   const size_t total_data_symbol_idx_ul =
       cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
-  const complex_float* data_buf = data_buffer_[total_data_symbol_idx_ul];
-
-  const size_t frame_slot = frame_id % kFrameWnd;
   size_t start_tsc = GetTime::WorkerRdtsc();
 
   if (kDebugPrintInTask == true) {
@@ -100,7 +102,7 @@ EventData DoDemul::Launch(size_t tag) {
         "In doDemul tid %d: frame: %zu, symbol idx: %zu, symbol idx ul: %zu, "
         "subcarrier: %zu, databuffer idx %zu \n",
         tid_, frame_id, symbol_id, symbol_idx_ul, base_sc_id,
-        total_data_symbol_idx_ul);
+        total_symbol_idx_ul);
   }
 
   size_t max_sc_ite =
@@ -204,7 +206,7 @@ EventData DoDemul::Launch(size_t tag) {
       arma::cx_float* equal_ptr = nullptr;
       if (kExportConstellation) {
         equal_ptr =
-            (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
+            (arma::cx_float*)(&equal_buffer_[total_symbol_idx_ul]
                                             [cur_sc_id *
                                              cfg_->SpatialStreamsNum()]);
       } else {
@@ -290,66 +292,71 @@ EventData DoDemul::Launch(size_t tag) {
   }
 
   size_t start_tsc3 = GetTime::WorkerRdtsc();
-  __m256i index2 = _mm256_setr_epi32(
-      0, 1, cfg_->SpatialStreamsNum() * 2, cfg_->SpatialStreamsNum() * 2 + 1,
-      cfg_->SpatialStreamsNum() * 4, cfg_->SpatialStreamsNum() * 4 + 1,
-      cfg_->SpatialStreamsNum() * 6, cfg_->SpatialStreamsNum() * 6 + 1);
-  auto* equal_t_ptr = reinterpret_cast<float*>(equaled_buffer_temp_transposed_);
-  for (size_t ss_id = 0; ss_id < cfg_->SpatialStreamsNum(); ss_id++) {
-    float* equal_ptr = nullptr;
-    if (kExportConstellation) {
-      equal_ptr = reinterpret_cast<float*>(
-          &equal_buffer_[total_data_symbol_idx_ul]
-                        [base_sc_id * cfg_->SpatialStreamsNum() + ss_id]);
-    } else {
-      equal_ptr = reinterpret_cast<float*>(equaled_buffer_temp_ + ss_id);
-    }
-    size_t k_num_double_in_sim_d256 = sizeof(__m256) / sizeof(double);  // == 4
-    for (size_t j = 0; j < max_sc_ite / k_num_double_in_sim_d256; j++) {
-      __m256 equal_t_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
-      _mm256_store_ps(equal_t_ptr, equal_t_temp);
-      equal_t_ptr += 8;
-      equal_ptr += cfg_->SpatialStreamsNum() * k_num_double_in_sim_d256 * 2;
-    }
-    equal_t_ptr = (float*)(equaled_buffer_temp_transposed_);
-    int8_t* demod_ptr = demod_buffers_[frame_slot][symbol_idx_ul][ss_id] +
-                        (cfg_->ModOrderBits(Direction::kUplink) * base_sc_id);
-    Demodulate(equal_t_ptr, demod_ptr, max_sc_ite,
-               cfg_->ModOrderBits(Direction::kUplink), kUplinkHardDemod);
-    // if hard demod is enabled calculate BER with modulated bits
-    if (((kPrintPhyStats || kEnableCsvLog) && kUplinkHardDemod) &&
-        (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols())) {
-      size_t ue_id = mac_sched_->ScheduledUeIndex(frame_id, base_sc_id, ss_id);
-      phy_stats_->UpdateDecodedBits(
-          ue_id, total_data_symbol_idx_ul, frame_slot,
-          max_sc_ite * cfg_->ModOrderBits(Direction::kUplink));
-      // Each block here is max_sc_ite
-      phy_stats_->IncrementDecodedBlocks(ue_id, total_data_symbol_idx_ul,
-                                         frame_slot);
-      size_t block_error(0);
-      int8_t* tx_bytes =
-          cfg_->GetModBitsBuf(cfg_->UlModBits(), Direction::kUplink, 0,
-                              symbol_idx_ul, ue_id, base_sc_id);
-      for (size_t i = 0; i < max_sc_ite; i++) {
-        uint8_t rx_byte = static_cast<uint8_t>(demod_ptr[i]);
-        uint8_t tx_byte = static_cast<uint8_t>(tx_bytes[i]);
-        phy_stats_->UpdateBitErrors(ue_id, total_data_symbol_idx_ul, frame_slot,
-                                    tx_byte, rx_byte);
-        if (rx_byte != tx_byte) {
-          block_error++;
-        }
+  if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
+    __m256i index2 = _mm256_setr_epi32(
+        0, 1, cfg_->SpatialStreamsNum() * 2, cfg_->SpatialStreamsNum() * 2 + 1,
+        cfg_->SpatialStreamsNum() * 4, cfg_->SpatialStreamsNum() * 4 + 1,
+        cfg_->SpatialStreamsNum() * 6, cfg_->SpatialStreamsNum() * 6 + 1);
+    auto* equal_t_ptr =
+        reinterpret_cast<float*>(equaled_buffer_temp_transposed_);
+    for (size_t ss_id = 0; ss_id < cfg_->SpatialStreamsNum(); ss_id++) {
+      float* equal_ptr = nullptr;
+      if (kExportConstellation) {
+        equal_ptr = reinterpret_cast<float*>(
+            &equal_buffer_[total_symbol_idx_ul]
+                          [base_sc_id * cfg_->SpatialStreamsNum() + ss_id]);
+      } else {
+        equal_ptr = reinterpret_cast<float*>(equaled_buffer_temp_ + ss_id);
       }
-      phy_stats_->UpdateBlockErrors(ue_id, total_data_symbol_idx_ul, frame_slot,
-                                    block_error);
-    }
+      size_t k_num_double_in_sim_d256 =
+          sizeof(__m256) / sizeof(double);  // == 4
+      for (size_t j = 0; j < max_sc_ite / k_num_double_in_sim_d256; j++) {
+        __m256 equal_t_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
+        _mm256_store_ps(equal_t_ptr, equal_t_temp);
+        equal_t_ptr += 8;
+        equal_ptr += cfg_->SpatialStreamsNum() * k_num_double_in_sim_d256 * 2;
+      }
+      equal_t_ptr = (float*)(equaled_buffer_temp_transposed_);
+      int8_t* demod_ptr =
+          demod_buffers_[frame_slot][data_symbol_idx_ul][ss_id] +
+          (cfg_->ModOrderBits(Direction::kUplink) * base_sc_id);
+      Demodulate(equal_t_ptr, demod_ptr, max_sc_ite,
+                 cfg_->ModOrderBits(Direction::kUplink), kUplinkHardDemod);
+      // if hard demod is enabled calculate BER with modulated bits
+      if (((kPrintPhyStats || kEnableCsvLog) && kUplinkHardDemod)) {
+        size_t ue_id =
+            mac_sched_->ScheduledUeIndex(frame_id, base_sc_id, ss_id);
+        phy_stats_->UpdateDecodedBits(
+            ue_id, total_data_symbol_idx_ul, frame_slot,
+            max_sc_ite * cfg_->ModOrderBits(Direction::kUplink));
+        // Each block here is max_sc_ite
+        phy_stats_->IncrementDecodedBlocks(ue_id, total_data_symbol_idx_ul,
+                                           frame_slot);
+        size_t block_error(0);
+        int8_t* tx_bytes =
+            cfg_->GetModBitsBuf(cfg_->UlModBits(), Direction::kUplink, 0,
+                                data_symbol_idx_ul, ue_id, base_sc_id);
+        for (size_t i = 0; i < max_sc_ite; i++) {
+          uint8_t rx_byte = static_cast<uint8_t>(demod_ptr[i]);
+          uint8_t tx_byte = static_cast<uint8_t>(tx_bytes[i]);
+          phy_stats_->UpdateBitErrors(ue_id, total_data_symbol_idx_ul,
+                                      frame_slot, tx_byte, rx_byte);
+          if (rx_byte != tx_byte) {
+            block_error++;
+          }
+        }
+        phy_stats_->UpdateBlockErrors(ue_id, total_data_symbol_idx_ul,
+                                      frame_slot, block_error);
+      }
 
-    // std::printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
-    //     tid, frame_id, symbol_idx_ul, base_sc_id);
-    // cout << "Demuled data : \n ";
-    // cout << " UE " << ue_id << ": ";
-    // for (int k = 0; k < max_sc_ite * cfg->ModOrderBits(Direction::kUplink); k++)
-    //   std::printf("%i ", demul_ptr[k]);
-    // cout << endl;
+      // std::printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
+      //     tid, frame_id, symbol_idx_ul, base_sc_id);
+      // cout << "Demuled data : \n ";
+      // cout << " UE " << ue_id << ": ";
+      // for (int k = 0; k < max_sc_ite * cfg->ModOrderBits(Direction::kUplink); k++)
+      //   std::printf("%i ", demul_ptr[k]);
+      // cout << endl;
+    }
   }
 
   duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;

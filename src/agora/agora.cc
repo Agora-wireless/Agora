@@ -1219,8 +1219,7 @@ void Agora::SaveTxDataToFile(int frame_id) {
 
 void Agora::GetEqualData(float** ptr, int* size) {
   const auto& cfg = config_;
-  auto offset = cfg->GetTotalDataSymbolIdxUl(
-      max_equaled_frame_, cfg->Frame().ClientUlPilotSymbols());
+  auto offset = cfg->GetTotalDataSymbolIdxUl(max_equaled_frame_, 0u);
   *ptr = (float*)&agora_memory_->GetEqual()[offset][0];
   *size = cfg->UeAntNum() * cfg->OfdmDataNum() * 2;
 }

@@ -63,17 +63,17 @@ EventData DoEncode::Launch(size_t tag) {
   size_t start_tsc = GetTime::WorkerRdtsc();
 
   size_t symbol_idx;
-  size_t symbol_idx_data;
+  size_t data_symbol_idx;
   size_t ue_id;
   if (dir_ == Direction::kDownlink) {
     symbol_idx = cfg_->Frame().GetDLSymbolIdx(symbol_id);
     assert(symbol_idx >= cfg_->Frame().ClientDlPilotSymbols());
-    symbol_idx_data = symbol_idx - cfg_->Frame().ClientDlPilotSymbols();
+    data_symbol_idx = symbol_idx - cfg_->Frame().ClientDlPilotSymbols();
     ue_id = mac_sched_->ScheduledUeIndex(frame_id, 0u, sched_ue_id);
   } else {
     symbol_idx = cfg_->Frame().GetULSymbolIdx(symbol_id);
     assert(symbol_idx >= cfg_->Frame().ClientUlPilotSymbols());
-    symbol_idx_data = symbol_idx - cfg_->Frame().ClientUlPilotSymbols();
+    data_symbol_idx = symbol_idx - cfg_->Frame().ClientUlPilotSymbols();
     ue_id = sched_ue_id;
   }
 
@@ -81,7 +81,7 @@ EventData DoEncode::Launch(size_t tag) {
     std::printf(
         "In doEncode thread %d: frame: %zu, symbol: %zu:%zu:%zu, code block "
         "%zu, ue_id: %zu\n",
-        tid_, frame_id, symbol_id, symbol_idx, symbol_idx_data, cur_cb_id,
+        tid_, frame_id, symbol_id, symbol_idx, data_symbol_idx, cur_cb_id,
         ue_id);
   }
 
@@ -92,14 +92,14 @@ EventData DoEncode::Launch(size_t tag) {
     // All cb's per symbol are included in 1 mac packet
     tx_data_ptr = cfg_->GetMacBits(raw_data_buffer_, dir_,
                                    (frame_id % raw_buffer_rollover_),
-                                   symbol_idx_data, ue_id, cur_cb_id);
+                                   data_symbol_idx, ue_id, cur_cb_id);
 
     if (kPrintRawMacData) {
       auto* pkt = reinterpret_cast<MacPacketPacked*>(tx_data_ptr);
       std::printf(
           "In doEncode [%d] mac packet frame: %d, symbol: %zu:%d, ue_id: %d, "
           "data length %d, crc %d size %zu:%zu\n",
-          tid_, pkt->Frame(), symbol_idx_data, pkt->Symbol(), pkt->Ue(),
+          tid_, pkt->Frame(), data_symbol_idx, pkt->Symbol(), pkt->Ue(),
           pkt->PayloadLength(), pkt->Crc(), cfg_->MacPacketLength(dir_),
           cfg_->NumBytesPerCb(dir_));
       std::printf("Data: ");
@@ -109,8 +109,10 @@ EventData DoEncode::Launch(size_t tag) {
       std::printf("\n");
     }
   } else {
-    tx_data_ptr =
-        cfg_->GetInfoBits(raw_data_buffer_, dir_, symbol_idx, ue_id, cur_cb_id);
+    tx_data_ptr = cfg_->GetInfoBits(
+        raw_data_buffer_, dir_,
+        (dir_ == Direction::kDownlink ? symbol_idx : data_symbol_idx), ue_id,
+        cur_cb_id);
   }
 
   int8_t* ldpc_input = tx_data_ptr;
@@ -152,7 +154,9 @@ EventData DoEncode::Launch(size_t tag) {
                    ue_id, dataprint.str().c_str());
   }
   int8_t* mod_buffer_ptr = cfg_->GetModBitsBuf(
-      mod_bits_buffer_, dir_, frame_id, symbol_idx, sched_ue_id, cur_cb_id);
+      mod_bits_buffer_, dir_, frame_id,
+      (dir_ == Direction::kDownlink ? symbol_idx : data_symbol_idx),
+      sched_ue_id, cur_cb_id);
 
   if (kPrintRawMacData && dir_ == Direction::kUplink) {
     std::printf("Encoded data - placed at location (%zu %zu %zu) %zu\n",
