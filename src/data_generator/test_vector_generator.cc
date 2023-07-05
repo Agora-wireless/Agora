@@ -25,16 +25,6 @@ static constexpr bool kPrintDlModData = false;
 static constexpr bool kPrintUplinkInformationBytes = false;
 static constexpr bool kPrintDownlinkInformationBytes = false;
 
-///Output files
-static const std::string kUlDataPrefix = "orig_ul_data_";
-static const std::string kUlLdpcDataPrefix = "LDPC_orig_ul_data_";
-static const std::string kUlModDataPrefix = "mod_ul_data_";
-static const std::string kUlTxPrefix = "ul_ifft_data_";
-static const std::string kDlDataPrefix = "orig_dl_data_";
-static const std::string kDlLdpcDataPrefix = "LDPC_orig_dl_data_";
-static const std::string kRxLdpcPrefix = "LDPC_rx_data_";
-static const std::string kDlTxPrefix = "LDPC_dl_tx_data_";
-
 DEFINE_string(profile, "random",
               "The profile of the input user bytes (e.g., 'random', '123')");
 DEFINE_string(
@@ -49,19 +39,16 @@ static float RandFloatFromShort(float min, float max) {
   return rand_val;
 }
 
-int main(int argc, char* argv[]) {
+static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
   const std::string directory =
       TOSTRING(PROJECT_DIRECTORY) "/files/experiment/";
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
-  gflags::SetVersionString(GetAgoraProjectVersion());
   AGORA_LOG_INIT();
-  auto cfg_ = std::make_unique<Config>(FLAGS_conf_file.c_str());
 
   const DataGenerator::Profile profile =
-      FLAGS_profile == "123" ? DataGenerator::Profile::kProfile123
-                             : DataGenerator::Profile::kRandom;
+      profile_flag == "123" ? DataGenerator::Profile::kProfile123
+                            : DataGenerator::Profile::kRandom;
   std::unique_ptr<DataGenerator> data_generator =
-      std::make_unique<DataGenerator>(cfg_.get(), 0 /* RNG seed */, profile);
+      std::make_unique<DataGenerator>(cfg_, 0 /* RNG seed */, profile);
 
   AGORA_LOG_INFO("DataGenerator: Using %s-orthogonal pilots\n",
                  cfg_->FreqOrthogonalPilot() ? "frequency" : "time");
@@ -194,7 +181,7 @@ int main(int argc, char* argv[]) {
           cfg_->LdpcConfig(Direction::kUplink).NumCbCodewLen(),
           cfg_->OfdmDataNum(), cfg_->ModOrderBits(Direction::kUplink));
       ul_modulated_symbols.at(i) = DataGenerator::MapOFDMSymbol(
-          cfg_.get(), ofdm_symbol, nullptr, SymbolType::kUL);
+          cfg_, ofdm_symbol, nullptr, SymbolType::kUL);
     }
 
     {
@@ -216,7 +203,7 @@ int main(int argc, char* argv[]) {
     pre_ifft_data_syms.resize(cfg_->UeAntNum() * cfg_->Frame().NumUlDataSyms());
     for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
       pre_ifft_data_syms.at(i) =
-          DataGenerator::BinForIfft(cfg_.get(), ul_modulated_symbols.at(i));
+          DataGenerator::BinForIfft(cfg_, ul_modulated_symbols.at(i));
     }
   }
 
@@ -449,7 +436,7 @@ int main(int argc, char* argv[]) {
           cfg_->LdpcConfig(Direction::kDownlink).NumCbCodewLen(),
           cfg_->OfdmDataNum(), cfg_->ModOrderBits(Direction::kDownlink));
       dl_modulated_codewords.at(i) = DataGenerator::MapOFDMSymbol(
-          cfg_.get(), ofdm_symbol, ue_specific_pilot[ue_id], SymbolType::kDL);
+          cfg_, ofdm_symbol, ue_specific_pilot[ue_id], SymbolType::kDL);
     }
 
     {
@@ -643,5 +630,12 @@ int main(int argc, char* argv[]) {
   rx_data_all_symbols.Free();
   ue_specific_pilot.Free();
   AGORA_LOG_SHUTDOWN();
+}
+
+int main(int argc, char* argv[]) {
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  gflags::SetVersionString(GetAgoraProjectVersion());
+  auto cfg_ = std::make_unique<Config>(FLAGS_conf_file.c_str());
+  GenerateTestVectors(cfg_.get(), FLAGS_profile);
   return 0;
 }
