@@ -40,16 +40,6 @@ static constexpr bool kDebugPrintPilot = false;
 
 static const std::string kLogFilepath =
     TOSTRING(PROJECT_DIRECTORY) "/files/log/";
-static const std::string kExperimentFilepath =
-    TOSTRING(PROJECT_DIRECTORY) "/files/experiment/";
-static const std::string kUlDataFilePrefix =
-    kExperimentFilepath + "LDPC_orig_ul_data_";
-static const std::string kDlDataFilePrefix =
-    kExperimentFilepath + "LDPC_orig_dl_data_";
-static const std::string kUlDataFreqPrefix = kExperimentFilepath + "ul_data_f_";
-static const std::string kUlModDataPrefix =
-    kExperimentFilepath + "mod_ul_data_";
-static const std::string kUlTxPrefix = kExperimentFilepath + "ul_ifft_data_";
 
 Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -1199,27 +1189,18 @@ void Config::GenPilots() {
   }
 }
 
-void Config::GenData() {
-  this->GenPilots();
-
-  ///// Read Uplink Test Vectors /////
-  const size_t ul_num_bytes_per_ue_pad =
-      Roundup<64>(this->ul_num_bytes_per_cb_) *
-      this->ul_ldpc_config_.NumBlocksInSymbol();
-  ul_iq_f_.Calloc(this->frame_.NumULSyms(),
-                  this->ofdm_data_num_ * this->ue_ant_num_,
-                  Agora_memory::Alignment_t::kAlign64);
-  ul_iq_t_.Calloc(this->frame_.NumULSyms(),
-                  this->samps_per_symbol_ * this->ue_ant_num_,
-                  Agora_memory::Alignment_t::kAlign64);
-
+void Config::LoadBinaryData() {
   if (this->frame_.NumUlDataSyms() > 0) {
+    const size_t ul_num_bytes_per_ue_pad =
+        Roundup<64>(this->ul_num_bytes_per_cb_) *
+        this->ul_ldpc_config_.NumBlocksInSymbol();
     // LDPC input bits
     ul_bits_.Calloc(this->frame_.NumUlDataSyms(),
                     ul_num_bytes_per_ue_pad * this->ue_ant_num_,
                     Agora_memory::Alignment_t::kAlign64);
     const std::string ul_data_file =
-        kUlDataFilePrefix + std::to_string(this->ofdm_ca_num_) + "_ant" +
+        kExperimentFilepath + kUlLdpcDataPrefix +
+        std::to_string(this->ofdm_ca_num_) + "_ant" +
         std::to_string(this->ue_ant_total_) + ".bin";
     AGORA_LOG_SYMBOL("Config: Reading raw ul data from %s\n",
                      ul_data_file.c_str());
@@ -1244,7 +1225,8 @@ void Config::GenData() {
                         Roundup<64>(this->ofdm_data_num_) * this->ue_ant_num_,
                         Agora_memory::Alignment_t::kAlign32);
     const std::string ul_mod_data_file =
-        kUlModDataPrefix + std::to_string(this->ofdm_ca_num_) + "_ant" +
+        kExperimentFilepath + kUlModDataPrefix +
+        std::to_string(this->ofdm_ca_num_) + "_ant" +
         std::to_string(this->ue_ant_total_) + ".bin";
     seek_offset = 0;
     // \todo assumes one code block per symbol
@@ -1264,35 +1246,50 @@ void Config::GenData() {
           (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_);
     }
   }
+}
+
+void Config::GenData() {
+  this->GenPilots();
+  this->LoadBinaryData();
+
+  ///// Read Uplink Test Vectors /////
+  ul_iq_f_.Calloc(this->frame_.NumUlDataSyms(),
+                  this->ofdm_data_num_ * this->ue_ant_num_,
+                  Agora_memory::Alignment_t::kAlign64);
+  ul_iq_t_.Calloc(this->frame_.NumUlDataSyms(),
+                  this->samps_per_symbol_ * this->ue_ant_num_,
+                  Agora_memory::Alignment_t::kAlign64);
 
   // Generate freq-domain uplink symbols
   Table<complex_float> ul_iq_ifft;
-  ul_iq_ifft.Calloc(this->frame_.NumULSyms(),
-                    this->ofdm_ca_num_ * this->ue_ant_num_,
-                    Agora_memory::Alignment_t::kAlign64);
-  const std::string ul_ifft_data_file =
-      kUlTxPrefix + std::to_string(this->ofdm_ca_num_) + "_ant" +
-      std::to_string(this->ue_ant_total_) + ".bin";
-  size_t seek_offset = 0;
-  for (size_t i = 0;  // this->frame_.ClientUlPilotSymbols();
-       i < this->frame_.NumULSyms(); i++) {
-    seek_offset += ofdm_ca_num_ * this->ue_ant_offset_ * sizeof(complex_float);
-    for (size_t j = 0; j < this->ue_ant_num_; j++) {
-      Utils::ReadBinaryFile(ul_ifft_data_file, sizeof(complex_float),
-                            ofdm_ca_num_, seek_offset,
-                            &ul_iq_ifft[i][j * ofdm_ca_num_]);
-      std::memcpy(&ul_iq_f_[i][j * ofdm_data_num_],
-                  &ul_iq_ifft[i][j * ofdm_ca_num_ + ofdm_data_start_],
-                  ofdm_data_num_);
-      CommsLib::FFTShift(&ul_iq_ifft[i][j * ofdm_ca_num_], ofdm_ca_num_);
-      seek_offset += ofdm_ca_num_ * sizeof(complex_float);
+  if (this->frame_.NumUlDataSyms() > 0) {
+    ul_iq_ifft.Calloc(this->frame_.NumUlDataSyms(),
+                      this->ofdm_ca_num_ * this->ue_ant_num_,
+                      Agora_memory::Alignment_t::kAlign64);
+    const std::string ul_ifft_data_file =
+        kExperimentFilepath + kUlTxPrefix + std::to_string(this->ofdm_ca_num_) +
+        "_ant" + std::to_string(this->ue_ant_total_) + ".bin";
+    size_t seek_offset = 0;
+    for (size_t i = 0;  // this->frame_.ClientUlPilotSymbols();
+         i < this->frame_.NumUlDataSyms(); i++) {
+      seek_offset +=
+          ofdm_ca_num_ * this->ue_ant_offset_ * sizeof(complex_float);
+      for (size_t j = 0; j < this->ue_ant_num_; j++) {
+        Utils::ReadBinaryFile(ul_ifft_data_file, sizeof(complex_float),
+                              ofdm_ca_num_, seek_offset,
+                              &ul_iq_ifft[i][j * ofdm_ca_num_]);
+        std::memcpy(&ul_iq_f_[i][j * ofdm_data_num_],
+                    &ul_iq_ifft[i][j * ofdm_ca_num_ + ofdm_data_start_],
+                    ofdm_data_num_);
+        CommsLib::FFTShift(&ul_iq_ifft[i][j * ofdm_ca_num_], ofdm_ca_num_);
+        seek_offset += ofdm_ca_num_ * sizeof(complex_float);
+      }
+      seek_offset +=
+          ofdm_ca_num_ *
+          (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
+          sizeof(complex_float);
     }
-    seek_offset +=
-        ofdm_ca_num_ *
-        (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
-        sizeof(complex_float);
   }
-
   ///// Read Downlink Test Vectors /////
 
   const size_t dl_num_bytes_per_ue_pad =
@@ -1309,7 +1306,8 @@ void Config::GenData() {
 
   if (this->frame_.NumDlDataSyms() > 0) {
     const std::string dl_data_file =
-        kDlDataFilePrefix + std::to_string(this->ofdm_ca_num_) + "_ant" +
+        kExperimentFilepath + kDlLdpcDataPrefix +
+        std::to_string(this->ofdm_ca_num_) + "_ant" +
         std::to_string(this->ue_ant_total_) + ".bin";
 
     AGORA_LOG_SYMBOL("Config: Reading raw dl data from %s\n",
@@ -1410,9 +1408,12 @@ void Config::GenData() {
   }
 
   // Find normalization factor through searching for max value in IFFT results
+
   float ul_max_mag =
-      CommsLib::FindMaxAbs(ul_iq_ifft, this->frame_.NumULSyms(),
-                           this->ue_ant_num_ * this->ofdm_ca_num_);
+      (this->frame_.NumUlDataSyms() > 0)
+          ? CommsLib::FindMaxAbs(ul_iq_ifft, this->frame_.NumUlDataSyms(),
+                                 this->ue_ant_num_ * this->ofdm_ca_num_)
+          : 0;
   float dl_max_mag =
       CommsLib::FindMaxAbs(dl_iq_ifft, this->frame_.NumDLSyms(),
                            this->ue_ant_num_ * this->ofdm_ca_num_);
@@ -1426,9 +1427,12 @@ void Config::GenData() {
   float dl_papr = dl_max_mag /
                   CommsLib::FindMeanAbs(dl_iq_ifft, this->frame_.NumDLSyms(),
                                         this->ue_ant_num_ * this->ofdm_ca_num_);
-  float ul_papr = ul_max_mag /
-                  CommsLib::FindMeanAbs(ul_iq_ifft, this->frame_.NumULSyms(),
-                                        this->ue_ant_num_ * this->ofdm_ca_num_);
+  float ul_papr =
+      (this->frame_.NumUlDataSyms() > 0)
+          ? ul_max_mag /
+                CommsLib::FindMeanAbs(ul_iq_ifft, this->frame_.NumUlDataSyms(),
+                                      this->ue_ant_num_ * this->ofdm_ca_num_)
+          : 0;
   std::printf("Uplink PAPR %2.2f dB, Downlink PAPR %2.2f dB\n",
               10 * std::log10(ul_papr), 10 * std::log10(dl_papr));
 
@@ -1444,7 +1448,7 @@ void Config::GenData() {
   }
 
   // Generate time domain uplink symbols
-  for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
+  for (size_t i = 0; i < this->frame_.NumUlDataSyms(); i++) {
     for (size_t u = 0; u < this->ue_ant_num_; u++) {
       size_t q = u * this->ofdm_ca_num_;
       size_t r = u * this->samps_per_symbol_;

@@ -66,6 +66,7 @@ UeWorker::UeWorker(
       ue_pilot_vec_(ue_pilot_vec) {
   ptok_ = std::make_unique<moodycamel::ProducerToken>(notify_queue);
 
+  phy_stats_.LoadGroundTruthIq();
   AllocBuffer1d(&rx_samps_tmp_, config_.SampsPerSymbol(),
                 Agora_memory::Alignment_t::kAlign64, 1);
 
@@ -665,7 +666,8 @@ void UeWorker::DoIfft(size_t tag) {
                   config_.OfdmDataNum() * sizeof(complex_float));
       if (kDebugTxData) {
         const complex_float* data_truth =
-            &config_.UlIqF()[ul_symbol_idx][ant_id * config_.OfdmDataNum()];
+            &config_
+                 .UlIqF()[ul_data_symbol_idx][ant_id * config_.OfdmDataNum()];
         if (memcmp(data_truth, modul_buff,
                    config_.OfdmDataNum() * sizeof(complex_float)) == 0) {
           AGORA_LOG_INFO(

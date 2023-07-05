@@ -40,6 +40,14 @@ void DataGenerator::GenMacData(MacPacketPacked* mac, size_t ue_id) {
   }
 }
 
+void DataGenerator::GenMacRandomBits(MacPacketPacked* mac) {
+  unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+  rand_byte_generator byte_gen(seed);
+  for (size_t i = 0; i < mac->PayloadLength(); i++) {
+    mac->DataPtr()[i] = byte_gen();
+  }
+}
+
 /**
    * @brief                        Generate one raw information bit sequence
    *
@@ -321,4 +329,137 @@ void DataGenerator::GetDecodedDataBatch(Table<int8_t>& demoded_data,
     }
   }
   std::free(resp_var_nodes);
+}
+
+void DataGenerator::GenerateUlTxTestVectors(Config* cfg) {
+  //Make sure the directory exists
+  if (std::filesystem::is_directory(kExperimentFilepath) == false) {
+    std::filesystem::create_directory(kExperimentFilepath);
+  }
+  std::unique_ptr<DoCRC> crc_obj = std::make_unique<DoCRC>();
+  const size_t ul_cb_bytes = cfg->NumBytesPerCb(Direction::kUplink);
+  LDPCconfig ul_ldpc_config = cfg->LdpcConfig(Direction::kUplink);
+  const size_t num_ul_mac_bytes = cfg->MacBytesNumPerframe(Direction::kUplink);
+  if (num_ul_mac_bytes > 0) {
+    std::vector<std::vector<int8_t>> ul_mac_info(cfg->UeAntNum());
+    AGORA_LOG_INFO("Total number of uplink MAC bytes: %zu\n", num_ul_mac_bytes);
+    for (size_t ue_id = 0; ue_id < cfg->UeAntNum(); ue_id++) {
+      ul_mac_info.at(ue_id).resize(num_ul_mac_bytes);
+      for (size_t pkt_id = 0;
+           pkt_id < cfg->MacPacketsPerframe(Direction::kUplink); pkt_id++) {
+        size_t pkt_offset = pkt_id * cfg->MacPacketLength(Direction::kUplink);
+        auto* pkt = reinterpret_cast<MacPacketPacked*>(
+            &ul_mac_info.at(ue_id).at(pkt_offset));
+
+        pkt->Set(0, pkt_id, ue_id,
+                 cfg->MacPayloadMaxLength(Direction::kUplink));
+        DataGenerator::GenMacRandomBits(pkt);
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
+                                pkt->Data(),
+                                cfg->MacPayloadMaxLength(Direction::kUplink)) &
+                            0xFFFF));
+      }
+    }
+
+    const size_t symbol_blocks =
+        ul_ldpc_config.NumBlocksInSymbol() * cfg->UeAntNum();
+    const size_t num_ul_codeblocks =
+        cfg->Frame().NumUlDataSyms() * symbol_blocks;
+
+    std::vector<std::vector<int8_t>> ul_information(num_ul_codeblocks);
+    std::vector<std::vector<int8_t>> ul_encoded_codewords(num_ul_codeblocks);
+    for (size_t cb = 0; cb < num_ul_codeblocks; cb++) {
+      // i : symbol -> ue -> cb (repeat)
+      size_t sym_id = cb / (symbol_blocks);
+      // ue antenna for code block
+      size_t sym_offset = cb % (symbol_blocks);
+      size_t ue_id = sym_offset / ul_ldpc_config.NumBlocksInSymbol();
+      size_t ue_cb_id = sym_offset % ul_ldpc_config.NumBlocksInSymbol();
+      size_t ue_cb_cnt =
+          (sym_id * ul_ldpc_config.NumBlocksInSymbol()) + ue_cb_id;
+
+      int8_t* cb_start = &ul_mac_info.at(ue_id).at(ue_cb_cnt * ul_cb_bytes);
+      ul_information.at(cb) =
+          std::vector<int8_t>(cb_start, cb_start + ul_cb_bytes);
+      ul_encoded_codewords.at(cb) = DataGenerator::GenCodeblock(
+          ul_ldpc_config, &ul_information.at(cb).at(0), ul_cb_bytes,
+          cfg->ScrambleEnabled());
+    }
+
+    {
+      const std::string filename_input =
+          kExperimentFilepath + kUlLdpcDataPrefix +
+          std::to_string(cfg->OfdmCaNum()) + "_ant" +
+          std::to_string(cfg->UeAntNum()) + ".bin";
+      AGORA_LOG_INFO("Saving raw uplink data (using LDPC) to %s\n",
+                     filename_input.c_str());
+      for (size_t i = 0; i < num_ul_codeblocks; i++) {
+        Utils::WriteBinaryFile(filename_input, sizeof(uint8_t), ul_cb_bytes,
+                               ul_information.at(i).data(),
+                               i != 0);  //Do not append in the first write
+      }
+    }
+
+    // Modulate the encoded codewords
+    std::vector<std::vector<uint8_t>> ul_modulated_codewords(num_ul_codeblocks);
+    std::vector<std::vector<complex_float>> ul_modulated_symbols(
+        num_ul_codeblocks);
+    for (size_t i = 0; i < num_ul_codeblocks; i++) {
+      ul_modulated_codewords.at(i).resize(cfg->OfdmDataNum());
+      auto ofdm_symbol = DataGenerator::GetModulation(
+          &ul_encoded_codewords.at(i)[0], &ul_modulated_codewords.at(i).at(0),
+          cfg->ModTable(Direction::kUplink),
+          cfg->LdpcConfig(Direction::kUplink).NumCbCodewLen(),
+          cfg->OfdmDataNum(), cfg->ModOrderBits(Direction::kUplink));
+      ul_modulated_symbols.at(i) = DataGenerator::MapOFDMSymbol(
+          cfg, ofdm_symbol, nullptr, SymbolType::kUL);
+    }
+
+    {
+      const std::string filename_input =
+          kExperimentFilepath + kUlModDataPrefix +
+          std::to_string(cfg->OfdmCaNum()) + "_ant" +
+          std::to_string(cfg->UeAntNum()) + ".bin";
+      AGORA_LOG_INFO("Saving modulated uplink data to %s\n",
+                     filename_input.c_str());
+      for (size_t i = 0; i < num_ul_codeblocks; i++) {
+        Utils::WriteBinaryFile(filename_input, sizeof(uint8_t),
+                               cfg->OfdmDataNum(),
+                               ul_modulated_codewords.at(i).data(),
+                               i != 0);  //Do not append in the first write
+      }
+    }
+    std::vector<std::vector<complex_float>> pre_ifft_data_syms(
+        cfg->UeAntNum() * cfg->Frame().NumUlDataSyms());
+    for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
+      pre_ifft_data_syms.at(i) =
+          DataGenerator::BinForIfft(cfg, ul_modulated_symbols.at(i));
+    }
+
+    std::vector<std::vector<complex_float>> tx_data_symbols(
+        cfg->Frame().NumUlDataSyms());
+    // Populate the UL symbols
+    for (size_t i = 0; i < cfg->Frame().NumUlDataSyms(); i++) {
+      tx_data_symbols.at(i).resize(cfg->UeAntNum() * cfg->OfdmCaNum());
+      for (size_t j = 0; j < cfg->UeAntNum(); j++) {
+        const size_t k = i - cfg->Frame().ClientUlPilotSymbols();
+        std::memcpy(&tx_data_symbols.at(i).at(0) + (j * cfg->OfdmCaNum()),
+                    &pre_ifft_data_syms.at(k * cfg->UeAntNum() + j).at(0),
+                    cfg->OfdmCaNum() * sizeof(complex_float));
+      }
+    }
+
+    {
+      const std::string filename_tx =
+          kExperimentFilepath + kUlTxPrefix + std::to_string(cfg->OfdmCaNum()) +
+          "_ant" + std::to_string(cfg->UeAntNum()) + ".bin";
+      AGORA_LOG_INFO("Saving UL tx data to %s\n", filename_tx.c_str());
+      for (size_t i = 0; i < cfg->Frame().NumUlDataSyms(); i++) {
+        Utils::WriteBinaryFile(filename_tx, sizeof(complex_float),
+                               cfg->OfdmCaNum() * cfg->UeAntNum(),
+                               tx_data_symbols.at(i).data(),
+                               i != 0);  //Do not append in the first write
+      }
+    }
+  }
 }

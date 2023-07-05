@@ -540,10 +540,15 @@ void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
       tx_data.at(ch) = reinterpret_cast<void*>(pkt->data_);
 
       if (kDebugTxData) {
-        auto* data_truth =
-            &Configuration()
-                 ->UlIqT()[ul_symbol_idx]
-                          [tx_ant * Configuration()->SampsPerSymbol()];
+        complex_float* data_truth;
+        if (ul_symbol_idx < Configuration()->Frame().ClientUlPilotSymbols()) {
+          data_truth = Configuration()->UeSpecificPilotT()[tx_ant];
+        } else {
+          data_truth =
+              &Configuration()
+                   ->UlIqT()[ul_symbol_idx]
+                            [tx_ant * Configuration()->SampsPerSymbol()];
+        }
         auto* data_pkt = reinterpret_cast<std::complex<int16_t>*>(pkt->data_);
         if (memcmp(data_truth, data_pkt, Configuration()->PacketLength()) ==
             0) {

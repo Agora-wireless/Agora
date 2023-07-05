@@ -46,6 +46,7 @@ DoDemul::DoDemul(
   arma::cx_fmat mat_pilot_data(ue_pilot_ptr, cfg_->OfdmDataNum(),
                                cfg_->UeAntNum(), false);
   ue_pilot_data_ = mat_pilot_data.st();
+  if (kPrintPhyStats) phy_stats_->LoadGroundTruthIq();
 
 #if defined(USE_MKL_JIT)
   MKL_Complex8 alpha = {1, 0};
@@ -280,7 +281,8 @@ EventData DoDemul::Launch(size_t tag) {
         mat_equaled %= mat_phase_correct;
 
         // Measure EVM from ground truth
-        if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
+        if (kPrintPhyStats &&
+            symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
           phy_stats_->UpdateEvm(frame_id, data_symbol_idx_ul, cur_sc_id,
                                 mat_equaled.col(0), ue_list);
         }

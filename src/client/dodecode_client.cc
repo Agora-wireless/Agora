@@ -41,7 +41,9 @@ EventData DoDecodeClient::Launch(size_t tag) {
 
   const size_t symbol_idx_dl = cfg_->Frame().GetDLSymbolIdx(symbol_id);
   const size_t symbol_offset =
-      cfg_->GetTotalDataSymbolIdxDl(frame_id, symbol_idx_dl);
+      //cfg_->GetTotalDataSymbolIdxDl(frame_id, symbol_idx_dl);
+      ((frame_id % kFrameWnd) * cfg_->Frame().NumDlDataSyms() + symbol_idx_dl -
+       cfg_->Frame().ClientDlPilotSymbols());
   const size_t cur_cb_id = (cb_id % ldpc_config.NumBlocksInSymbol());
   const size_t ue_id = (cb_id / ldpc_config.NumBlocksInSymbol());
   const size_t frame_slot = (frame_id % kFrameWnd);
