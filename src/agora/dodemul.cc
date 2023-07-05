@@ -325,12 +325,31 @@ EventData DoDemul::Launch(size_t tag) {
         mat_phase_correct.set_real(cos(-cur_theta));
         mat_phase_correct.set_imag(sin(-cur_theta));
         mat_equaled %= mat_phase_correct;
+	
+	if (frame_id == 2000){
+		std::string filename = "phase.txt";
 
-        if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
-          phy_stats_->UpdateEvm(frame_id, data_symbol_idx_ul, cur_sc_id,
-                                mat_equaled.col(0));
-        }
+		// Open the file in output mode, overwriting any existing content
+		std::ofstream outputFile(filename);
+
+		// Check if the file was opened successfully
+		if (outputFile.is_open()) {
+			// Save the matrix to the file
+			mat_equaled.save(outputFile, arma::raw_ascii);
+
+			// Close the file
+			outputFile.close();
+		} else {
+			// Handle error if the file couldn't be opened
+			std::cerr << "Error opening file: " << filename << std::endl;
+		}	
+	}
+	if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
+		phy_stats_->UpdateEvm(frame_id, data_symbol_idx_ul, cur_sc_id,
+				mat_equaled.col(0));
+	}
       }
+      
       if (frame_id == 2000) {
           std::string filename = "equalized_symbols.bin";
           size_t num_elements = cfg_->DemulBlockSize();

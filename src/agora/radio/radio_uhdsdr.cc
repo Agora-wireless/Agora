@@ -208,7 +208,7 @@ void RadioUHDSdr::Activate(Radio::ActivationTypes type, long long act_time_ns,
       "%d\n",
       SerialNumber().c_str(), Id(), act_time_ns, samples,
       static_cast<int>(type));
-  bool is_ue_ = true;
+  bool is_ue_ = false;
   if (is_ue_) {
     AGORA_LOG_INFO("setting sources to internal \n");
     dev_->set_clock_source("internal");

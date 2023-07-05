@@ -30,7 +30,8 @@ def process_csv_file(file_path, last_processed_frame, prev_frame_number, prev_re
 
             if (ylabel == 'BER') and (reading == 0):
                 reading = float(0.0001)
-
+            if (ylabel == 'EVM (%)'):
+                reading = np.sqrt(reading/100)*100
             if (frame_number + 1) % 500 == 0:
                 frame_numbers.append(frame_number)
                 readings.append(reading)

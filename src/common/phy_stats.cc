@@ -222,12 +222,15 @@ void PhyStats::PrintPhyStats() {
 void PhyStats::PrintEvmStats(size_t frame_id) {
   arma::fmat evm_buf(evm_buffer_[frame_id % kFrameWnd], config_->UeAntNum(), 1,
                      false);
+  arma::fmat square_root_mat;
   arma::fmat evm_mat =
       evm_buf.st() / (config_->OfdmDataNum() * num_rxdata_symbols_);
 
+  square_root_mat = arma::sqrt(evm_mat);
+  
   [[maybe_unused]] std::stringstream ss;
   ss << "Frame " << frame_id << " Constellation:\n"
-     << "  EVM " << (100.0f * evm_mat) << ", SNR "
+     << "  EVM " << (100.0f * square_root_mat) << ", SNR "
      << (-10.0f * arma::log10(evm_mat));
 
   for (size_t i = 0; i < config_->UeAntNum(); i++) {
@@ -661,6 +664,7 @@ void PhyStats::UpdateCsiCond(size_t frame_id, size_t sc_id, float cond) {
   csi_cond_[frame_id % kFrameWnd][sc_id] = cond;
 }
 
+
 void PhyStats::UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t sc_id,
                          const arma::cx_fvec& eq_vec) {
   const arma::fvec evm_vec = arma::square(
@@ -697,7 +701,30 @@ void PhyStats::UpdateBitErrors(size_t ue_id, size_t offset, size_t frame_slot,
   bit_error_count_[ue_id][offset] += bit_errors;
   frame_bit_errors_[ue_id][frame_slot] += bit_errors;
 }
+/*
+void PhyStats::UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t sc_id,
+                         const arma::cx_fvec& eq_vec) {
+  const arma::cx_fvec& gt_vec = gt_cube_.slice(data_symbol_id).col(sc_id);
 
+  float sum_evm = 0.0f;
+  for (size_t ue_id = 0; ue_id < config_->UeAntNum(); ue_id++) {
+    const arma::cx_float& eq = eq_vec(ue_id);
+    const arma::cx_float& gt = gt_vec(ue_id);
+
+    const float diff_real = std::real(eq - gt);
+    const float diff_imag = std::imag(eq - gt);
+    const float evm = std::sqrt(diff_real * diff_real + diff_imag * diff_imag);
+
+    sum_evm += evm;
+
+    evm_sc_buffer_[frame_id % kFrameWnd]
+                  [ue_id * config_->OfdmDataNum() + sc_id] = evm;
+  }
+
+  const float average_evm = sum_evm / config_->UeAntNum();
+  evm_buffer_[frame_id % kFrameWnd][sc_id] = average_evm * 100;
+}
+*/
 void PhyStats::UpdateDecodedBits(size_t ue_id, size_t offset, size_t frame_slot,
                                  size_t new_bits_num) {
   decoded_bits_count_[ue_id][offset] += new_bits_num;

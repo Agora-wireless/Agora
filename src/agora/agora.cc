@@ -451,8 +451,9 @@ void Agora::Start() {
               stats_->PrintPerFrameDone(PrintType::kDemul, frame_id);
               if (kPrintPhyStats) {
                 this->phy_stats_->PrintEvmStats(frame_id);
-                if (frame_id != 0 && ((frame_id % 500) == 0)){
-                  SaveEqualDataToFile(frame_id);
+                if (frame_id != 0 && ((frame_id % 10) == 0)){
+                    std::cout<<"symbol id is: " << symbol_id<<std::endl;
+		    SaveEqualDataToFile(frame_id);
                 }
               }
               this->phy_stats_->RecordCsiCond(frame_id, config_->LogScNum());

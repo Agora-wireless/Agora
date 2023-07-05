@@ -12,7 +12,8 @@ imaginary_part = fft_vec.imag
 plt.figure()
 
 
-plt.plot(abs(fft_vec))
+#plt.plot(abs(fft_vec))
+plt.plot(real_part)
 plt.xlabel('Index')
 plt.ylabel('Value')
 plt.title('FFT Vector')
