@@ -232,7 +232,6 @@ EventData DoDemul::Launch(size_t tag) {
       mat_equaled = mat_ul_beam * mat_data;
 #endif
       auto ue_list = mac_sched_->ScheduledUeList(frame_id, cur_sc_id);
-	  /* ----
       if (symbol_idx_ul <
           cfg_->Frame().ClientUlPilotSymbols()) {  // Calc new phase shift
         if (symbol_idx_ul == 0 && cur_sc_id == 0) {
@@ -283,8 +282,7 @@ EventData DoDemul::Launch(size_t tag) {
           phy_stats_->UpdateEvm(frame_id, data_symbol_idx_ul, cur_sc_id,
                                 mat_equaled.col(0), ue_list);
         }
-      } 
-	  --- */
+      }
       size_t start_tsc3 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
       duration_stat_->task_count_++;

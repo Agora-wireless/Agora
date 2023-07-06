@@ -199,8 +199,8 @@ static constexpr bool kUplinkHardDemod = false;
 
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = true;
-static constexpr bool kCollectPhyStats = false;
-static constexpr bool kPrintBeamStats = false;
+static constexpr bool kCollectPhyStats = true;
+static constexpr bool kPrintBeamStats = true;
 
 static constexpr bool kStatsPrintFrameSummary = true;
 static constexpr bool kDebugPrintPerFrameDone = true;

@@ -116,7 +116,7 @@ class PhyStats {
   CsvLog::MatLogger logger_ul_beam_;
   CsvLog::MatLogger logger_dl_beam_;
   std::vector<size_t> valid_EVM_count_;
-  std::vector<std::vector<size_t> > error_bits_per_frame_;
+  std::vector<std::vector<size_t>> error_bits_per_frame_;
 };
 
 #endif  // PHY_STATS_H_

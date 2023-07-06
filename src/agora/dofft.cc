@@ -243,9 +243,9 @@ EventData DoFFT::Launch(size_t tag) {
         SimdConvertShortToFloat(pkt->data_,
                                 reinterpret_cast<float*>(rx_samps_tmp_),
                                 2 * cfg_->SampsPerSymbol());
-        std::printf("frame_id %zu, ul_symbol_id %zu, ant_id %zu\n", frame_id,
-                    ul_symbol_id, ant_id);
-        std::fflush(stdout);
+        AGORA_LOG_TRACE(
+            "UL Phy Stats: frame_id %zu, ul_symbol_id %zu, ant_id %zu\n",
+            frame_id, ul_symbol_id, ant_id);
         phy_stats_->UpdateUlSnr(frame_id, ul_symbol_id, ant_id, rx_samps_tmp_);
       }
     }

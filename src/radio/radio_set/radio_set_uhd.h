@@ -29,7 +29,6 @@ class RadioSetUhd : public RadioSet {
   void ConfigureRadio(size_t radio_id);
 
   Config* cfg_;
-  uhd::usrp::multi_usrp::sptr hubs_;
 
   size_t radio_num_;
   size_t antenna_num_;
