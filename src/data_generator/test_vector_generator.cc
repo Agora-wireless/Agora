@@ -90,16 +90,6 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
     }
 
     {
-      const std::string filename_input =
-          directory + kUlDataPrefix + std::to_string(cfg_->OfdmCaNum()) +
-          "_ant" + std::to_string(cfg_->UeAntNum()) + ".bin";
-      AGORA_LOG_INFO("Saving uplink MAC data to %s\n", filename_input.c_str());
-      for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
-        Utils::WriteBinaryFile(filename_input, sizeof(uint8_t),
-                               num_ul_mac_bytes, ul_mac_info.at(i).data(),
-                               i != 0);  //Do not append in the first write
-      }
-
       if (kPrintUplinkInformationBytes) {
         std::printf("Uplink information bytes\n");
         for (size_t n = 0; n < cfg_->UeAntNum(); n++) {
@@ -146,7 +136,7 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
     {
       const std::string filename_input =
           directory + kUlLdpcDataPrefix + std::to_string(cfg_->OfdmCaNum()) +
-          "_ant" + std::to_string(cfg_->UeAntNum()) + ".bin";
+          "_ue" + std::to_string(cfg_->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving raw uplink data (using LDPC) to %s\n",
                      filename_input.c_str());
       for (size_t i = 0; i < num_ul_codeblocks; i++) {
@@ -187,7 +177,7 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
     {
       const std::string filename_input =
           directory + kUlModDataPrefix + std::to_string(cfg_->OfdmCaNum()) +
-          "_ant" + std::to_string(cfg_->UeAntNum()) + ".bin";
+          "_ue" + std::to_string(cfg_->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving modulated uplink data to %s\n",
                      filename_input.c_str());
       for (size_t i = 0; i < num_ul_codeblocks; i++) {
@@ -264,7 +254,7 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
 
   {
     const std::string filename_tx = directory + kUlIfftPrefix +
-                                    std::to_string(cfg_->OfdmCaNum()) + "_ant" +
+                                    std::to_string(cfg_->OfdmCaNum()) + "_ue" +
                                     std::to_string(cfg_->UeAntNum()) + ".bin";
     AGORA_LOG_INFO("Saving UL tx data to %s\n", filename_tx.c_str());
     for (size_t i = 0; i < cfg_->Frame().NumULSyms(); i++) {
@@ -319,7 +309,7 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
     }
   }
 
-  const std::string filename_rx = directory + kRxLdpcPrefix +
+  const std::string filename_rx = directory + kUlRxPrefix +
                                   std::to_string(cfg_->OfdmCaNum()) + "_ant" +
                                   std::to_string(cfg_->BsAntNum()) + ".bin";
   AGORA_LOG_INFO("Saving rx data to %s\n", filename_rx.c_str());
@@ -375,17 +365,6 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
     }
 
     {
-      const std::string filename_input =
-          directory + kDlDataPrefix + std::to_string(cfg_->OfdmCaNum()) +
-          "_ant" + std::to_string(cfg_->UeAntNum()) + ".bin";
-      AGORA_LOG_INFO("Saving downlink MAC data to %s\n",
-                     filename_input.c_str());
-      for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
-        Utils::WriteBinaryFile(filename_input, sizeof(uint8_t),
-                               num_dl_mac_bytes, dl_mac_info.at(i).data(),
-                               i != 0);  //Do not append in the first write
-      }
-
       if (kPrintDownlinkInformationBytes) {
         std::printf("Downlink information bytes\n");
         for (size_t n = 0; n < cfg_->UeAntNum(); n++) {
@@ -465,7 +444,7 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
       // Save downlink information bytes to file
       const std::string filename_ldpc =
           directory + kDlLdpcDataPrefix + std::to_string(cfg_->OfdmCaNum()) +
-          "_ant" + std::to_string(cfg_->UeAntNum()) + ".bin";
+          "_ue" + std::to_string(cfg_->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving raw dl data (using LDPC) to %s\n",
                      filename_ldpc.c_str());
       for (size_t i = 0; i < num_dl_codeblocks; i++) {
@@ -476,7 +455,7 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
 
       const std::string filename_modul =
           directory + kDlModDataPrefix + std::to_string(cfg_->OfdmCaNum()) +
-          "_ant" + std::to_string(cfg_->UeAntNum()) + ".bin";
+          "_ue" + std::to_string(cfg_->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving modulated dl data to %s\n",
                      filename_modul.c_str());
       for (size_t i = 0; i < num_dl_codeblocks; i++) {
@@ -488,7 +467,7 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
 
       const std::string filename_tx =
           directory + kDlIfftPrefix + std::to_string(cfg_->OfdmCaNum()) +
-          "_ant" + std::to_string(cfg_->UeAntNum()) + ".bin";
+          "_ue" + std::to_string(cfg_->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving DL tx data to %s\n", filename_tx.c_str());
       for (size_t i = 0; i < cfg_->Frame().NumDlDataSyms(); i++) {
         Utils::WriteBinaryFile(filename_tx, sizeof(complex_float),
@@ -532,20 +511,18 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
                        Agora_memory::Alignment_t::kAlign64);
     for (size_t i = 0; i < cfg_->Frame().NumDLSyms(); i++) {
       for (size_t j = 0; j < cfg_->UeAntNum(); j++) {
-        for (size_t sc_id = 0; sc_id < cfg_->OfdmDataNum(); sc_id++) {
-          complex_float sc_data;
-          if ((i < cfg_->Frame().ClientDlPilotSymbols()) ||
-              (sc_id % cfg_->OfdmPilotSpacing() == 0)) {
-            sc_data = ue_specific_pilot[j][sc_id];
-          } else {
-            sc_data = dl_modulated_symbols
-                          .at(((i - cfg_->Frame().ClientDlPilotSymbols()) *
-                               cfg_->UeAntNum()) +
-                              j)
-                          .at(sc_id);
-          }
-          dl_mod_data[i][j * cfg_->OfdmCaNum() + sc_id +
-                         cfg_->OfdmDataStart()] = sc_data;
+        void* dst_ptr =
+            &dl_mod_data[i][j * cfg_->OfdmCaNum() + cfg_->OfdmDataStart()];
+        if (i < cfg_->Frame().ClientDlPilotSymbols()) {
+          std::memcpy(dst_ptr, ue_specific_pilot[j],
+                      cfg_->OfdmDataNum() * sizeof(complex_float));
+        } else {
+          size_t data_sym_id = i - cfg_->Frame().ClientDlPilotSymbols();
+          std::memcpy(
+              dst_ptr,
+              dl_modulated_symbols.at(data_sym_id * cfg_->UeAntNum() + j)
+                  .data(),
+              cfg_->OfdmDataNum() * sizeof(complex_float));
         }
       }
     }
