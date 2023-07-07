@@ -23,10 +23,13 @@ static const std::string kUlDataPrefix = "orig_ul_data_";
 static const std::string kDlDataPrefix = "orig_dl_data_";
 static const std::string kUlLdpcDataPrefix = "LDPC_orig_ul_data_";
 static const std::string kDlLdpcDataPrefix = "LDPC_orig_dl_data_";
-static const std::string kUlDataFreqPrefix = "ul_data_f_";
+//static const std::string kUlDataFreqPrefix = "ul_data_f_";
+//static const std::string kDlDataFreqPrefix = "dl_data_f_";
 static const std::string kUlModDataPrefix = "mod_ul_data_";
+static const std::string kDlModDataPrefix = "mod_dl_data_";
+static const std::string kUlIfftPrefix = "ul_ifft_data_";
+static const std::string kDlIfftPrefix = "dl_ifft_data_";
 static const std::string kRxLdpcPrefix = "LDPC_rx_data_";
-static const std::string kUlTxPrefix = "ul_ifft_data_";
 static const std::string kDlTxPrefix = "LDPC_dl_tx_data_";
 
 typedef std::independent_bits_engine<std::mt19937, 8, std::uint_fast8_t>
@@ -137,7 +140,9 @@ class DataGenerator {
                                   size_t num_codeblocks,
                                   size_t num_decoded_bytes,
                                   bool scramble_enabled = false);
-  static void GenerateUlTxTestVectors(Config* cfg);
+  static void GenerateUlTxTestVectors(Config* const cfg);
+  static void GenerateDlTxTestVectors(Config* const cfg,
+                                      Table<complex_float>& dmrs);
 
  private:
   FastRand fast_rand_;  // A fast random number generator

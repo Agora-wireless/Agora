@@ -122,10 +122,8 @@ void PhyStats::LoadGroundTruthIq() {
   if (num_rxdata_symbols_ > 0) {
     for (size_t i = 0; i < num_rxdata_symbols_; i++) {
       auto* iq_f_ptr = reinterpret_cast<arma::cx_float*>(
-          (dir_ == Direction::kDownlink)
-              ? config_
-                    ->DlIqF()[i + this->config_->Frame().ClientDlPilotSymbols()]
-              : config_->UlIqF()[i]);
+          (dir_ == Direction::kDownlink) ? config_->DlIqF()[i]
+                                         : config_->UlIqF()[i]);
       arma::cx_fmat iq_f_mat(iq_f_ptr, this->config_->OfdmDataNum(),
                              this->config_->UeAntNum(), false);
       gt_cube_.slice(i) = iq_f_mat.st();

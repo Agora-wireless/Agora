@@ -331,7 +331,7 @@ void DataGenerator::GetDecodedDataBatch(Table<int8_t>& demoded_data,
   std::free(resp_var_nodes);
 }
 
-void DataGenerator::GenerateUlTxTestVectors(Config* cfg) {
+void DataGenerator::GenerateUlTxTestVectors(Config* const cfg) {
   //Make sure the directory exists
   if (std::filesystem::is_directory(kExperimentFilepath) == false) {
     std::filesystem::create_directory(kExperimentFilepath);
@@ -450,11 +450,163 @@ void DataGenerator::GenerateUlTxTestVectors(Config* cfg) {
     }
 
     {
-      const std::string filename_tx =
-          kExperimentFilepath + kUlTxPrefix + std::to_string(cfg->OfdmCaNum()) +
-          "_ant" + std::to_string(cfg->UeAntNum()) + ".bin";
+      const std::string filename_tx = kExperimentFilepath + kUlIfftPrefix +
+                                      std::to_string(cfg->OfdmCaNum()) +
+                                      "_ant" + std::to_string(cfg->UeAntNum()) +
+                                      ".bin";
       AGORA_LOG_INFO("Saving UL tx data to %s\n", filename_tx.c_str());
       for (size_t i = 0; i < cfg->Frame().NumUlDataSyms(); i++) {
+        Utils::WriteBinaryFile(filename_tx, sizeof(complex_float),
+                               cfg->OfdmCaNum() * cfg->UeAntNum(),
+                               tx_data_symbols.at(i).data(),
+                               i != 0);  //Do not append in the first write
+      }
+    }
+  }
+}
+
+void DataGenerator::GenerateDlTxTestVectors(Config* const cfg,
+                                            Table<complex_float>& dmrs) {
+  //Make sure the directory exists
+  if (std::filesystem::is_directory(kExperimentFilepath) == false) {
+    std::filesystem::create_directory(kExperimentFilepath);
+  }
+  assert(dmrs.Dim1() == cfg->UeAntNum());
+  std::unique_ptr<DoCRC> crc_obj = std::make_unique<DoCRC>();
+  const LDPCconfig dl_ldpc_config = cfg->LdpcConfig(Direction::kDownlink);
+  const size_t dl_cb_bytes = cfg->NumBytesPerCb(Direction::kDownlink);
+  const size_t num_dl_mac_bytes =
+      cfg->MacBytesNumPerframe(Direction::kDownlink);
+  std::vector<std::vector<int8_t>> dl_mac_info(cfg->UeAntNum());
+  if (num_dl_mac_bytes > 0) {
+    for (size_t ue_id = 0; ue_id < cfg->UeAntNum(); ue_id++) {
+      dl_mac_info[ue_id].resize(num_dl_mac_bytes);
+      for (size_t pkt_id = 0;
+           pkt_id < cfg->MacPacketsPerframe(Direction::kDownlink); pkt_id++) {
+        size_t pkt_offset = pkt_id * cfg->MacPacketLength(Direction::kDownlink);
+        auto* pkt = reinterpret_cast<MacPacketPacked*>(
+            &dl_mac_info.at(ue_id).at(pkt_offset));
+
+        pkt->Set(0, pkt_id, ue_id,
+                 cfg->MacPayloadMaxLength(Direction::kDownlink));
+        DataGenerator::GenMacRandomBits(pkt);
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(pkt->Data(),
+                                                    cfg->MacPayloadMaxLength(
+                                                        Direction::kDownlink)) &
+                            0xFFFF));
+      }
+    }
+
+    {
+      const std::string filename_input =
+          kExperimentFilepath + kDlDataPrefix +
+          std::to_string(cfg->OfdmCaNum()) + "_ant" +
+          std::to_string(cfg->UeAntNum()) + ".bin";
+      AGORA_LOG_INFO("Saving downlink MAC data to %s\n",
+                     filename_input.c_str());
+      for (size_t i = 0; i < cfg->UeAntNum(); i++) {
+        Utils::WriteBinaryFile(filename_input, sizeof(uint8_t),
+                               num_dl_mac_bytes, dl_mac_info.at(i).data(),
+                               i != 0);  //Do not append in the first write
+      }
+    }
+
+    const size_t symbol_blocks =
+        dl_ldpc_config.NumBlocksInSymbol() * cfg->UeAntNum();
+    const size_t num_dl_codeblocks =
+        cfg->Frame().NumDlDataSyms() * symbol_blocks;
+
+    std::vector<std::vector<int8_t>> dl_information(num_dl_codeblocks);
+    std::vector<std::vector<int8_t>> dl_encoded_codewords(num_dl_codeblocks);
+    for (size_t cb = 0; cb < num_dl_codeblocks; cb++) {
+      // i : symbol -> ue -> cb (repeat)
+      const size_t sym_id = cb / (symbol_blocks);
+      // ue antenna for code block
+      const size_t sym_offset = cb % (symbol_blocks);
+      const size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
+      const size_t ue_cb_id = sym_offset % dl_ldpc_config.NumBlocksInSymbol();
+      const size_t ue_cb_cnt =
+          (sym_id * dl_ldpc_config.NumBlocksInSymbol()) + ue_cb_id;
+      int8_t* cb_start = &dl_mac_info.at(ue_id).at(ue_cb_cnt * dl_cb_bytes);
+      dl_information.at(cb) =
+          std::vector<int8_t>(cb_start, cb_start + dl_cb_bytes);
+      dl_encoded_codewords.at(cb) = DataGenerator::GenCodeblock(
+          dl_ldpc_config, &dl_information.at(cb).at(0), dl_cb_bytes,
+          cfg->ScrambleEnabled());
+    }
+
+    {
+      // Save downlink information bytes to file
+      const std::string filename_input =
+          kExperimentFilepath + kDlLdpcDataPrefix +
+          std::to_string(cfg->OfdmCaNum()) + "_ant" +
+          std::to_string(cfg->UeAntNum()) + ".bin";
+      AGORA_LOG_INFO("Saving raw dl data (using LDPC) to %s\n",
+                     filename_input.c_str());
+      for (size_t i = 0; i < num_dl_codeblocks; i++) {
+        Utils::WriteBinaryFile(filename_input, sizeof(uint8_t), dl_cb_bytes,
+                               dl_information.at(i).data(),
+                               i != 0);  //Do not append in the first write
+      }
+    }
+
+    // Modulate the encoded codewords
+    std::vector<std::vector<uint8_t>> dl_modulated_codewords(num_dl_codeblocks);
+    std::vector<std::vector<complex_float>> dl_modulated_symbols(
+        num_dl_codeblocks);
+    for (size_t i = 0; i < num_dl_codeblocks; i++) {
+      const size_t sym_offset = i % (symbol_blocks);
+      const size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
+      dl_modulated_codewords.at(i).resize(cfg->OfdmDataNum());
+      auto ofdm_symbol = DataGenerator::GetModulation(
+          &dl_encoded_codewords.at(i)[0], &dl_modulated_codewords.at(i)[0],
+          cfg->ModTable(Direction::kDownlink),
+          cfg->LdpcConfig(Direction::kDownlink).NumCbCodewLen(),
+          cfg->OfdmDataNum(), cfg->ModOrderBits(Direction::kDownlink));
+      dl_modulated_symbols.at(i) = DataGenerator::MapOFDMSymbol(
+          cfg, ofdm_symbol, dmrs[ue_id], SymbolType::kDL);
+    }
+    {
+      const std::string filename_input =
+          kExperimentFilepath + kDlModDataPrefix +
+          std::to_string(cfg->OfdmCaNum()) + "_ant" +
+          std::to_string(cfg->UeAntNum()) + ".bin";
+      AGORA_LOG_INFO("Saving modulated downlink data to %s\n",
+                     filename_input.c_str());
+      for (size_t i = 0; i < num_dl_codeblocks; i++) {
+        Utils::WriteBinaryFile(filename_input, sizeof(uint8_t),
+                               cfg->OfdmDataNum(),
+                               dl_modulated_codewords.at(i).data(),
+                               i != 0);  //Do not append in the first write
+      }
+    }
+    std::vector<std::vector<complex_float>> pre_ifft_data_syms(
+        cfg->UeAntNum() * cfg->Frame().NumDlDataSyms());
+    for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
+      pre_ifft_data_syms.at(i) =
+          DataGenerator::BinForIfft(cfg, dl_modulated_symbols.at(i));
+    }
+
+    std::vector<std::vector<complex_float>> tx_data_symbols(
+        cfg->Frame().NumDlDataSyms());
+    // Populate the UL symbols
+    for (size_t i = 0; i < cfg->Frame().NumDlDataSyms(); i++) {
+      tx_data_symbols.at(i).resize(cfg->UeAntNum() * cfg->OfdmCaNum());
+      for (size_t j = 0; j < cfg->UeAntNum(); j++) {
+        const size_t k = i - cfg->Frame().ClientDlPilotSymbols();
+        std::memcpy(&tx_data_symbols.at(i).at(0) + (j * cfg->OfdmCaNum()),
+                    &pre_ifft_data_syms.at(k * cfg->UeAntNum() + j).at(0),
+                    cfg->OfdmCaNum() * sizeof(complex_float));
+      }
+    }
+
+    {
+      const std::string filename_tx = kExperimentFilepath + kDlIfftPrefix +
+                                      std::to_string(cfg->OfdmCaNum()) +
+                                      "_ant" + std::to_string(cfg->UeAntNum()) +
+                                      ".bin";
+      AGORA_LOG_INFO("Saving UL tx data to %s\n", filename_tx.c_str());
+      for (size_t i = 0; i < cfg->Frame().NumDlDataSyms(); i++) {
         Utils::WriteBinaryFile(filename_tx, sizeof(complex_float),
                                cfg->OfdmCaNum() * cfg->UeAntNum(),
                                tx_data_symbols.at(i).data(),
