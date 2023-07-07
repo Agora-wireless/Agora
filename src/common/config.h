@@ -412,7 +412,8 @@ class Config {
 
   // Public functions
   void GenPilots();
-  void LoadBinaryData();
+  void LoadUplinkData();
+  void LoadDownlinkData();
   void GenData();
   void GenBroadcastSlots(std::vector<std::complex<int16_t>*>& bcast_iq_samps,
                          std::vector<size_t> ctrl_msg);
