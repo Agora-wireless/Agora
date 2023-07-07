@@ -1200,7 +1200,7 @@ void Config::LoadUplinkData() {
                     Agora_memory::Alignment_t::kAlign64);
     const std::string ul_data_file =
         kExperimentFilepath + kUlLdpcDataPrefix +
-        std::to_string(this->ofdm_ca_num_) + "_ant" +
+        std::to_string(this->ofdm_ca_num_) + "_ue" +
         std::to_string(this->ue_ant_total_) + ".bin";
     AGORA_LOG_SYMBOL("Config: Reading raw ul data from %s\n",
                      ul_data_file.c_str());
@@ -1225,7 +1225,7 @@ void Config::LoadUplinkData() {
                         Agora_memory::Alignment_t::kAlign32);
     const std::string ul_mod_data_file =
         kExperimentFilepath + kUlModDataPrefix +
-        std::to_string(this->ofdm_ca_num_) + "_ant" +
+        std::to_string(this->ofdm_ca_num_) + "_ue" +
         std::to_string(this->ue_ant_total_) + ".bin";
     seek_offset = 0;
     // \todo assumes one code block per symbol
@@ -1253,16 +1253,10 @@ void Config::LoadDownlinkData() {
   dl_bits_.Calloc(this->frame_.NumDLSyms(),
                   dl_num_bytes_per_ue_pad * this->ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
-  dl_iq_f_.Calloc(this->frame_.NumDLSyms(), ofdm_data_num_ * ue_ant_num_,
-                  Agora_memory::Alignment_t::kAlign64);
-  dl_iq_t_.Calloc(this->frame_.NumDLSyms(),
-                  this->samps_per_symbol_ * this->ue_ant_num_,
-                  Agora_memory::Alignment_t::kAlign64);
-
   if (this->frame_.NumDlDataSyms() > 0) {
     const std::string dl_data_file =
         kExperimentFilepath + kDlLdpcDataPrefix +
-        std::to_string(this->ofdm_ca_num_) + "_ant" +
+        std::to_string(this->ofdm_ca_num_) + "_ue" +
         std::to_string(this->ue_ant_total_) + ".bin";
 
     AGORA_LOG_FRAME("Config: Reading raw dl data from %s\n",
@@ -1284,7 +1278,7 @@ void Config::LoadDownlinkData() {
                       Agora_memory::Alignment_t::kAlign32);
   const std::string dl_mod_data_file =
       kExperimentFilepath + kDlModDataPrefix +
-      std::to_string(this->ofdm_ca_num_) + "_ant" +
+      std::to_string(this->ofdm_ca_num_) + "_ue" +
       std::to_string(this->ue_ant_total_) + ".bin";
   size_t seek_offset = 0;
   // \todo assumes one code block per symbol
@@ -1322,7 +1316,7 @@ void Config::GenData() {
                       Agora_memory::Alignment_t::kAlign64);
     const std::string ul_ifft_data_file =
         kExperimentFilepath + kUlIfftPrefix +
-        std::to_string(this->ofdm_ca_num_) + "_ant" +
+        std::to_string(this->ofdm_ca_num_) + "_ue" +
         std::to_string(this->ue_ant_total_) + ".bin";
     size_t seek_offset = 0;
     for (size_t i = 0; i < this->frame_.NumUlDataSyms(); i++) {
@@ -1347,6 +1341,11 @@ void Config::GenData() {
 
   this->LoadDownlinkData();
   // Generate freq-domain downlink symbols
+  dl_iq_f_.Calloc(this->frame_.NumDLSyms(), ofdm_data_num_ * ue_ant_num_,
+                  Agora_memory::Alignment_t::kAlign64);
+  dl_iq_t_.Calloc(this->frame_.NumDLSyms(),
+                  this->samps_per_symbol_ * this->ue_ant_num_,
+                  Agora_memory::Alignment_t::kAlign64);
   Table<complex_float> dl_iq_ifft;
   if (this->frame_.NumDlDataSyms() > 0) {
     dl_iq_ifft.Calloc(this->frame_.NumDlDataSyms(),
@@ -1354,7 +1353,7 @@ void Config::GenData() {
                       Agora_memory::Alignment_t::kAlign64);
     const std::string dl_ifft_data_file =
         kExperimentFilepath + kDlIfftPrefix +
-        std::to_string(this->ofdm_ca_num_) + "_ant" +
+        std::to_string(this->ofdm_ca_num_) + "_ue" +
         std::to_string(this->ue_ant_total_) + ".bin";
     size_t seek_offset = 0;
     for (size_t i = 0; i < this->frame_.NumDlDataSyms(); i++) {
@@ -1376,28 +1375,6 @@ void Config::GenData() {
           sizeof(complex_float);
     }
   }
-  /*for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
-    for (size_t u = 0; u < ue_ant_num_; u++) {
-      size_t q = u * ofdm_data_num_;
-
-      for (size_t j = 0; j < ofdm_data_num_; j++) {
-        size_t sc = j + ofdm_data_start_;
-        if (IsDataSubcarrier(j) == true) {
-          int8_t* mod_input_ptr =
-              GetModBitsBuf(dl_mod_bits_, Direction::kDownlink, 0, i, u,
-                            this->GetOFDMDataIndex(j));
-          dl_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, dl_mod_table_);
-        } else {
-          dl_iq_f_[i][q + j] = ue_specific_pilot_[u][j];
-        }
-        // FFT Shift
-        const size_t k = sc >= ofdm_ca_num_ / 2 ? sc - ofdm_ca_num_ / 2
-                                                : sc + ofdm_ca_num_ / 2;
-        dl_iq_ifft[i][u * ofdm_ca_num_ + k] = dl_iq_f_[i][q + j];
-      }
-      CommsLib::IFFT(&dl_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
-    }
-  }*/
 
   // Find normalization factor through searching for max value in IFFT results
 

@@ -1,6 +1,7 @@
 #include <string>
 
 #include "agora.h"
+#include "data_generator.h"
 #include "datatype_conversion.h"
 #include "gflags/gflags.h"
 #include "logger.h"
@@ -9,15 +10,12 @@
 static const bool kDebugPrintUlCorr = false;
 static const bool kDebugPrintDlCorr = false;
 
-static const std::string kInputFileDirectory =
-    TOSTRING(PROJECT_DIRECTORY) "/files/experiment/";
 static const std::string kUlCheckFilePrefix =
-    kInputFileDirectory + "LDPC_orig_ul_data_";
+    kExperimentFilepath + kUlLdpcDataPrefix;
+static const std::string kDlCheckFilePrefix = kExperimentFilepath + kDlTxPrefix;
+static const std::string kTxFilename = kExperimentFilepath + "tx_data.bin";
 static const std::string kDecodedFilename =
-    kInputFileDirectory + "decode_data.bin";
-static const std::string kDlCheckFilePrefix =
-    kInputFileDirectory + "LDPC_dl_tx_data_";
-static const std::string kTxFilename = kInputFileDirectory + "tx_data.bin";
+    kExperimentFilepath + "decode_data.bin";
 
 template <class TableType>
 static void ReadFromFile(const std::string& filename, Table<TableType>& data,
@@ -61,7 +59,7 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg) {
   int ul_pilot_syms = cfg->Frame().ClientUlPilotSymbols();
 
   const std::string raw_data_filename =
-      kUlCheckFilePrefix + std::to_string(cfg->OfdmCaNum()) + "_ant" +
+      kUlCheckFilePrefix + std::to_string(cfg->OfdmCaNum()) + "_ue" +
       std::to_string(cfg->UeAntNum()) + ".bin";
 
   Table<uint8_t> raw_data;

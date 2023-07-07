@@ -19,18 +19,14 @@
 
 static const std::string kExperimentFilepath =
     TOSTRING(PROJECT_DIRECTORY) "/files/experiment/";
-static const std::string kUlDataPrefix = "orig_ul_data_";
-static const std::string kDlDataPrefix = "orig_dl_data_";
-static const std::string kUlLdpcDataPrefix = "LDPC_orig_ul_data_";
-static const std::string kDlLdpcDataPrefix = "LDPC_orig_dl_data_";
-//static const std::string kUlDataFreqPrefix = "ul_data_f_";
-//static const std::string kDlDataFreqPrefix = "dl_data_f_";
-static const std::string kUlModDataPrefix = "mod_ul_data_";
-static const std::string kDlModDataPrefix = "mod_dl_data_";
+static const std::string kUlLdpcDataPrefix = "ul_ldpc_data_";
+static const std::string kDlLdpcDataPrefix = "dl_ldpc_data_";
+static const std::string kUlModDataPrefix = "ul_mod_data_";
+static const std::string kDlModDataPrefix = "dl_mod_data_";
 static const std::string kUlIfftPrefix = "ul_ifft_data_";
 static const std::string kDlIfftPrefix = "dl_ifft_data_";
-static const std::string kRxLdpcPrefix = "LDPC_rx_data_";
-static const std::string kDlTxPrefix = "LDPC_dl_tx_data_";
+static const std::string kUlRxPrefix = "ul_rx_data_";
+static const std::string kDlTxPrefix = "dl_tx_data_";
 
 typedef std::independent_bits_engine<std::mt19937, 8, std::uint_fast8_t>
     rand_byte_generator;

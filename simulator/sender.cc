@@ -8,6 +8,7 @@
 #include <csignal>
 #include <thread>
 
+#include "data_generator.h"
 #include "datatype_conversion.h"
 #include "gettime.h"
 #include "logger.h"
@@ -74,8 +75,7 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     i = new size_t[cfg->Frame().NumTotalSyms()]();
   }
 
-  InitIqFromFile(std::string(TOSTRING(PROJECT_DIRECTORY)) +
-                 "/files/experiment/LDPC_rx_data_" +
+  InitIqFromFile(kExperimentFilepath + kUlRxPrefix +
                  std::to_string(cfg->OfdmCaNum()) + "_ant" +
                  std::to_string(cfg->BsAntNum()) + ".bin");
 

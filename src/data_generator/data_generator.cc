@@ -389,7 +389,7 @@ void DataGenerator::GenerateUlTxTestVectors(Config* const cfg) {
     {
       const std::string filename_input =
           kExperimentFilepath + kUlLdpcDataPrefix +
-          std::to_string(cfg->OfdmCaNum()) + "_ant" +
+          std::to_string(cfg->OfdmCaNum()) + "_ue" +
           std::to_string(cfg->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving raw uplink data (using LDPC) to %s\n",
                      filename_input.c_str());
@@ -418,7 +418,7 @@ void DataGenerator::GenerateUlTxTestVectors(Config* const cfg) {
     {
       const std::string filename_input =
           kExperimentFilepath + kUlModDataPrefix +
-          std::to_string(cfg->OfdmCaNum()) + "_ant" +
+          std::to_string(cfg->OfdmCaNum()) + "_ue" +
           std::to_string(cfg->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving modulated uplink data to %s\n",
                      filename_input.c_str());
@@ -451,9 +451,8 @@ void DataGenerator::GenerateUlTxTestVectors(Config* const cfg) {
 
     {
       const std::string filename_tx = kExperimentFilepath + kUlIfftPrefix +
-                                      std::to_string(cfg->OfdmCaNum()) +
-                                      "_ant" + std::to_string(cfg->UeAntNum()) +
-                                      ".bin";
+                                      std::to_string(cfg->OfdmCaNum()) + "_ue" +
+                                      std::to_string(cfg->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving UL tx data to %s\n", filename_tx.c_str());
       for (size_t i = 0; i < cfg->Frame().NumUlDataSyms(); i++) {
         Utils::WriteBinaryFile(filename_tx, sizeof(complex_float),
@@ -497,20 +496,6 @@ void DataGenerator::GenerateDlTxTestVectors(Config* const cfg,
       }
     }
 
-    {
-      const std::string filename_input =
-          kExperimentFilepath + kDlDataPrefix +
-          std::to_string(cfg->OfdmCaNum()) + "_ant" +
-          std::to_string(cfg->UeAntNum()) + ".bin";
-      AGORA_LOG_INFO("Saving downlink MAC data to %s\n",
-                     filename_input.c_str());
-      for (size_t i = 0; i < cfg->UeAntNum(); i++) {
-        Utils::WriteBinaryFile(filename_input, sizeof(uint8_t),
-                               num_dl_mac_bytes, dl_mac_info.at(i).data(),
-                               i != 0);  //Do not append in the first write
-      }
-    }
-
     const size_t symbol_blocks =
         dl_ldpc_config.NumBlocksInSymbol() * cfg->UeAntNum();
     const size_t num_dl_codeblocks =
@@ -539,7 +524,7 @@ void DataGenerator::GenerateDlTxTestVectors(Config* const cfg,
       // Save downlink information bytes to file
       const std::string filename_input =
           kExperimentFilepath + kDlLdpcDataPrefix +
-          std::to_string(cfg->OfdmCaNum()) + "_ant" +
+          std::to_string(cfg->OfdmCaNum()) + "_ue" +
           std::to_string(cfg->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving raw dl data (using LDPC) to %s\n",
                      filename_input.c_str());
@@ -569,7 +554,7 @@ void DataGenerator::GenerateDlTxTestVectors(Config* const cfg,
     {
       const std::string filename_input =
           kExperimentFilepath + kDlModDataPrefix +
-          std::to_string(cfg->OfdmCaNum()) + "_ant" +
+          std::to_string(cfg->OfdmCaNum()) + "_ue" +
           std::to_string(cfg->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving modulated downlink data to %s\n",
                      filename_input.c_str());
@@ -602,9 +587,8 @@ void DataGenerator::GenerateDlTxTestVectors(Config* const cfg,
 
     {
       const std::string filename_tx = kExperimentFilepath + kDlIfftPrefix +
-                                      std::to_string(cfg->OfdmCaNum()) +
-                                      "_ant" + std::to_string(cfg->UeAntNum()) +
-                                      ".bin";
+                                      std::to_string(cfg->OfdmCaNum()) + "_ue" +
+                                      std::to_string(cfg->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving UL tx data to %s\n", filename_tx.c_str());
       for (size_t i = 0; i < cfg->Frame().NumDlDataSyms(); i++) {
         Utils::WriteBinaryFile(filename_tx, sizeof(complex_float),
