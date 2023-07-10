@@ -7,16 +7,18 @@
 class ExampleModel: public ChannelModel {
 
     public:
-        ExampleModel( const Config* config ) : ChannelModel( config ) {}
 
-        arma::cx_fmat GetAndUpdateMatrix() override 
+        //Example model constructor, call parent class ChannelModel( Config, FadingType )
+        ExampleModel( const Config* config ) : ChannelModel( config, ChannelModel::kFlat ) {}
+
+        void UpdateModel() override
         {
 
-            //GetAndUpdateMatrix is called each frame 
-            return arma::cx_fmat();
+            //Set a value for h_flat_ if Flat Fading
+            //Set a value for h_selective_ if Selective Fading
 
         }
-       
+
 };
 
 #endif

@@ -53,11 +53,7 @@ class Channel {
 
   ChannelModel* channel_model;
   ChannelModel* GetChannelModel();
-
-  enum ChanModel { kAwgn, kRayleigh, kDataset } chan_model_; 
   
-  arma::cx_fmat h_;
-
 };
 
 #endif  // CHANNEL_H_

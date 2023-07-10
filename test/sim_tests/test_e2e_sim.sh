@@ -20,7 +20,7 @@ done
 
 # Setup the config with the number of frames to test
 cp ${input_filepath}/chsim.json ${input_filepath}/chsim-tmp.json
-sed -i '2i\ \ "max_frame": 1000,' ${input_filepath}/chsim-tmp.json
+sed -i '2i\ \ "max_frame": 50,' ${input_filepath}/chsim-tmp.json
 
 echo "==========================================="
 echo "Generating data for emulated RRU end-to-end test with channel simulator ......"
@@ -34,7 +34,7 @@ echo "Emulated RRU Test" > ${output_filepath}/test_user_output.txt
 echo "Emulated RRU Test" > ${output_filepath}/test_agora_output.txt
 echo "Emulated RRU Test" > ${output_filepath}/test_chsim_output.txt
 ./build/user --conf_file ${input_filepath}/chsim-tmp.json >> ${output_filepath}/test_user_output.txt &
-sleep 1; ./build/chsim --bs_threads 1 --core_offset 19 --conf_file ${input_filepath}/chsim-tmp.json >> ${output_filepath}/test_chsim_output.txt &
+sleep 1; ./build/chsim --bs_threads 2 --ue_threads 2 --worker_threads 2 --core_offset 24 --chan_model="DATASET" --chan_dataset="./simulator/datasets/32_4_512_50_rayleigh_dataset.hdf5" --conf_file ${input_filepath}/chsim-tmp.json >> ${output_filepath}/test_chsim_output.txt &
 sleep 1; ./build/agora --conf_file ${input_filepath}/chsim-tmp.json >> ${output_filepath}/test_agora_output.txt
 
 sleep 5;

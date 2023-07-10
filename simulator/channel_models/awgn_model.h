@@ -7,18 +7,18 @@
 class AwgnModel: public ChannelModel {
 
     public:
-        AwgnModel( const Config* config ) : ChannelModel( config ) {}
+        AwgnModel( const Config* config ) : ChannelModel( config, ChannelModel::kFlat ) {}
 
-        arma::cx_fmat GetAndUpdateMatrix() override 
+        void UpdateModel() override
         {
 
-            arma::fmat rmat(ues_num, bss_num, arma::fill::ones);
-            arma::fmat imat(ues_num, bss_num, arma::fill::zeros);
+            arma::fmat rmat(ues_num_, bss_num_, arma::fill::ones);
+            arma::fmat imat(ues_num_, bss_num_, arma::fill::zeros);
 
-            return arma::cx_fmat(rmat, imat);
+            h_flat_ = arma::cx_fmat(rmat, imat);
 
         }
-       
+
 };
 
 #endif

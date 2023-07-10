@@ -37,7 +37,7 @@ ChannelModel* Channel::GetChannelModel()
 
   if( sim_chan_model_ == "DATASET" ) return new DatasetModel( cfg_ , dataset_path_ );
   
-  AGORA_LOG_WARN("Invalid channel model at CHSim, assuming AWGN... \n");
+  AGORA_LOG_WARN("Invalid channel model at CHSim, assuming AWGN Model... \n");
 
   return new AwgnModel( cfg_ );
 
@@ -49,23 +49,55 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
 
   if( is_newChan )
   {
+    channel_model->UpdateModel();
+  }
 
-    h_ = channel_model->GetAndUpdateMatrix();
-    h_ = sqrt(kMeanChannelGain / 2.0f) * h_;
+  switch ( channel_model->fading_type )
+  {
+    
+    case ChannelModel::kFlat:
+    {
+      
+      fmat_h = fmat_src * channel_model->GetMatrix( is_downlink );
+      break;
+
+    }
+      
+    case ChannelModel::kSelective:
+    {
+
+      //For each Subcarrier or OFDMSample input, multiply H Matrix slice
+      for( int h_index = 0; h_index < (int)fmat_src.n_rows; h_index++ )
+      {
+
+        arma::cx_fmat y_ = fmat_src.row( h_index ) * channel_model->GetMatrix( is_downlink, h_index );
+        fmat_h.insert_rows( h_index, y_ );
+        
+      }
+
+      break;
+
+    }
+    
+    default:
+    {
+      
+      AGORA_LOG_ERROR("Invalid Channel model fading type \n");
+      
+      break;
+
+    }
 
   }
 
-  if (is_downlink) {
-    fmat_h = fmat_src * h_.st(); 
-  } else {
-    fmat_h = fmat_src * h_; 
-  }
+  //std::printf("Y [%d Rows x %d Cols] \n", (int)fmat_h.n_rows, (int)fmat_h.n_cols);
 
   // Add noise
   Awgn(fmat_h, fmat_dst);
-  
-  if (kPrintChannelOutput) {
-    Utils::PrintMat(h_, "H");
+
+  if (kPrintChannelOutput)
+  { 
+    Utils::PrintMat( fmat_dst, "H");
   }
 
 }
