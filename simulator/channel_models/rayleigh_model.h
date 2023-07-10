@@ -8,18 +8,18 @@
 class RayleighModel: public ChannelModel {
 
     public:
-        RayleighModel( const Config* config ) : ChannelModel( config ) {}
+        RayleighModel( const Config* config ) : ChannelModel( config, ChannelModel::kFlat ) {}
 
-        arma::cx_fmat GetAndUpdateMatrix() override 
+        void UpdateModel() override
         {
 
-            arma::fmat rmat(ues_num, bss_num, arma::fill::randn);
-            arma::fmat imat(ues_num, bss_num, arma::fill::randn);
+            arma::fmat rmat(ues_num_, bss_num_, arma::fill::randn);
+            arma::fmat imat(ues_num_, bss_num_, arma::fill::randn);
 
-            return arma::cx_fmat(rmat, imat);
+            h_flat_ = arma::cx_fmat(rmat, imat);
 
         }
-       
+
 };
 
 #endif
