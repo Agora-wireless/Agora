@@ -65,7 +65,7 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
       
     case ChannelModel::kSelective:
     {
-
+      
       //For each Subcarrier or OFDMSample input, multiply H Matrix slice
       for( int h_index = 0; h_index < (int)fmat_src.n_rows; h_index++ )
       {
