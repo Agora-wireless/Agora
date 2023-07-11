@@ -63,21 +63,29 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
                                                cfg->Frame().NumTotalSyms()));
   ticks_wnd2_ = ticks_all_ * 15;
 
+  std::cout << "This is where we fail.\n" << std::flush;
+
   AGORA_LOG_INFO(
       "Initializing sender, sending to base station server at %s, frame "
       "duration = %.2f ms, slow start = %s\n",
       cfg->BsServerAddr().c_str(), frame_duration_ / 1000.0,
       enable_slow_start == 1 ? "yes" : "no");
 
+  std::cout << "Dead yet?\n" << std::flush;
+
   unused(server_mac_addr_str);
   for (auto& i : packet_count_per_symbol_) {
     i = new size_t[cfg->Frame().NumTotalSyms()]();
   }
 
+  std::cout << "How about now?\n" << std::flush;
+
   InitIqFromFile(std::string(TOSTRING(PROJECT_DIRECTORY)) +
                  "/files/experiment/LDPC_rx_data_" +
                  std::to_string(cfg->OfdmCaNum()) + "_ant" +
                  std::to_string(cfg->BsAntNum()) + ".bin");
+
+  std::cout << "Does InitIQFromFile Finish?\n" << std::flush;
 
   task_ptok_ =
       static_cast<moodycamel::ProducerToken**>(Agora_memory::PaddedAlignedAlloc(
@@ -549,22 +557,34 @@ uint64_t Sender::GetTicksForFrame(size_t frame_id) const {
 }
 
 void Sender::InitIqFromFile(const std::string& filename) {
+  std::cout << "Inside InitIQFromFile\n" << std::flush;
   const size_t packets_per_frame =
       cfg_->Frame().NumTotalSyms() * cfg_->BsAntNum();
   iq_data_short_.Calloc(packets_per_frame, (cfg_->SampsPerSymbol()) * 2,
                         Agora_memory::Alignment_t::kAlign64);
+  std::cout << "Defined packets per frame\n" << std::flush;
 
   Table<float> iq_data_float;
   iq_data_float.Calloc(packets_per_frame, (cfg_->SampsPerSymbol()) * 2,
                        Agora_memory::Alignment_t::kAlign64);
-  
+
+  std::cout << "iq_data_float\n" << std::flush;
+
   FILE* fp = std::fopen(filename.c_str(), "rb");
   RtAssert(fp != nullptr, "Failed to open IQ data file");
+
+  std::cout << "opened file\n" << std::flush;
+
 
   for (size_t i = 0; i < packets_per_frame; i++) {
     const size_t expected_count = (cfg_->SampsPerSymbol()) * 2;
     const size_t actual_count =
         std::fread(iq_data_float[i], sizeof(float), expected_count, fp);
+
+        
+
+        //std::cout << "doing packet" << i <<  "\n" << std::flush;
+
     if (expected_count != actual_count) {
       std::fprintf(
           stderr,
@@ -574,17 +594,22 @@ void Sender::InitIqFromFile(const std::string& filename) {
       throw std::runtime_error("Sender: Failed to read IQ data file");
     }
     if (kUse12BitIQ) {
+      //std::cout << "kUse12BitIQ.\n";
       // Adapt 32-bit IQ samples to 24-bit to reduce network throughput
       ConvertFloatTo12bitIq(iq_data_float[i],
                             reinterpret_cast<uint8_t*>(iq_data_short_[i]),
                             expected_count);
     } else {
+      //std::cout << "In the else statement.\n";
       SimdConvertFloatToShort(iq_data_float[i], iq_data_short_[i],
                               expected_count);
     }
   }
   std::fclose(fp);
   iq_data_float.Free();
+
+    std::cout << "operated on file\n" << std::flush;
+
 }
 
 void Sender::CreateWorkerThreads(size_t num_workers) {
@@ -608,6 +633,7 @@ void Sender::WriteStatsToFile(size_t tx_frame_count) const {
 
 void Sender::RunFft(Packet* pkt, complex_float* fft_inout,
                     DFTI_DESCRIPTOR_HANDLE mkl_handle) const {
+  //std::cout << "In RunFFT.\n" << std::flush;
   // pkt->data has (cp_len + ofdm_ca_num) unsigned short samples. After FFT,
   // we'll remove the cyclic prefix and have ofdm_ca_num() short samples left.
   SimdConvertShortToFloat(&pkt->data_[2 * cfg_->CpLen()],

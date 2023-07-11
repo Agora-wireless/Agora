@@ -306,7 +306,6 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
            j += this->cfg_->PilotScGroupSize()) {
         pilots_f_ue.at(i + j) = pilot_fd.at(i + j); 
       }
-      
       // Load pilots
       std::memcpy(
           tx_data_all_symbols[pilot_sym_idx] + (i * this->cfg_->OfdmCaNum()),

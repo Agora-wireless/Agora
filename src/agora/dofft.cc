@@ -218,7 +218,6 @@ EventData DoFFT::Launch(size_t tag) {
     // TODO 3. interpolation of CSI in gap subcarriers
     if (cfg_->FreqOrthogonalPilot() &&
         pilot_symbol_id == cfg_->Frame().NumPilotSyms() - 1) {
-
       const size_t num_blocks = cfg_->OfdmDataNum() / kTransposeBlockSize;
       for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
         const size_t block_base_offset =

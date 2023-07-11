@@ -8,12 +8,10 @@
  */
 
 #include "config.h"
-
 #include <ctime>
 #include <cmath>
 #include <filesystem>
 #include <utility>
-
 #include "comms-constants.inc"
 #include "comms-lib.h"
 #include "data_generator.h"
@@ -26,6 +24,8 @@
 #include "scrambler.h"
 #include "simd_types.h"
 #include "utils_ldpc.h"
+#include "fivegconfig.h"
+
 
 using json = nlohmann::json;
 
@@ -49,18 +49,6 @@ static const std::string kDlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_dl_data_";
 static const std::string kUlDataFreqPrefix = kExperimentFilepath + "ul_data_f_";
 static const size_t kFlexibleSlotFormatIdx = 2;
-static const size_t kSubframesPerFrame = 10;
-
-std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub,
- size_t fft_size, double sampling_rate, double CBW,
-std::string frame_schedule, size_t user_num, std::map<int,
- std::string> format_table, std::vector<std::string> flex_formats);
-
-std::string formBeaconSubframe(int format_num, size_t user_num, 
- std::map<int, std::string> format_table);
-
-std::string formFrame(std::string frame_schedule, size_t user_num, 
- std::map<int, std::string> format_table, std::vector<std::string> flex_formats);
 
 Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -78,24 +66,6 @@ Config::Config(std::string jsonfilename)
                std::to_string(local_time.tm_hour) + "-" +
                std::to_string(local_time.tm_min) + "-" +
                std::to_string(local_time.tm_sec);
-
-  /*
-  All free symbols 'F' specified in the 5G slot config table
-  Are represented here by a guard symbol G. Also, format 2 is
-  handled separately and so is not included in this table.
-  */ 
-  format_table[0] = "DDDDDDDDDDDDDD";
-  format_table[1] = "UUUUUUUUUUUUUU";
-  format_table[3] = "DDDDDDDDDDDDDG";
-  format_table[10] = "GUUUUUUUUUUUUU";
-  format_table[27] = "DDDGGGGGGGGUUU";
-  format_table[28] = "DDDDDDDDDDDDGU";
-  format_table[30] = "DDDDDDDDDDGGGU";
-  format_table[34] = "DGUUUUUUUUUUUU";
-  format_table[39] = "DDDGGUUUUUUUUU";
-  format_table[41] = "DDGGGUUUUUUUUU";
-  format_table[45] = "DDDDDDGGUUUUUU";
-  format_table[48] = "DGUUUUUDGUUUUU";
 
   pilots_ = nullptr;
   pilots_sgn_ = nullptr;
@@ -290,11 +260,7 @@ Config::Config(std::string jsonfilename)
     client_rx_gain_b_.assign(gain_rx_json_b.begin(), gain_rx_json_b.end());
   }
 
-  //0 is currently the only suported 5G numerology.
-  numerology = tdd_conf.value("numerology", 0);
-  RtAssert(numerology == 0, "Numerology not equal to zero.\n");
-
-  CBW = tdd_conf.value("channel_bandwidth", 0);
+  //channel_bandwidth = tdd_conf.value("channel_bandwidth", 0);
   rate_ = tdd_conf.value("sample_rate", 5e6);
   nco_ = tdd_conf.value("nco_frequency", 0.75 * rate_);
   bw_filter_ = rate_ + 2 * nco_;
@@ -322,7 +288,6 @@ Config::Config(std::string jsonfilename)
   dpdk_num_ports_ = tdd_conf.value("dpdk_num_ports", 1);
   dpdk_port_offset_ = tdd_conf.value("dpdk_port_offset", 0);
   dpdk_mac_addrs_ = tdd_conf.value("dpdk_mac_addrs", "");
-
   ue_mac_tx_port_ = tdd_conf.value("ue_mac_tx_port", kMacUserRemotePort);
   ue_mac_rx_port_ = tdd_conf.value("ue_mac_rx_port", kMacUserLocalPort);
   bs_mac_tx_port_ = tdd_conf.value("bs_mac_tx_port", kMacBaseRemotePort);
@@ -347,6 +312,7 @@ Config::Config(std::string jsonfilename)
       tdd_conf.value("ofdm_rx_zero_prefix_cal_ul", 0) + cp_len_;
   ofdm_rx_zero_prefix_cal_dl_ =
       tdd_conf.value("ofdm_rx_zero_prefix_cal_dl", 0) + cp_len_;
+  RtAssert(cp_len_ % 16 == 0, "cyclic prefix length must be divisible by 16.");
   RtAssert(ofdm_data_num_ % kSCsPerCacheline == 0,
            "ofdm_data_num must be a multiple of subcarriers per cacheline");
   RtAssert(ofdm_data_num_ % kTransposeBlockSize == 0,
@@ -562,8 +528,6 @@ Config::Config(std::string jsonfilename)
   } else {
 
     json jframes = tdd_conf.value("frame_schedule", json::array());
-    std::vector<std::string> flex_formats = tdd_conf.value("flex_formats", json::array());
-
     // Only allow 1 unique frame type
     assert(jframes.size() == 1);
     std::string frame = jframes.at(0).get<std::string>();
@@ -574,12 +538,15 @@ Config::Config(std::string jsonfilename)
     is designed to handle.
     */ 
     if (frame.find(",")!=std::string::npos) { 
-      frame = fiveGNR(numerology, ofdm_data_num_, ofdm_ca_num_, rate_, CBW,
-      frame, ue_num_, format_table, flex_formats);
+      std::vector<std::string> flex_formats = tdd_conf.value("flex_formats", json::array());
+      FiveGConfig fivegconfig = FiveGConfig(tdd_conf);
+      frame = fivegconfig.FiveGFormat();
+      std::cout<<"Here 2" << std::endl << std::flush;
     } 
 
     frame_ = FrameStats(frame);
   }
+
   AGORA_LOG_INFO("Config: Frame schedule %s (%zu symbols)\n",
                  frame_.FrameIdentifier().c_str(), frame_.NumTotalSyms());
 
@@ -734,16 +701,6 @@ Config::Config(std::string jsonfilename)
 
   samps_per_symbol_ =
       ofdm_tx_zero_prefix_ + ofdm_ca_num_ + cp_len_ + ofdm_tx_zero_postfix_;
-
-  #ifdef __AVX512F__
-    RtAssert(samps_per_symbol_ % 16 == 0,
-             "samps_per_symbol_ = " + std::to_string(samps_per_symbol_) + 
-             "is not divisible by 16.\n");
-  #else
-    RtAssert(samps_per_symbol_ % 8 == 0,
-             "samps_per_symbol_ = " + std::to_string(samps_per_symbol_) + 
-             "is not divisible by 8.\n");
-  #endif
   
   packet_length_ =
       Packet::kOffsetOfData + ((kUse12BitIQ ? 3 : 4) * samps_per_symbol_);
@@ -2004,158 +1961,11 @@ void Config::Print() const {
               << "Noise Level: " << noise_level_ << std::endl
               << "UL Bytes per CB: " << ul_num_bytes_per_cb_ << std::endl
               << "DL Bytes per CB: " << dl_num_bytes_per_cb_ << std::endl
-              << "FFT in rru: " << fft_in_rru_ << std::endl
-              << "Channel bandwidth: " << CBW << std::endl;
+              << "FFT in rru: " << fft_in_rru_ << std::endl;
+              //<< "Channel bandwidth: " << channel_bandwidth << std::endl;
   }
 }
 
-/** 
- * Effects: Verifies that the passed specs are 5G compliant and compatible
- *          with eachother and returns a 5G formated frame.
-*/
-std::string fiveGNR(size_t numerology, size_t num_ofdm_data_sub,
- size_t fft_size, double sampling_rate, double CBW,
- std::string frame_schedule, size_t user_num, std::map<int, std::string> format_table, std::vector<std::string> flex_formats) {
-  double GB; //Guardband.
-  double TBW; //Transmission bandwidth.
-  double min_sampling_rate;
-  float scs; //Sub carrier spacing.
-  bool fft_is_valid = false;
-  size_t num_slots = pow(2, numerology);
-  size_t num_symbols = kSubframesPerFrame*num_slots*14;
-  
-  //This is kind of a hack, but it's faster and simpler than calculating.
-  std::vector<size_t> valid_ffts{512, 1024, 1536, 2048};
-  scs = (15e3) * num_slots;
-
-  RtAssert(CBW != 0, "Channel Bandwidth isn't specified!\n");
-  RtAssert(num_symbols <= kMaxSymbols, "Number of symbols exceeded " +
-   std::to_string(kMaxSymbols) + " symbols.\n");
-  RtAssert(!(num_ofdm_data_sub % 16), "The given number of ofdm data "
-   "subcarriers is not divisible by 16.\n");
-  RtAssert(fft_size > num_ofdm_data_sub, "The fft_size is smaller than the "
-   "number of subcarriers.\n");
-
-  for (size_t i = 0; i < valid_ffts.size(); i++) {
-    if (fft_size == valid_ffts.at(i)) {
-      fft_is_valid = true;
-    }
-  }
-
-  RtAssert(fft_is_valid, "Specified fft_size is not a valid fft size,\n");
-  min_sampling_rate = scs*(fft_size); 
-  if (min_sampling_rate < sampling_rate) {
-    AGORA_LOG_WARN("Specified sampling rate %f is larger than the minimum"
-    "required sampling rate of %f.\n", sampling_rate, min_sampling_rate);
-  }
-
-  /*
-  Calculate channel bandwidth based on the specified parameters and
-  verify that the specified channel bandwidth is valid.
-  */ 
-  TBW = num_ofdm_data_sub * scs;
-  //CBW must be in MHz and SCS must be in Khz
-  GB = (1e3) * (1000 * (CBW / 1e6) - (num_ofdm_data_sub + 1) * (scs / 1e3)) / 2;
-  RtAssert(CBW > TBW + 2*GB, "Specified CBW is smaller than required theoretical value.\n");
-  frame_schedule = formFrame(frame_schedule, user_num, format_table, flex_formats);
-
-  return frame_schedule;
-}
-
-/**
- * Effects: Generates a subframe that transmits a beacon symbol and as many
- * pilot symbols as there are users.
-*/
-std::string formBeaconSubframe(int format_num, size_t user_num, std::map<int, std::string> format_table) {
-  std::string subframe = format_table[format_num];
-  size_t pilot_num = 0;
-
-  RtAssert(subframe.at(0) == 'D', "First symbol of selected format doesn't start with a downlink symbol.");
-  RtAssert(user_num < 12, "Number of users exceeds pilot symbol limit of 12.");
-  //Replace the first symbol with a beacon symbol.
-  subframe.replace(0, 1, "B");
-  //Add in the pilot symbols.
-  for (unsigned int i = 1; i < subframe.size(); i++) {
-    // Break once user_num many pilot_nums have been put in the beacon subframe.
-    if (pilot_num >= user_num) {
-      break;
-    }
-    if (subframe.at(i) == 'U') {
-      subframe.replace(i, 1, "P");
-      pilot_num++;
-    }
-  }
-  RtAssert(pilot_num == user_num, "More users specified than the " 
-   "chosen slot format can support.");
-  /*
-  If the last symbol of the first slot is a D and this D is not overwritten
-  by a pilot and the first symbol of the next slot is a U we might get a DU 
-  pair in the frame which could cause a problem.
-  */
-  return subframe;
-}
-
-
-/**
- * Effects: Builds a symbol based frame which Agora is built to handle from the 
- *          slot format based frame given in the frame schedule.
-*/
-std::string formFrame(std::string frame_schedule, size_t user_num,std::map<int,
- std::string> format_table, std::vector<std::string> flex_formats) {
-  std::string frame;
-  std::string temp = "";
-  int subframes[kSubframesPerFrame]; // Update this hardcoded value to a var.
-  int subframe_idx = 0;
-  size_t flex_format_idx = 0;
-
-  for (unsigned int i = 0; i < frame_schedule.size(); i++) {
-
-    // Throw an error if the input frame schedule has more than 10 subframes.
-    if (subframe_idx > 9) {
-      throw std::runtime_error(
-        "Entered frame_schedule has more than 10 subframes."
-      );
-    }
-    if (i == frame_schedule.size()-1 && subframe_idx != 9){
-      throw std::runtime_error(
-        "There are less than 10 frames in the frame schedule."
-      );
-    }
-    if (frame_schedule.at(i) == ',') {   
-
-      subframes[subframe_idx] = std::stoi(temp);
-      subframe_idx++;
-      temp.clear();
-    } else {
-      temp += std::to_string(frame_schedule.at(i) - 48);
-    } 
-    if (i == frame_schedule.size()-1) {
-      subframes[subframe_idx] = std::stoi(temp);
-    }
-  }
-
-  // Create the frame based on the format nums in the subframe array.
-  frame += formBeaconSubframe(subframes[0], user_num, format_table);
-  for (size_t i = 1; i < kSubframesPerFrame; i++) {  
-    try {
-      if (subframes[i] == kFlexibleSlotFormatIdx) {
-        frame += flex_formats.at(flex_format_idx);
-        flex_format_idx++;
-      } else {
-        frame += format_table.at(subframes[i]);
-      }
-    } catch (std::out_of_range &e) {
-      std::string error_message = "User specified a non supported subframe "
-      "format.\nCurrently supported subframe formats are:";
-
-      for (auto format = format_table.begin(); format != format_table.end(); format++) {
-        error_message += std::to_string(format->first) + " " + format->second + ".\n";
-      }
-      throw std::runtime_error(error_message);
-    }
-  }
-  return frame;
-}
 
 extern "C" {
 __attribute__((visibility("default"))) Config* ConfigNew(char* filename) {

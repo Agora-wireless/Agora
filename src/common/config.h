@@ -14,7 +14,6 @@
 #include <cstddef>
 #include <string>
 #include <vector>
-#include <map>
 
 #include "armadillo"
 #include "common_typedef_sdk.h"
@@ -352,7 +351,6 @@ class Config {
   }
 
   inline const FrameStats& Frame() const { return this->frame_; }
-  //inline const FrameStats Special() const {return this->frame_;};
   inline const std::vector<std::complex<float>>& PilotCf32() const {
     return this->pilot_cf32_;
   };
@@ -997,10 +995,5 @@ class Config {
   std::string trace_file_;
   std::string timestamp_;
   std::vector<std::string> ul_tx_f_data_files_;
-
-  //5G slot format variables
-  double CBW;
-  size_t numerology;
-  std::map<int, std::string> format_table;
 };
 #endif /* CONFIG_HPP_ */
