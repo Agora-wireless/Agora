@@ -18,8 +18,7 @@ using json = nlohmann::json;
 static constexpr size_t kSubframesPerFrame = 10;
 static constexpr size_t kFlexibleSlotFormatIdx = 2;
 static constexpr size_t kMaxSlotFormat = 55;
-static constexpr double kEpsilon = 0.1;
-
+static constexpr bool kDebug = false;
 
 std::map<size_t, std::string> FiveGConfig::format_table {};
 std::vector<size_t> FiveGConfig::supported_formats{};
@@ -116,8 +115,7 @@ void FiveGConfig::ReadAndVerifyValues() {
   RtAssert(!tdd_conf_.contains("sample_rate"), "The sampling rate is "
   "calculated using the fft_size and the subcarrier spacing which is a result "
   "of the numerology and should not be specified by the user in a 5G schema.");
-  RtAssert(tdd_conf_.contains("ue_radio_num"));
-
+  RtAssert(tdd_conf_.contains("ue_radio_num"), "ue_radio_num not specified.");
   user_num_ = tdd_conf_.value("ue_radio_num", 0);
   json jframes = tdd_conf_.value("frame_schedule", json::array());
   assert(jframes.size() == 1);
@@ -140,25 +138,24 @@ void FiveGConfig::ReadAndVerifyValues() {
     RtAssert(*iterator == channel_bandwidth_,
             "Specified channel bandwidth is not supported.");
     ofdm_data_num_ = channel_bandwidth_to_ofdm_data_num_.at(channel_bandwidth_);
-
     for (size_t i = 0; i < valid_ffts_.size(); i++) {
       if (valid_ffts_.at(i) > ofdm_data_num_) {
         fft_size_ = valid_ffts_.at(i); 
       }
     }
   } else {
+    std::cout<<"Gets to else\n" << std::flush;
     RtAssert(tdd_conf_.contains("ofdm_data_num") &&
             tdd_conf_.contains("fft_size"), "ofdm_data_num and "
             "fft_size must both be specified for a 5G configuration.");
- 
     ofdm_data_num_ = tdd_conf_.value("ofdm_data_num", 0); 
     fft_size_ = tdd_conf_.value("fft_size", 0);
     RtAssert((ofdm_data_num_ % 12 == 0), "The given number of ofdm data "
     "subcarriers is not divisible by 12. Non integer number of reasource blocks.\n");
     RtAssert(fft_size_ > ofdm_data_num_, "The fft_size is smaller than the "
     "number of subcarriers.\n");
-    RtAssert(SetChannelBandwidth());
-    AGORA_LOG_INFO("Selected channel bandwidth: %zu Mhz\n", channel_bandwidth_);
+    RtAssert(SetChannelBandwidth(), "No supported channel bandwidth compatible"
+            "with given fft_size and ofdm_data_num parameters.");
     transmission_bandwidth = ofdm_data_num_ * subcarrier_spacing_;
     //channel bandwidth must be in Mhz and subcarrier spacing must be in Khz
     guard_band = (1e3) * (1000 * (channel_bandwidth_) - 
@@ -168,8 +165,6 @@ void FiveGConfig::ReadAndVerifyValues() {
             "The channel bandwidth calculated from the specified parameters "
             "is larger than the selected channel bandwidth. Try using "
             "smaller values.");
-    AGORA_LOG_INFO("Calculated CBW: %f\n", transmission_bandwidth+2*guard_band);
-
     for (size_t i = 0; i < valid_ffts_.size(); i++) {
             if (fft_size_ == valid_ffts_.at(i)) {
                     fft_is_valid = true;
@@ -177,13 +172,18 @@ void FiveGConfig::ReadAndVerifyValues() {
     }
     RtAssert(fft_is_valid, "Specified fft_size is not a valid fft size,\n");
   }
-
   ofdm_data_start_ = (fft_size_-ofdm_data_num_)/2;
   sampling_rate_ = subcarrier_spacing_*(fft_size_); 
   RtAssert(num_symbols <= kMaxSymbols, "Number of symbols exceeded " +
         std::to_string(kMaxSymbols) + " symbols.\n");
-}
 
+  if (kDebug == true) {
+        AGORA_LOG_INFO("Selected channel bandwidth: %zu Mhz\n", 
+                      channel_bandwidth_);
+        AGORA_LOG_INFO("Calculated CBW: %f\n", 
+                      transmission_bandwidth+2*guard_band);
+  }
+}
 /** 
  * Effects: Verifies that the passed specs are 5G compliant and compatible
  *          with eachother and returns a 5G formated frame.
@@ -192,7 +192,6 @@ std::string FiveGConfig::FiveGFormat() {
   ReadAndVerifyValues();
   return FormFrame(frame_schedule_, user_num_, flex_formats_);
 }
-
 /**
  * Effects: Generates a subframe that transmits a beacon symbol and as many
  * pilot symbols as there are users.
@@ -200,12 +199,10 @@ std::string FiveGConfig::FiveGFormat() {
 std::string FiveGConfig::FormBeaconSubframe(int format_num, size_t user_num) {
   std::string subframe = format_table[format_num];
   size_t pilot_num = 0;
-
   RtAssert(subframe.at(0) == 'D', "First symbol of selected format doesn't start with a downlink symbol.");
   RtAssert(user_num_ < 12, "Number of users exceeds pilot symbol limit of 12.");
   //Replace the first symbol with a beacon symbol.
   subframe.replace(0, 1, "B");
-
   //Add in the pilot symbols.
   for (size_t i = 1; i < subframe.size(); i++) {
           // Break once user_num many pilot_nums have been put in the beacon subframe.
@@ -217,8 +214,6 @@ std::string FiveGConfig::FormBeaconSubframe(int format_num, size_t user_num) {
                   pilot_num++;
           }
   }
-
-  std::cout<<"Pilot num: " << std::to_string(pilot_num) << std::flush;
   RtAssert(pilot_num == user_num_, "More users specified than the " 
   "chosen slot format can support.");
   /*
@@ -228,7 +223,6 @@ std::string FiveGConfig::FormBeaconSubframe(int format_num, size_t user_num) {
   */
   return subframe;
 }
-
 /**
  * Effects: Builds a symbol based frame which Agora is built to handle from the 
  *          slot format based frame given in the frame schedule.
@@ -256,16 +250,13 @@ std::string FiveGConfig::FormFrame(std::string frame_schedule, size_t user_num,
             subframes[subframe_idx] = std::stoi(temp);
     }
   }
-
   RtAssert(subframe_idx == 9, "Entered frame_schedule has less than 10 subframes.");
   // Create the frame based on the format nums in the subframe array.
   frame += FormBeaconSubframe(subframes[0], user_num_);
   for (size_t i = 1; i < kSubframesPerFrame; i++) {  
-
     if (subframes[i] < 0 || subframes[i] > kMaxSlotFormat) {
       std::string error_message = "User specified a non supported subframe "
       "format.\nCurrently supported subframe formats are:";
-
       for (auto format = format_table.begin(); format != format_table.end(); format++) {
             error_message += std::to_string(format->first) + " " + format->second + ".\n";
       }
@@ -281,7 +272,9 @@ std::string FiveGConfig::FormFrame(std::string frame_schedule, size_t user_num,
   }
   return frame;
 }
-
+/**
+ * Effects: Checks that the passed format is in the list of supported formats.
+*/
 bool FiveGConfig::IsSupported(size_t format_num) {
   for (size_t i = 0; i < supported_formats.size(); i++) { 
     if (format_num == supported_formats[i]) {
@@ -290,7 +283,9 @@ bool FiveGConfig::IsSupported(size_t format_num) {
   }
   return false;
 }
-
+/**
+ * Effects: Sets the channel bandwidth based on the ofdm_data_num.
+*/
 bool FiveGConfig::SetChannelBandwidth(){
     for (auto iterator = channel_bandwidth_to_ofdm_data_num_.begin(); 
         iterator != channel_bandwidth_to_ofdm_data_num_.end(); ++iterator) {
@@ -301,7 +296,6 @@ bool FiveGConfig::SetChannelBandwidth(){
     }
     return false;
 }
-
 //Accessors for sampling rate and ofdm data start.
 double FiveGConfig::SamplingRate(){
   return sampling_rate_;

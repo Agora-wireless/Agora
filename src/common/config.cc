@@ -537,12 +537,18 @@ Config::Config(std::string jsonfilename)
     is designed to handle.
     */ 
     if (frame.find(",")!=std::string::npos) { 
+      std::cout<<"Gets to 5g\n" << std::flush;
       std::vector<std::string> flex_formats = tdd_conf.value("flex_formats", json::array());
       FiveGConfig fivegconfig = FiveGConfig(tdd_conf);
+      std::cout<<"Calls 5g\n" << std::flush;
+
       frame = fivegconfig.FiveGFormat();
       rate_ = fivegconfig.SamplingRate();
       ofdm_data_start_ = fivegconfig.OfdmDataStart();
     } 
+    
+    std::cout<<"Returns from 5g\n" << std::flush;
+
     frame_ = FrameStats(frame);
   }
 

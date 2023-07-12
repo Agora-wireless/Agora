@@ -7,10 +7,10 @@
         /*"sample_rate": 15.36e6,*/
         "demul_block_size": 48,
         "cp_size": 80,
-        "fft_size": 1024,
-        "ofdm_data_num": 336,
+        /*"fft_size": 1024,*/
+        /*"ofdm_data_num": 336,*/
         /*In Mhz*/
-        /*"channel_bandwidth": 15,*/
+        "channel_bandwidth": 20,
         "ofdm_pilot_spacing": 16,
         /*  (fft_size - ofdm_data_num_) / 2 */
         /*"ofdm_data_start": 88,*/
