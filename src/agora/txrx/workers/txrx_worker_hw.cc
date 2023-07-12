@@ -526,6 +526,9 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
 
     const size_t dl_symbol_idx =
         Configuration()->Frame().GetDLSymbolIdx(symbol_id);
+    const size_t dl_data_symbol_idx =
+        Configuration()->Frame().GetDLSymbolIdx(symbol_id) -
+        Configuration()->Frame().ClientDlPilotSymbols();
 
     // All antenna data is ready to tx for a given symbol, if last then TX out the data
     if (last_antenna) {
@@ -573,8 +576,8 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
                     : pilot.data();
           } else {
             std::vector<std::complex<int16_t>> data_t(
-                Configuration()->DlIqT()[dl_symbol_idx],
-                Configuration()->DlIqT()[dl_symbol_idx] +
+                Configuration()->DlIqT()[dl_data_symbol_idx],
+                Configuration()->DlIqT()[dl_data_symbol_idx] +
                     Configuration()->SampsPerSymbol());
             std::vector<std::complex<int16_t>> nt_data_t(data_t);
             for (auto& v : nt_data_t) {

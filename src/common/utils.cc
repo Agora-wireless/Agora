@@ -437,7 +437,7 @@ void Utils::ReadBinaryFile(const std::string& name, size_t elem_size,
 
   const auto read_status = std::fread(buff, elem_size, buffer_size, f_handle);
   if (read_status != buffer_size) {
-    throw std::runtime_error("Failed to write binary file " + name);
+    throw std::runtime_error("Failed to read binary file " + name);
   }
 
   const auto close_status = std::fclose(f_handle);

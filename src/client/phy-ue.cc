@@ -45,10 +45,11 @@ PhyUe::PhyUe(Config* config)
     : mac_sched_(std::make_unique<MacScheduler>(config)),
       stats_(std::make_unique<Stats>(config)),
       phy_stats_(std::make_unique<PhyStats>(config, Direction::kDownlink)),
-      demod_buffer_(kFrameWnd, config->Frame().NumDLSyms(), config->UeAntNum(),
+      demod_buffer_(kFrameWnd, config->Frame().NumDlDataSyms(),
+                    config->UeAntNum(),
                     kMaxModType * Roundup<64>(config->GetOFDMDataNum())),
       decoded_buffer_(
-          kFrameWnd, config->Frame().NumDLSyms(), config->UeAntNum(),
+          kFrameWnd, config->Frame().NumDlDataSyms(), config->UeAntNum(),
           config->LdpcConfig(Direction::kDownlink).NumBlocksInSymbol() *
               Roundup<64>(config->NumBytesPerCb(Direction::kDownlink))) {
   srand(time(nullptr));
@@ -131,7 +132,7 @@ PhyUe::PhyUe(Config* config)
     auto new_worker = std::make_unique<UeWorker>(
         i, *config_, *mac_sched_, *stats_, *phy_stats_, complete_queue_,
         work_queue_, *work_producer_token_.get(), ul_bits_buffer_,
-        ul_syms_buffer_, modul_buffer_, ifft_buffer_, tx_buffer_, rx_buffer_,
+        encoded_buffer_, modul_buffer_, ifft_buffer_, tx_buffer_, rx_buffer_,
         csi_buffer_, equal_buffer_, non_null_sc_ind_, fft_buffer_,
         demod_buffer_, decoded_buffer_, ue_pilot_vec_);
 
@@ -912,17 +913,11 @@ void PhyUe::InitializeUplinkBuffers() {
   ul_bits_buffer_status_.Calloc(config_->UeAntNum(), kFrameWnd,
                                 Agora_memory::Alignment_t::kAlign64);
 
-  // Temp -- Using more memory than necessary to comply with the DoEncode
-  // function which uses the total number of ul symbols offset (instead of
-  // just the data specific ones) ul_syms_buffer_size_ =
-  //    kFrameWnd * ul_symbol_perframe_ * config_->OfdmDataNum();
-  // ul_syms_buffer_.Calloc(config_->UeAntNum(), ul_syms_buffer_size_,
-  //                       Agora_memory::Alignment_t::kAlign64);
   const size_t ul_data_syms_buffer_dim1 = ul_data_symbol_perframe_ * kFrameWnd;
-  const size_t ul_syms_buffer_dim2 =
+  const size_t encoded_buffer_dim2 =
       Roundup<64>(config_->OfdmDataNum()) * config_->UeAntNum();
 
-  ul_syms_buffer_.Calloc(ul_data_syms_buffer_dim1, ul_syms_buffer_dim2,
+  encoded_buffer_.Calloc(ul_data_syms_buffer_dim1, encoded_buffer_dim2,
                          Agora_memory::Alignment_t::kAlign64);
 
   // initialize modulation buffer
@@ -943,7 +938,7 @@ void PhyUe::InitializeUplinkBuffers() {
 void PhyUe::FreeUplinkBuffers() {
   ul_bits_buffer_.Free();
   ul_bits_buffer_status_.Free();
-  ul_syms_buffer_.Free();
+  encoded_buffer_.Free();
   modul_buffer_.Free();
   ifft_buffer_.Free();
 

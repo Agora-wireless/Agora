@@ -446,27 +446,37 @@ class Config {
 
   /// Return total number of uplink data symbols of all frames in a buffer
   /// that holds data of kFrameWnd frames
+  inline size_t GetTotalDataSymbolIdxUl(size_t frame_id,
+                                        size_t data_symbol_idx_ul) const {
+    return ((frame_id % kFrameWnd) * this->frame_.NumUlDataSyms() +
+            data_symbol_idx_ul);
+  }
+
+  /// Return total number of uplink data symbols of all frames in a buffer
+  /// that holds data of kFrameWnd frames
   inline size_t GetTotalSymbolIdxUl(size_t frame_id,
                                     size_t symbol_idx_ul) const {
     return ((frame_id % kFrameWnd) * this->frame_.NumULSyms() + symbol_idx_ul);
   }
 
-  /// Return total number of uplink data symbols of all frames in a buffer
-  /// that holds data of kFrameWnd frames
-  inline size_t GetTotalDataSymbolIdxUl(size_t frame_id,
-                                        size_t symbol_idx_ul) const {
-    return ((frame_id % kFrameWnd) * this->frame_.NumUlDataSyms() +
-            symbol_idx_ul);
-  }
-
   /// Return total number of downlink data symbols of all frames in a buffer
   /// that holds data of kFrameWnd frames
   inline size_t GetTotalDataSymbolIdxDl(size_t frame_id,
-                                        size_t symbol_idx_dl) const {
+                                        size_t data_symbol_idx_dl) const {
+    return ((frame_id % kFrameWnd) * this->frame_.NumDlDataSyms() +
+            data_symbol_idx_dl);
+  }
+
+  /// Return total number of downlink data and pilot symbols of all frames in a buffer
+  /// that holds data of kFrameWnd frames
+  inline size_t GetTotalSymbolIdxDl(size_t frame_id,
+                                    size_t symbol_idx_dl) const {
     return ((frame_id % kFrameWnd) * this->frame_.NumDLSyms() + symbol_idx_dl);
   }
 
-  inline size_t GetTotalSymbolIdxDl(size_t frame_id, size_t symbol_id) {
+  /// Return total number of downlink data, pilot, and broadcast symbols of all frames
+  /// in a buffer that holds data of kFrameWnd frames
+  inline size_t GetTotalSymbolIdxDlBcast(size_t frame_id, size_t symbol_id) {
     const size_t symbol_idx_dl =
         symbol_id < this->frame_.GetDLSymbol(0)
             ? this->frame_.GetDLControlSymbolIdx(symbol_id)
@@ -553,7 +563,7 @@ class Config {
       num_bytes_per_cb = this->dl_num_bytes_per_cb_;
       mac_packet_length = this->dl_mac_packet_length_;
     } else {
-      mac_bytes_perframe = ul_mac_bytes_num_perframe_;
+      mac_bytes_perframe = this->ul_mac_bytes_num_perframe_;
       num_bytes_per_cb = this->ul_num_bytes_per_cb_;
       mac_packet_length = this->ul_mac_packet_length_;
     }
