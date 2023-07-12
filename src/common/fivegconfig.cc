@@ -18,6 +18,7 @@ using json = nlohmann::json;
 static constexpr size_t kSubframesPerFrame = 10;
 static constexpr size_t kFlexibleSlotFormatIdx = 2;
 static constexpr size_t kMaxSlotFormat = 55;
+static constexpr double kEpsilon = 0.1;
 
 
 std::map<size_t, std::string> FiveGConfig::format_table {};
@@ -25,9 +26,9 @@ std::vector<size_t> FiveGConfig::supported_formats{};
 
 FiveGConfig::FiveGConfig (json tdd_conf) {
   tdd_conf_ = tdd_conf;
-  max_supported_channel_bandwidth_ = 20e6;
-  subcarrier_spacing_ = 15e3;
+  max_supported_channel_bandwidth_ = 20;
   numerology_ = 0;
+  subcarrier_spacing_ = 15e3*pow(2, numerology_);
   valid_ffts_= {512, 1024, 1536, 2048};
   supported_channel_bandwidths_ = {5, 10, 15, 20};
   channel_bandwidth_to_ofdm_data_num_[5] = 288;
@@ -105,83 +106,69 @@ FiveGConfig::~FiveGConfig() = default;
 void FiveGConfig::ReadAndVerifyValues() {
   double guard_band; 
   double transmission_bandwidth; 
-  double min_sampling_rate;
   double num_slots = pow(2, numerology_);
   size_t num_symbols = kSubframesPerFrame*num_slots*14;
   bool fft_is_valid = false;
+  //ofdm_data_start and sampling rate should be calculated, not specified.
+  RtAssert(!tdd_conf_.contains("ofdm_data_start"), "Ofdm data start is "
+  "calculated using fft_size and ofdm_data_num and should not be specified by "
+  "the user in a 5G schema.");
+  RtAssert(!tdd_conf_.contains("sample_rate"), "The sampling rate is "
+  "calculated using the fft_size and the subcarrier spacing which is a result "
+  "of the numerology and should not be specified by the user in a 5G schema.");
+  RtAssert(tdd_conf_.contains("ue_radio_num"));
 
   user_num_ = tdd_conf_.value("ue_radio_num", 0);
   json jframes = tdd_conf_.value("frame_schedule", json::array());
   assert(jframes.size() == 1);
   frame_schedule_ = jframes.at(0);
   flex_formats_ = tdd_conf_.value("flex_formats", json::array());
-
   if (tdd_conf_.contains("channel_bandwidth")) {
-    channel_bandwidth_ = tdd_conf_.value("channel_bandwidth", -1);
-    if (tdd_conf_.contains("sample_rate") || 
-      tdd_conf_.contains("num_ofdm_data_sub") ||
-      tdd_conf_.contains("fft_size")) {
-      throw std::runtime_error("The Channel Bandwidth variable is not "
-        "compatible with sample rate, num_ofdm_data_sub, and fft_size. "
-        "Either do not specify a channel bandwidth or do not specify the "
-        "sample rate, num_ofdm_data_sub, and fft_size.");
-    }
-
+    channel_bandwidth_ = tdd_conf_.value("channel_bandwidth", 0);
+    RtAssert(channel_bandwidth_ <= max_supported_channel_bandwidth_, 
+            "Specified channel bandwidth is larger than the max supported "
+            "channel bandwidth.");
+    RtAssert(!tdd_conf_.contains("ofdm_data_num") && 
+            !tdd_conf_.contains("fft_size"), "The channel bandwidth is not "
+            "compatible with ofdm_data_num and fft_size. Either do not "
+            "specify a channel bandwidth or do not specify the "
+            "ofdm_data_num and fft_size.");
+    //Calculate ofdm_data_num and fft_size from the channel bandwidth.
     auto iterator = std::find(supported_channel_bandwidths_.begin(), 
                               supported_channel_bandwidths_.end(), 
                               channel_bandwidth_);
     RtAssert(*iterator == channel_bandwidth_,
-            "Specified Channel Bandwidth is not supported.");
+            "Specified channel bandwidth is not supported.");
     ofdm_data_num_ = channel_bandwidth_to_ofdm_data_num_.at(channel_bandwidth_);
 
     for (size_t i = 0; i < valid_ffts_.size(); i++) {
-      if (valid_ffts_.at(i) > 2*ofdm_data_num_) {
-        fft_size_ = valid_ffts_.at(i); // Need to check this to make sure
-        //it produces a 10 ms frame.
+      if (valid_ffts_.at(i) > ofdm_data_num_) {
+        fft_size_ = valid_ffts_.at(i); 
+      }
     }
-  }
-    //Set the sample_rate, num_ofdm_data_sub, and fft_size given the
-    //channel bandwidth
-    sampling_rate_ = subcarrier_spacing_ * fft_size_;
   } else {
-    RtAssert(tdd_conf_.contains("sample_rate") && 
-            tdd_conf_.contains("ofdm_data_num") &&
-            tdd_conf_.contains("fft_size"), "Sample rate, "
-            "num_ofdm_data_subcarriers and fft_size must all be specified for "
-            "a 5G configuration.");
-
-    sampling_rate_ = tdd_conf_.value("sample_rate", -1);
-    ofdm_data_num_ = tdd_conf_.value("ofdm_data_num", 0);
-    fft_size_ = tdd_conf_.value("fft_size", -1);
-
+    RtAssert(tdd_conf_.contains("ofdm_data_num") &&
+            tdd_conf_.contains("fft_size"), "ofdm_data_num and "
+            "fft_size must both be specified for a 5G configuration.");
+ 
+    ofdm_data_num_ = tdd_conf_.value("ofdm_data_num", 0); 
+    fft_size_ = tdd_conf_.value("fft_size", 0);
+    RtAssert((ofdm_data_num_ % 12 == 0), "The given number of ofdm data "
+    "subcarriers is not divisible by 12. Non integer number of reasource blocks.\n");
+    RtAssert(fft_size_ > ofdm_data_num_, "The fft_size is smaller than the "
+    "number of subcarriers.\n");
     RtAssert(SetChannelBandwidth());
-
+    AGORA_LOG_INFO("Selected channel bandwidth: %zu Mhz\n", channel_bandwidth_);
     transmission_bandwidth = ofdm_data_num_ * subcarrier_spacing_;
     //channel bandwidth must be in Mhz and subcarrier spacing must be in Khz
     guard_band = (1e3) * (1000 * (channel_bandwidth_) - 
       (ofdm_data_num_ + 1) * (subcarrier_spacing_ / 1e3)) / 2;
-
-    std::cout<<"CBW: " << std::to_string(transmission_bandwidth + 2* guard_band) << std::endl;
-    std::cout<<"TBW: " << std::to_string(transmission_bandwidth) << std::endl;
-    std::cout<<"Channel_bandwidth: " << std::to_string(channel_bandwidth_) << std::endl;
-    std::cout<<"sampling_rate_: " << std::to_string(sampling_rate_) << std::endl;
-    std::cout<<"ofdm_data_num: " << std::to_string(ofdm_data_num_) << std::endl;
-    std::cout<<"fft_size_: " << std::to_string(fft_size_) << std::endl;
-
-
-    std::cout<<"max_supported_channel_bandwidh: " << std::to_string(max_supported_channel_bandwidth_) << std::endl<<std::flush;
-
-    RtAssert(transmission_bandwidth+2*guard_band <= max_supported_channel_bandwidth_,
-    "The channel bandwidth required to transmit given the specified parameters"
-    "is larger than Agora currently supports. Try using smaller values.");
-
-    RtAssert(!(ofdm_data_num_ % 16), "The given number of ofdm data "
-    "subcarriers is not divisible by 16. Agora's memory management requires"
-    " that the number of ofdm subcarriers be divisible by 16.\n");
-    RtAssert(!(ofdm_data_num_ % 12), "The given number of ofdm data "
-    "subcarriers is not divisible by 12. Non integer number of reasource blocks.\n");
-    RtAssert(fft_size_ > ofdm_data_num_, "The fft_size is smaller than the "
-    "number of subcarriers.\n");
+    RtAssert(transmission_bandwidth+2*guard_band <= 
+            channel_bandwidth_ * 1e6,
+            "The channel bandwidth calculated from the specified parameters "
+            "is larger than the selected channel bandwidth. Try using "
+            "smaller values.");
+    AGORA_LOG_INFO("Calculated CBW: %f\n", transmission_bandwidth+2*guard_band);
 
     for (size_t i = 0; i < valid_ffts_.size(); i++) {
             if (fft_size_ == valid_ffts_.at(i)) {
@@ -191,13 +178,8 @@ void FiveGConfig::ReadAndVerifyValues() {
     RtAssert(fft_is_valid, "Specified fft_size is not a valid fft size,\n");
   }
 
-  min_sampling_rate = subcarrier_spacing_*(fft_size_); 
-  
-  if (min_sampling_rate < sampling_rate_) {
-    AGORA_LOG_WARN("Specified sampling rate %f is larger than the " 
-    "minimum required sampling rate of %f.\n", sampling_rate_, 
-    min_sampling_rate);
-  }
+  ofdm_data_start_ = (fft_size_-ofdm_data_num_)/2;
+  sampling_rate_ = subcarrier_spacing_*(fft_size_); 
   RtAssert(num_symbols <= kMaxSymbols, "Number of symbols exceeded " +
         std::to_string(kMaxSymbols) + " symbols.\n");
 }
@@ -208,7 +190,6 @@ void FiveGConfig::ReadAndVerifyValues() {
 */
 std::string FiveGConfig::FiveGFormat() {
   ReadAndVerifyValues();
-  std::cout<<"Here.\n" << std::flush;
   return FormFrame(frame_schedule_, user_num_, flex_formats_);
 }
 
@@ -224,9 +205,6 @@ std::string FiveGConfig::FormBeaconSubframe(int format_num, size_t user_num) {
   RtAssert(user_num_ < 12, "Number of users exceeds pilot symbol limit of 12.");
   //Replace the first symbol with a beacon symbol.
   subframe.replace(0, 1, "B");
-
-  std::cout<< subframe << std::endl << std::flush;
-  std::cout<< "format num: " << std::to_string(format_num) << std::endl << std::flush;
 
   //Add in the pilot symbols.
   for (size_t i = 1; i < subframe.size(); i++) {
@@ -264,9 +242,6 @@ std::string FiveGConfig::FormFrame(std::string frame_schedule, size_t user_num,
   size_t flex_format_idx = 0;
 
   for (size_t i = 0; i < frame_schedule.size(); i++) {
-
-    std::cout<<"subframe index: " << subframe_idx << std::endl<<std::flush;
-    std::cout<< "inex: " << i << std::endl<<std::flush;
     RtAssert(subframe_idx < 10, "Entered frame_schedule has more than 10 subframes.");
 
     if (frame_schedule.at(i) == ',') {   
@@ -283,11 +258,6 @@ std::string FiveGConfig::FormFrame(std::string frame_schedule, size_t user_num,
   }
 
   RtAssert(subframe_idx == 9, "Entered frame_schedule has less than 10 subframes.");
-
-
-
-  std::cout<<"Midway"<<std::endl<<std::flush;
-
   // Create the frame based on the format nums in the subframe array.
   frame += FormBeaconSubframe(subframes[0], user_num_);
   for (size_t i = 1; i < kSubframesPerFrame; i++) {  
@@ -322,11 +292,20 @@ bool FiveGConfig::IsSupported(size_t format_num) {
 }
 
 bool FiveGConfig::SetChannelBandwidth(){
-    for (auto iterator = channel_bandwidth_to_ofdm_data_num_.begin(); iterator != channel_bandwidth_to_ofdm_data_num_.end(); ++iterator) {
-      if (iterator->second > ofdm_data_num_) {
+    for (auto iterator = channel_bandwidth_to_ofdm_data_num_.begin(); 
+        iterator != channel_bandwidth_to_ofdm_data_num_.end(); ++iterator) {
+      if (iterator->second >= ofdm_data_num_) {
         channel_bandwidth_ = iterator->first;
         return true;
       }
     }
     return false;
+}
+
+//Accessors for sampling rate and ofdm data start.
+double FiveGConfig::SamplingRate(){
+  return sampling_rate_;
+}
+size_t FiveGConfig::OfdmDataStart(){
+  return ofdm_data_start_;
 }

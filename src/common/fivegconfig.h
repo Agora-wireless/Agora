@@ -33,13 +33,17 @@ class FiveGConfig {
 
     std::string FormFrame(std::string frame_schedule, size_t user_num, 
                                     std::vector<std::string> flex_formats);
+
+    double SamplingRate();
+    size_t OfdmDataStart();
   private:
     nlohmann::json tdd_conf_;
-    double channel_bandwidth_;
     double sampling_rate_;
-    double max_supported_channel_bandwidth_;
     float subcarrier_spacing_;
+    size_t max_supported_channel_bandwidth_;
+    size_t channel_bandwidth_;
     size_t ofdm_data_num_;
+    size_t ofdm_data_start_;
     size_t fft_size_;
     size_t user_num_;
     size_t numerology_;
@@ -47,8 +51,8 @@ class FiveGConfig {
     std::vector<std::string> flex_formats_;
     std::vector<size_t> valid_ffts_;
     std::vector<size_t> supported_channel_bandwidths_;
+    //only valid for numerology 0.
     std::map<size_t, size_t> channel_bandwidth_to_ofdm_data_num_;
-
     bool IsSupported(size_t format_num);
     bool SetChannelBandwidth();
 };

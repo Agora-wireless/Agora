@@ -260,7 +260,6 @@ Config::Config(std::string jsonfilename)
     client_rx_gain_b_.assign(gain_rx_json_b.begin(), gain_rx_json_b.end());
   }
 
-  //channel_bandwidth = tdd_conf.value("channel_bandwidth", 0);
   rate_ = tdd_conf.value("sample_rate", 5e6);
   nco_ = tdd_conf.value("nco_frequency", 0.75 * rate_);
   bw_filter_ = rate_ + 2 * nco_;
@@ -541,9 +540,9 @@ Config::Config(std::string jsonfilename)
       std::vector<std::string> flex_formats = tdd_conf.value("flex_formats", json::array());
       FiveGConfig fivegconfig = FiveGConfig(tdd_conf);
       frame = fivegconfig.FiveGFormat();
-      std::cout<<"Here 2" << std::endl << std::flush;
+      rate_ = fivegconfig.SamplingRate();
+      ofdm_data_start_ = fivegconfig.OfdmDataStart();
     } 
-
     frame_ = FrameStats(frame);
   }
 
@@ -1962,7 +1961,6 @@ void Config::Print() const {
               << "UL Bytes per CB: " << ul_num_bytes_per_cb_ << std::endl
               << "DL Bytes per CB: " << dl_num_bytes_per_cb_ << std::endl
               << "FFT in rru: " << fft_in_rru_ << std::endl;
-              //<< "Channel bandwidth: " << channel_bandwidth << std::endl;
   }
 }
 
