@@ -144,7 +144,6 @@ void FiveGConfig::ReadAndVerifyValues() {
       }
     }
   } else {
-    std::cout<<"Gets to else\n" << std::flush;
     RtAssert(tdd_conf_.contains("ofdm_data_num") &&
             tdd_conf_.contains("fft_size"), "ofdm_data_num and "
             "fft_size must both be specified for a 5G configuration.");
