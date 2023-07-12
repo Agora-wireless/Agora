@@ -57,4 +57,4 @@ class FiveGConfig {
     bool SetChannelBandwidth();
 };
 
-#endif /* FIVEGCONFIG_H_ */
+#endif /* FIVEGCONFIG_HPP_ */
