@@ -145,7 +145,7 @@ class PhyUe {
   Table<int8_t> ul_bits_buffer_status_;
   size_t ul_bits_buffer_size_;
 
-  Table<int8_t> ul_syms_buffer_;
+  Table<int8_t> encoded_buffer_;
   size_t ul_syms_buffer_size_;
   /**
    * Data after modulation

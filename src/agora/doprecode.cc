@@ -70,8 +70,12 @@ EventData DoPrecode::Launch(size_t tag) {
   const size_t base_sc_id = gen_tag_t(tag).sc_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t symbol_idx_dl = cfg_->Frame().GetDLSymbolIdx(symbol_id);
+  const size_t total_symbol_idx =
+      cfg_->GetTotalSymbolIdxDl(frame_id, symbol_idx_dl);
+  const size_t data_symbol_idx_dl =
+      symbol_idx_dl - cfg_->Frame().ClientDlPilotSymbols();
   const size_t total_data_symbol_idx =
-      cfg_->GetTotalDataSymbolIdxDl(frame_id, symbol_idx_dl);
+      cfg_->GetTotalDataSymbolIdxDl(frame_id, data_symbol_idx_dl);
   const size_t frame_slot = frame_id % kFrameWnd;
 
   // Mark pilot subcarriers in this block
@@ -144,7 +148,7 @@ EventData DoPrecode::Launch(size_t tag) {
                                      cfg_->BsAntNum() * 3);
   auto* precoded_ptr = reinterpret_cast<float*>(precoded_buffer_temp_);
   for (size_t ant_id = 0; ant_id < cfg_->BsAntNum(); ant_id++) {
-    int ifft_buffer_offset = ant_id + cfg_->BsAntNum() * total_data_symbol_idx;
+    int ifft_buffer_offset = ant_id + cfg_->BsAntNum() * total_symbol_idx;
     auto* ifft_ptr = reinterpret_cast<float*>(
         &dl_ifft_buffer_[ifft_buffer_offset]
                         [base_sc_id + cfg_->OfdmDataStart()]);

@@ -330,14 +330,14 @@ Config::Config(std::string jsonfilename)
       control_symbol_map_.at(i) = SubcarrierType::kDMRS;
     } else {
       dl_symbol_map_.at(i) = SubcarrierType::kData;
-      dl_symbol_data_id_.at(i) = data_idx;
-      data_idx++;
+      dl_symbol_data_id_.at(i) = data_idx++;
+      //data_idx++;
       if (i % ofdm_pilot_spacing_ == 1) {
         control_symbol_map_.at(i) = SubcarrierType::kPTRS;
       } else {
         control_symbol_map_.at(i) = SubcarrierType::kData;
-        dl_symbol_ctrl_id_.at(i) = ctrl_idx;
-        ctrl_idx++;
+        dl_symbol_ctrl_id_.at(i) = ctrl_idx++;
+        //ctrl_idx++;
       }
     }
   }
@@ -1194,7 +1194,7 @@ void Config::LoadUplinkData() {
     const size_t ul_num_bytes_per_ue_pad =
         Roundup<64>(this->ul_num_bytes_per_cb_) *
         this->ul_ldpc_config_.NumBlocksInSymbol();
-    // LDPC input bits
+    // Uplink LDPC input bits
     ul_bits_.Calloc(this->frame_.NumUlDataSyms(),
                     ul_num_bytes_per_ue_pad * this->ue_ant_num_,
                     Agora_memory::Alignment_t::kAlign64);
@@ -1202,24 +1202,30 @@ void Config::LoadUplinkData() {
         kExperimentFilepath + kUlLdpcDataPrefix +
         std::to_string(this->ofdm_ca_num_) + "_ue" +
         std::to_string(this->ue_ant_total_) + ".bin";
-    AGORA_LOG_SYMBOL("Config: Reading raw ul data from %s\n",
-                     ul_data_file.c_str());
+    AGORA_LOG_FRAME("Config: Reading uplink data bits from %s\n",
+                    ul_data_file.c_str());
 
+    // \todo assumes one code block per symbol
+    size_t code_block_in_symbol_i = 0;
     size_t seek_offset = 0;
     for (size_t i = 0; i < this->frame_.NumUlDataSyms(); i++) {
-      seek_offset += ul_data_bytes_num_persymbol_ * this->ue_ant_offset_;
+      seek_offset +=
+          ul_data_bytes_num_persymbol_ * this->ue_ant_offset_ * sizeof(int8_t);
       for (size_t j = 0; j < this->ue_ant_num_; j++) {
-        Utils::ReadBinaryFile(
-            ul_data_file, sizeof(int8_t), ul_data_bytes_num_persymbol_,
-            seek_offset, this->ul_bits_[i] + (j * ul_num_bytes_per_ue_pad));
+        int8_t* ul_bits_ptr = this->GetInfoBits(
+            this->ul_bits_, Direction::kUplink, i, j, code_block_in_symbol_i);
+        Utils::ReadBinaryFile(ul_data_file, sizeof(int8_t),
+                              ul_data_bytes_num_persymbol_, seek_offset,
+                              ul_bits_ptr);
         seek_offset += ul_data_bytes_num_persymbol_ * sizeof(int8_t);
       }
       seek_offset +=
           ul_data_bytes_num_persymbol_ *
-          (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_);
+          (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
+          sizeof(int8_t);
     }
 
-    // Modulation input bits
+    // Uplink modulation input bits
     ul_mod_bits_.Calloc(this->frame_.NumUlDataSyms(),
                         Roundup<64>(this->ofdm_data_num_) * this->ue_ant_num_,
                         Agora_memory::Alignment_t::kAlign32);
@@ -1228,92 +1234,105 @@ void Config::LoadUplinkData() {
         std::to_string(this->ofdm_ca_num_) + "_ue" +
         std::to_string(this->ue_ant_total_) + ".bin";
     seek_offset = 0;
-    // \todo assumes one code block per symbol
-    size_t code_block_in_symbol_i = 0;
     for (size_t i = 0; i < this->frame_.NumUlDataSyms(); i++) {
-      seek_offset += ofdm_data_num_ * this->ue_ant_offset_;
+      seek_offset += ofdm_data_num_ * this->ue_ant_offset_ * sizeof(int8_t);
       for (size_t j = 0; j < this->ue_ant_num_; j++) {
-        int8_t* ul_mod_data_ptr = GetModBitsBuf(
+        int8_t* ul_mod_data_ptr = this->GetModBitsBuf(
             ul_mod_bits_, Direction::kUplink, 0, i, j, code_block_in_symbol_i);
         Utils::ReadBinaryFile(ul_mod_data_file, sizeof(int8_t), ofdm_data_num_,
                               seek_offset, ul_mod_data_ptr);
-        seek_offset += ofdm_data_num_;
+        seek_offset += ofdm_data_num_ * sizeof(int8_t);
       }
       seek_offset +=
           ofdm_data_num_ *
-          (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_);
+          (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
+          sizeof(int8_t);
     }
   }
 }
 
 void Config::LoadDownlinkData() {
-  const size_t dl_num_bytes_per_ue_pad =
-      Roundup<64>(this->dl_num_bytes_per_cb_) *
-      this->dl_ldpc_config_.NumBlocksInSymbol();
-  dl_bits_.Calloc(this->frame_.NumDLSyms(),
-                  dl_num_bytes_per_ue_pad * this->ue_ant_num_,
-                  Agora_memory::Alignment_t::kAlign64);
   if (this->frame_.NumDlDataSyms() > 0) {
+    const size_t dl_num_bytes_per_ue_pad =
+        Roundup<64>(this->dl_num_bytes_per_cb_) *
+        this->dl_ldpc_config_.NumBlocksInSymbol();
+    // Downlink LDPC input bits
+    dl_bits_.Calloc(this->frame_.NumDlDataSyms(),
+                    dl_num_bytes_per_ue_pad * this->ue_ant_num_,
+                    Agora_memory::Alignment_t::kAlign64);
     const std::string dl_data_file =
         kExperimentFilepath + kDlLdpcDataPrefix +
         std::to_string(this->ofdm_ca_num_) + "_ue" +
         std::to_string(this->ue_ant_total_) + ".bin";
-
-    AGORA_LOG_FRAME("Config: Reading raw dl data from %s\n",
+    AGORA_LOG_FRAME("Config: Reading downlink data bits from %s\n",
                     dl_data_file.c_str());
+
+    // \todo assumes one code block per symbol
+    size_t code_block_in_symbol_i = 0;
     size_t seek_offset = 0;
-    for (size_t i = this->frame_.ClientDlPilotSymbols();
-         i < this->frame_.NumDLSyms(); i++) {
+    for (size_t i = 0; i < this->frame_.NumDlDataSyms(); i++) {
+      seek_offset +=
+          dl_data_bytes_num_persymbol_ * this->ue_ant_offset_ * sizeof(int8_t);
       for (size_t j = 0; j < this->ue_ant_num_; j++) {
+        int8_t* dl_bits_ptr = this->GetInfoBits(
+            this->dl_bits_, Direction::kDownlink, i, j, code_block_in_symbol_i);
         Utils::ReadBinaryFile(
             dl_data_file, sizeof(int8_t), dl_data_bytes_num_persymbol_,
-            seek_offset, this->dl_bits_[i] + (j * dl_num_bytes_per_ue_pad));
+            seek_offset,
+            dl_bits_ptr);  //this->dl_bits_[i] + (j * dl_num_bytes_per_ue_pad));
         seek_offset += dl_data_bytes_num_persymbol_ * sizeof(int8_t);
       }
+      seek_offset +=
+          dl_data_bytes_num_persymbol_ *
+          (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
+          sizeof(int8_t);
     }
-  }
 
-  dl_mod_bits_.Calloc(this->frame_.NumDLSyms(),
-                      Roundup<64>(this->GetOFDMDataNum()) * ue_ant_num_,
-                      Agora_memory::Alignment_t::kAlign32);
-  const std::string dl_mod_data_file =
-      kExperimentFilepath + kDlModDataPrefix +
-      std::to_string(this->ofdm_ca_num_) + "_ue" +
-      std::to_string(this->ue_ant_total_) + ".bin";
-  size_t seek_offset = 0;
-  // \todo assumes one code block per symbol
-  size_t code_block_in_symbol_i = 0;
-  for (size_t i = 0; i < this->frame_.NumDlDataSyms(); i++) {
-    seek_offset += ofdm_data_num_ * this->ue_ant_offset_;
-    for (size_t j = 0; j < this->ue_ant_num_; j++) {
-      int8_t* dl_mod_data_ptr = GetModBitsBuf(
-          dl_mod_bits_, Direction::kDownlink, 0, i, j, code_block_in_symbol_i);
-      Utils::ReadBinaryFile(dl_mod_data_file, sizeof(int8_t), ofdm_data_num_,
-                            seek_offset, dl_mod_data_ptr);
-      seek_offset += ofdm_data_num_;
+    // Downlink modulation input bits
+    dl_mod_bits_.Calloc(this->frame_.NumDlDataSyms(),
+                        Roundup<64>(this->GetOFDMDataNum()) * ue_ant_num_,
+                        Agora_memory::Alignment_t::kAlign32);
+    const std::string dl_mod_data_file =
+        kExperimentFilepath + kDlModDataPrefix +
+        std::to_string(this->ofdm_ca_num_) + "_ue" +
+        std::to_string(this->ue_ant_total_) + ".bin";
+    seek_offset = 0;
+    for (size_t i = 0; i < this->frame_.NumDlDataSyms(); i++) {
+      seek_offset +=
+          this->GetOFDMDataNum() * this->ue_ant_offset_ * sizeof(int8_t);
+      for (size_t j = 0; j < this->ue_ant_num_; j++) {
+        int8_t* dl_mod_data_ptr =
+            this->GetModBitsBuf(dl_mod_bits_, Direction::kDownlink, 0, i, j,
+                                code_block_in_symbol_i);
+        Utils::ReadBinaryFile(dl_mod_data_file, sizeof(int8_t),
+                              this->GetOFDMDataNum(), seek_offset,
+                              dl_mod_data_ptr);
+        seek_offset += this->GetOFDMDataNum() * sizeof(int8_t);
+      }
+      seek_offset +=
+          this->GetOFDMDataNum() *
+          (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
+          sizeof(int8_t);
     }
-    seek_offset += ofdm_data_num_ * (this->ue_ant_total_ -
-                                     this->ue_ant_offset_ - this->ue_ant_num_);
   }
 }
 
 void Config::GenData() {
   this->GenPilots();
 
-  this->LoadUplinkData();
   // Freq-domain uplink symbols
-  ul_iq_f_.Calloc(this->frame_.NumUlDataSyms(),
-                  this->ofdm_data_num_ * this->ue_ant_num_,
-                  Agora_memory::Alignment_t::kAlign64);
-  ul_iq_t_.Calloc(this->frame_.NumUlDataSyms(),
-                  this->samps_per_symbol_ * this->ue_ant_num_,
-                  Agora_memory::Alignment_t::kAlign64);
-
+  this->LoadUplinkData();
   Table<complex_float> ul_iq_ifft;
   if (this->frame_.NumUlDataSyms() > 0) {
     ul_iq_ifft.Calloc(this->frame_.NumUlDataSyms(),
                       this->ofdm_ca_num_ * this->ue_ant_num_,
                       Agora_memory::Alignment_t::kAlign64);
+    ul_iq_f_.Calloc(this->frame_.NumUlDataSyms(),
+                    this->ofdm_data_num_ * this->ue_ant_num_,
+                    Agora_memory::Alignment_t::kAlign64);
+    ul_iq_t_.Calloc(this->frame_.NumUlDataSyms(),
+                    this->samps_per_symbol_ * this->ue_ant_num_,
+                    Agora_memory::Alignment_t::kAlign64);
     const std::string ul_ifft_data_file =
         kExperimentFilepath + kUlIfftPrefix +
         std::to_string(this->ofdm_ca_num_) + "_ue" +
@@ -1328,8 +1347,9 @@ void Config::GenData() {
                               &ul_iq_ifft[i][j * ofdm_ca_num_]);
         std::memcpy(&ul_iq_f_[i][j * ofdm_data_num_],
                     &ul_iq_ifft[i][j * ofdm_ca_num_ + ofdm_data_start_],
-                    ofdm_data_num_);
+                    ofdm_data_num_ * sizeof(complex_float));
         CommsLib::FFTShift(&ul_iq_ifft[i][j * ofdm_ca_num_], ofdm_ca_num_);
+        CommsLib::IFFT(&ul_iq_ifft[i][j * ofdm_ca_num_], ofdm_ca_num_, false);
         seek_offset += ofdm_ca_num_ * sizeof(complex_float);
       }
       seek_offset +=
@@ -1339,18 +1359,18 @@ void Config::GenData() {
     }
   }
 
-  this->LoadDownlinkData();
   // Generate freq-domain downlink symbols
-  dl_iq_f_.Calloc(this->frame_.NumDLSyms(), ofdm_data_num_ * ue_ant_num_,
-                  Agora_memory::Alignment_t::kAlign64);
-  dl_iq_t_.Calloc(this->frame_.NumDLSyms(),
-                  this->samps_per_symbol_ * this->ue_ant_num_,
-                  Agora_memory::Alignment_t::kAlign64);
+  this->LoadDownlinkData();
   Table<complex_float> dl_iq_ifft;
   if (this->frame_.NumDlDataSyms() > 0) {
     dl_iq_ifft.Calloc(this->frame_.NumDlDataSyms(),
                       this->ofdm_ca_num_ * this->ue_ant_num_,
                       Agora_memory::Alignment_t::kAlign64);
+    dl_iq_f_.Calloc(this->frame_.NumDlDataSyms(), ofdm_data_num_ * ue_ant_num_,
+                    Agora_memory::Alignment_t::kAlign64);
+    dl_iq_t_.Calloc(this->frame_.NumDlDataSyms(),
+                    this->samps_per_symbol_ * this->ue_ant_num_,
+                    Agora_memory::Alignment_t::kAlign64);
     const std::string dl_ifft_data_file =
         kExperimentFilepath + kDlIfftPrefix +
         std::to_string(this->ofdm_ca_num_) + "_ue" +
@@ -1365,8 +1385,9 @@ void Config::GenData() {
                               &dl_iq_ifft[i][j * ofdm_ca_num_]);
         std::memcpy(&dl_iq_f_[i][j * ofdm_data_num_],
                     &dl_iq_ifft[i][j * ofdm_ca_num_ + ofdm_data_start_],
-                    ofdm_data_num_);
+                    ofdm_data_num_ * sizeof(complex_float));
         CommsLib::FFTShift(&dl_iq_ifft[i][j * ofdm_ca_num_], ofdm_ca_num_);
+        CommsLib::IFFT(&dl_iq_ifft[i][j * ofdm_ca_num_], ofdm_ca_num_, false);
         seek_offset += ofdm_ca_num_ * sizeof(complex_float);
       }
       seek_offset +=
@@ -1384,8 +1405,10 @@ void Config::GenData() {
                                  this->ue_ant_num_ * this->ofdm_ca_num_)
           : 0;
   float dl_max_mag =
-      CommsLib::FindMaxAbs(dl_iq_ifft, this->frame_.NumDLSyms(),
-                           this->ue_ant_num_ * this->ofdm_ca_num_);
+      (this->frame_.NumDlDataSyms() > 0)
+          ? CommsLib::FindMaxAbs(dl_iq_ifft, this->frame_.NumDlDataSyms(),
+                                 this->ue_ant_num_ * this->ofdm_ca_num_)
+          : 0;
   float ue_pilot_max_mag = CommsLib::FindMaxAbs(
       ue_pilot_ifft_, this->ue_ant_num_, this->ofdm_ca_num_);
   float pilot_max_mag = CommsLib::FindMaxAbs(pilot_ifft_, this->ofdm_ca_num_);
@@ -1393,20 +1416,24 @@ void Config::GenData() {
   this->scale_ =
       2 * std::max({ul_max_mag, dl_max_mag, ue_pilot_max_mag, pilot_max_mag});
 
-  float dl_papr = dl_max_mag /
-                  CommsLib::FindMeanAbs(dl_iq_ifft, this->frame_.NumDLSyms(),
-                                        this->ue_ant_num_ * this->ofdm_ca_num_);
+  float dl_papr =
+      (this->frame_.NumDlDataSyms() > 0)
+          ? dl_max_mag /
+                CommsLib::FindMeanAbs(dl_iq_ifft, this->frame_.NumDlDataSyms(),
+                                      this->ue_ant_num_ * this->ofdm_ca_num_)
+          : 0;
   float ul_papr =
       (this->frame_.NumUlDataSyms() > 0)
           ? ul_max_mag /
                 CommsLib::FindMeanAbs(ul_iq_ifft, this->frame_.NumUlDataSyms(),
                                       this->ue_ant_num_ * this->ofdm_ca_num_)
           : 0;
-  std::printf("Uplink PAPR %2.2f dB, Downlink PAPR %2.2f dB\n",
-              10 * std::log10(ul_papr), 10 * std::log10(dl_papr));
+  std::printf(
+      "Uplink PAPR %2.2f dB, Downlink PAPR %2.2f dB, using scale %2.2f\n",
+      10 * std::log10(ul_papr), 10 * std::log10(dl_papr), this->scale_);
 
   // Generate time domain symbols for downlink
-  for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
+  for (size_t i = 0; i < this->frame_.NumDlDataSyms(); i++) {
     for (size_t u = 0; u < this->ue_ant_num_; u++) {
       size_t q = u * this->ofdm_ca_num_;
       size_t r = u * this->samps_per_symbol_;

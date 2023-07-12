@@ -497,7 +497,7 @@ void Stats::PrintPerFrameDone(PrintType print_type, size_t frame_id) const {
             frame_id,
             MasterGetDeltaMs(TsType::kDecodeDone, TsType::kFirstSymbolRX,
                              frame_id),
-            this->config_->Frame().NumULSyms());
+            this->config_->Frame().NumUlDataSyms());
         break;
       case (PrintType::kPacketFromMac):
         AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed MAC RX \n",

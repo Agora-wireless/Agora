@@ -193,7 +193,7 @@ void UeWorker::DoFftPilot(size_t tag) {
 
     // remove CP, do FFT
     size_t total_dl_symbol_id =
-        (frame_slot * config_.Frame().NumDLSyms()) + dl_symbol_id;
+        config_.GetTotalSymbolIdxDl(frame_id, dl_symbol_id);
     size_t fft_buffer_target_id =
         (total_dl_symbol_id * config_.UeAntNum()) + ant_id;
 
@@ -211,10 +211,8 @@ void UeWorker::DoFftPilot(size_t tag) {
     // perform fft
     DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 
-    //// FFT shift the buffer
-    auto* fft_buff_complex =
-        reinterpret_cast<complex_float*>(fft_buffer_[fft_buffer_target_id]);
-    CommsLib::FFTShift(fft_buff_complex, config_.OfdmCaNum());
+    // FFT shift the buffer
+    CommsLib::FFTShift(fft_buffer_[fft_buffer_target_id], config_.OfdmCaNum());
 
     size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
     auto* csi_buffer_ptr =
@@ -278,10 +276,12 @@ void UeWorker::DoFftData(size_t tag) {
 
     const size_t sig_offset = config_.OfdmRxZeroPrefixClient();
     const size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
+    const size_t dl_data_symbol_id =
+        dl_symbol_id - config_.Frame().ClientDlPilotSymbols();
 
     // remove CP, do FFT
     size_t total_dl_symbol_id =
-        (frame_slot * config_.Frame().NumDLSyms()) + dl_symbol_id;
+        config_.GetTotalSymbolIdxDl(frame_id, dl_symbol_id);
     size_t fft_buffer_target_id =
         (total_dl_symbol_id * config_.UeAntNum()) + ant_id;
 
@@ -297,20 +297,16 @@ void UeWorker::DoFftData(size_t tag) {
     DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 
     //// FFT shift the buffer
-    auto* fft_buff_complex =
-        reinterpret_cast<complex_float*>(fft_buffer_[fft_buffer_target_id]);
-    CommsLib::FFTShift(fft_buff_complex, config_.OfdmCaNum());
+    CommsLib::FFTShift(fft_buffer_[fft_buffer_target_id], config_.OfdmCaNum());
 
+    auto* fft_buffer_ptr =
+        reinterpret_cast<arma::cx_float*>(fft_buffer_[fft_buffer_target_id]);
     size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
     auto* csi_buffer_ptr =
         reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset]);
-    auto* fft_buffer_ptr =
-        reinterpret_cast<arma::cx_float*>(fft_buffer_[fft_buffer_target_id]);
 
-    size_t dl_data_symbol_perframe = config_.Frame().NumDlDataSyms();
     size_t total_dl_data_symbol_id =
-        (frame_slot * dl_data_symbol_perframe) +
-        (dl_symbol_id - config_.Frame().ClientDlPilotSymbols());
+        config_.GetTotalDataSymbolIdxDl(frame_id, dl_data_symbol_id);
     size_t eq_buffer_offset =
         total_dl_data_symbol_id * config_.UeAntNum() + ant_id;
 
@@ -343,13 +339,11 @@ void UeWorker::DoFftData(size_t tag) {
         equ_buffer_ptr[data_sc_id] = (y / csi_buffer_ptr[j]) * phc;
         size_t ant = (kDebugDownlink == true) ? 0 : ant_id;
         if (kCollectPhyStats) {
-          const size_t dl_data_symbol_id =
-              dl_symbol_id - config_.Frame().ClientDlPilotSymbols();
           phy_stats_.UpdateEvm(frame_id, dl_data_symbol_id, j, ant, ant_id,
                                equ_buffer_ptr[data_sc_id]);
         }
         complex_float tx =
-            config_.DlIqF()[dl_symbol_id][ant * config_.OfdmDataNum() + j];
+            config_.DlIqF()[dl_data_symbol_id][ant * config_.OfdmDataNum() + j];
         evm += std::norm(equ_buffer_ptr[data_sc_id] -
                          arma::cx_float(tx.re, tx.im));
       }
@@ -358,7 +352,7 @@ void UeWorker::DoFftData(size_t tag) {
     evm = evm / config_.GetOFDMDataNum();
     if (kPrintEqualizedSymbols) {
       complex_float* tx =
-          &config_.DlIqF()[dl_symbol_id][ant_id * config_.OfdmDataNum()];
+          &config_.DlIqF()[dl_data_symbol_id][ant_id * config_.OfdmDataNum()];
       arma::cx_fvec x_vec(reinterpret_cast<arma::cx_float*>(tx),
                           config_.OfdmDataNum(), false);
       Utils::PrintVec(x_vec, std::string("x") +
@@ -408,17 +402,17 @@ void UeWorker::DoDemul(size_t tag) {
 
     const size_t frame_slot = frame_id % kFrameWnd;
     const size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
-    const size_t dl_data_symbol_perframe = config_.Frame().NumDlDataSyms();
-    const size_t total_dl_symbol_id = frame_slot * dl_data_symbol_perframe +
-                                      dl_symbol_id -
-                                      config_.Frame().ClientDlPilotSymbols();
+    const size_t dl_data_symbol_id =
+        dl_symbol_id - config_.Frame().ClientDlPilotSymbols();
+    size_t total_dl_symbol_id =
+        config_.GetTotalDataSymbolIdxDl(frame_id, dl_data_symbol_id);
     size_t offset = total_dl_symbol_id * config_.UeAntNum() + ant_id;
     auto* equal_ptr = reinterpret_cast<float*>(&equal_buffer_[offset][0]);
 
     const size_t base_sc_id = 0;
 
     int8_t* demod_ptr =
-        demod_buffer_[frame_slot][dl_symbol_id][ant_id] +
+        demod_buffer_[frame_slot][dl_data_symbol_id][ant_id] +
         (config_.ModOrderBits(Direction::kDownlink) * base_sc_id);
 
     Demodulate(equal_ptr, demod_ptr, config_.GetOFDMDataNum(),
@@ -432,7 +426,7 @@ void UeWorker::DoDemul(size_t tag) {
               config_.ModOrderBits(Direction::kDownlink));
       phy_stats_.IncrementDecodedBlocks(ant_id, total_dl_symbol_id, frame_slot);
       int8_t* tx_bytes = config_.GetModBitsBuf(
-          config_.DlModBits(), Direction::kDownlink, 0, dl_symbol_id,
+          config_.DlModBits(), Direction::kDownlink, 0, dl_data_symbol_id,
           kDebugDownlink ? 0 : ant_id, base_sc_id);
       size_t block_error(0);
       for (size_t i = 0; i < config_.GetOFDMDataNum(); i++) {

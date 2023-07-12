@@ -447,7 +447,9 @@ void Agora::Start() {
               this->demul_counters_.CompleteTask(frame_id, symbol_id);
 
           if (last_demul_task == true) {
-            if (kUplinkHardDemod == false) {
+            if (kUplinkHardDemod == false &&
+                symbol_id >= config_->Frame().GetULSymbol(
+                                 config_->Frame().ClientUlPilotSymbols())) {
               ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
                                  frame_id, symbol_id);
             }
@@ -489,8 +491,12 @@ void Agora::Start() {
                   assert(frame_tracking_.cur_sche_frame_id_ == frame_id);
                   CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
                 } else {
-                  ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
-                                     frame_id, symbol_id);
+                  if (symbol_id >=
+                      config_->Frame().GetULSymbol(
+                          config_->Frame().ClientUlPilotSymbols())) {
+                    ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
+                                       frame_id, symbol_id);
+                  }
                 }
               }
             }
@@ -1071,11 +1077,11 @@ void Agora::InitializeCounters() {
   demul_counters_.Init(cfg->Frame().NumULSyms(), cfg->DemulEventsPerSymbol());
 
   decode_counters_.Init(
-      cfg->Frame().NumULSyms(),
+      cfg->Frame().NumUlDataSyms(),
       cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
           cfg->SpatialStreamsNum());
 
-  tomac_counters_.Init(cfg->Frame().NumULSyms(), cfg->SpatialStreamsNum());
+  tomac_counters_.Init(cfg->Frame().NumUlDataSyms(), cfg->SpatialStreamsNum());
 
   if (config_->Frame().NumDLSyms() > 0) {
     AGORA_LOG_TRACE("Agora: Initializing downlink buffers\n");
@@ -1195,8 +1201,9 @@ void Agora::SaveTxDataToFile(int frame_id) {
     AGORA_LOG_ERROR("SaveTxDataToFile error creating file pointer\n")
   } else {
     for (size_t i = 0; i < cfg->Frame().NumDLSyms(); i++) {
+      size_t symbol_id = cfg->Frame().GetDLSymbol(i);
       const size_t total_data_symbol_id =
-          cfg->GetTotalDataSymbolIdxDl(frame_id, i);
+          cfg->GetTotalSymbolIdxDlBcast(frame_id, symbol_id);
 
       for (size_t ant_id = 0; ant_id < cfg->BsAntNum(); ant_id++) {
         const size_t offset = total_data_symbol_id * cfg->BsAntNum() + ant_id;
