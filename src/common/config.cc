@@ -48,7 +48,6 @@ static const std::string kUlDataFilePrefix =
 static const std::string kDlDataFilePrefix =
     kExperimentFilepath + "LDPC_orig_dl_data_";
 static const std::string kUlDataFreqPrefix = kExperimentFilepath + "ul_data_f_";
-static const size_t kFlexibleSlotFormatIdx = 2;
 
 Config::Config(std::string jsonfilename)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -312,7 +311,8 @@ Config::Config(std::string jsonfilename)
       tdd_conf.value("ofdm_rx_zero_prefix_cal_ul", 0) + cp_len_;
   ofdm_rx_zero_prefix_cal_dl_ =
       tdd_conf.value("ofdm_rx_zero_prefix_cal_dl", 0) + cp_len_;
-  RtAssert(cp_len_ % 16 == 0, "cyclic prefix length must be divisible by 16.");
+  RtAssert(cp_len_ % 16 == 0, "cyclic prefix must be a multiple of subcarriers "
+          "per cacheline.");
   RtAssert(ofdm_data_num_ % kSCsPerCacheline == 0,
            "ofdm_data_num must be a multiple of subcarriers per cacheline");
   RtAssert(ofdm_data_num_ % kTransposeBlockSize == 0,
@@ -526,6 +526,7 @@ Config::Config(std::string jsonfilename)
     frame_ = FrameStats(sched);
   } else {
     json jframes = tdd_conf.value("frame_schedule", json::array());
+
     // Only allow 1 unique frame type
     assert(jframes.size() == 1);
     std::string frame = jframes.at(0).get<std::string>();
@@ -543,9 +544,9 @@ Config::Config(std::string jsonfilename)
     } 
     frame_ = FrameStats(frame);
   }
-
   AGORA_LOG_INFO("Config: Frame schedule %s (%zu symbols)\n",
                  frame_.FrameIdentifier().c_str(), frame_.NumTotalSyms());
+
   if (frame_.IsRecCalEnabled()) {
     RtAssert(bf_ant_num_ >= frame_.NumDLCalSyms(),
              "Too many DL Cal symbols for the number of base station antennas");

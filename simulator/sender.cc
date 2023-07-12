@@ -74,8 +74,6 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     i = new size_t[cfg->Frame().NumTotalSyms()]();
   }
 
-  std::cout << "How about now?\n" << std::flush;
-
   InitIqFromFile(std::string(TOSTRING(PROJECT_DIRECTORY)) +
                  "/files/experiment/LDPC_rx_data_" +
                  std::to_string(cfg->OfdmCaNum()) + "_ant" +
