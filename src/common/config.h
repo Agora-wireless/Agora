@@ -996,4 +996,4 @@ class Config {
   std::string timestamp_;
   std::vector<std::string> ul_tx_f_data_files_;
 };
-#endif /* CONFIG_HPP_ */
+#endif /* CONFIG_H_ */

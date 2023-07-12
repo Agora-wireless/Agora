@@ -8,10 +8,11 @@
  */
 
 #include "config.h"
+
 #include <ctime>
-#include <cmath>
 #include <filesystem>
 #include <utility>
+
 #include "comms-constants.inc"
 #include "comms-lib.h"
 #include "data_generator.h"
@@ -25,7 +26,6 @@
 #include "simd_types.h"
 #include "utils_ldpc.h"
 #include "fivegconfig.h"
-
 
 using json = nlohmann::json;
 
@@ -287,6 +287,7 @@ Config::Config(std::string jsonfilename)
   dpdk_num_ports_ = tdd_conf.value("dpdk_num_ports", 1);
   dpdk_port_offset_ = tdd_conf.value("dpdk_port_offset", 0);
   dpdk_mac_addrs_ = tdd_conf.value("dpdk_mac_addrs", "");
+
   ue_mac_tx_port_ = tdd_conf.value("ue_mac_tx_port", kMacUserRemotePort);
   ue_mac_rx_port_ = tdd_conf.value("ue_mac_rx_port", kMacUserLocalPort);
   bs_mac_tx_port_ = tdd_conf.value("bs_mac_tx_port", kMacBaseRemotePort);
@@ -386,7 +387,6 @@ Config::Config(std::string jsonfilename)
   // If frames not specified explicitly, construct default based on frame_type /
   // symbol_num_perframe / pilot_num / ul_symbol_num_perframe /
   // dl_symbol_num_perframe / dl_data_symbol_start
-
   if (tdd_conf.find("frame_schedule") == tdd_conf.end()) {
     size_t ul_data_symbol_num_perframe = kDefaultULSymPerFrame;
     size_t ul_data_symbol_start = kDefaultULSymStart;
@@ -525,12 +525,10 @@ Config::Config(std::string jsonfilename)
     }
     frame_ = FrameStats(sched);
   } else {
-
     json jframes = tdd_conf.value("frame_schedule", json::array());
     // Only allow 1 unique frame type
     assert(jframes.size() == 1);
     std::string frame = jframes.at(0).get<std::string>();
-
     /*
     If an apostrophe delimiter is found in the frame string, execute logic to
     convert a subframe formated frame into the symbol formated frame that Agora
@@ -539,7 +537,6 @@ Config::Config(std::string jsonfilename)
     if (frame.find(",")!=std::string::npos) { 
       std::vector<std::string> flex_formats = tdd_conf.value("flex_formats", json::array());
       FiveGConfig fivegconfig = FiveGConfig(tdd_conf);
-
       frame = fivegconfig.FiveGFormat();
       rate_ = fivegconfig.SamplingRate();
       ofdm_data_start_ = fivegconfig.OfdmDataStart();
@@ -549,7 +546,6 @@ Config::Config(std::string jsonfilename)
 
   AGORA_LOG_INFO("Config: Frame schedule %s (%zu symbols)\n",
                  frame_.FrameIdentifier().c_str(), frame_.NumTotalSyms());
-
   if (frame_.IsRecCalEnabled()) {
     RtAssert(bf_ant_num_ >= frame_.NumDLCalSyms(),
              "Too many DL Cal symbols for the number of base station antennas");
@@ -701,7 +697,6 @@ Config::Config(std::string jsonfilename)
 
   samps_per_symbol_ =
       ofdm_tx_zero_prefix_ + ofdm_ca_num_ + cp_len_ + ofdm_tx_zero_postfix_;
-  
   packet_length_ =
       Packet::kOffsetOfData + ((kUse12BitIQ ? 3 : 4) * samps_per_symbol_);
   dl_packet_length_ = Packet::kOffsetOfData + (samps_per_symbol_ * 4);
@@ -1964,7 +1959,6 @@ void Config::Print() const {
               << "FFT in rru: " << fft_in_rru_ << std::endl;
   }
 }
-
 
 extern "C" {
 __attribute__((visibility("default"))) Config* ConfigNew(char* filename) {

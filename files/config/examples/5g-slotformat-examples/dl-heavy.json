@@ -4,7 +4,6 @@
         "cells": 1,
         "bs_radio_num": 8,
         "ue_radio_num": 8,  
-        /*"sample_rate": 15.36e6,*/
         "demul_block_size": 48,
         "cp_size": 80,
         /*"fft_size": 1024,*/

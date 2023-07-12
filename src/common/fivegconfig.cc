@@ -8,7 +8,6 @@
  * specified configuration is compatible with 5G standards
  */
 
-
 #include "fivegconfig.h"
 #include "logger.h"
 #include "utils.h"
