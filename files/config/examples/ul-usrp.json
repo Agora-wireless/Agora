@@ -63,7 +63,7 @@
     "ue_socket_thread_num": 1,
     /* BS (Agora) */
     "core_offset": 1,
-    "worker_thread_num": 8,
+    "worker_thread_num": 1,
     "socket_thread_num": 1,
     "max_frame": 200000,
     "corr_scale": [100]
