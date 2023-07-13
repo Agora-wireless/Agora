@@ -281,6 +281,10 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
                          bool is_turn_to_dequeue_from_io) {
   size_t total_events = 0;
   size_t remaining_events = events_list.size();
+  // debug: fetched 0 events
+  // AGORA_LOG_INFO("Fetch Event: Num of events try to obtain = %zu\n", remaining_events);
+  // AGORA_LOG_INFO("Fetch Event: SocketThreadNum = %zu\n", config_->SocketThreadNum());
+  // AGORA_LOG_INFO("Fetch Event: kDeququeBulkSizeTXRX = %zu\n", kDequeueBulkSizeTXRX);
   if (is_turn_to_dequeue_from_io) {
     for (size_t i = 0; i < config_->SocketThreadNum(); i++) {
       if (remaining_events > 0) {
@@ -290,6 +294,10 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
         const size_t new_events = message_queue_.try_dequeue_bulk_from_producer(
             *(rx_ptoks_ptr_[i]), &events_list.at(total_events), request_events);
         remaining_events = remaining_events - new_events;
+        // AGORA_LOG_INFO("message_queue_.size_approx() = %d\n", message_queue_.size_approx());
+        // AGORA_LOG_INFO("Fetch Event: new_events = %zu\n", new_events);
+        if (new_events != 0) printf("[debug] Fetch Event: new_events = %zu\n", new_events);
+        // debug: the number of new events is zero
         total_events = total_events + new_events;
       } else {
         AGORA_LOG_WARN(
@@ -319,6 +327,7 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
 }
 
 void Agora::Start() {
+  AGORA_LOG_INFO("Agora: Init finished. Start the main loop.\n");
   const auto& cfg = this->config_;
 
   const bool start_status = packet_tx_rx_->StartTxRx(
@@ -328,6 +337,8 @@ void Agora::Start() {
     this->Stop();
     return;
   }
+
+  AGORA_LOG_INFO("Agora: TxRx running. Start the execution loop.\n");
 
   // Counters for printing summary
   size_t tx_count = 0;
@@ -346,9 +357,16 @@ void Agora::Start() {
         FetchEvent(events_list, is_turn_to_dequeue_from_io);
     is_turn_to_dequeue_from_io = !is_turn_to_dequeue_from_io;
 
+    // debug: # event fetched
+    // AGORA_LOG_INFO("Agora: %ld events fetched\n", num_events);
+    if (num_events !=0 ) printf("[debug] Agora: %ld events fetched\n", num_events);
+
     // Handle each event
     for (size_t ev_i = 0; ev_i < num_events; ev_i++) {
       EventData& event = events_list.at(ev_i);
+
+      // AGORA_LOG_INFO("Agora: Handling events\n")
+      printf("[debug] Agora: Handling events\n");
 
       // FFT processing is scheduled after falling through the switch
       switch (event.event_type_) {
@@ -806,6 +824,11 @@ void Agora::Start() {
                              do_fft_task);
         }
       }
+
+      // For each event, call a worker to solve it.
+      AGORA_LOG_INFO("Agora: Reach before the worker starts\n");
+      printf("===== worker_set_->RunWorker(0) =====\n[debug] Entering worker execution\n");
+      worker_set_->RunWorker(0);
     } /* End of for */
   }   /* End of while */
 
@@ -1111,19 +1134,22 @@ void Agora::InitializeThreads() {
         std::thread(&MacThreadBaseStation::RunEventLoop, mac_thread_.get());
   }
 
+  // debug
+  AGORA_LOG_INFO("Worker: Creating worker set pointers\n");
+
   // Create workers
   ///\todo convert unique ptr to shared
   worker_set_ = std::make_unique<AgoraWorker>(
       config_, stats_.get(), phy_stats_.get(), message_.get(),
       agora_memory_.get(), &frame_tracking_);
 
-  AGORA_LOG_INFO(
-      "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
-      "cores %zu--%zu\n",
-      config_->CoreOffset(), config_->CoreOffset() + 1,
-      config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1,
-      base_worker_core_offset_,
-      base_worker_core_offset_ + config_->WorkerThreadNum() - 1);
+  // AGORA_LOG_INFO(
+  //     "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
+  //     "cores %zu--%zu\n",
+  //     config_->CoreOffset(), config_->CoreOffset() + 1,
+  //     config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1,
+  //     base_worker_core_offset_,
+  //     base_worker_core_offset_ + config_->WorkerThreadNum() - 1);
 }
 
 void Agora::SaveDecodeDataToFile(int frame_id) {
@@ -1135,7 +1161,7 @@ void Agora::SaveDecodeDataToFile(int frame_id) {
   AGORA_LOG_INFO("Saving decode data to %s\n", kDecodeDataFilename.c_str());
   auto* fp = std::fopen(kDecodeDataFilename.c_str(), "wb");
   if (fp == nullptr) {
-    AGORA_LOG_ERROR("SaveDecodeDataToFile error creating file pointer\n")
+    AGORA_LOG_ERROR("SaveDecodeDataToFile error creating file pointer\n");
   } else {
     for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
       for (size_t j = 0; j < cfg->UeAntNum(); j++) {
@@ -1144,13 +1170,13 @@ void Agora::SaveDecodeDataToFile(int frame_id) {
         const auto write_status =
             std::fwrite(ptr, sizeof(uint8_t), num_decoded_bytes, fp);
         if (write_status != num_decoded_bytes) {
-          AGORA_LOG_ERROR("SaveDecodeDataToFile error while writting file\n")
+          AGORA_LOG_ERROR("SaveDecodeDataToFile error while writting file\n");
         }
       }
     }  // end for
     const auto close_status = std::fclose(fp);
     if (close_status != 0) {
-      AGORA_LOG_ERROR("SaveDecodeDataToFile error while closing file\n")
+      AGORA_LOG_ERROR("SaveDecodeDataToFile error while closing file\n");
     }
   }  // end else
 }
@@ -1161,7 +1187,7 @@ void Agora::SaveTxDataToFile(int frame_id) {
                  kTxDataFilename.c_str());
   auto* fp = std::fopen(kTxDataFilename.c_str(), "wb");
   if (fp == nullptr) {
-    AGORA_LOG_ERROR("SaveTxDataToFile error creating file pointer\n")
+    AGORA_LOG_ERROR("SaveTxDataToFile error creating file pointer\n");
   } else {
     for (size_t i = 0; i < cfg->Frame().NumDLSyms(); i++) {
       const size_t total_data_symbol_id =
@@ -1175,13 +1201,13 @@ void Agora::SaveTxDataToFile(int frame_id) {
         const auto write_status = std::fwrite(socket_ptr, sizeof(short),
                                               cfg->SampsPerSymbol() * 2, fp);
         if (write_status != cfg->SampsPerSymbol() * 2) {
-          AGORA_LOG_ERROR("SaveTxDataToFile error while writting file\n")
+          AGORA_LOG_ERROR("SaveTxDataToFile error while writting file\n");
         }
       }
     }
     const auto close_status = std::fclose(fp);
     if (close_status != 0) {
-      AGORA_LOG_ERROR("SaveTxDataToFile error while closing file\n")
+      AGORA_LOG_ERROR("SaveTxDataToFile error while closing file\n");
     }
   }
 }

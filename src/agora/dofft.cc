@@ -97,6 +97,9 @@ EventData DoFFT::Launch(size_t tag) {
   const size_t cell_id = pkt->cell_id_;
   const SymbolType sym_type = cfg_->GetSymbolType(symbol_id);
 
+  printf("[debug] DoFFT: frame_id = %ld\n", frame_id);
+  printf("[debug] DoFFT: symbol_id = %ld\n", symbol_id);
+
   if (cfg_->FftInRru() == true) {
     SimdConvertFloat16ToFloat32(
         reinterpret_cast<float*>(fft_inout_),

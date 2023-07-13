@@ -7,6 +7,7 @@
 #define DOER_H_
 
 #include <cstddef>
+#include <typeinfo>
 
 #include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"
@@ -20,10 +21,18 @@ class Doer {
       moodycamel::ConcurrentQueue<EventData>& task_queue,
       moodycamel::ConcurrentQueue<EventData>& complete_task_queue,
       moodycamel::ProducerToken* worker_ptok) {
+    
+    printf("===== Doer - TryLaunch =====\n");
+    printf("[debug] Doer: Try Launch.\n");
     EventData req_event;
+
+    printf("[debug] Doer: Try to dequeue.\n");
 
     ///Each event is handled by 1 Doer(Thread) and each tag is processed sequentually
     if (task_queue.try_dequeue(req_event)) {
+
+      printf("[debug] Doer: Dequeue'in.\n");
+      printf("[debug] Doer: Dequeued event type: %d\n", static_cast<int>(req_event.event_type_));
       // We will enqueue one response event containing results for all
       // request tags in the request event
       EventData resp_event;
@@ -31,12 +40,18 @@ class Doer {
       resp_event.event_type_ = req_event.event_type_;
 
       for (size_t i = 0; i < req_event.num_tags_; i++) {
+        printf("[debug] Before launch...\n");
         EventData doer_comp = Launch(req_event.tags_.at(i));
+        printf("[debug] After launch...\n");
         RtAssert(doer_comp.num_tags_ == 1, "Invalid num_tags in resp");
         resp_event.tags_.at(i) = doer_comp.tags_.at(0);
         RtAssert(resp_event.event_type_ == doer_comp.event_type_,
                  "Invalid event type in resp");
       }
+
+      // debug
+      printf("===== Doer - Launched =====\n");
+      printf("[debug] TryEnqueueFallback...\n");
       TryEnqueueFallback(&complete_task_queue, worker_ptok, resp_event);
       return true;
     }

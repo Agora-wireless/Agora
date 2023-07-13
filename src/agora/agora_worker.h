@@ -16,6 +16,7 @@
 #include "mat_logger.h"
 #include "phy_stats.h"
 #include "stats.h"
+#include "doer.h"
 
 class AgoraWorker {
  public:
@@ -23,6 +24,9 @@ class AgoraWorker {
                        MessageInfo* message, AgoraBuffer* buffer,
                        FrameInfo* frame);
   ~AgoraWorker();
+
+  void InitializeWorker(int tid);
+  void RunWorker(int tid);
 
  private:
   void WorkerThread(int tid);
@@ -38,6 +42,12 @@ class AgoraWorker {
   MessageInfo* message_;
   AgoraBuffer* buffer_;
   FrameInfo* frame_;
+
+  std::vector<Doer*> computers_vec;
+  std::vector<EventType> events_vec;
+  size_t cur_qid;
+  size_t empty_queue_itrs;
+  bool empty_queue;
 };
 
 #endif  // AGORA_WORKER_H_

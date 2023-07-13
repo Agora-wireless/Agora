@@ -52,7 +52,7 @@ void AgoraBuffer::AllocateTables() {
     size_t dl_socket_buffer_status_size =
         config_->BsAntNum() * task_buffer_symbol_num;
     size_t dl_socket_buffer_size =
-        config_->DlPacketLength() * dl_socket_buffer_status_size;
+        config_->DlPacketLength() * dl_socket_buffer_status_size; // debug socket memory size from txrx streamer
     AllocBuffer1d(&dl_socket_buffer_, dl_socket_buffer_size,
                   Agora_memory::Alignment_t::kAlign64, 1);
 

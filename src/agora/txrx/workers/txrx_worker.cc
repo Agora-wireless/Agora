@@ -73,8 +73,14 @@ void TxRxWorker::WaitSync() {
 }
 
 bool TxRxWorker::NotifyComplete(const EventData& complete_event) {
+  // AGORA_LOG_INFO("Before enqueue: event_notify_q_.size_approx() = %ld\n", event_notify_q_->size_approx());
+  printf("[debug] Before enqueue: event_notify_q_.size_approx() = %ld\n", event_notify_q_->size_approx());
   auto enqueue_status =
       event_notify_q_->enqueue(notify_producer_token_, complete_event);
+  // AGORA_LOG_INFO("After enqueue: event_notify_q_.size_approx() = %ld\n", event_notify_q_->size_approx());
+  printf("[debug] After enqueue: event_notify_q_.size_approx() = %ld\n", event_notify_q_->size_approx());
+  // AGORA_LOG_INFO("TxRxWorker[%zu]: Enqueue status = %s\n", tid_, enqueue_status ? "True" : "False");
+  printf("[debug] TxRxWorker[%zu]: Enqueue status = %s\n", tid_, enqueue_status ? "True" : "False");
   if (enqueue_status == false) {
     AGORA_LOG_ERROR("TxRxWorker[%zu]: socket message enqueue failed\n", tid_);
     throw std::runtime_error("TxRxWorker: socket message enqueue failed");
