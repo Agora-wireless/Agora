@@ -447,9 +447,10 @@ void Agora::Start() {
               this->demul_counters_.CompleteTask(frame_id, symbol_id);
 
           if (last_demul_task == true) {
-            if (kUplinkHardDemod == false &&
+            if (kUplinkHardDemod == false) {
+              /*  &&
                 symbol_id >= config_->Frame().GetULSymbol(
-                                 config_->Frame().ClientUlPilotSymbols())) {
+                                 config_->Frame().ClientUlPilotSymbols())) {*/
               ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
                                  frame_id, symbol_id);
             }
@@ -491,12 +492,14 @@ void Agora::Start() {
                   assert(frame_tracking_.cur_sche_frame_id_ == frame_id);
                   CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
                 } else {
-                  if (symbol_id >=
+                  ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
+                                     frame_id, symbol_id);
+                  /*if (symbol_id >=
                       config_->Frame().GetULSymbol(
                           config_->Frame().ClientUlPilotSymbols())) {
                     ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
                                        frame_id, symbol_id);
-                  }
+                  }*/
                 }
               }
             }
@@ -1076,12 +1079,13 @@ void Agora::InitializeCounters() {
 
   demul_counters_.Init(cfg->Frame().NumULSyms(), cfg->DemulEventsPerSymbol());
 
+  // \todo setting the first dim to NumUlDataSyms breaks the scheduler
   decode_counters_.Init(
-      cfg->Frame().NumUlDataSyms(),
+      cfg->Frame().NumULSyms(),
       cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
           cfg->SpatialStreamsNum());
 
-  tomac_counters_.Init(cfg->Frame().NumUlDataSyms(), cfg->SpatialStreamsNum());
+  tomac_counters_.Init(cfg->Frame().NumULSyms(), cfg->SpatialStreamsNum());
 
   if (config_->Frame().NumDLSyms() > 0) {
     AGORA_LOG_TRACE("Agora: Initializing downlink buffers\n");
