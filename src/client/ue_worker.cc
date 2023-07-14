@@ -641,13 +641,9 @@ void UeWorker::DoIfft(size_t tag) {
           frame_id, symbol_id, ant_id);
     }
 
-    complex_float* ifft_buff = ifft_buffer_[buff_offset];
-
-    std::memset(ifft_buff, 0u, sizeof(complex_float) * config_.OfdmDataStart());
     if (ul_symbol_idx < config_.Frame().ClientUlPilotSymbols()) {
-      std::memcpy(ifft_buff + config_.OfdmDataStart(),
-                  config_.UeSpecificPilot()[ant_id],
-                  config_.OfdmDataNum() * sizeof(complex_float));
+      std::memcpy(tx_data_ptr, config_.UeSpecificPilotT()[ant_id],
+                  config_.SampsPerSymbol() * sizeof(std::complex<int16_t>));
     } else {
       const size_t ul_data_symbol_idx =
           ul_symbol_idx - config_.Frame().ClientUlPilotSymbols();
@@ -656,6 +652,9 @@ void UeWorker::DoIfft(size_t tag) {
       complex_float* modul_buff =
           &modul_buffer_[total_ul_data_symbol_id]
                         [ant_id * config_.OfdmDataNum()];
+      complex_float* ifft_buff = ifft_buffer_[buff_offset];
+      std::memset(ifft_buff, 0u,
+                  sizeof(complex_float) * config_.OfdmDataStart());
       std::memcpy(ifft_buff + config_.OfdmDataStart(), modul_buff,
                   config_.OfdmDataNum() * sizeof(complex_float));
       if (kDebugTxData) {
@@ -683,26 +682,27 @@ void UeWorker::DoIfft(size_t tag) {
               config_.OfdmDataNum());
         }
       }
+      std::memset(ifft_buff + config_.OfdmDataStop(), 0,
+                  sizeof(complex_float) * config_.OfdmDataStart());
+
+      CommsLib::FFTShift(ifft_buff, config_.OfdmCaNum());
+      CommsLib::IFFT(ifft_buff, config_.OfdmCaNum(), false);
+
+      if (kDebugTxMemory) {
+        AGORA_LOG_INFO(
+            "Tx data for (Frame %zu Symbol %zu Ant %zu) is located at tx "
+            "offset "
+            "%zu:%zu at location %ld\n",
+            frame_id, symbol_id, ant_id, buff_offset, tx_offset,
+            (intptr_t)cur_tx_buffer);
+      }
+
+      CommsLib::Ifft2tx(ifft_buff, tx_data_ptr, config_.OfdmCaNum(),
+                        config_.OfdmTxZeroPrefix(), config_.CpLen(),
+                        config_.Scale());
     }
-    std::memset(ifft_buff + config_.OfdmDataStop(), 0,
-                sizeof(complex_float) * config_.OfdmDataStart());
-
-    CommsLib::FFTShift(ifft_buff, config_.OfdmCaNum());
-    CommsLib::IFFT(ifft_buff, config_.OfdmCaNum(), false);
-
-    if (kDebugTxMemory) {
-      AGORA_LOG_INFO(
-          "Tx data for (Frame %zu Symbol %zu Ant %zu) is located at tx offset "
-          "%zu:%zu at location %ld\n",
-          frame_id, symbol_id, ant_id, buff_offset, tx_offset,
-          (intptr_t)cur_tx_buffer);
-    }
-
-    CommsLib::Ifft2tx(ifft_buff, tx_data_ptr, config_.OfdmCaNum(),
-                      config_.OfdmTxZeroPrefix(), config_.CpLen(),
-                      config_.Scale());
   } else {
-    std::memset(tx_data_ptr, 0, 2 * sizeof(short) * config_.SampsPerSymbol());
+    std::memset(pkt->data_, 0, 2 * sizeof(short) * config_.SampsPerSymbol());
   }
 
   if (kDebugPrintPerTaskDone) {
