@@ -15,6 +15,7 @@
 ################
 
 exe=./build/agora
+data_gen_exe=./build/data_generator
 config=./files/config/examples/ul-usrp.json
 logpath=./log
 logfile=$logpath/$(date +"%Y-%m-%d_%H-%M-%S").log
@@ -27,11 +28,15 @@ logfile=$logpath/$(date +"%Y-%m-%d_%H-%M-%S").log
 function display_help {
     echo "Usage: ./mvp_test.sh [option]"
     echo "Options:"
-    echo "  -b, --build   - Build the project"
-    echo "  -x, --execute - Run the project"
-    echo "  -r, --read    - Read the log of the latest test run"
-    echo "  -c, --clean   - Clean the project"
-    echo "  -h, --help    - Display this help message"
+    echo "  -b, --build    - Build the project"
+    echo "  -d, --debug    - Set the project in debug mode, need to rebuild"
+    echo "  -n, --normal   - Set the project in normal mode, need to rebuild"
+    echo "  -g, --datagen  - Generate the data from the config file"
+    echo "  -x, --execute  - Run the project"
+#     echo "  -v, --valgrind - Run the project with vlagrind"
+    echo "  -r, --read     - Read the log of the latest test run"
+    echo "  -c, --clean    - Clean the project"
+    echo "  -h, --help     - Display this help message"
 }
 
 # Function to build the project
@@ -42,12 +47,36 @@ function build_project {
     cd ..
 }
 
+function set_debug {
+    echo "Setting the project to debug mode..."
+    cd build
+    cmake .. -DDEBUG=true
+    cd ..
+}
+
+function set_normal {
+    echo "Setting the project to normal mode..."
+    cd build
+    cmake .. -DDEBUG=false
+    cd ..
+}
+
+function gen_data {
+    echo "Generating the data for simulation based on config file: $config"
+    $data_gen_exe --conf_file $config
+}
+
 # Function to run the project
 function exe_project {
     echo "Running the project..."
     script -q -c "$exe --conf_file $config" $logfile
     # Use `cat log/2023-06-23_11-32-22.log | less -R` to read colored log file
 }
+
+# function valgrind_exe {
+#     echo "Running the project with valgrind..."
+#     script -q -c "valgrind --leak-check=full $exe --conf_file $config" $logfile
+# }
 
 # Function to read the log
 function read_log {
@@ -56,7 +85,8 @@ function read_log {
 
     # Read the contents
     if [ -f "$latest_log" ]; then
-        echo "Reading the latest log: $latest_log"
+        echo "Reading the latest log: $latest_log with"
+        echo "cat \`$latest_log | less -R\` to read colored log file"
         # tail "$latest_log"
         cat $latest_log | less -R
     else
@@ -87,9 +117,21 @@ case "$1" in
     "-b" | "--build")
         build_project
         ;;
+    "-d" | "--debug")
+        set_debug
+        ;;
+    "-n" | "--normal")
+        set_normal
+        ;;
+    "-g" | "--datagen")
+        gen_data
+        ;;
     "-x" | "--exe")
         exe_project
         ;;
+#     "-v" | "--valgrind")
+#         valgrind_exe
+#         ;;
     "-r" | "--read")
         read_log
         ;;
