@@ -229,54 +229,54 @@ EventData DoDemul::Launch(size_t tag) {
       mat_equaled = mat_ul_beam * mat_data;
 #endif
 
-      // if (symbol_idx_ul <
-      //     cfg_->Frame().ClientUlPilotSymbols()) {  // Calc new phase shift
-      //   if (symbol_idx_ul == 0 && cur_sc_id == 0) {
-      //     // Reset previous frame
-      //     arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
-      //         ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
-      //     arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(),
-      //                                   cfg_->Frame().ClientUlPilotSymbols(),
-      //                                   false);
-      //     mat_phase_shift.fill(0);
-      //   }
-      //   arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
-      //       &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
-      //                             [symbol_idx_ul * cfg_->UeAntNum()]);
-      //   arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(), 1,
-      //                                 false);
-      //   arma::cx_fmat shift_sc =
-      //       sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
-      //   mat_phase_shift += shift_sc;
-      // }
-      // // apply previously calc'ed phase shift to data
-      // else if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
-      //   arma::cx_float* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
-      //       ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
-      //   arma::cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeAntNum(),
-      //                                cfg_->Frame().ClientUlPilotSymbols(),
-      //                                false);
-      //   arma::fmat theta_mat = arg(pilot_corr_mat);
-      //   arma::fmat theta_inc = arma::zeros<arma::fmat>(cfg_->UeAntNum(), 1);
-      //   for (size_t s = 1; s < cfg_->Frame().ClientUlPilotSymbols(); s++) {
-      //     arma::fmat theta_diff = theta_mat.col(s) - theta_mat.col(s - 1);
-      //     theta_inc += theta_diff;
-      //   }
-      //   theta_inc /= (float)std::max(
-      //       1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
-      //   arma::fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
-      //   arma::cx_fmat mat_phase_correct =
-      //       arma::zeros<arma::cx_fmat>(size(cur_theta));
-      //   mat_phase_correct.set_real(cos(-cur_theta));
-      //   mat_phase_correct.set_imag(sin(-cur_theta));
-      //   mat_equaled %= mat_phase_correct;
+      if (symbol_idx_ul <
+          cfg_->Frame().ClientUlPilotSymbols()) {  // Calc new phase shift
+        if (symbol_idx_ul == 0 && cur_sc_id == 0) {
+          // Reset previous frame
+          arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
+              ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
+          arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(),
+                                        cfg_->Frame().ClientUlPilotSymbols(),
+                                        false);
+          mat_phase_shift.fill(0);
+        }
+        arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
+            &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
+                                  [symbol_idx_ul * cfg_->UeAntNum()]);
+        arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(), 1,
+                                      false);
+        arma::cx_fmat shift_sc =
+            sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
+        mat_phase_shift += shift_sc;
+      }
+      // apply previously calc'ed phase shift to data
+      else if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
+        arma::cx_float* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
+            ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
+        arma::cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeAntNum(),
+                                     cfg_->Frame().ClientUlPilotSymbols(),
+                                     false);
+        arma::fmat theta_mat = arg(pilot_corr_mat);
+        arma::fmat theta_inc = arma::zeros<arma::fmat>(cfg_->UeAntNum(), 1);
+        for (size_t s = 1; s < cfg_->Frame().ClientUlPilotSymbols(); s++) {
+          arma::fmat theta_diff = theta_mat.col(s) - theta_mat.col(s - 1);
+          theta_inc += theta_diff;
+        }
+        theta_inc /= (float)std::max(
+            1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
+        arma::fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
+        arma::cx_fmat mat_phase_correct =
+            arma::zeros<arma::cx_fmat>(size(cur_theta));
+        mat_phase_correct.set_real(cos(-cur_theta));
+        mat_phase_correct.set_imag(sin(-cur_theta));
+        mat_equaled %= mat_phase_correct;
 
-      //   // Measure EVM from ground truth
-      //   if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
-      //     phy_stats_->UpdateEvm(frame_id, data_symbol_idx_ul, cur_sc_id,
-      //                           mat_equaled.col(0));
-      //   }
-      // }
+        // // Measure EVM from ground truth
+        // if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
+        //   phy_stats_->UpdateEvm(frame_id, data_symbol_idx_ul, cur_sc_id,
+        //                         mat_equaled.col(0));
+        // }
+      }
       size_t start_tsc3 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
       duration_stat_->task_count_++;

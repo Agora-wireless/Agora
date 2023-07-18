@@ -28,9 +28,9 @@
     "ofdm_tx_zero_postfix": 160,
     "ofdm_rx_zero_prefix_bs": 160,
     "frame_schedule": [
-        "BGGGGPUUGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+        "BGGGGPUUUGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
     ],
-    "client_ul_pilot_syms": 1,
+    "client_ul_pilot_syms": 2,
     "beacon_antenna" : 0,
     "beamsweep": false,
     /* UE configuration */
@@ -49,7 +49,7 @@
         15
     ],
     "tx_advance": [
-        60 
+        80
     ],
     "ue_hw_framer": false,
     "hw_framer": false,
