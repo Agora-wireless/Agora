@@ -43,7 +43,7 @@ class AgoraWorker {
   AgoraBuffer* buffer_;
   FrameInfo* frame_;
 
-  std::vector<Doer*> computers_vec;
+  std::vector<std::shared_ptr<Doer> > computers_vec;
   std::vector<EventType> events_vec;
   size_t cur_qid;
   size_t empty_queue_itrs;

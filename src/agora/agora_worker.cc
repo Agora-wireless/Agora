@@ -106,22 +106,22 @@ void AgoraWorker::InitializeWorker(int tid) {
       phy_stats_, stats_);
 
   ///*************************
-  computers_vec.push_back(compute_beam.get());
-  computers_vec.push_back(compute_fft.get());
+  computers_vec.push_back(std::move(compute_beam));
+  computers_vec.push_back(std::move(compute_fft));
   events_vec.push_back(EventType::kBeam);
   events_vec.push_back(EventType::kFFT);
 
   if (config_->Frame().NumULSyms() > 0) {
-    computers_vec.push_back(compute_decoding.get());
-    computers_vec.push_back(compute_demul.get());
+    computers_vec.push_back(std::move(compute_decoding));
+    computers_vec.push_back(std::move(compute_demul));
     events_vec.push_back(EventType::kDecode);
     events_vec.push_back(EventType::kDemul);
   }
 
   if (config_->Frame().NumDLSyms() > 0) {
-    computers_vec.push_back(compute_ifft.get());
-    computers_vec.push_back(compute_precode.get());
-    computers_vec.push_back(compute_encoding.get());
+    computers_vec.push_back(std::move(compute_ifft));
+    computers_vec.push_back(std::move(compute_precode));
+    computers_vec.push_back(std::move(compute_encoding));
     events_vec.push_back(EventType::kIFFT);
     events_vec.push_back(EventType::kPrecode);
     events_vec.push_back(EventType::kEncode);
@@ -132,6 +132,13 @@ void AgoraWorker::InitializeWorker(int tid) {
   cur_qid = 0;
   empty_queue_itrs = 0;
   empty_queue = true;
+  // printf("[debug] InitWorker: computers_vec length = %ld\n", computers_vec.size());
+  // for (size_t i = 0; i < computers_vec.size(); i++) {
+  //   // printf("[debug] Worker list: *computers_vec.at(%ld) type = %s\n", i, "None");
+  //   printf("[debug] InitWorker list: computers_vec.at(%ld) type = %s\n", i, typeid(computers_vec.at(i)).name());
+  //   printf("[debug] InitWorker list: events_vec.at(%ld) type = %d\n", i, events_vec.at(i));
+  //   printf("[debug] InitWorker list: *computers_vec.at(%ld) type = %s\n", i, typeid(*computers_vec.at(i)).name());
+  // }
 }
 
 void AgoraWorker::RunWorker(int tid) {
@@ -139,6 +146,13 @@ void AgoraWorker::RunWorker(int tid) {
     // debug
     AGORA_LOG_INFO("Worker: Enters the main loop\n");
     printf("[debug] Worker: Enters the main loop\n");
+    // printf("[debug] RunWorker: computers_vec length = %ld\n", computers_vec.size());
+    // for (size_t i = 0; i < computers_vec.size(); i++) {
+    //   // printf("[debug] Worker list: *computers_vec.at(%ld) type = %s\n", i, "None");
+    //   printf("[debug] RunWorker list: computers_vec.at(%ld) type = %s\n", i, typeid(computers_vec.at(i)).name());
+    //   printf("[debug] RunWorker list: events_vec.at(%ld) type = %ld\n", i, events_vec.at(i));
+    //   printf("[debug] Worker list: *computers_vec.at(%ld) type = %s\n", i, typeid(*computers_vec.at(i)).name());
+    // }
     for (size_t i = 0; i < computers_vec.size(); i++) {
       // AGORA_LOG_INFO("Worker: Get the first working pointer\n");
       // // The worker cannot find anything in the queue
@@ -168,6 +182,7 @@ void AgoraWorker::RunWorker(int tid) {
         printf("[debug] Worker: finished one task from the concurrent queue\n");
         break;
       }
+      printf("[debug] Doer: TryLaunch for %s fails, try another doer\n", typeid(*computers_vec.at(i)).name());
     }
     // If all queues in this set are empty for 5 iterations,
     // check the other set of queues
