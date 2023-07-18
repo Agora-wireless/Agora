@@ -13,6 +13,10 @@
 #include <numeric>
 
 #include "armadillo"
+#include "channel_models/awgn_model.h"      //Testing
+#include "channel_models/channel_model.h"   //Testing
+#include "channel_models/dataset_model.h"   //Testing
+#include "channel_models/rayleigh_model.h"  //Testing
 #include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"
@@ -21,15 +25,10 @@
 #include "symbols.h"
 #include "utils.h"
 
-#include "channel_models/channel_model.h" //Testing
-#include "channel_models/awgn_model.h" //Testing
-#include "channel_models/dataset_model.h" //Testing
-#include "channel_models/rayleigh_model.h" //Testing
-
 class Channel {
  public:
   Channel(const Config* const config, std::string& channel_type,
-          double channel_snr, std::string& dataset_path );
+          double channel_snr, std::string& dataset_path);
   ~Channel();
 
   // Dimensions of fmat_src: ( bscfg->sampsPerSymbol, uecfg->UE_ANT_NUM )
@@ -49,11 +48,10 @@ class Channel {
   double channel_snr_db_;
   double noise_samp_std_;
 
-  std::string dataset_path_; 
+  std::string dataset_path_;
 
   ChannelModel* channel_model;
   ChannelModel* GetChannelModel();
-  
 };
 
 #endif  // CHANNEL_H_

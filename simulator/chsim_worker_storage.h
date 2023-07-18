@@ -34,7 +34,7 @@ class ChSimWorkerStorage {
     ue_input_matrix_ = std::make_unique<arma::cx_fmat>(
         reinterpret_cast<arma::cx_float*>(ue_input_float_storage),
         samples_per_symbol, ue_ant_count, false, true);
-    
+
     AGORA_LOG_TRACE("Ue input location %zu:%zu  diff %zu size %zu\n",
                     reinterpret_cast<intptr_t>(ue_input_matrix_->memptr()),
                     reinterpret_cast<intptr_t>(ue_input_float_storage),

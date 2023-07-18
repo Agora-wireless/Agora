@@ -399,9 +399,6 @@ void Agora::Start() {
         } break;
 
         case EventType::kBeam: {
-
-                    
-
           for (size_t tag_id = 0; (tag_id < event.num_tags_); tag_id++) {
             const size_t frame_id = gen_tag_t(event.tags_[tag_id]).frame_id_;
             stats_->PrintPerTaskDone(PrintType::kBeam, frame_id, 0,
@@ -895,7 +892,6 @@ void Agora::HandleEventFft(size_t tag) {
       }
     }
   } else if (sym_type == SymbolType::kUL) {
-
     const size_t symbol_idx_ul = config_->Frame().GetULSymbolIdx(symbol_id);
 
     const bool last_fft_per_symbol =

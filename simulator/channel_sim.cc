@@ -64,7 +64,7 @@ class SocketRxBuffer {
 ChannelSim::ChannelSim(const Config* const config, size_t bs_thread_num,
                        size_t user_thread_num, size_t worker_thread_num,
                        size_t in_core_offset, std::string in_chan_type,
-                       double in_chan_snr , std::string dataset_path )
+                       double in_chan_snr, std::string dataset_path)
     : cfg_(config),
       bs_thread_num_(bs_thread_num),
       user_thread_num_(user_thread_num),
@@ -106,7 +106,8 @@ ChannelSim::ChannelSim(const Config* const config, size_t bs_thread_num,
   payload_length_ = cfg_->PacketLength() - Packet::kOffsetOfData;
 
   // Initialize channel
-  channel_ = std::make_unique<Channel>(cfg_, channel_type_, channel_snr_, dataset_path_ );
+  channel_ = std::make_unique<Channel>(cfg_, channel_type_, channel_snr_,
+                                       dataset_path_);
 
   for (size_t i = 0; i < worker_thread_num_; i++) {
     task_ptok_.at(i) =
