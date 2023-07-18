@@ -97,10 +97,12 @@ EventData DoFFT::Launch(size_t tag) {
   const size_t cell_id = pkt->cell_id_;
   const SymbolType sym_type = cfg_->GetSymbolType(symbol_id);
 
-  if (cfg_->FftInRru() == true) {
-    SimdConvertFloat16ToFloat32(
+  const bool bypass_FFT = (cfg_->FreqDomainChannel() || cfg_->FftInRru()); 
+  
+  if (bypass_FFT) {
+    SimdConvertShortToFloat(
+        reinterpret_cast<short*>(&pkt->data_[2 * cfg_->OfdmRxZeroPrefixBs()]),
         reinterpret_cast<float*>(fft_inout_),
-        reinterpret_cast<float*>(&pkt->data_[2 * cfg_->OfdmRxZeroPrefixBs()]),
         cfg_->OfdmCaNum() * 2);
   } else {
     if (kUse12BitIQ) {
@@ -181,7 +183,7 @@ EventData DoFFT::Launch(size_t tag) {
   size_t start_tsc1 = GetTime::WorkerRdtsc();
   duration_stat->task_duration_.at(1) += start_tsc1 - start_tsc;
 
-  if (!cfg_->FftInRru() == true) {
+  if (bypass_FFT == false) {
     DftiComputeForward(
         mkl_handle_,
         reinterpret_cast<float*>(fft_inout_));  // Compute FFT in-place

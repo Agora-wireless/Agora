@@ -81,9 +81,10 @@ void Channel::Awgn(const arma::cx_fmat& src, arma::cx_fmat& dst) const {
     // arma::cx_fmat noise = arma::cx_fmat(x, y);
 
     // Add noise to signal
-    noise *= noise_samp_std_;
-    dst = src + noise;
-
+    //noise *= noise_samp_std_;
+    //dst = src + noise;
+    dst = src;
+    
     // Check SNR
     if (kPrintSNRCheck) {
       arma::fmat noise_sq = arma::square(abs(noise));
