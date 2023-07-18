@@ -4,21 +4,16 @@
 #include "armadillo"
 #include "channel_model.h"
 
-class AwgnModel: public ChannelModel {
+class AwgnModel : public ChannelModel {
+ public:
+  AwgnModel(const Config* config) : ChannelModel(config, ChannelModel::kFlat) {}
 
-    public:
-        AwgnModel( const Config* config ) : ChannelModel( config, ChannelModel::kFlat ) {}
+  void UpdateModel() override {
+    arma::fmat rmat(ues_num_, bss_num_, arma::fill::ones);
+    arma::fmat imat(ues_num_, bss_num_, arma::fill::ones);
 
-        void UpdateModel() override
-        {
-
-            arma::fmat rmat(ues_num_, bss_num_, arma::fill::ones);
-            arma::fmat imat(ues_num_, bss_num_, arma::fill::ones);
-
-            h_flat_ = arma::cx_fmat(rmat, imat);
-
-        }
-
+    h_flat_ = arma::cx_fmat(rmat, imat);
+  }
 };
 
 #endif

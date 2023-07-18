@@ -1,77 +1,60 @@
 #ifndef CHANNEL_MODEL_H
 #define CHANNEL_MODEL_H
 
-#include "config.h"
 #include "armadillo"
+#include "config.h"
 
 class ChannelModel {
+ protected:
+  size_t bss_num_;
+  size_t ues_num_;
+  size_t n_samps_;
 
-    protected:
-        size_t bss_num_;
-        size_t ues_num_;
-        size_t n_samps_;
+ public:
+  enum FadingType { kFlat, kSelective };
 
-    public:
+  ChannelModel(const Config* config, FadingType fading_type_) {
+    bss_num_ = config->BsAntNum();
+    ues_num_ = config->UeAntNum();
+    n_samps_ = config->SampsPerSymbol();
 
-        enum FadingType { kFlat, kSelective };
+    fading_type = fading_type_;
+  }
+  virtual ~ChannelModel() = default;
 
-        ChannelModel( const Config* config, FadingType fading_type_ )
-        {
-            
-            bss_num_ = config->BsAntNum();
-            ues_num_ = config->UeAntNum();
-            n_samps_ = config->SampsPerSymbol();
+  FadingType fading_type;
 
-            fading_type = fading_type_;
+  //H Matrix, MUST be of size UEs x BSs
+  arma::cx_fmat h_flat_ = arma::cx_fmat();
 
-        }
-        virtual ~ChannelModel() = default;
+  // Vector MUST be of size NSubcarriers or OFDMSamples
+  std::vector<arma::cx_fmat> h_selective_ = std::vector<arma::cx_fmat>();
 
-        FadingType fading_type;
+  //Function called every frame
+  virtual void UpdateModel() {}
 
-        //H Matrix, MUST be of size UEs x BSs
-        arma::cx_fmat h_flat_ = arma::cx_fmat();
-        
-        // Vector MUST be of size NSubcarriers or OFDMSamples
-        std::vector<arma::cx_fmat> h_selective_ = std::vector<arma::cx_fmat>();
+  /*
+  * Returns H Matrix, if selective fading apply h_slice_index for each subcarrier
+  * @param h_matrix_index  -1 if flat fading, subcarrier index if selective fading
+  */
+  virtual arma::cx_fmat GetMatrix(bool is_downlink, int h_matrix_index = -1) {
+    //Check if its flat fading
+    if (h_matrix_index == -1) {
+      return GetMatrixByPathway(is_downlink, h_flat_);
+    }
 
-        //Function called every frame
-        virtual void UpdateModel(){}
+    return GetMatrixByPathway(is_downlink, h_selective_[h_matrix_index]);
+  }
 
-        /*
-        * Returns H Matrix, if selective fading apply h_slice_index for each subcarrier
-        * @param h_matrix_index  -1 if flat fading, subcarrier index if selective fading
-        */
-        virtual arma::cx_fmat GetMatrix( bool is_downlink , int h_matrix_index = -1)
-        {
-            
-            //Check if its flat fading
-            if( h_matrix_index == -1 )
-            {
+  //Returns Simple Transposed Target Matrix if Downlink or Target Matrix if Uplink.
+  arma::cx_fmat GetMatrixByPathway(bool is_downlink,
+                                   const arma::cx_fmat& matrix_target) {
+    if (is_downlink) {
+      return matrix_target.st();
+    }
 
-                return GetMatrixByPathway( is_downlink, h_flat_ );   
-        
-            }
-        
-            return GetMatrixByPathway( is_downlink, h_selective_[ h_matrix_index ] );
-        
-        }
-
-        //Returns Simple Transposed Target Matrix if Downlink or Target Matrix if Uplink.
-        arma::cx_fmat GetMatrixByPathway( bool is_downlink, const arma::cx_fmat& matrix_target )
-        {
-
-            if( is_downlink )
-            {
-                
-                return matrix_target.st();
-
-            }
-
-            return matrix_target;
-
-        }
-      
+    return matrix_target;
+  }
 };
 
 #endif

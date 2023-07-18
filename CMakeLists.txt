@@ -605,7 +605,6 @@ foreach(test_name IN LISTS UNIT_TESTS)
     $<TARGET_OBJECTS:agora_sources_lib>
     $<TARGET_OBJECTS:shared_txrx_sources_lib>
     $<TARGET_OBJECTS:common_sources_lib>)
-    
   # Unit tests should pass without memory errors
   set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")
   target_link_libraries(${test_name} ${COMMON_LIBS} ${GTEST_LIBRARIES})
