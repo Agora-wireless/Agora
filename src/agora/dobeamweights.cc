@@ -201,6 +201,7 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
       phy_stats_->UpdateDlBeam(frame_id, cur_sc_id, mat_dl_beam);
     }
   }
+
   for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {
     if (cfg_->ExternalRefNode(i) == true) {
       mat_ul_beam_tmp.insert_cols(

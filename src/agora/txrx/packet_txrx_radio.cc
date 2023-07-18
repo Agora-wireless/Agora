@@ -72,7 +72,7 @@ bool PacketTxRxRadio::StartTxRx(Table<complex_float>& calib_dl_buffer,
     PacketTxRx::StartTxRx(calib_dl_buffer, calib_ul_buffer);
     std::this_thread::sleep_for(std::chrono::milliseconds(kRadioTriggerWaitMs));
     AGORA_LOG_INFO(
-        "PacketTxRxRadio : All workers started triggering the radio\n");
+        "PacketTxRxRadio: All workers started triggering the radio\n");
     radio_config_->Go();
   }
   return status;

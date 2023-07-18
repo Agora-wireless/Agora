@@ -17,6 +17,7 @@
 #include "mat_logger.h"
 #include "phy_stats.h"
 #include "stats.h"
+#include "doer.h"
 
 class AgoraWorker {
  public:
@@ -25,9 +26,10 @@ class AgoraWorker {
                        AgoraBuffer* buffer, FrameInfo* frame);
   ~AgoraWorker();
 
+  void RunWorker();
+
  private:
-  void WorkerThread(int tid);
-  void CreateThreads();
+  void InitializeWorker();
 
   const size_t base_worker_core_offset_;
 
@@ -40,6 +42,13 @@ class AgoraWorker {
   MessageInfo* message_;
   AgoraBuffer* buffer_;
   FrameInfo* frame_;
+
+  std::vector<std::shared_ptr<Doer> > computers_vec;
+  std::vector<EventType> events_vec;
+  int tid; // TODO: remove thread id for single-core
+  size_t cur_qid;
+  size_t empty_queue_itrs;
+  bool empty_queue;
 };
 
 #endif  // AGORA_WORKER_H_
