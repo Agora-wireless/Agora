@@ -320,6 +320,8 @@ class Config {
   inline float NoiseLevel() const { return this->noise_level_; }
   inline bool FftInRru() const { return this->fft_in_rru_; }
 
+  inline bool FreqDomainChannel() const { return this->freq_domain_channel_; }
+
   inline uint16_t DpdkNumPorts() const { return this->dpdk_num_ports_; }
   inline uint16_t DpdkPortOffset() const { return this->dpdk_port_offset_; }
 
@@ -995,5 +997,8 @@ class Config {
   std::string trace_file_;
   std::string timestamp_;
   std::vector<std::string> ul_tx_f_data_files_;
+
+  bool freq_domain_channel_; // If true, channel matrix H will be applied in the frequency domain
+
 };
 #endif /* CONFIG_HPP_ */
