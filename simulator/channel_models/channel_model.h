@@ -29,9 +29,10 @@ class ChannelModel {
 
         FadingType fading_type;
 
+        //H Matrix, MUST be of size UEs x BSs
         arma::cx_fmat h_flat_ = arma::cx_fmat();
         
-        //Vector MUST be of size NSubcarriers or OFDMSamples
+        // Vector MUST be of size NSubcarriers or OFDMSamples
         std::vector<arma::cx_fmat> h_selective_ = std::vector<arma::cx_fmat>();
 
         //Function called every frame
