@@ -26,7 +26,6 @@ DEFINE_string(chan_dataset, "", "Dataset source");
 DEFINE_double(chan_snr, 20.0, "Signal-to-Noise Ratio");
 
 int main(int argc, char* argv[]) {
-
   int ret = EXIT_FAILURE;
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   gflags::SetVersionString(GetAgoraProjectVersion());
@@ -55,5 +54,4 @@ int main(int argc, char* argv[]) {
   gflags::ShutDownCommandLineFlags();
   AGORA_LOG_SHUTDOWN();
   return ret;
- 
 }

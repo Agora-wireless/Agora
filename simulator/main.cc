@@ -5,7 +5,6 @@
 #include "simulator.h"
 
 int main(int argc, char const* argv[]) {
-
   const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string conf_file;
   int thread_num;
