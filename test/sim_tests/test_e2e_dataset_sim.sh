@@ -34,7 +34,7 @@ echo "Emulated RRU Test" > ${output_filepath}/test_user_output.txt
 echo "Emulated RRU Test" > ${output_filepath}/test_agora_output.txt
 echo "Emulated RRU Test" > ${output_filepath}/test_chsim_output.txt
 ./build/user --conf_file ${input_filepath}/chsim-tmp.json >> ${output_filepath}/test_user_output.txt &
-sleep 1; ./build/chsim --bs_threads 2 --ue_threads 2 --worker_threads 2 --core_offset 24 --chan_model="DATASET" --chan_dataset="./simulator/datasets/32_4_512_10_rayleigh_dataset.hdf5" --conf_file ${input_filepath}/chsim-tmp.json >> ${output_filepath}/test_chsim_output.txt &
+sleep 1; ./build/chsim --conf_file files/config/examples/chsim-dataset.json --chan_model="DATASET" --chan_dataset="./simulator/datasets/example_32_4_512_10_rayleigh_dataset.hdf5" ${output_filepath}/test_chsim_output.txt &
 sleep 1; ./build/agora --conf_file ${input_filepath}/chsim-tmp.json >> ${output_filepath}/test_agora_output.txt
 
 sleep 5;

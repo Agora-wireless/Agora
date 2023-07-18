@@ -13,10 +13,10 @@
 #include <numeric>
 
 #include "armadillo"
-#include "channel_models/awgn_model.h"      //Testing
-#include "channel_models/channel_model.h"   //Testing
-#include "channel_models/dataset_model.h"   //Testing
-#include "channel_models/rayleigh_model.h"  //Testing
+#include "channel_models/awgn_model.h"
+#include "channel_models/channel_model.h"
+#include "channel_models/dataset_model.h"
+#include "channel_models/rayleigh_model.h"
 #include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"
