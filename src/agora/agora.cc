@@ -296,7 +296,7 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
         remaining_events = remaining_events - new_events;
         // AGORA_LOG_INFO("message_queue_.size_approx() = %d\n", message_queue_.size_approx());
         // AGORA_LOG_INFO("Fetch Event: new_events = %zu\n", new_events);
-        if (new_events != 0) printf("[debug] Fetch Event: new_events = %zu\n", new_events);
+        // if (new_events != 0) printf("[debug] Fetch Event: new_events = %zu\n", new_events);
         // debug: the number of new events is zero
         total_events = total_events + new_events;
       } else {
@@ -327,7 +327,7 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
 }
 
 void Agora::Start() {
-  AGORA_LOG_INFO("Agora: Init finished. Start the main loop.\n");
+  // AGORA_LOG_INFO("Agora: Init finished. Start the main loop.\n");
   const auto& cfg = this->config_;
 
   const bool start_status = packet_tx_rx_->StartTxRx(
@@ -338,7 +338,7 @@ void Agora::Start() {
     return;
   }
 
-  AGORA_LOG_INFO("Agora: TxRx running. Start the execution loop.\n");
+  // AGORA_LOG_INFO("Agora: TxRx running. Start the execution loop.\n");
 
   // Counters for printing summary
   size_t tx_count = 0;
@@ -359,14 +359,14 @@ void Agora::Start() {
 
     // debug: # event fetched
     // AGORA_LOG_INFO("Agora: %ld events fetched\n", num_events);
-    if (num_events !=0 ) printf("[debug] Agora: %ld events fetched\n", num_events);
+    // if (num_events !=0 ) printf("[debug] Agora: %ld events fetched\n", num_events);
 
     // Handle each event
     for (size_t ev_i = 0; ev_i < num_events; ev_i++) {
       EventData& event = events_list.at(ev_i);
 
       // AGORA_LOG_INFO("Agora: Handling events\n")
-      printf("[debug] Agora: Handling events\n");
+      // printf("[debug] Agora: Handling events\n");
 
       // FFT processing is scheduled after falling through the switch
       switch (event.event_type_) {
@@ -826,8 +826,8 @@ void Agora::Start() {
       }
 
       // For each event, call a worker to solve it.
-      AGORA_LOG_INFO("Agora: Reach before the worker starts\n");
-      printf("===== worker_set_->RunWorker(0) =====\n[debug] Entering worker execution\n");
+      // AGORA_LOG_INFO("Agora: Reach before the worker starts\n");
+      // printf("===== worker_set_->RunWorker(0) =====\n[debug] Entering worker execution\n");
       worker_set_->RunWorker(0);
     } /* End of for */
   }   /* End of while */
@@ -1135,7 +1135,7 @@ void Agora::InitializeThreads() {
   }
 
   // debug
-  AGORA_LOG_INFO("Worker: Creating worker set pointers\n");
+  // AGORA_LOG_INFO("Worker: Creating worker set pointers\n");
 
   // Create workers
   ///\todo convert unique ptr to shared
@@ -1143,13 +1143,10 @@ void Agora::InitializeThreads() {
       config_, stats_.get(), phy_stats_.get(), message_.get(),
       agora_memory_.get(), &frame_tracking_);
 
-  // AGORA_LOG_INFO(
-  //     "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
-  //     "cores %zu--%zu\n",
-  //     config_->CoreOffset(), config_->CoreOffset() + 1,
-  //     config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1,
-  //     base_worker_core_offset_,
-  //     base_worker_core_offset_ + config_->WorkerThreadNum() - 1);
+  AGORA_LOG_INFO(
+      "Master/worker thread core %zu, TX/RX thread cores %zu--%zu\n",
+      config_->CoreOffset(), config_->CoreOffset() + 1,
+      config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1);
 }
 
 void Agora::SaveDecodeDataToFile(int frame_id) {

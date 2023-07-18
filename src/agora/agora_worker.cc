@@ -132,27 +132,10 @@ void AgoraWorker::InitializeWorker(int tid) {
   cur_qid = 0;
   empty_queue_itrs = 0;
   empty_queue = true;
-  // printf("[debug] InitWorker: computers_vec length = %ld\n", computers_vec.size());
-  // for (size_t i = 0; i < computers_vec.size(); i++) {
-  //   // printf("[debug] Worker list: *computers_vec.at(%ld) type = %s\n", i, "None");
-  //   printf("[debug] InitWorker list: computers_vec.at(%ld) type = %s\n", i, typeid(computers_vec.at(i)).name());
-  //   printf("[debug] InitWorker list: events_vec.at(%ld) type = %d\n", i, events_vec.at(i));
-  //   printf("[debug] InitWorker list: *computers_vec.at(%ld) type = %s\n", i, typeid(*computers_vec.at(i)).name());
-  // }
 }
 
 void AgoraWorker::RunWorker(int tid) {
   if (config_->Running() == true) {
-    // debug
-    AGORA_LOG_INFO("Worker: Enters the main loop\n");
-    printf("[debug] Worker: Enters the main loop\n");
-    // printf("[debug] RunWorker: computers_vec length = %ld\n", computers_vec.size());
-    // for (size_t i = 0; i < computers_vec.size(); i++) {
-    //   // printf("[debug] Worker list: *computers_vec.at(%ld) type = %s\n", i, "None");
-    //   printf("[debug] RunWorker list: computers_vec.at(%ld) type = %s\n", i, typeid(computers_vec.at(i)).name());
-    //   printf("[debug] RunWorker list: events_vec.at(%ld) type = %ld\n", i, events_vec.at(i));
-    //   printf("[debug] Worker list: *computers_vec.at(%ld) type = %s\n", i, typeid(*computers_vec.at(i)).name());
-    // }
     for (size_t i = 0; i < computers_vec.size(); i++) {
       // AGORA_LOG_INFO("Worker: Get the first working pointer\n");
       // // The worker cannot find anything in the queue
@@ -171,18 +154,18 @@ void AgoraWorker::RunWorker(int tid) {
 
       // use `c++filt -t` to "demangle" (interpret) the output type from log
       // printf("[debug] Worker: computers_vec.at(%ld) type = %s\n", i, typeid(computers_vec.at(i)).name());
-      printf("[debug] Worker: *computers_vec.at(%ld) type = %s\n", i, typeid(*computers_vec.at(i)).name());
+      // printf("[debug] Worker: *computers_vec.at(%ld) type = %s\n", i, typeid(*computers_vec.at(i)).name());
       if (computers_vec.at(i)->TryLaunch(
               *message_->GetConq(events_vec.at(i), cur_qid),
               message_->GetCompQueue(cur_qid),
               message_->GetWorkerPtok(cur_qid, tid))) {
         empty_queue = false;
 
-        AGORA_LOG_INFO("Worker: Finished one task from the concurrent queue\n");
-        printf("[debug] Worker: finished one task from the concurrent queue\n");
+        // AGORA_LOG_INFO("Worker: Finished one task from the concurrent queue\n");
+        // printf("[debug] Worker: finished one task from the concurrent queue\n");
         break;
       }
-      printf("[debug] Doer: TryLaunch for %s fails, try another doer\n", typeid(*computers_vec.at(i)).name());
+      // printf("[debug] Doer: TryLaunch for %s fails, try another doer\n", typeid(*computers_vec.at(i)).name());
     }
     // If all queues in this set are empty for 5 iterations,
     // check the other set of queues
