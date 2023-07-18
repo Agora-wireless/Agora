@@ -25,12 +25,12 @@ class AgoraWorker {
                        FrameInfo* frame);
   ~AgoraWorker();
 
-  void InitializeWorker();
   void RunWorker();
 
  private:
-  void WorkerThread(int tid);
-  void CreateThreads();
+  void InitializeWorker();
+  // void WorkerThread(int tid);
+  // void CreateThreads();
 
   const size_t base_worker_core_offset_;
 

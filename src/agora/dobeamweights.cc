@@ -96,14 +96,12 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
                                     const float noise,
                                     complex_float* ul_beam_mem,
                                     complex_float* dl_beam_mem) {
-
   if (kEnableMatLog) {
     phy_stats_->UpdateUlCsi(frame_id, cur_sc_id, mat_csi);
   }
   arma::cx_fmat mat_ul_beam(reinterpret_cast<arma::cx_float*>(ul_beam_mem),
                             cfg_->UeAntNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_beam_tmp;
-
   switch (cfg_->BeamformingAlgo()) {
     case CommsLib::BeamformingAlgorithm::kZF:
       if (kUseInverseForZF) {
@@ -465,7 +463,6 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
     if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
       noise = phy_stats_->GetNoise(frame_id);
     }
-
     ComputePrecoder(frame_id, cur_sc_id, mat_csi, cal_sc_vec, noise,
                     ul_beam_matrices_[frame_slot][cur_sc_id],
                     dl_beam_matrices_[frame_slot][cur_sc_id]);
