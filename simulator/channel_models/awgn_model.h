@@ -13,7 +13,7 @@ class AwgnModel: public ChannelModel {
         {
 
             arma::fmat rmat(ues_num_, bss_num_, arma::fill::ones);
-            arma::fmat imat(ues_num_, bss_num_, arma::fill::zeros);
+            arma::fmat imat(ues_num_, bss_num_, arma::fill::ones);
 
             h_flat_ = arma::cx_fmat(rmat, imat);
 

@@ -29,13 +29,16 @@ Channel::Channel(const Config* const config, std::string& in_channel_type,
 }
 
 ChannelModel* Channel::GetChannelModel() {
-  if (sim_chan_model_ == "AWGN") return new AwgnModel(cfg_);
-
-  if (sim_chan_model_ == "RAYLEIGH") return new RayleighModel(cfg_);
-
-  if (sim_chan_model_ == "DATASET")
+  if (sim_chan_model_ == "AWGN") {
+    return new AwgnModel(cfg_);
+  }
+  else if (sim_chan_model_ == "RAYLEIGH") {
+    return new RayleighModel(cfg_);
+  } 
+  else if (sim_chan_model_ == "DATASET") {
     return new DatasetModel(cfg_, dataset_path_);
-
+  }
+  
   AGORA_LOG_WARN("Invalid channel model at CHSim, assuming AWGN Model... \n");
 
   return new AwgnModel(cfg_);
@@ -62,18 +65,14 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
                            channel_model->GetMatrix(is_downlink, h_index);
         fmat_h.insert_rows(h_index, y_);
       }
-
       break;
     }
 
     default: {
       AGORA_LOG_ERROR("Invalid Channel model fading type \n");
-
       break;
     }
   }
-
-  //std::printf("Y [%d Rows x %d Cols] \n", (int)fmat_h.n_rows, (int)fmat_h.n_cols);
 
   // Add noise
   Awgn(fmat_h, fmat_dst);
