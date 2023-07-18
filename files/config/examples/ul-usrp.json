@@ -49,7 +49,7 @@
         15
     ],
     "tx_advance": [
-        80
+        60
     ],
     "ue_hw_framer": false,
     "hw_framer": false,

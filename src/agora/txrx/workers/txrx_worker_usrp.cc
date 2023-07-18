@@ -119,11 +119,8 @@ void TxRxWorkerUsrp::DoTxRx() {
   size_t local_interface = 0;
 
   while (Configuration()->Running()) {
-    // debug: USRP enqueue
-    // AGORA_LOG_INFO("USRP: Try to enqueue!\n");
     // receive data (assumes we rx samples_per_symbol)
     RecvEnqueue(local_interface, rx_frame_id, rx_symbol_id, rx_locs);
-    // AGORA_LOG_INFO("USRP: Enqueue succeeded.\n");
 
     //if rx is successful than update the counter / times
     // Schedule the next beacon (only on interface 0)
@@ -283,10 +280,7 @@ int TxRxWorkerUsrp::DequeueSend() {
   }
 
   const auto complete_event = EventData(EventType::kPacketTX, event.tags_[0]);
-  // debug
-  AGORA_LOG_INFO("NotifyComplete is ready to execute\n");
   NotifyComplete(complete_event);
-  AGORA_LOG_INFO("NotifyComplete is executed\n");
   return event.tags_[0];
 }
 
@@ -359,10 +353,7 @@ int TxRxWorkerUsrp::DequeueSend(int frame_id, int symbol_id) {
   }
 
   const auto complete_event = EventData(EventType::kPacketTX, event.tags_[0]);
-  // debug
-  AGORA_LOG_INFO("NotifyComplete is ready to execute\n");
   NotifyComplete(complete_event);
-  AGORA_LOG_INFO("NotifyComplete is executed\n");
   return event.tags_[0];
 }
 

@@ -1113,9 +1113,6 @@ void Agora::InitializeThreads() {
         std::thread(&MacThreadBaseStation::RunEventLoop, mac_thread_.get());
   }
 
-  // debug
-  // AGORA_LOG_INFO("Worker: Creating worker set pointers\n");
-
   // Create workers
   ///\todo convert unique ptr to shared
   worker_set_ = std::make_unique<AgoraWorker>(

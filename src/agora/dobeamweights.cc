@@ -96,21 +96,21 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
                                     const float noise,
                                     complex_float* ul_beam_mem,
                                     complex_float* dl_beam_mem) {
-  
+
   if (kEnableMatLog) {
     phy_stats_->UpdateUlCsi(frame_id, cur_sc_id, mat_csi);
   }
   arma::cx_fmat mat_ul_beam(reinterpret_cast<arma::cx_float*>(ul_beam_mem),
                             cfg_->UeAntNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_beam_tmp;
-  
+
   switch (cfg_->BeamformingAlgo()) {
     case CommsLib::BeamformingAlgorithm::kZF:
       if (kUseInverseForZF) {
         try {
           mat_ul_beam_tmp =
               arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
-        } catch (std::runtime_error& e) {
+        } catch (std::runtime_error&) {
           AGORA_LOG_WARN(
               "Failed to invert channel matrix, falling back to pinv()\n");
           arma::pinv(mat_ul_beam_tmp, mat_csi, 1e-2, "dc");

@@ -7,7 +7,6 @@
 #define DOER_H_
 
 #include <cstddef>
-#include <typeinfo>
 
 #include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"

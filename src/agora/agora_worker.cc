@@ -3,9 +3,6 @@
  * @brief Implementation file for the main Agora worker class
  */
 
-// debug
-#include <typeinfo>
-
 #include "agora_worker.h"
 
 #include "concurrent_queue_wrapper.h"
@@ -33,7 +30,7 @@ AgoraWorker::AgoraWorker(Config* cfg, Stats* stats, PhyStats* phy_stats,
 }
 
 AgoraWorker::~AgoraWorker() {
-  // debug: no worker threads anymore
+  // No worker threads anymore
   // for (auto& worker_thread : workers_) {
   //   AGORA_LOG_SYMBOL("Agora: Joining worker thread\n");
   //   if (worker_thread.joinable()) {
