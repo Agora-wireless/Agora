@@ -97,7 +97,6 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
                                     complex_float* ul_beam_mem,
                                     complex_float* dl_beam_mem) {
   
-  // printf("[debug] DoBeamweights: break point 7-1\n");
   if (kEnableMatLog) {
     phy_stats_->UpdateUlCsi(frame_id, cur_sc_id, mat_csi);
   }
@@ -105,53 +104,18 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
                             cfg_->UeAntNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_beam_tmp;
   
-  // printf("[debug] DoBeamweights: break point 7-2\n");
-  
-  // printf("[debug] DoBeamweights: break point 7-2: %ld\n", cfg_->BeamformingAlgo());
   switch (cfg_->BeamformingAlgo()) {
     case CommsLib::BeamformingAlgorithm::kZF:
       if (kUseInverseForZF) {
-        // try {
-        //   mat_ul_beam_tmp =
-        //       arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
-        // } catch (std::runtime_error&) {
-        //   AGORA_LOG_WARN(
-        //       "Failed to invert channel matrix, falling back to pinv()\n");
-        //   arma::pinv(mat_ul_beam_tmp, mat_csi, 1e-2, "dc");
-        // }
         try {
-          // printf("[debug] DoBeamweights: break point 7-2-1-1 - mat_csi.t()\n");
-          // arma::cx_fmat tmp = mat_csi.t();
-          // tmp.print();
-          // printf("[debug] DoBeamweights: break point 7-2-1-2 - mat_csi.t() * mat_csi\n");
-          // arma::cx_fmat tmp2 = mat_csi.t() * mat_csi;
-          // tmp2.print();
-          // printf("[debug] DoBeamweights: break point 7-2-1-3 - mat_csi\n");
-          // mat_csi.print();
-          // try {
-          // printf("[debug] DoBeamweights: break point 7-2-1-4\n");
-          // printf("[debug] Check with if is_sympd: %s\n", tmp2.is_sympd() ? "True" : "False");
-          // bool zeros = (as_scalar(sum(abs(tmp2))) == 0);
-          // if (!zeros)
           mat_ul_beam_tmp =
               arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
-          // else
-          // arma::pinv(mat_ul_beam_tmp, mat_csi, 1e-2, "dc");
         } catch (std::runtime_error& e) {
-          // printf("[debug] DoBeamweights: break point 7-2-1-5\n");
-          // std::cerr << "[debug] cerr output " << std::endl;
           AGORA_LOG_WARN(
               "Failed to invert channel matrix, falling back to pinv()\n");
           arma::pinv(mat_ul_beam_tmp, mat_csi, 1e-2, "dc");
-        }// catch (const std::bad_alloc& e) {
-        //   printf("[debug] DoBeamweights: malloc error = %s\n", e.what());
-        // } catch (const std::exception& e) {
-        //   std::cerr << "Generic exception caught: " << e.what() << std::endl;
-        // } catch (...) {
-        //   std::cerr << "Uknown exception type..." << std::endl;
-        // }
+        }
       } else {
-        printf("[debug] DoBeamweights: break point 7-2-2\n");
         arma::pinv(mat_ul_beam_tmp, mat_csi, 1e-2, "dc");
       }
       break;
@@ -169,7 +133,6 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
       AGORA_LOG_ERROR("Beamforming algorithm is not implemented!");
   }
 
-  // printf("[debug] DoBeamweights: break point 7-3\n");
   if (cfg_->Frame().NumDLSyms() > 0) {
     arma::cx_fmat mat_dl_beam_tmp;
     if (kUseUlZfForDownlink == true) {
@@ -237,7 +200,6 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     }
   }
 
-  // printf("[debug] DoBeamweights: break point 7-4\n");
   for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {
     if (cfg_->ExternalRefNode(i) == true) {
       mat_ul_beam_tmp.insert_cols(
@@ -430,8 +392,6 @@ static inline void TransposeGather(size_t cur_sc_id, float* src, float*& dst,
 }
 
 void DoBeamWeights::ComputeBeams(size_t tag) {
-  // debug
-  // printf("[debug] DoBeamweights: Entering beamforming func\n");
   //Request was generated from gen_tag_t::FrmSc
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t base_sc_id = gen_tag_t(tag).sc_id_;
@@ -440,8 +400,6 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
     std::printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid_,
                 frame_id, base_sc_id);
   }
-  // printf("[debug] In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid_,
-  //               frame_id, base_sc_id);
 
   // Process BeamBlockSize (or less) number of carriers
   // cfg_->OfdmDataNum() is the total number of usable subcarriers
@@ -450,7 +408,6 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
       base_sc_id +
       std::min(cfg_->BeamBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
 
-  // printf("[debug] DoBeamweights: Process subcarriers\n");
   // Default: Handle each subcarrier one by one
   size_t sc_inc = 1;
   size_t start_sc = base_sc_id;
@@ -465,16 +422,12 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
     }
   }
 
-
-  // printf("[debug] DoBeamweights: Process subcarriers (in block)\n");
   // Handle each subcarrier in the block (base_sc_id : last_sc_id -1)
   for (size_t cur_sc_id = start_sc; cur_sc_id < last_sc_id;
        cur_sc_id = cur_sc_id + sc_inc) {
     arma::cx_fvec& cal_sc_vec = *calib_sc_vec_ptr_;
     const size_t start_tsc1 = GetTime::WorkerRdtsc();
 
-
-    // printf("[debug] DoBeamweights: break point 1\n");
     // Gather CSI matrices of each pilot from partially-transposed CSIs.
     for (size_t ue_idx = 0; ue_idx < cfg_->UeAntNum(); ue_idx++) {
       auto* dst_csi_ptr = reinterpret_cast<float*>(csi_gather_buffer_ +
@@ -492,16 +445,12 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
       }
     }
 
-    // printf("[debug] DoBeamweights: break point 2\n");
     const size_t start_tsc2 = GetTime::WorkerRdtsc();
     duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
 
-    // printf("[debug] DoBeamweights: break point 3\n");
     arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer_, cfg_->BsAntNum(),
                           cfg_->UeAntNum(), false);
-    // debug - mat_csi has zero value, check why
 
-    // printf("[debug] DoBeamweights: break point 4\n");
     if (cfg_->Frame().NumDLSyms() > 0) {
       ComputeCalib(frame_id, cur_sc_id, cal_sc_vec);
     }
@@ -509,22 +458,18 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
       mat_csi.shed_rows(ext_ref_id_);
     }
 
-    // printf("[debug] DoBeamweights: break point 5\n");
     const double start_tsc3 = GetTime::WorkerRdtsc();
     duration_stat_->task_duration_[2u] += start_tsc3 - start_tsc2;
 
-    // printf("[debug] DoBeamweights: break point 6\n");
     float noise = 0;
     if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
       noise = phy_stats_->GetNoise(frame_id);
     }
 
-    // printf("[debug] DoBeamweights: break point 7\n");
     ComputePrecoder(frame_id, cur_sc_id, mat_csi, cal_sc_vec, noise,
                     ul_beam_matrices_[frame_slot][cur_sc_id],
                     dl_beam_matrices_[frame_slot][cur_sc_id]);
 
-    // printf("[debug] DoBeamweights: break point 8\n");
     duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
     duration_stat_->task_count_++;
     duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;

@@ -281,10 +281,6 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
                          bool is_turn_to_dequeue_from_io) {
   size_t total_events = 0;
   size_t remaining_events = events_list.size();
-  // debug: fetched 0 events
-  // AGORA_LOG_INFO("Fetch Event: Num of events try to obtain = %zu\n", remaining_events);
-  // AGORA_LOG_INFO("Fetch Event: SocketThreadNum = %zu\n", config_->SocketThreadNum());
-  // AGORA_LOG_INFO("Fetch Event: kDeququeBulkSizeTXRX = %zu\n", kDequeueBulkSizeTXRX);
   if (is_turn_to_dequeue_from_io) {
     for (size_t i = 0; i < config_->SocketThreadNum(); i++) {
       if (remaining_events > 0) {
@@ -294,10 +290,6 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
         const size_t new_events = message_queue_.try_dequeue_bulk_from_producer(
             *(rx_ptoks_ptr_[i]), &events_list.at(total_events), request_events);
         remaining_events = remaining_events - new_events;
-        // AGORA_LOG_INFO("message_queue_.size_approx() = %d\n", message_queue_.size_approx());
-        // AGORA_LOG_INFO("Fetch Event: new_events = %zu\n", new_events);
-        // if (new_events != 0) printf("[debug] Fetch Event: new_events = %zu\n", new_events);
-        // debug: the number of new events is zero
         total_events = total_events + new_events;
       } else {
         AGORA_LOG_WARN(
@@ -327,7 +319,6 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
 }
 
 void Agora::Start() {
-  // AGORA_LOG_INFO("Agora: Init finished. Start the main loop.\n");
   const auto& cfg = this->config_;
 
   const bool start_status = packet_tx_rx_->StartTxRx(
@@ -337,8 +328,6 @@ void Agora::Start() {
     this->Stop();
     return;
   }
-
-  // AGORA_LOG_INFO("Agora: TxRx running. Start the execution loop.\n");
 
   // Counters for printing summary
   size_t tx_count = 0;
@@ -357,16 +346,9 @@ void Agora::Start() {
         FetchEvent(events_list, is_turn_to_dequeue_from_io);
     is_turn_to_dequeue_from_io = !is_turn_to_dequeue_from_io;
 
-    // debug: # event fetched
-    // AGORA_LOG_INFO("Agora: %ld events fetched\n", num_events);
-    // if (num_events !=0 ) printf("[debug] Agora: %ld events fetched\n", num_events);
-
     // Handle each event
     for (size_t ev_i = 0; ev_i < num_events; ev_i++) {
       EventData& event = events_list.at(ev_i);
-
-      // AGORA_LOG_INFO("Agora: Handling events\n")
-      // printf("[debug] Agora: Handling events\n");
 
       // FFT processing is scheduled after falling through the switch
       switch (event.event_type_) {
@@ -825,10 +807,7 @@ void Agora::Start() {
         }
       }
 
-      // For each event, call a worker to solve it.
-      // AGORA_LOG_INFO("Agora: Reach before the worker starts\n");
-      // printf("===== worker_set_->RunWorker(0) =====\n[debug] Entering worker execution\n");
-      worker_set_->RunWorker(0);
+      worker_set_->RunWorker();
     } /* End of for */
   }   /* End of while */
 

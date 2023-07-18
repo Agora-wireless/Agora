@@ -29,7 +29,7 @@ AgoraWorker::AgoraWorker(Config* cfg, Stats* stats, PhyStats* phy_stats,
       message_(message),
       buffer_(buffer),
       frame_(frame) {
-  CreateThreads();
+  InitializeWorker();
 }
 
 AgoraWorker::~AgoraWorker() {
@@ -42,27 +42,22 @@ AgoraWorker::~AgoraWorker() {
   // }
 }
 
-void AgoraWorker::CreateThreads() {
+// void AgoraWorker::CreateThreads() {
+//   AGORA_LOG_SYMBOL("Worker: creating %zu workers\n",
+//                    config_->WorkerThreadNum());
+//   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
+//     workers_.emplace_back(&AgoraWorker::WorkerThread, this, i);
+//   }
+// }
+
+void AgoraWorker::InitializeWorker() {
   /* Limit the number of thread to be 1 */
   if (config_->WorkerThreadNum() != 1) {
     AGORA_LOG_ERROR("Worker: Single-core mode allows only 1 thread!\n");
     exit(EXIT_FAILURE);
   }
-  AGORA_LOG_INFO("Worker: working with %zu worker threads\n",
-                 config_->WorkerThreadNum());
-  
-  // Directly call the worker in the same thread
-  // AgoraWorker::WorkerThread(0);
 
-  // AGORA_LOG_SYMBOL("Worker: creating %zu workers\n",
-  //                  config_->WorkerThreadNum());
-  // for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
-  //   workers_.emplace_back(&AgoraWorker::WorkerThread, this, i);
-  // }
-  InitializeWorker(0);
-}
-
-void AgoraWorker::InitializeWorker(int tid) {
+  tid = 0; // starts with 0 but has only one thread (master)
 
   AGORA_LOG_INFO("Worker: Initialize worker (function)\n");
 
@@ -134,38 +129,16 @@ void AgoraWorker::InitializeWorker(int tid) {
   empty_queue = true;
 }
 
-void AgoraWorker::RunWorker(int tid) {
+void AgoraWorker::RunWorker() {
   if (config_->Running() == true) {
     for (size_t i = 0; i < computers_vec.size(); i++) {
-      // AGORA_LOG_INFO("Worker: Get the first working pointer\n");
-      // // The worker cannot find anything in the queue
-      // AGORA_LOG_INFO("Worker: Computer Vector Length = %d\n",
-      //                computers_vec.size());
-      // AGORA_LOG_INFO("Worker: Task queue length = %d\n", message_)
-      // exit(EXIT_FAILURE);
-      // printf("[debug] Worker: computers_vec length = %ld\n", computers_vec.size());
-      // printf("[debug] Worker: message_ pointer = %p\n", message_);
-      // printf("[debug] Worker: cur_qid = %ld\n", cur_qid);
-      // printf("[debug] Worker: tid = %d\n", tid);
-      // printf("[debug] Worker: events_vec length = %ld\n", events_vec.size());
-      // printf("[debug] Worker: *message_->GetConq(events_vec.at(i), cur_qid) = %p\n", &(*message_->GetConq(events_vec.at(i), cur_qid)));
-      // printf("[debug] Worker: message_->GetCompQueue(cur_qid) = %p\n", &(message_->GetCompQueue(cur_qid)));
-      // printf("[debug] Worker: message_->GetWorkerPtok(cur_qid, tid) = %p\n", message_->GetWorkerPtok(cur_qid, tid));
-
-      // use `c++filt -t` to "demangle" (interpret) the output type from log
-      // printf("[debug] Worker: computers_vec.at(%ld) type = %s\n", i, typeid(computers_vec.at(i)).name());
-      // printf("[debug] Worker: *computers_vec.at(%ld) type = %s\n", i, typeid(*computers_vec.at(i)).name());
       if (computers_vec.at(i)->TryLaunch(
               *message_->GetConq(events_vec.at(i), cur_qid),
               message_->GetCompQueue(cur_qid),
               message_->GetWorkerPtok(cur_qid, tid))) {
         empty_queue = false;
-
-        // AGORA_LOG_INFO("Worker: Finished one task from the concurrent queue\n");
-        // printf("[debug] Worker: finished one task from the concurrent queue\n");
         break;
       }
-      // printf("[debug] Doer: TryLaunch for %s fails, try another doer\n", typeid(*computers_vec.at(i)).name());
     }
     // If all queues in this set are empty for 5 iterations,
     // check the other set of queues

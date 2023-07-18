@@ -25,8 +25,8 @@ class AgoraWorker {
                        FrameInfo* frame);
   ~AgoraWorker();
 
-  void InitializeWorker(int tid);
-  void RunWorker(int tid);
+  void InitializeWorker();
+  void RunWorker();
 
  private:
   void WorkerThread(int tid);
@@ -45,6 +45,7 @@ class AgoraWorker {
 
   std::vector<std::shared_ptr<Doer> > computers_vec;
   std::vector<EventType> events_vec;
+  int tid; // TODO: remove thread id for single-core
   size_t cur_qid;
   size_t empty_queue_itrs;
   bool empty_queue;
