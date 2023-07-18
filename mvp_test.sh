@@ -15,6 +15,7 @@
 ################
 
 exe=./build/agora
+user=./build/user
 data_gen_exe=./build/data_generator
 config=./files/config/examples/ul-usrp.json
 logpath=./log
@@ -32,7 +33,8 @@ function display_help {
     echo "  -d, --debug    - Set the project in debug mode, need to rebuild"
     echo "  -n, --normal   - Set the project in normal mode, need to rebuild"
     echo "  -g, --datagen  - Generate the data from the config file"
-    echo "  -x, --execute  - Run the project"
+    echo "  -x, --execute  - Run the basestation"
+    echo "  -u, --user     - Run the user"
 #     echo "  -v, --valgrind - Run the project with vlagrind"
     echo "  -r, --read     - Read the log of the latest test run"
     echo "  -c, --clean    - Clean the project"
@@ -67,10 +69,16 @@ function gen_data {
 }
 
 # Function to run the project
-function exe_project {
-    echo "Running the project..."
+function exe_bs {
+    echo "Running the basestation..."
     script -q -c "$exe --conf_file $config" $logfile
     # Use `cat log/2023-06-23_11-32-22.log | less -R` to read colored log file
+}
+
+function exe_user {
+    echo "Running the user..."
+    $user --conf_file $config
+    # script -q -c "$user --conf_file $config" $logfile
 }
 
 # function valgrind_exe {
@@ -127,7 +135,10 @@ case "$1" in
         gen_data
         ;;
     "-x" | "--exe")
-        exe_project
+        exe_bs
+        ;;
+    "-u" | "--user")
+        exe_user
         ;;
 #     "-v" | "--valgrind")
 #         valgrind_exe
