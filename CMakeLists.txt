@@ -538,7 +538,6 @@ add_executable(chsim
   simulator/chsim_main.cc
   simulator/channel_sim.cc
   simulator/channel.cc
-  simulator/channel_models/dataset_model.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(chsim ${COMMON_LIBS})
 
