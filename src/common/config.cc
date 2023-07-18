@@ -697,6 +697,7 @@ Config::Config(std::string jsonfilename)
   this->UpdateCtrlMCS();
 
   fft_in_rru_ = tdd_conf.value("fft_in_rru", false);
+  freq_domain_channel_ = tdd_conf.value("freq_domain_channel", false);
 
   samps_per_symbol_ =
       ofdm_tx_zero_prefix_ + ofdm_ca_num_ + cp_len_ + ofdm_tx_zero_postfix_;
@@ -1959,7 +1960,8 @@ void Config::Print() const {
               << "Noise Level: " << noise_level_ << std::endl
               << "UL Bytes per CB: " << ul_num_bytes_per_cb_ << std::endl
               << "DL Bytes per CB: " << dl_num_bytes_per_cb_ << std::endl
-              << "FFT in rru: " << fft_in_rru_ << std::endl;
+              << "FFT in rru: " << fft_in_rru_ << std::endl
+              << "Frequency domain channel: " << freq_domain_channel_ << std::endl;
   }
 }
 
