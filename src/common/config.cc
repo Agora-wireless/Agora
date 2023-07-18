@@ -17,6 +17,7 @@
 #include "comms-lib.h"
 #include "data_generator.h"
 #include "datatype_conversion.h"
+#include "fivegconfig.h"
 #include "gettime.h"
 #include "logger.h"
 #include "message.h"
@@ -25,7 +26,6 @@
 #include "scrambler.h"
 #include "simd_types.h"
 #include "utils_ldpc.h"
-#include "fivegconfig.h"
 
 using json = nlohmann::json;
 
@@ -311,8 +311,9 @@ Config::Config(std::string jsonfilename)
       tdd_conf.value("ofdm_rx_zero_prefix_cal_ul", 0) + cp_len_;
   ofdm_rx_zero_prefix_cal_dl_ =
       tdd_conf.value("ofdm_rx_zero_prefix_cal_dl", 0) + cp_len_;
-  RtAssert(cp_len_ % 16 == 0, "cyclic prefix must be a multiple of subcarriers "
-          "per cacheline.");
+  RtAssert(cp_len_ % 16 == 0,
+           "cyclic prefix must be a multiple of subcarriers "
+           "per cacheline.");
   RtAssert(ofdm_data_num_ % kSCsPerCacheline == 0,
            "ofdm_data_num must be a multiple of subcarriers per cacheline");
   RtAssert(ofdm_data_num_ % kTransposeBlockSize == 0,
@@ -534,14 +535,15 @@ Config::Config(std::string jsonfilename)
     If an apostrophe delimiter is found in the frame string, execute logic to
     convert a subframe formated frame into the symbol formated frame that Agora
     is designed to handle.
-    */ 
-    if (frame.find(",")!=std::string::npos) { 
-      std::vector<std::string> flex_formats = tdd_conf.value("flex_formats", json::array());
+    */
+    if (frame.find(",") != std::string::npos) {
+      std::vector<std::string> flex_formats =
+          tdd_conf.value("flex_formats", json::array());
       FiveGConfig fivegconfig = FiveGConfig(tdd_conf);
       frame = fivegconfig.FiveGFormat();
       rate_ = fivegconfig.SamplingRate();
       ofdm_data_start_ = fivegconfig.OfdmDataStart();
-    } 
+    }
     frame_ = FrameStats(frame);
   }
   AGORA_LOG_INFO("Config: Frame schedule %s (%zu symbols)\n",
