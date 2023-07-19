@@ -1,8 +1,8 @@
 {
     "bs_radio_num": 1,
     "ue_radio_num": 1,
-    "fft_size": 1024,
-    "ofdm_data_num": 768,
+    "fft_size": 2048,
+    "ofdm_data_num": 1560,
     "demul_block_size": 64,
     "frame_schedule": [
         "PUUUUUUUUUGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"

@@ -8,12 +8,12 @@
         "PUUUUUUUUUGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
     ],
     "ul_mcs" : {
-      "modulation": "64QAM",
+      "modulation": "16QAM",
       "code_rate": 0.333
     },
 
     "dl_mcs" : {
-        "modulation": "64QAM",
+        "modulation": "16QAM",
         "code_rate": 0.333
     },
 
