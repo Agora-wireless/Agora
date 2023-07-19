@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2022, Rice University
+// Copyright (c) 2018-2023, Rice University
 // RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 
 /**
@@ -15,92 +15,80 @@
 
 static constexpr size_t kSubframesPerFrame = 10;
 static constexpr size_t kFlexibleSlotFormatIdx = 2;
-static constexpr size_t kMaxSlotFormat = 55;
 static constexpr bool kDebug = false;
 
-std::map<size_t, std::string> FiveGConfig::format_table{};
-std::vector<size_t> FiveGConfig::supported_formats{};
+static constexpr size_t kNumerology = 0;
 
-FiveGConfig::FiveGConfig(nlohmann::json tdd_conf) {
+FiveGConfig::FiveGConfig(const nlohmann::json& tdd_conf)
+    : valid_ffts_({512, 1024, 1536, 2048}),
+      supported_channel_bandwidths_({5, 10, 15, 20}),
+      supported_formats_({0, 1, 2, 3, 4, 27, 28, 34, 39}) {
   tdd_conf_ = tdd_conf;
-  max_supported_channel_bandwidth_ = 20;
-  numerology_ = 0;
-  subcarrier_spacing_ = 15e3 * pow(2, numerology_);
-  valid_ffts_ = {512, 1024, 1536, 2048};
-  supported_channel_bandwidths_ = {5, 10, 15, 20};
+  subcarrier_spacing_ = 15e3 * pow(2, kNumerology);
   /*
-  Maximum ofdm subcarriers that can be supported in each
-   hannel bandwidth while representing whole reasource blocks
+  Maximum number of ofdm subcarriers that can be supported in each
+  hannel bandwidth while representing whole reasource blocks
   and satisfying AVX512 requirements. 
   */
   channel_bandwidth_to_ofdm_data_num_[5] = 288;
   channel_bandwidth_to_ofdm_data_num_[10] = 624;
   channel_bandwidth_to_ofdm_data_num_[15] = 912;
   channel_bandwidth_to_ofdm_data_num_[20] = 1200;
-  format_table[0] = "DDDDDDDDDDDDDD";
-  format_table[1] = "UUUUUUUUUUUUUU";
-  format_table[3] = "DDDDDDDDDDDDDG";
-  format_table[4] = "DDDDDDDDDDDDGG";
-  format_table[5] = "DDDDDDDDDDDGGG";
-  format_table[6] = "DDDDDDDDDDGGGG";
-  format_table[7] = "DDDDDDDDDGGGGG";
-  format_table[8] = "GGGGGGGGGGGGGU";
-  format_table[9] = "GGGGGGGGGGGGUU";
-  format_table[10] = "GUUUUUUUUUUUUU";
-  format_table[11] = "GGUUUUUUUUUUUU";
-  format_table[12] = "GGGUUUUUUUUUUU";
-  format_table[13] = "GGGGUUUUUUUUUU";
-  format_table[14] = "GGGGGUUUUUUUUU";
-  format_table[15] = "GGGGGGUUUUUUUU";
-  format_table[16] = "DGGGGGGGGGGGGGG";
-  format_table[17] = "DDGGGGGGGGGGGGG";
-  format_table[18] = "DDDGGGGGGGGGGGG";
-  format_table[19] = "DGGGGGGGGGGGGGU";
-  format_table[20] = "DDGGGGGGGGGGGU";
-  format_table[21] = "DDDGGGGGGGGGGU";
-  format_table[22] = "DGGGGGGGGGGGUU";
-  format_table[23] = "DDGGGGGGGGGGUU";
-  format_table[24] = "DDDGGGGGGGGGUU";
-  format_table[25] = "DGGGGGGGGGGUUU";
-  format_table[26] = "DDGGGGGGGGGUUU";
-  format_table[27] = "DDDGGGGGGGGUUU";
-  format_table[28] = "DDDDDDDDDDDDGU";
-  format_table[29] = "DDDDDDDDDDDGGU";
-  format_table[30] = "DDDDDDDDDDGGGU";
-  format_table[31] = "DDDDDDDDDDDGUU";
-  format_table[32] = "DDDDDDDDDDGGUU";
-  format_table[33] = "DDDDDDDDDGGGUU";
-  format_table[34] = "DGUUUUUUUUUUUU";
-  format_table[35] = "DDGUUUUUUUUUUU";
-  format_table[36] = "DDDGUUUUUUUUUU";
-  format_table[37] = "DGGUUUUUUUUUUU";
-  format_table[38] = "DDGGUUUUUUUUUU";
-  format_table[39] = "DDDGGUUUUUUUUU";
-  format_table[40] = "DGGGUUUUUUUUUU";
-  format_table[41] = "DDGGGUUUUUUUUU";
-  format_table[42] = "DDDGGGUUUUUUUU";
-  format_table[43] = "DDDDDDDDDGGGGU";
-  format_table[44] = "DDDDDDGGGGGGUU";
-  format_table[45] = "DDDDDDGGUUUUUU";
-  format_table[46] = "DDDDDGUDDDDDGU";
-  format_table[47] = "DDGUUUUDDGUUUU";
-  format_table[48] = "DGUUUUUDGUUUUU";
-  format_table[49] = "DDDDGGUDDDDGGU";
-  format_table[50] = "DDGGUUUDDGGUUU";
-  format_table[51] = "DGGUUUUDFFUUUU";
-  format_table[52] = "DGGGGGUDGGGGGU";
-  format_table[53] = "DDGGGGUDDGGGGU";
-  format_table[54] = "GGGGGGGDDDDDDD";
-  format_table[55] = "DDGGGUUUDDDDDD";
-  supported_formats.push_back(0);
-  supported_formats.push_back(1);
-  supported_formats.push_back(2);
-  supported_formats.push_back(3);
-  supported_formats.push_back(4);
-  supported_formats.push_back(27);
-  supported_formats.push_back(28);
-  supported_formats.push_back(34);
-  supported_formats.push_back(39);
+  format_table_.at(0) = "DDDDDDDDDDDDDD";
+  format_table_.at(1) = "UUUUUUUUUUUUUU";
+  format_table_.at(3) = "DDDDDDDDDDDDDG";
+  format_table_.at(4) = "DDDDDDDDDDDDGG";
+  format_table_.at(5) = "DDDDDDDDDDDGGG";
+  format_table_.at(6) = "DDDDDDDDDDGGGG";
+  format_table_.at(7) = "DDDDDDDDDGGGGG";
+  format_table_.at(8) = "GGGGGGGGGGGGGU";
+  format_table_.at(9) = "GGGGGGGGGGGGUU";
+  format_table_.at(10) = "GUUUUUUUUUUUUU";
+  format_table_.at(11) = "GGUUUUUUUUUUUU";
+  format_table_.at(12) = "GGGUUUUUUUUUUU";
+  format_table_.at(13) = "GGGGUUUUUUUUUU";
+  format_table_.at(14) = "GGGGGUUUUUUUUU";
+  format_table_.at(15) = "GGGGGGUUUUUUUU";
+  format_table_.at(16) = "DGGGGGGGGGGGGGG";
+  format_table_.at(17) = "DDGGGGGGGGGGGGG";
+  format_table_.at(18) = "DDDGGGGGGGGGGGG";
+  format_table_.at(19) = "DGGGGGGGGGGGGGU";
+  format_table_.at(20) = "DDGGGGGGGGGGGU";
+  format_table_.at(21) = "DDDGGGGGGGGGGU";
+  format_table_.at(22) = "DGGGGGGGGGGGUU";
+  format_table_.at(23) = "DDGGGGGGGGGGUU";
+  format_table_.at(24) = "DDDGGGGGGGGGUU";
+  format_table_.at(25) = "DGGGGGGGGGGUUU";
+  format_table_.at(26) = "DDGGGGGGGGGUUU";
+  format_table_.at(27) = "DDDGGGGGGGGUUU";
+  format_table_.at(28) = "DDDDDDDDDDDDGU";
+  format_table_.at(29) = "DDDDDDDDDDDGGU";
+  format_table_.at(30) = "DDDDDDDDDDGGGU";
+  format_table_.at(31) = "DDDDDDDDDDDGUU";
+  format_table_.at(32) = "DDDDDDDDDDGGUU";
+  format_table_.at(33) = "DDDDDDDDDGGGUU";
+  format_table_.at(34) = "DGUUUUUUUUUUUU";
+  format_table_.at(35) = "DDGUUUUUUUUUUU";
+  format_table_.at(36) = "DDDGUUUUUUUUUU";
+  format_table_.at(37) = "DGGUUUUUUUUUUU";
+  format_table_.at(38) = "DDGGUUUUUUUUUU";
+  format_table_.at(39) = "DDDGGUUUUUUUUU";
+  format_table_.at(40) = "DGGGUUUUUUUUUU";
+  format_table_.at(41) = "DDGGGUUUUUUUUU";
+  format_table_.at(42) = "DDDGGGUUUUUUUU";
+  format_table_.at(43) = "DDDDDDDDDGGGGU";
+  format_table_.at(44) = "DDDDDDGGGGGGUU";
+  format_table_.at(45) = "DDDDDDGGUUUUUU";
+  format_table_.at(46) = "DDDDDGUDDDDDGU";
+  format_table_.at(47) = "DDGUUUUDDGUUUU";
+  format_table_.at(48) = "DGUUUUUDGUUUUU";
+  format_table_.at(49) = "DDDDGGUDDDDGGU";
+  format_table_.at(50) = "DDGGUUUDDGGUUU";
+  format_table_.at(51) = "DGGUUUUDFFUUUU";
+  format_table_.at(52) = "DGGGGGUDGGGGGU";
+  format_table_.at(53) = "DDGGGGUDDGGGGU";
+  format_table_.at(54) = "GGGGGGGDDDDDDD";
+  format_table_.at(55) = "DDGGGUUUDDDDDD";
 }
 
 FiveGConfig::~FiveGConfig() = default;
@@ -108,21 +96,17 @@ FiveGConfig::~FiveGConfig() = default;
 void FiveGConfig::ReadAndVerifyValues() {
   double guard_band;
   double transmission_bandwidth;
-  double num_slots = pow(2, numerology_);
-  size_t num_symbols = kSubframesPerFrame * num_slots * 14;
+  const double num_slots = pow(2, kNumerology);
+  const size_t num_symbols = kSubframesPerFrame * num_slots * 14;
   bool fft_is_valid = false;
   //ofdm_data_start and sampling rate should be calculated, not specified.
   RtAssert(!tdd_conf_.contains("ofdm_data_start"),
-           "Ofdm data start is "
-           "calculated using fft_size and ofdm_data_num and should not be "
-           "specified by "
-           "the user in a 5G schema.");
+           "Ofdm data start is calculated using fft_size and ofdm_data_num and "
+           "should not be specified by the user in a 5G schema.");
   RtAssert(!tdd_conf_.contains("sample_rate"),
-           "The sampling rate is "
-           "calculated using the fft_size and the subcarrier spacing which is "
-           "a result "
-           "of the numerology and should not be specified by the user in a 5G "
-           "schema.");
+           "The sampling rate is calculated using the fft_size and the "
+           "subcarrier spacing which is a result of the numerology and should "
+           "not be specified by the user in a 5G schema.");
   RtAssert(tdd_conf_.contains("ue_radio_num"), "ue_radio_num not specified.");
   user_num_ = tdd_conf_.value("ue_radio_num", 0);
   nlohmann::json jframes =
@@ -132,15 +116,14 @@ void FiveGConfig::ReadAndVerifyValues() {
   flex_formats_ = tdd_conf_.value("flex_formats", nlohmann::json::array());
   if (tdd_conf_.contains("channel_bandwidth")) {
     channel_bandwidth_ = tdd_conf_.value("channel_bandwidth", 0);
-    RtAssert(channel_bandwidth_ <= max_supported_channel_bandwidth_,
+    RtAssert(channel_bandwidth_ <= supported_channel_bandwidths_.back(),
              "Specified channel bandwidth is larger than the max supported "
              "channel bandwidth.");
     RtAssert(
         !tdd_conf_.contains("ofdm_data_num") && !tdd_conf_.contains("fft_size"),
-        "The channel bandwidth is not "
-        "compatible with ofdm_data_num and fft_size. Either do not "
-        "specify a channel bandwidth or do not specify the "
-        "ofdm_data_num and fft_size.");
+        "The channel bandwidth is not compatible with ofdm_data_num and "
+        "fft_size. Either do not specify a channel bandwidth or do not "
+        "specify the ofdm_data_num and fft_size.");
     //Calculate ofdm_data_num and fft_size from the channel bandwidth.
     auto iterator =
         std::find(supported_channel_bandwidths_.begin(),
@@ -156,20 +139,18 @@ void FiveGConfig::ReadAndVerifyValues() {
   } else {
     RtAssert(
         tdd_conf_.contains("ofdm_data_num") && tdd_conf_.contains("fft_size"),
-        "ofdm_data_num and "
-        "fft_size must both be specified for a 5G configuration.");
+        "ofdm_data_num and fft_size must both be specified for a 5G "
+        "configuration.");
     ofdm_data_num_ = tdd_conf_.value("ofdm_data_num", 0);
     fft_size_ = tdd_conf_.value("fft_size", 0);
     RtAssert((ofdm_data_num_ % 12 == 0),
-             "The given number of ofdm data "
-             "subcarriers is not divisible by 12. Non integer number of "
-             "reasource blocks.\n");
+             "The given number of ofdm data subcarriers is not divisible by "
+             "12. Non integer number of reasource blocks.\n");
     RtAssert(fft_size_ > ofdm_data_num_,
-             "The fft_size is smaller than the "
-             "number of subcarriers.\n");
+             "The fft_size is smaller than the number of subcarriers.\n");
     RtAssert(SetChannelBandwidth(),
-             "No supported channel bandwidth compatible"
-             "with given fft_size and ofdm_data_num parameters.");
+             "No supported channel bandwidth compatible with given fft_size "
+             "and ofdm_data_num parameters.");
     transmission_bandwidth = ofdm_data_num_ * subcarrier_spacing_;
     //channel bandwidth must be in Mhz and subcarrier spacing must be in Khz
     guard_band = (1e3) *
@@ -213,11 +194,11 @@ std::string FiveGConfig::FiveGFormat() {
  * pilot symbols as there are users.
 */
 std::string FiveGConfig::FormBeaconSubframe(int format_num, size_t user_num) {
-  std::string subframe = format_table[format_num];
+  std::string subframe = format_table_.at(format_num);
   size_t pilot_num = 0;
-  RtAssert(
-      subframe.at(0) == 'D',
-      "First symbol of selected format doesn't start with a downlink symbol.");
+  RtAssert(subframe.at(0) == 'D',
+           "First symbol of selected format doesn't start with a downlink "
+           "symbol.");
   RtAssert(user_num_ < 12, "Number of users exceeds pilot symbol limit of 12.");
   //Replace the first symbol with a beacon symbol.
   subframe.replace(0, 1, "B");
@@ -277,11 +258,11 @@ std::string FiveGConfig::FormFrame(std::string frame_schedule, size_t user_num,
   // Create the frame based on the format nums in the subframe array.
   frame += FormBeaconSubframe(subframes[0], user_num_);
   for (size_t i = 1; i < kSubframesPerFrame; i++) {
-    if (subframes[i] < 0 || subframes[i] > kMaxSlotFormat) {
+    if (subframes[i] < 0 || subframes[i] > format_table_.size()) {
       std::string error_message =
-          "User specified a non supported subframe "
-          "format.\nCurrently supported subframe formats are:";
-      for (auto format = format_table.begin(); format != format_table.end();
+          "User specified a non supported subframe format.\nCurrently "
+          "supported subframe formats are:";
+      for (auto format = format_table_.begin(); format != format_table_.end();
            format++) {
         error_message +=
             std::to_string(format->first) + " " + format->second + ".\n";
@@ -292,7 +273,7 @@ std::string FiveGConfig::FormFrame(std::string frame_schedule, size_t user_num,
         frame += flex_formats.at(flex_format_idx);
         flex_format_idx++;
       } else {
-        frame += format_table.at(subframes[i]);
+        frame += format_table_.at(subframes[i]);
       }
     }
   }
@@ -301,9 +282,9 @@ std::string FiveGConfig::FormFrame(std::string frame_schedule, size_t user_num,
 /**
  * Effects: Checks that the passed format is in the list of supported formats.
 */
-bool FiveGConfig::IsSupported(size_t format_num) {
-  for (size_t i = 0; i < supported_formats.size(); i++) {
-    if (format_num == supported_formats[i]) {
+bool FiveGConfig::IsSupported(size_t format_num) const {
+  for (size_t i = 0; i < supported_formats_.size(); i++) {
+    if (format_num == supported_formats_[i]) {
       return true;
     }
   }
@@ -323,5 +304,5 @@ bool FiveGConfig::SetChannelBandwidth() {
   return false;
 }
 //Accessors for sampling rate and ofdm data start.
-double FiveGConfig::SamplingRate() { return sampling_rate_; }
-size_t FiveGConfig::OfdmDataStart() { return ofdm_data_start_; }
+double FiveGConfig::SamplingRate() const { return sampling_rate_; }
+size_t FiveGConfig::OfdmDataStart() const { return ofdm_data_start_; }
