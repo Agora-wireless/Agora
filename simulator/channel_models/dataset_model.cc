@@ -1,25 +1,32 @@
-#include "dataset_model.h"
+/**
+ * @file dataset_model.cc
+ * @brief Implementation file for the dataset channel model.  Can be imported with an HDF5 file
+ */
 
-#include <H5Cpp.h>
+#include "dataset_model.h"
 
 #include <iostream>
 
+#include "H5Cpp.h"
 #include "logger.h"
 
 bool kPrintDatasetOutput = true;
 
-DatasetModel::DatasetModel(const Config* config, std::string dataset_path)
-    : ChannelModel(config, ChannelModel::kSelective) {
+DatasetModel::DatasetModel(size_t bs_ant_num, size_t ue_ant_num,
+                           size_t samples_per_sym,
+                           const std::string& dataset_path)
+    : ChannelModel(bs_ant_num, ue_ant_num, samples_per_sym,
+                   ChannelModel::kSelective) {
   InstantiateDataset(dataset_path);
 }
 
-void DatasetModel::InstantiateDataset(std::string dataset_path) {
+void DatasetModel::InstantiateDataset(const std::string& dataset_path) {
   hsize_t frames_num = 0;
   hsize_t scs_num = 0;
   hsize_t bss_num = 0;
   hsize_t ues_num = 0;
 
-  current_frame_num = 0;
+  current_frame_num_ = 0;
 
   try {
     H5::H5File file(dataset_path, H5F_ACC_RDONLY);
@@ -75,14 +82,14 @@ void DatasetModel::InstantiateDataset(std::string dataset_path) {
         h_subcarrier_matrices.push_back(h_);
       }
 
-      h_matrices_frames.push_back(h_subcarrier_matrices);
+      h_matrices_frames_.push_back(h_subcarrier_matrices);
 
       if (kPrintDatasetOutput) {
         std::printf(
             "Dataset Frame = %ld with %ld Subcarriers loaded successfully \n",
-            h_matrices_frames.size(), h_subcarrier_matrices.size());
+            h_matrices_frames_.size(), h_subcarrier_matrices.size());
 
-        //Utils::PrintMat( h_matrices_frames[0][0], "H_");
+        //Utils::PrintMat( h_matrices_frames_[0][0], "H_");
       }
     }
 
@@ -118,6 +125,6 @@ void DatasetModel::InstantiateDataset(std::string dataset_path) {
 }
 
 void DatasetModel::UpdateModel() {
-  h_selective_ = h_matrices_frames[current_frame_num];
-  current_frame_num++;
+  h_selective_ = h_matrices_frames_[current_frame_num_];
+  current_frame_num_++;
 }

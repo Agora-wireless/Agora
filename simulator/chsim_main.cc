@@ -6,6 +6,7 @@
 
 #include "channel_sim.h"
 #include "logger.h"
+#include "signal_handler.h"
 #include "version_config.h"
 
 DEFINE_uint64(bs_threads, 1,

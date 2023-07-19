@@ -5,25 +5,12 @@
 #ifndef CHANNEL_H_
 #define CHANNEL_H_
 
-#include <algorithm>
-#include <cassert>
-#include <cmath>
-#include <ctime>
-#include <iomanip>
-#include <numeric>
+#include <string>
 
 #include "armadillo"
-#include "channel_models/awgn_model.h"
-#include "channel_models/channel_model.h"
-#include "channel_models/dataset_model.h"
-#include "channel_models/rayleigh_model.h"
+#include "channel.h"
+#include "channel_model.h"
 #include "config.h"
-#include "gettime.h"
-#include "memory_manage.h"
-#include "message.h"
-#include "signal_handler.h"
-#include "symbols.h"
-#include "utils.h"
 
 class Channel {
  public:
@@ -40,18 +27,15 @@ class Channel {
   void Awgn(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst) const;
 
  private:
+  ChannelModel* GetChannelModel();
+
   const Config* const cfg_;
-
   Channel* channel_;
-
   std::string sim_chan_model_;
   double channel_snr_db_;
   double noise_samp_std_;
-
   std::string dataset_path_;
-
   ChannelModel* channel_model;
-  ChannelModel* GetChannelModel();
 };
 
 #endif  // CHANNEL_H_
