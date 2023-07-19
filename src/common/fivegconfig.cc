@@ -259,9 +259,6 @@ std::string FiveGConfig::FormFrame(std::string frame_schedule, size_t user_num,
   // Create the frame based on the format nums in the subframe array.
   frame += FormBeaconSubframe(subframes[0], user_num_);
   for (size_t i = 1; i < kSubframesPerFrame; i++) {
-    RtAssert(IsSupported(subframes[i]),
-             "Format " + std::to_string(subframes[subframe_idx]) +
-                 " isn't supported.");
     if (subframes[i] == kFlexibleSlotFormatIdx) {
       frame += flex_formats.at(flex_format_idx);
       flex_format_idx++;
