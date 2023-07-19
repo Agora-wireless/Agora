@@ -4,9 +4,13 @@
  */
 #include "channel.h"
 
-#include <utility>
-
+#include "armadillo"
+#include "awgn_model.h"
+#include "channel_model.h"
+#include "dataset_model.h"
 #include "logger.h"
+#include "rayleigh_model.h"
+#include "utils.h"
 
 static constexpr bool kPrintChannelOutput = false;
 static constexpr bool kPrintSNRCheck = false;
@@ -22,7 +26,7 @@ Channel::Channel(const Config* const config, std::string& in_channel_type,
       dataset_path_(dataset_path) {
   channel_model = GetChannelModel();
 
-  float snr_lin = std::pow(10, channel_snr_db_ / 10.0f);
+  const float snr_lin = std::pow(10, channel_snr_db_ / 10.0f);
   noise_samp_std_ = std::sqrt(kMeanChannelGain / (snr_lin * 2.0f));
   std::cout << "Noise level to be used is: " << std::fixed << std::setw(5)
             << std::setprecision(2) << noise_samp_std_ << std::endl;
@@ -30,18 +34,23 @@ Channel::Channel(const Config* const config, std::string& in_channel_type,
 
 ChannelModel* Channel::GetChannelModel() {
   if (sim_chan_model_ == "AWGN") {
-    return new AwgnModel(cfg_);
+    return new AwgnModel(cfg_->BsAntNum(), cfg_->UeAntNum(),
+                         cfg_->SampsPerSymbol());
+  } else if (sim_chan_model_ == "RAYLEIGH") {
+    return new RayleighModel(cfg_->BsAntNum(), cfg_->UeAntNum(),
+                             cfg_->SampsPerSymbol());
+#if defined(ENABLE_HDF5)
+  } else if (sim_chan_model_ == "DATASET") {
+    return new DatasetModel(cfg_->BsAntNum(), cfg_->UeAntNum(),
+                            cfg_->SampsPerSymbol(), dataset_path_);
+#endif
+  } else {
+    AGORA_LOG_WARN(
+        "Invalid channel model (%s) at CHSim, assuming AWGN Model... \n",
+        sim_chan_model_.c_str());
+    return new AwgnModel(cfg_->BsAntNum(), cfg_->UeAntNum(),
+                         cfg_->SampsPerSymbol());
   }
-  else if (sim_chan_model_ == "RAYLEIGH") {
-    return new RayleighModel(cfg_);
-  } 
-  else if (sim_chan_model_ == "DATASET") {
-    return new DatasetModel(cfg_, dataset_path_);
-  }
-  
-  AGORA_LOG_WARN("Invalid channel model at CHSim, assuming AWGN Model... \n");
-
-  return new AwgnModel(cfg_);
 }
 
 void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
@@ -52,7 +61,7 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
     channel_model->UpdateModel();
   }
 
-  switch (channel_model->fading_type) {
+  switch (channel_model->GetFadingType()) {
     case ChannelModel::kFlat: {
       fmat_h = fmat_src * channel_model->GetMatrix(is_downlink);
       break;
