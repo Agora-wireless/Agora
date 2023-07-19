@@ -6,9 +6,11 @@
 #define CHANNEL_MODEL_H_
 
 #include <cstddef>
+#include <memory>
 #include <vector>
 
 #include "armadillo"
+#include "config.h"
 
 class ChannelModel {
  public:
@@ -32,6 +34,10 @@ class ChannelModel {
                                    const arma::cx_fmat& matrix_target);
 
   inline FadingType GetFadingType() const { return fading_type_; }
+  //Factory function
+  static std::unique_ptr<ChannelModel> CreateChannelModel(
+      const Config* const config, std::string& channel_type,
+      std::string& dataset_path);
 
  protected:
   const size_t bss_num_;

@@ -5,11 +5,7 @@
 #include "channel.h"
 
 #include "armadillo"
-#include "awgn_model.h"
-#include "channel_model.h"
-#include "dataset_model.h"
 #include "logger.h"
-#include "rayleigh_model.h"
 #include "utils.h"
 
 static constexpr bool kPrintChannelOutput = false;
@@ -22,9 +18,9 @@ Channel::Channel(const Config* const config, std::string& in_channel_type,
                  double in_channel_snr, std::string& dataset_path)
     : cfg_(config),
       sim_chan_model_(std::move(in_channel_type)),
-      channel_snr_db_(in_channel_snr),
-      dataset_path_(dataset_path) {
-  channel_model = GetChannelModel();
+      channel_snr_db_(in_channel_snr) {
+  channel_model_ = std::move(
+      ChannelModel::CreateChannelModel(cfg_, in_channel_type, dataset_path));
 
   const float snr_lin = std::pow(10, channel_snr_db_ / 10.0f);
   noise_samp_std_ = std::sqrt(kMeanChannelGain / (snr_lin * 2.0f));
@@ -32,38 +28,17 @@ Channel::Channel(const Config* const config, std::string& in_channel_type,
             << std::setprecision(2) << noise_samp_std_ << std::endl;
 }
 
-ChannelModel* Channel::GetChannelModel() {
-  if (sim_chan_model_ == "AWGN") {
-    return new AwgnModel(cfg_->BsAntNum(), cfg_->UeAntNum(),
-                         cfg_->SampsPerSymbol());
-  } else if (sim_chan_model_ == "RAYLEIGH") {
-    return new RayleighModel(cfg_->BsAntNum(), cfg_->UeAntNum(),
-                             cfg_->SampsPerSymbol());
-#if defined(ENABLE_HDF5)
-  } else if (sim_chan_model_ == "DATASET") {
-    return new DatasetModel(cfg_->BsAntNum(), cfg_->UeAntNum(),
-                            cfg_->SampsPerSymbol(), dataset_path_);
-#endif
-  } else {
-    AGORA_LOG_WARN(
-        "Invalid channel model (%s) at CHSim, assuming AWGN Model... \n",
-        sim_chan_model_.c_str());
-    return new AwgnModel(cfg_->BsAntNum(), cfg_->UeAntNum(),
-                         cfg_->SampsPerSymbol());
-  }
-}
-
 void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
                         const bool is_downlink, const bool is_newChan) {
   arma::cx_fmat fmat_h;
 
   if (is_newChan) {
-    channel_model->UpdateModel();
+    channel_model_->UpdateModel();
   }
 
-  switch (channel_model->GetFadingType()) {
+  switch (channel_model_->GetFadingType()) {
     case ChannelModel::kFlat: {
-      fmat_h = fmat_src * channel_model->GetMatrix(is_downlink);
+      fmat_h = fmat_src * channel_model_->GetMatrix(is_downlink);
       break;
     }
 
@@ -71,7 +46,7 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
       //For each Subcarrier or OFDMSample input, multiply H Matrix slice
       for (int h_index = 0; h_index < (int)fmat_src.n_rows; h_index++) {
         arma::cx_fmat y_ = fmat_src.row(h_index) *
-                           channel_model->GetMatrix(is_downlink, h_index);
+                           channel_model_->GetMatrix(is_downlink, h_index);
         fmat_h.insert_rows(h_index, y_);
       }
       break;
