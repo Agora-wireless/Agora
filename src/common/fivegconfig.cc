@@ -36,6 +36,7 @@ FiveGConfig::FiveGConfig(const nlohmann::json& tdd_conf)
   channel_bandwidth_to_ofdm_data_num_[20] = 1200;
   format_table_.at(0) = "DDDDDDDDDDDDDD";
   format_table_.at(1) = "UUUUUUUUUUUUUU";
+  format_table_.at(2) = "FFFFFFFFFFFFFF";
   format_table_.at(3) = "DDDDDDDDDDDDDG";
   format_table_.at(4) = "DDDDDDDDDDDDGG";
   format_table_.at(5) = "DDDDDDDDDDDGGG";
@@ -258,23 +259,14 @@ std::string FiveGConfig::FormFrame(std::string frame_schedule, size_t user_num,
   // Create the frame based on the format nums in the subframe array.
   frame += FormBeaconSubframe(subframes[0], user_num_);
   for (size_t i = 1; i < kSubframesPerFrame; i++) {
-    if (subframes[i] < 0 || subframes[i] > format_table_.size()) {
-      std::string error_message =
-          "User specified a non supported subframe format.\nCurrently "
-          "supported subframe formats are:";
-      for (auto format = format_table_.begin(); format != format_table_.end();
-           format++) {
-        error_message +=
-            std::to_string(format->first) + " " + format->second + ".\n";
-      }
-      throw std::runtime_error(error_message);
+    RtAssert(IsSupported(subframes[i]),
+             "Format " + std::to_string(subframes[subframe_idx]) +
+                 " isn't supported.");
+    if (subframes[i] == kFlexibleSlotFormatIdx) {
+      frame += flex_formats.at(flex_format_idx);
+      flex_format_idx++;
     } else {
-      if (subframes[i] == kFlexibleSlotFormatIdx) {
-        frame += flex_formats.at(flex_format_idx);
-        flex_format_idx++;
-      } else {
-        frame += format_table_.at(subframes[i]);
-      }
+      frame += format_table_.at(subframes[i]);
     }
   }
   return frame;
@@ -288,6 +280,15 @@ bool FiveGConfig::IsSupported(size_t format_num) const {
       return true;
     }
   }
+  std::string error_message =
+      "User specified a non supported subframe format.\nCurrently "
+      "supported subframe formats are:\n";
+  for (auto format = supported_formats_.begin();
+       format != supported_formats_.end(); format++) {
+    error_message +=
+        std::to_string(*format) + " " + format_table_.at(*format) + ".\n";
+  }
+  AGORA_LOG_ERROR(error_message);
   return false;
 }
 /**
