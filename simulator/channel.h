@@ -5,6 +5,7 @@
 #ifndef CHANNEL_H_
 #define CHANNEL_H_
 
+#include <memory>
 #include <string>
 
 #include "armadillo"
@@ -27,15 +28,11 @@ class Channel {
   void Awgn(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst) const;
 
  private:
-  ChannelModel* GetChannelModel();
-
   const Config* const cfg_;
-  Channel* channel_;
   std::string sim_chan_model_;
   double channel_snr_db_;
   double noise_samp_std_;
-  std::string dataset_path_;
-  ChannelModel* channel_model;
+  std::unique_ptr<ChannelModel> channel_model_;
 };
 
 #endif  // CHANNEL_H_
