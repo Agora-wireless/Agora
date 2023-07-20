@@ -20,7 +20,7 @@ Channel::Channel(const Config* const config, std::string& in_channel_type,
       sim_chan_model_(std::move(in_channel_type)),
       channel_snr_db_(in_channel_snr) {
   channel_model_ = std::move(
-      ChannelModel::CreateChannelModel(cfg_, in_channel_type, dataset_path));
+      ChannelModel::CreateChannelModel(cfg_, sim_chan_model_, dataset_path));
 
   const float snr_lin = std::pow(10, channel_snr_db_ / 10.0f);
   noise_samp_std_ = std::sqrt(kMeanChannelGain / (snr_lin * 2.0f));
