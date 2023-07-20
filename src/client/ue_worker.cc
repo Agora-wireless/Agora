@@ -634,7 +634,8 @@ void UeWorker::DoIfft(size_t tag) {
   const size_t ant_id = gen_tag_t(tag).ue_id_;
   const size_t frame_slot = (frame_id % kFrameWnd);
 
-  const bool bypass_iFFT = config_.FreqDomainChannel();
+  //const bool bypass_iFFT = config_.FreqDomainChannel();//TODO
+  const bool bypass_iFFT = false;
 
   const size_t ul_symbol_perframe = config_.Frame().NumULSyms();
   const size_t ul_symbol_idx = config_.Frame().GetULSymbolIdx(symbol_id);
