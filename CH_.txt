@@ -1,0 +1,361 @@
+FlexRAN SDK bblib_lte_ldpc_decoder version sdk-19.04-ea1-1-g3be2380
+FlexRAN SDK bblib_common version sdk-19.04-ea1-1-g3be2380
+Base Station configuration
+System CPU count 72
+NUMA node 0 111111111111111111000000000000000000000000000000000000000000000000000000 CPUs: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 
+NUMA node 1 000000000000000000111111111111111111000000000000000000000000000000000000 CPUs: 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 
+Usable Cpu count 35
+[16:558245][I] Config: Frame schedule BPPPPGGGGGGGGGGGGUUUGDDD (24 symbols)
+[16:558316][I] Uplink MCS Info: LDPC: Zc: 18, 1 code blocks per symbol, 396 information bits per encoding, 1188 bits per encoded code word, decoder iterations: 5, code rate 0.333 (nRows = 46), modulation 16QAM
+[16:558318][I] Downlink MCS Info: LDPC: Zc: 30, 1 code blocks per symbol, 660 information bits per encoding, 1110 bits per encoded code word, decoder iterations: 5, code rate 0.595 (nRows = 17), modulation 16QAM
+[16:558319][W] LDPC required Input Buffer size exceeds uplink code block size!, Increased cb padding from 15 to 79 uplink CB Bytes 49, LDPC Input Min for zc 64:256: 74
+[16:558327][I] Config: 32 BS antennas, 4 UE antennas, 4 pilot symbols per frame,
+	3 uplink data symbols per frame, 3 downlink data symbols per frame,
+	512 OFDM subcarriers (304 data subcarriers),
+	UL modulation 16QAM, DL modulation 16QAM, Beamforming ZF, 
+	1 UL codeblocks per symbol, 49 UL bytes per code block,
+	1 DL codeblocks per symbol, 82 DL bytes per code block,
+	39 UL MAC data bytes per frame, 49 UL MAC bytes per frame,
+	72 DL MAC data bytes per frame, 82 DL MAC bytes per frame,
+	Frame time 12288.000 usec
+Uplink Max Mac data per-user tp (Mbps) 0.025
+Downlink Max Mac data per-user tp (Mbps) 0.047
+Radio Network Traffic Peak (Mbps): 24.000
+Radio Network Traffic Avg  (Mbps): 10.000
+Basestation Network Traffic Peak (Mbps): 768.000
+Basestation Network Traffic Avg  (Mbps): 320.000
+UE Network Traffic Peak (Mbps): 48.000
+UE Network Traffic Avg  (Mbps): 31.000
+All UEs Network Traffic Avg (Mbps): 192.000
+All UEs Network Traffic Avg (Mbps): 124.000
+Noise level to be used is:  0.02
+[16:611169][I] Starting Channel Simulator ...
+[16:614440][I] UE_Input = 16384 
+[16:614619][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:614643][I] UDPComm socket 3 created 127.0.0.1 :  requested port 8200
+[16:614651][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8200 for remote 127.0.0.1:8100
+[16:614673][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:614674][I] UDPComm socket 4 created 127.0.0.1 :  requested port 8201
+[16:614677][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8201 for remote 127.0.0.1:8101
+[16:614686][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:614702][I] UDPComm socket 5 created 127.0.0.1 :  requested port 8202
+[16:614730][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8202 for remote 127.0.0.1:8102
+[16:614742][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:614744][I] UDPComm socket 6 created 127.0.0.1 :  requested port 8203
+[16:614747][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8203 for remote 127.0.0.1:8103
+[16:614756][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:614757][I] UDPComm socket 7 created 127.0.0.1 :  requested port 8204
+[16:614760][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8204 for remote 127.0.0.1:8104
+[16:614775][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:614776][I] UDPComm socket 8 created 127.0.0.1 :  requested port 8205
+[16:614791][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8205 for remote 127.0.0.1:8105
+[16:614804][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:614806][I] UDPComm socket 9 created 127.0.0.1 :  requested port 8206
+[16:614811][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8206 for remote 127.0.0.1:8106
+[16:614822][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:614824][I] UDPComm socket 10 created 127.0.0.1 :  requested port 8207
+[16:614827][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8207 for remote 127.0.0.1:8107
+[16:614837][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:614839][I] UDPComm socket 11 created 127.0.0.1 :  requested port 8208
+[16:614843][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8208 for remote 127.0.0.1:8108
+[16:614853][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:614853][I] UDPComm socket 12 created 127.0.0.1 :  requested port 8209
+[16:614857][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8209 for remote 127.0.0.1:8109
+[16:614867][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:614868][I] UDPComm socket 13 created 127.0.0.1 :  requested port 8210
+[16:614871][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8210 for remote 127.0.0.1:8110
+[16:614881][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:614883][I] UDPComm socket 14 created 127.0.0.1 :  requested port 8211
+[16:614887][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8211 for remote 127.0.0.1:8111
+[16:614899][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:614900][I] UDPComm socket 15 created 127.0.0.1 :  requested port 8212
+[16:614904][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8212 for remote 127.0.0.1:8112
+[16:614916][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:614917][I] UDPComm socket 16 created 127.0.0.1 :  requested port 8213
+[16:614921][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8213 for remote 127.0.0.1:8113
+[16:614931][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:614932][I] UDPComm socket 17 created 127.0.0.1 :  requested port 8214
+[16:614937][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8214 for remote 127.0.0.1:8114
+[16:614953][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:614956][I] UDPComm socket 18 created 127.0.0.1 :  requested port 8215
+[16:614960][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8215 for remote 127.0.0.1:8115
+[16:614970][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:614973][I] UDPComm socket 23 created 127.0.0.1 :  requested port 8216
+[16:614977][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8216 for remote 127.0.0.1:8116
+[16:614987][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:614988][I] UDPComm socket 25 created 127.0.0.1 :  requested port 8217
+[16:614994][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8217 for remote 127.0.0.1:8117
+[16:615004][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:615008][I] UDPComm socket 26 created 127.0.0.1 :  requested port 8218
+[16:615012][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8218 for remote 127.0.0.1:8118
+[16:615023][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:615023][I] UDPComm socket 27 created 127.0.0.1 :  requested port 8219
+[16:615027][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8219 for remote 127.0.0.1:8119
+[16:615039][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:615041][I] UDPComm socket 28 created 127.0.0.1 :  requested port 8220
+[16:615044][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8220 for remote 127.0.0.1:8120
+[16:615055][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:615056][I] UDPComm socket 29 created 127.0.0.1 :  requested port 8221
+[16:615060][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8221 for remote 127.0.0.1:8121
+[16:615072][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:615073][I] UDPComm socket 30 created 127.0.0.1 :  requested port 8222
+[16:615076][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8222 for remote 127.0.0.1:8122
+[16:615086][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:615087][I] UDPComm socket 31 created 127.0.0.1 :  requested port 8223
+[16:615090][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8223 for remote 127.0.0.1:8123
+[16:615101][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:615102][I] UDPComm socket 32 created 127.0.0.1 :  requested port 8224
+[16:615105][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8224 for remote 127.0.0.1:8124
+[16:615116][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:615117][I] UDPComm socket 33 created 127.0.0.1 :  requested port 8225
+[16:615121][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8225 for remote 127.0.0.1:8125
+[16:615130][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:615131][I] UDPComm socket 34 created 127.0.0.1 :  requested port 8226
+[16:615135][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8226 for remote 127.0.0.1:8126
+[16:615145][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:615146][I] UDPComm socket 35 created 127.0.0.1 :  requested port 8227
+[16:615149][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8227 for remote 127.0.0.1:8127
+[16:615160][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:615164][I] UDPComm socket 36 created 127.0.0.1 :  requested port 8228
+[16:615167][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8228 for remote 127.0.0.1:8128
+[16:615176][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:615177][I] UDPComm socket 37 created 127.0.0.1 :  requested port 8229
+[16:615181][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8229 for remote 127.0.0.1:8129
+[16:615192][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:615193][I] UDPComm socket 38 created 127.0.0.1 :  requested port 8230
+[16:615196][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8230 for remote 127.0.0.1:8130
+[16:615206][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:615207][I] UDPComm socket 39 created 127.0.0.1 :  requested port 8231
+[16:615210][I] ChannelSim set up UDP socket server listening to 127.0.0.1:8231 for remote 127.0.0.1:8131
+[16:615540][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:615544][I] UDPComm socket 40 created 127.0.0.1 :  requested port 7000
+[16:615548][I] ChannelSim set up UDP socket server listening to 127.0.0.1:7000 for remote 127.0.0.1:6000
+[16:615558][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:615559][I] UDPComm socket 41 created 127.0.0.1 :  requested port 7001
+[16:615563][I] ChannelSim set up UDP socket server listening to 127.0.0.1:7001 for remote 127.0.0.1:6001
+[16:615573][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:615574][I] UDPComm socket 42 created 127.0.0.1 :  requested port 7002
+[16:615577][I] ChannelSim set up UDP socket server listening to 127.0.0.1:7002 for remote 127.0.0.1:6002
+[16:615588][W] UDPComm:  Error setting RX buffer size to 536870911 actual size 100000000 with status 0
+[16:615589][I] UDPComm socket 43 created 127.0.0.1 :  requested port 7003
+[16:615593][I] ChannelSim set up UDP socket server listening to 127.0.0.1:7003 for remote 127.0.0.1:6003
+[16:618400][I] RxLoop[1]: handling sockets 4 from 0 to 3 rx packet bytes 2112, max udp rx 9000 
+[16:622397][I] RxLoop[0]: handling sockets 32 from 0 to 31 rx packet bytes 2112, max udp rx 9000 
+[17:985515][W] Channel Sim[0]: DoTxUe, ApplyChannel completion time 3.045mS for (Frame 0, Symbol 0)
+[18:030417][I] (Frame 0): Finished uplink   reception    of 7 symbols in 0.035mS
+[18:042231][I] (Frame 0): Finished uplink   transmission of 7 symbols in 11.816mS (rx to tx), 6.469mS (tx to tx)
+[18:046522][I] (Frame 0): Finished downlink reception    of 4 symbols in 64.094mS
+[18:046911][I] (Frame 0): Finished downlink transmission of 4 symbols in 0.389mS (rx to tx), 61.336mS (tx to tx)
+[18:374418][I] (Frame 1): Finished uplink   reception    of 7 symbols in 0.040mS
+[18:387327][I] (Frame 1): Finished downlink reception    of 4 symbols in 27.668mS
+[18:389561][I] (Frame 1): Finished uplink   transmission of 7 symbols in 15.144mS (rx to tx), 6.125mS (tx to tx)
+[18:390054][I] (Frame 1): Finished downlink transmission of 4 symbols in 2.728mS (rx to tx), 30.199mS (tx to tx)
+[18:790556][I] (Frame 2): Finished uplink   reception    of 7 symbols in 0.110mS
+[18:805750][I] (Frame 2): Finished uplink   transmission of 7 symbols in 15.214mS (rx to tx), 6.130mS (tx to tx)
+[18:814814][I] (Frame 2): Finished downlink reception    of 4 symbols in 61.785mS
+[18:830863][I] (Frame 2): Finished downlink transmission of 4 symbols in 16.049mS (rx to tx), 64.027mS (tx to tx)
+[19:198516][I] (Frame 3): Finished uplink   reception    of 7 symbols in 0.125mS
+[19:219469][I] (Frame 3): Finished downlink reception    of 4 symbols in 68.926mS
+[19:221682][I] (Frame 3): Finished uplink   transmission of 7 symbols in 23.166mS (rx to tx), 6.207mS (tx to tx)
+[19:222175][I] (Frame 3): Finished downlink transmission of 4 symbols in 2.706mS (rx to tx), 71.445mS (tx to tx)
+[19:582519][I] (Frame 4): Finished uplink   reception    of 7 symbols in 0.109mS
+[19:604760][I] (Frame 4): Finished downlink reception    of 4 symbols in 65.399mS
+[19:605615][I] (Frame 4): Finished uplink   transmission of 7 symbols in 23.103mS (rx to tx), 6.204mS (tx to tx)
+[19:606093][I] (Frame 4): Finished downlink transmission of 4 symbols in 1.340mS (rx to tx), 66.547mS (tx to tx)
+[19:954522][I] (Frame 5): Finished uplink   reception    of 7 symbols in 0.132mS
+[19:960268][I] (Frame 5): Finished downlink reception    of 4 symbols in 27.679mS
+[19:961637][I] (Frame 5): Finished uplink   transmission of 7 symbols in 7.115mS (rx to tx), 6.152mS (tx to tx)
+[19:962108][I] (Frame 5): Finished downlink transmission of 4 symbols in 1.840mS (rx to tx), 29.335mS (tx to tx)
+[20:358496][I] (Frame 6): Finished uplink   reception    of 7 symbols in 0.106mS
+[20:376278][I] (Frame 6): Finished downlink reception    of 4 symbols in 45.759mS
+[20:377632][I] (Frame 6): Finished uplink   transmission of 7 symbols in 19.136mS (rx to tx), 6.184mS (tx to tx)
+[20:378122][I] (Frame 6): Finished downlink transmission of 4 symbols in 1.844mS (rx to tx), 39.559mS (tx to tx)
+[20:738506][I] (Frame 7): Finished uplink   reception    of 7 symbols in 0.108mS
+[20:744250][I] (Frame 7): Finished downlink reception    of 4 symbols in 25.240mS
+[20:745663][I] (Frame 7): Finished uplink   transmission of 7 symbols in 7.158mS (rx to tx), 6.178mS (tx to tx)
+[20:746136][I] (Frame 7): Finished downlink transmission of 4 symbols in 1.886mS (rx to tx), 15.575mS (tx to tx)
+[21:146514][I] (Frame 8): Finished uplink   reception    of 7 symbols in 0.116mS
+[21:153575][I] (Frame 8): Finished uplink   transmission of 7 symbols in 7.068mS (rx to tx), 6.100mS (tx to tx)
+[21:158869][I] (Frame 8): Finished downlink reception    of 4 symbols in 32.310mS
+[21:159057][I] (Frame 8): Finished downlink transmission of 4 symbols in 0.196mS (rx to tx), 32.317mS (tx to tx)
+[21:598533][I] (Frame 9): Finished uplink   reception    of 7 symbols in 0.143mS
+[21:605566][I] (Frame 9): Finished uplink   transmission of 7 symbols in 7.033mS (rx to tx), 6.085mS (tx to tx)
+[21:614829][I] (Frame 9): Finished downlink reception    of 4 symbols in 96.310mS
+[21:626859][I] (Frame 9): Finished downlink transmission of 4 symbols in 12.031mS (rx to tx), 92.297mS (tx to tx)
+[21:982510][I] (Frame 10): Finished uplink   reception    of 7 symbols in 0.118mS
+[21:989600][I] (Frame 10): Finished uplink   transmission of 7 symbols in 7.091mS (rx to tx), 6.096mS (tx to tx)
+[21:998842][I] (Frame 10): Finished downlink reception    of 4 symbols in 96.297mS
+[22:014859][I] (Frame 10): Finished downlink transmission of 4 symbols in 16.017mS (rx to tx), 96.303mS (tx to tx)
+[22:330517][I] (Frame 11): Finished uplink   reception    of 7 symbols in 0.120mS
+[22:341555][I] (Frame 11): Finished uplink   transmission of 7 symbols in 11.046mS (rx to tx), 6.097mS (tx to tx)
+[22:350856][I] (Frame 11): Finished downlink reception    of 4 symbols in 58.981mS
+[22:351081][I] (Frame 11): Finished downlink transmission of 4 symbols in 0.225mS (rx to tx), 48.520mS (tx to tx)
+[22:710521][I] (Frame 12): Finished uplink   reception    of 7 symbols in 0.117mS
+[22:724338][I] (Frame 12): Finished downlink reception    of 4 symbols in 39.228mS
+[22:725766][I] (Frame 12): Finished uplink   transmission of 7 symbols in 15.248mS (rx to tx), 6.154mS (tx to tx)
+[22:726258][I] (Frame 12): Finished downlink transmission of 4 symbols in 1.927mS (rx to tx), 39.574mS (tx to tx)
+[23:094522][I] (Frame 13): Finished uplink   reception    of 7 symbols in 0.131mS
+[23:108256][I] (Frame 13): Finished downlink reception    of 4 symbols in 29.941mS
+[23:109633][I] (Frame 13): Finished uplink   transmission of 7 symbols in 15.111mS (rx to tx), 6.184mS (tx to tx)
+[23:110113][I] (Frame 13): Finished downlink transmission of 4 symbols in 1.857mS (rx to tx), 31.611mS (tx to tx)
+[23:502488][I] (Frame 14): Finished uplink   reception    of 7 symbols in 0.098mS
+[23:525569][I] (Frame 14): Finished uplink   transmission of 7 symbols in 23.081mS (rx to tx), 6.120mS (tx to tx)
+[23:538834][I] (Frame 14): Finished downlink reception    of 4 symbols in 60.283mS
+[23:550855][I] (Frame 14): Finished downlink transmission of 4 symbols in 12.021mS (rx to tx), 64.294mS (tx to tx)
+[23:882513][I] (Frame 15): Finished uplink   reception    of 7 symbols in 0.109mS
+[23:902389][W] Channel Sim[0]: DoTxBs, ApplyChannel completion time 16.867mS for (Frame 15, Symbol 4)
+[23:905651][I] (Frame 15): Finished uplink   transmission of 7 symbols in 23.145mS (rx to tx), 22.161mS (tx to tx)
+[23:918841][I] (Frame 15): Finished downlink reception    of 4 symbols in 54.099mS
+[23:934854][I] (Frame 15): Finished downlink transmission of 4 symbols in 16.022mS (rx to tx), 64.300mS (tx to tx)
+[24:294515][I] (Frame 16): Finished uplink   reception    of 7 symbols in 0.116mS
+[24:301584][I] (Frame 16): Finished uplink   transmission of 7 symbols in 7.069mS (rx to tx), 6.100mS (tx to tx)
+[24:302830][I] (Frame 16): Finished downlink reception    of 4 symbols in 32.290mS
+[24:318863][I] (Frame 16): Finished downlink transmission of 4 symbols in 16.034mS (rx to tx), 32.309mS (tx to tx)
+[24:686518][I] (Frame 17): Finished uplink   reception    of 7 symbols in 0.127mS
+[24:724274][I] (Frame 17): Finished downlink reception    of 4 symbols in 65.746mS
+[24:725661][I] (Frame 17): Finished uplink   transmission of 7 symbols in 39.144mS (rx to tx), 22.217mS (tx to tx)
+[24:726143][I] (Frame 17): Finished downlink transmission of 4 symbols in 1.869mS (rx to tx), 55.576mS (tx to tx)
+[25:062518][I] (Frame 18): Finished uplink   reception    of 7 symbols in 0.117mS
+[25:069589][I] (Frame 18): Finished uplink   transmission of 7 symbols in 7.071mS (rx to tx), 6.083mS (tx to tx)
+[25:074835][I] (Frame 18): Finished downlink reception    of 4 symbols in 30.461mS
+[25:086862][I] (Frame 18): Finished downlink transmission of 4 symbols in 12.027mS (rx to tx), 32.303mS (tx to tx)
+[25:466519][I] (Frame 19): Finished uplink   reception    of 7 symbols in 0.120mS
+[25:472339][I] (Frame 19): Finished downlink reception    of 4 symbols in 34.724mS
+[25:473673][I] (Frame 19): Finished uplink   transmission of 7 symbols in 7.161mS (rx to tx), 6.191mS (tx to tx)
+[25:474164][I] (Frame 19): Finished downlink transmission of 4 symbols in 1.833mS (rx to tx), 36.369mS (tx to tx)
+[25:886506][I] (Frame 20): Finished uplink   reception    of 7 symbols in 0.115mS
+[25:906383][W] Channel Sim[0]: DoTxBs, ApplyChannel completion time 16.868mS for (Frame 20, Symbol 4)
+[25:908357][I] (Frame 20): Finished downlink reception    of 4 symbols in 69.816mS
+[25:909733][I] (Frame 20): Finished uplink   transmission of 7 symbols in 23.227mS (rx to tx), 22.248mS (tx to tx)
+[25:910213][I] (Frame 20): Finished downlink transmission of 4 symbols in 1.856mS (rx to tx), 67.656mS (tx to tx)
+[26:270527][I] (Frame 21): Finished uplink   reception    of 7 symbols in 0.138mS
+[26:290377][W] Channel Sim[0]: DoTxBs, ApplyChannel completion time 16.871mS for (Frame 21, Symbol 4)
+[26:292422][I] (Frame 21): Finished downlink reception    of 4 symbols in 68.398mS
+[26:293748][I] (Frame 21): Finished uplink   transmission of 7 symbols in 23.221mS (rx to tx), 22.269mS (tx to tx)
+[26:294222][I] (Frame 21): Finished downlink transmission of 4 symbols in 1.801mS (rx to tx), 67.666mS (tx to tx)
+[26:654515][I] (Frame 22): Finished uplink   reception    of 7 symbols in 0.107mS
+[26:674409][W] Channel Sim[0]: DoTxBs, ApplyChannel completion time 16.875mS for (Frame 22, Symbol 4)
+[26:677686][I] (Frame 22): Finished uplink   transmission of 7 symbols in 23.181mS (rx to tx), 22.185mS (tx to tx)
+[26:690832][I] (Frame 22): Finished downlink reception    of 4 symbols in 64.302mS
+[26:706860][I] (Frame 22): Finished downlink transmission of 4 symbols in 16.028mS (rx to tx), 64.304mS (tx to tx)
+[27:030506][I] (Frame 23): Finished uplink   reception    of 7 symbols in 0.107mS
+[27:037602][I] (Frame 23): Finished uplink   transmission of 7 symbols in 7.096mS (rx to tx), 6.117mS (tx to tx)
+[27:042859][I] (Frame 23): Finished downlink reception    of 4 symbols in 32.322mS
+[27:058858][I] (Frame 23): Finished downlink transmission of 4 symbols in 16.006mS (rx to tx), 32.302mS (tx to tx)
+[27:434509][I] (Frame 24): Finished uplink   reception    of 7 symbols in 0.120mS
+[27:449570][I] (Frame 24): Finished uplink   transmission of 7 symbols in 15.061mS (rx to tx), 6.124mS (tx to tx)
+[27:458830][I] (Frame 24): Finished downlink reception    of 4 symbols in 55.159mS
+[27:474860][I] (Frame 24): Finished downlink transmission of 4 symbols in 16.029mS (rx to tx), 64.305mS (tx to tx)
+[27:834512][I] (Frame 25): Finished uplink   reception    of 7 symbols in 0.109mS
+[27:845729][I] (Frame 25): Finished uplink   transmission of 7 symbols in 11.221mS (rx to tx), 6.105mS (tx to tx)
+[27:854801][I] (Frame 25): Finished downlink reception    of 4 symbols in 57.891mS
+[27:870858][I] (Frame 25): Finished downlink transmission of 4 symbols in 16.058mS (rx to tx), 64.181mS (tx to tx)
+[28:218523][I] (Frame 26): Finished uplink   reception    of 7 symbols in 0.109mS
+[28:229542][I] (Frame 26): Finished uplink   transmission of 7 symbols in 11.026mS (rx to tx), 6.085mS (tx to tx)
+[28:238817][I] (Frame 26): Finished downlink reception    of 4 symbols in 48.710mS
+[28:254863][I] (Frame 26): Finished downlink transmission of 4 symbols in 16.053mS (rx to tx), 64.307mS (tx to tx)
+[28:606505][I] (Frame 27): Finished uplink   reception    of 7 symbols in 0.115mS
+[28:626370][W] Channel Sim[0]: DoTxBs, ApplyChannel completion time 16.872mS for (Frame 27, Symbol 4)
+[28:629661][I] (Frame 27): Finished uplink   transmission of 7 symbols in 23.156mS (rx to tx), 22.186mS (tx to tx)
+[28:642829][I] (Frame 27): Finished downlink reception    of 4 symbols in 59.503mS
+[28:658859][I] (Frame 27): Finished downlink transmission of 4 symbols in 16.029mS (rx to tx), 64.302mS (tx to tx)
+[28:982509][I] (Frame 28): Finished uplink   reception    of 7 symbols in 0.115mS
+[28:989588][I] (Frame 28): Finished uplink   transmission of 7 symbols in 7.079mS (rx to tx), 6.105mS (tx to tx)
+[28:994847][I] (Frame 28): Finished downlink reception    of 4 symbols in 18.314mS
+[29:010865][I] (Frame 28): Finished downlink transmission of 4 symbols in 16.018mS (rx to tx), 32.310mS (tx to tx)
+[29:414518][I] (Frame 29): Finished uplink   reception    of 7 symbols in 0.119mS
+[29:433561][I] (Frame 29): Finished uplink   transmission of 7 symbols in 19.043mS (rx to tx), 6.124mS (tx to tx)
+[29:442846][I] (Frame 29): Finished downlink reception    of 4 symbols in 64.326mS
+[29:458858][I] (Frame 29): Finished downlink transmission of 4 symbols in 16.011mS (rx to tx), 64.300mS (tx to tx)
+[29:822523][I] (Frame 30): Finished uplink   reception    of 7 symbols in 0.131mS
+[29:842385][W] Channel Sim[0]: DoTxBs, ApplyChannel completion time 16.873mS for (Frame 30, Symbol 4)
+[29:844298][I] (Frame 30): Finished downlink reception    of 4 symbols in 69.772mS
+[29:845693][I] (Frame 30): Finished uplink   transmission of 7 symbols in 23.171mS (rx to tx), 22.214mS (tx to tx)
+[29:846180][I] (Frame 30): Finished downlink transmission of 4 symbols in 1.890mS (rx to tx), 67.623mS (tx to tx)
+[30:194517][I] (Frame 31): Finished uplink   reception    of 7 symbols in 0.118mS
+[30:200381][I] (Frame 31): Finished downlink reception    of 4 symbols in 41.852mS
+[30:201700][I] (Frame 31): Finished uplink   transmission of 7 symbols in 7.183mS (rx to tx), 6.228mS (tx to tx)
+[30:202199][I] (Frame 31): Finished downlink transmission of 4 symbols in 1.817mS (rx to tx), 39.641mS (tx to tx)
+[30:606507][I] (Frame 32): Finished uplink   reception    of 7 symbols in 0.114mS
+[30:617545][I] (Frame 32): Finished uplink   transmission of 7 symbols in 11.039mS (rx to tx), 6.101mS (tx to tx)
+[30:626829][I] (Frame 32): Finished downlink reception    of 4 symbols in 64.299mS
+[30:642863][I] (Frame 32): Finished downlink transmission of 4 symbols in 16.035mS (rx to tx), 64.304mS (tx to tx)
+[30:986515][I] (Frame 33): Finished uplink   reception    of 7 symbols in 0.117mS
+[31:001560][I] (Frame 33): Finished uplink   transmission of 7 symbols in 15.052mS (rx to tx), 6.123mS (tx to tx)
+[31:010836][I] (Frame 33): Finished downlink reception    of 4 symbols in 64.314mS
+[31:026867][I] (Frame 33): Finished downlink transmission of 4 symbols in 16.030mS (rx to tx), 64.310mS (tx to tx)
+[31:370526][I] (Frame 34): Finished uplink   reception    of 7 symbols in 0.115mS
+[31:385743][I] (Frame 34): Finished uplink   transmission of 7 symbols in 15.221mS (rx to tx), 6.130mS (tx to tx)
+[31:390837][I] (Frame 34): Finished downlink reception    of 4 symbols in 54.986mS
+[31:391047][I] (Frame 34): Finished downlink transmission of 4 symbols in 0.217mS (rx to tx), 44.363mS (tx to tx)
+[31:770506][I] (Frame 35): Finished uplink   reception    of 7 symbols in 0.109mS
+[31:793609][I] (Frame 35): Finished uplink   transmission of 7 symbols in 23.103mS (rx to tx), 22.131mS (tx to tx)
+[31:806852][I] (Frame 35): Finished downlink reception    of 4 symbols in 64.333mS
+[31:822856][I] (Frame 35): Finished downlink transmission of 4 symbols in 16.004mS (rx to tx), 64.296mS (tx to tx)
+[32:146504][I] (Frame 36): Finished uplink   reception    of 7 symbols in 0.109mS
+[32:153572][I] (Frame 36): Finished uplink   transmission of 7 symbols in 7.068mS (rx to tx), 6.109mS (tx to tx)
+[32:158852][I] (Frame 36): Finished downlink reception    of 4 symbols in 32.329mS
+[32:159070][I] (Frame 36): Finished downlink transmission of 4 symbols in 0.217mS (rx to tx), 16.517mS (tx to tx)
+[32:542520][I] (Frame 37): Finished uplink   reception    of 7 symbols in 0.122mS
+[32:548348][I] (Frame 37): Finished downlink reception    of 4 symbols in 32.857mS
+[32:549713][I] (Frame 37): Finished uplink   transmission of 7 symbols in 7.193mS (rx to tx), 6.226mS (tx to tx)
+[32:550188][I] (Frame 37): Finished downlink transmission of 4 symbols in 1.841mS (rx to tx), 34.508mS (tx to tx)
+[32:930524][I] (Frame 38): Finished uplink   reception    of 7 symbols in 0.125mS
+[32:936403][I] (Frame 38): Finished downlink reception    of 4 symbols in 27.706mS
+[32:937715][I] (Frame 38): Finished uplink   transmission of 7 symbols in 7.191mS (rx to tx), 6.228mS (tx to tx)
+[32:938191][I] (Frame 38): Finished downlink transmission of 4 symbols in 1.788mS (rx to tx), 29.305mS (tx to tx)
+[33:334492][I] (Frame 39): Finished uplink   reception    of 7 symbols in 0.098mS
+[33:345547][I] (Frame 39): Finished uplink   transmission of 7 symbols in 11.055mS (rx to tx), 6.118mS (tx to tx)
+[33:346854][I] (Frame 39): Finished downlink reception    of 4 symbols in 32.329mS
+[33:347045][I] (Frame 39): Finished downlink transmission of 4 symbols in 0.192mS (rx to tx), 32.331mS (tx to tx)
+[33:430516][I] (Frame 40): Finished uplink   reception    of 7 symbols in 0.111mS
+[33:441558][I] (Frame 40): Finished uplink   transmission of 7 symbols in 11.044mS (rx to tx), 6.129mS (tx to tx)
+[33:442833][I] (Frame 40): Finished downlink reception    of 4 symbols in 32.288mS
+[33:443031][I] (Frame 40): Finished downlink transmission of 4 symbols in 0.198mS (rx to tx), 32.298mS (tx to tx)
+[33:550512][I] (Frame 41): Finished uplink   reception    of 7 symbols in 0.112mS
+[33:556392][I] (Frame 41): Finished downlink reception    of 4 symbols in 37.864mS
+[33:557693][I] (Frame 41): Finished uplink   transmission of 7 symbols in 7.182mS (rx to tx), 6.229mS (tx to tx)
+[33:558178][I] (Frame 41): Finished downlink transmission of 4 symbols in 1.788mS (rx to tx), 39.465mS (tx to tx)
+[33:610425][I] (Frame 42): Finished uplink   reception    of 7 symbols in 0.046mS
+[33:620212][I] (Frame 42): Finished downlink reception    of 4 symbols in 23.451mS
+[33:621545][I] (Frame 42): Finished uplink   transmission of 7 symbols in 11.121mS (rx to tx), 6.120mS (tx to tx)
+[33:622019][I] (Frame 42): Finished downlink transmission of 4 symbols in 1.807mS (rx to tx), 25.071mS (tx to tx)
+[33:734425][I] (Frame 43): Finished uplink   reception    of 7 symbols in 0.045mS
+[33:765572][I] (Frame 43): Finished uplink   transmission of 7 symbols in 31.148mS (rx to tx), 22.158mS (tx to tx)
+[33:774576][I] (Frame 43): Finished downlink reception    of 4 symbols in 64.139mS
+[33:774929][I] (Frame 43): Finished downlink transmission of 4 symbols in 0.353mS (rx to tx), 64.305mS (tx to tx)
+[33:838433][I] (Frame 44): Finished uplink   reception    of 7 symbols in 0.053mS
+[33:861599][I] (Frame 44): Finished uplink   transmission of 7 symbols in 23.168mS (rx to tx), 22.165mS (tx to tx)
+[33:870580][I] (Frame 44): Finished downlink reception    of 4 symbols in 64.131mS
+[33:870927][I] (Frame 44): Finished downlink transmission of 4 symbols in 0.349mS (rx to tx), 64.294mS (tx to tx)
+[33:934434][I] (Frame 45): Finished uplink   reception    of 7 symbols in 0.055mS
+[33:955442][I] (Frame 45): Finished downlink reception    of 4 symbols in 63.767mS
+[33:957601][I] (Frame 45): Finished uplink   transmission of 7 symbols in 23.167mS (rx to tx), 22.160mS (tx to tx)
+[33:958070][I] (Frame 45): Finished downlink transmission of 4 symbols in 2.629mS (rx to tx), 66.210mS (tx to tx)
+[34:026432][I] (Frame 46): Finished uplink   reception    of 7 symbols in 0.053mS
+[34:033563][I] (Frame 46): Finished uplink   transmission of 7 symbols in 7.131mS (rx to tx), 6.110mS (tx to tx)
+[34:046566][I] (Frame 46): Finished downlink reception    of 4 symbols in 56.588mS
+[34:050856][I] (Frame 46): Finished downlink transmission of 4 symbols in 4.290mS (rx to tx), 60.694mS (tx to tx)
+[34:118441][I] (Frame 47): Finished uplink   reception    of 7 symbols in 0.051mS
+[34:123504][I] (Frame 47): Finished downlink reception    of 4 symbols in 35.222mS
+[34:125597][I] (Frame 47): Finished uplink   transmission of 7 symbols in 7.156mS (rx to tx), 6.146mS (tx to tx)
+[34:126065][I] (Frame 47): Finished downlink transmission of 4 symbols in 2.561mS (rx to tx), 37.600mS (tx to tx)
+[34:210431][I] (Frame 48): Finished uplink   reception    of 7 symbols in 0.053mS
+[34:215440][I] (Frame 48): Finished downlink reception    of 4 symbols in 28.853mS
+[34:217588][I] (Frame 48): Finished uplink   transmission of 7 symbols in 7.158mS (rx to tx), 6.149mS (tx to tx)
+[34:218062][I] (Frame 48): Finished downlink transmission of 4 symbols in 2.624mS (rx to tx), 31.289mS (tx to tx)
+[34:302424][I] (Frame 49): Finished uplink   reception    of 7 symbols in 0.047mS
+[34:311501][I] (Frame 49): Finished downlink reception    of 4 symbols in 26.608mS
+[34:313542][I] (Frame 49): Finished uplink   transmission of 7 symbols in 11.118mS (rx to tx), 6.105mS (tx to tx)
+[34:314018][I] (Frame 49): Finished downlink transmission of 4 symbols in 2.518mS (rx to tx), 28.937mS (tx to tx)
+[35:440894][I] Destroying channel simulator
+Channel Simulator Exit
+=================================
+          CORE LIST SUMMARY      
+=================================
+Total Number of Cores: 72 : 36 
+|| Core ID:  1 || Requested:  0 || ThreadType: Master           || ThreadId: 140453172356480 
+|| Core ID:  2 || Requested:  1 || ThreadType: TXRX             || ThreadId: 140452975277824 
+|| Core ID:  3 || Requested:  2 || ThreadType: TXRX             || ThreadId: 140452966885120 
+|| Core ID:  4 || Requested:  3 || ThreadType: Worker           || ThreadId: 140452983670528 
+=================================
