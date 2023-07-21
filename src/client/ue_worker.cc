@@ -693,7 +693,7 @@ void UeWorker::DoIfft(size_t tag) {
     std::memset(ifft_buff + config_.OfdmDataStop(), 0,
                 sizeof(complex_float) * config_.OfdmDataStart());
 
-      CommsLib::FFTShift(ifft_buff, config_.OfdmCaNum());
+    CommsLib::FFTShift(ifft_buff, config_.OfdmCaNum());
     if(bypass_iFFT == false) {
       CommsLib::IFFT(ifft_buff, config_.OfdmCaNum(), false);
     }

@@ -1182,13 +1182,9 @@ void Config::GenPilots() {
                 Agora_memory::Alignment_t::kAlign64, 1);
 
   for (size_t j = 0; j < ofdm_data_num_; j++) {
-    // FFT Shift
-    const size_t k = j + ofdm_data_start_ >= ofdm_ca_num_ / 2
-                         ? j + ofdm_data_start_ - ofdm_ca_num_ / 2
-                         : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
-    pilot_ifft_[k] = this->pilots_[j];
+    CommsLib::FFTShift( pilot_ifft_ , ofdm_ca_num_ );
   }
-  //CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
+  CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
 
   // Generate UE-specific pilots based on Zadoff-Chu sequence for phase tracking
   this->ue_specific_pilot_.Malloc(this->ue_ant_num_, this->ofdm_data_num_,
@@ -1209,9 +1205,12 @@ void Config::GenPilots() {
       const size_t k = j + ofdm_data_start_ >= ofdm_ca_num_ / 2
                            ? j + ofdm_data_start_ - ofdm_ca_num_ / 2
                            : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
+
+      //CommsLib::FFTShift( ue_pilot_ifft_[i], ofdm_ca_num_ );
+
       ue_pilot_ifft_[i][k] = this->ue_specific_pilot_[i][j];
     }
-    //CommsLib::IFFT(ue_pilot_ifft_[i], ofdm_ca_num_, false);
+    CommsLib::IFFT(ue_pilot_ifft_[i], ofdm_ca_num_, false);
   }
 }
 
@@ -1393,8 +1392,6 @@ void Config::GenData() {
   }
 
   // Generate freq-domain uplink symbols
-  /*Bypass the IFFT...*/
-
   Table<complex_float> ul_iq_ifft;
   ul_iq_ifft.Calloc(this->frame_.NumULSyms(),
                     this->ofdm_ca_num_ * this->ue_ant_num_,
@@ -1447,7 +1444,7 @@ void Config::GenData() {
         }
       }
       /*CHSim Bypass Uplink*/
-      //CommsLib::IFFT(&ul_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
+      CommsLib::IFFT(&ul_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
     }
   }
   if (kOutputUlScData) {
@@ -1522,7 +1519,6 @@ void Config::GenData() {
       size_t q = u * ofdm_data_num_;
 
       for (size_t j = 0; j < ofdm_data_num_; j++) {
-        size_t sc = j + ofdm_data_start_;
         if (IsDataSubcarrier(j) == true) {
           int8_t* mod_input_ptr =
               GetModBitsBuf(dl_mod_bits_, Direction::kDownlink, 0, i, u,
@@ -1531,14 +1527,9 @@ void Config::GenData() {
         } else {
           dl_iq_f_[i][q + j] = ue_specific_pilot_[u][j];
         }
-        // FFT Shift
-        const size_t k = sc >= ofdm_ca_num_ / 2 ? sc - ofdm_ca_num_ / 2
-                                                : sc + ofdm_ca_num_ / 2;
-        dl_iq_ifft[i][u * ofdm_ca_num_ + k] = dl_iq_f_[i][q + j];
+        CommsLib::FFTShift( dl_iq_ifft[i] , ofdm_ca_num_ );
       }
-      
-      /*CHSim Bypass Downlink*/
-      //CommsLib::IFFT(&dl_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
+      CommsLib::IFFT(&dl_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
     }
   }
 
@@ -1623,13 +1614,17 @@ void Config::GenData() {
       this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).resize(samps_per_symbol_, 0);
       if (this->freq_orthogonal_pilot_ || ue_id == pilot_idx) {
         std::vector<arma::uword> pilot_sc_list;
+
         for (size_t sc_id = 0; sc_id < ofdm_data_num_; sc_id++) {
+
           const size_t org_sc = sc_id + ofdm_data_start_;
           const size_t center_sc = ofdm_ca_num_ / 2;
           // FFT Shift
           const size_t shifted_sc = (org_sc >= center_sc)
                                         ? (org_sc - center_sc)
                                         : (org_sc + center_sc);
+          
+          
           if (this->freq_orthogonal_pilot_ == false ||
               sc_id % this->pilot_sc_group_size_ == ue_id) {
             pilot_ifft_[shifted_sc] = this->pilots_[sc_id];
@@ -1638,11 +1633,13 @@ void Config::GenData() {
             pilot_ifft_[shifted_sc].re = 0.0f;
             pilot_ifft_[shifted_sc].im = 0.0f;
           }
+
+
         }
         pilot_ue_sc_.at(ue_id) = arma::uvec(pilot_sc_list);
 
         /*CHSim Bypass*/
-        //CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
+        CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
         CommsLib::Ifft2tx(pilot_ifft_,
                           this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).data(),
                           ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
@@ -1781,7 +1778,7 @@ void Config::GenBroadcastSlots(
     auto mapped_symbol = DataGenerator::MapOFDMSymbol(
         this, modulated_vector, pilots_, SymbolType::kControl);
     auto ofdm_symbol = DataGenerator::BinForIfft(this, mapped_symbol, true);
-    //CommsLib::IFFT(&ofdm_symbol[0], ofdm_ca_num_, false);
+    CommsLib::IFFT(&ofdm_symbol[0], ofdm_ca_num_, false);
     // additional 2^2 (6dB) power backoff
     float dl_bcast_scale =
         2 * CommsLib::FindMaxAbs(&ofdm_symbol[0], ofdm_symbol.size());
