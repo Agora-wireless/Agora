@@ -1188,7 +1188,7 @@ void Config::GenPilots() {
                          : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
     pilot_ifft_[k] = this->pilots_[j];
   }
-  CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
+  //CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
 
   // Generate UE-specific pilots based on Zadoff-Chu sequence for phase tracking
   this->ue_specific_pilot_.Malloc(this->ue_ant_num_, this->ofdm_data_num_,
@@ -1211,7 +1211,7 @@ void Config::GenPilots() {
                            : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
       ue_pilot_ifft_[i][k] = this->ue_specific_pilot_[i][j];
     }
-    CommsLib::IFFT(ue_pilot_ifft_[i], ofdm_ca_num_, false);
+    //CommsLib::IFFT(ue_pilot_ifft_[i], ofdm_ca_num_, false);
   }
 }
 
@@ -1393,6 +1393,8 @@ void Config::GenData() {
   }
 
   // Generate freq-domain uplink symbols
+  /*Bypass the IFFT...*/
+
   Table<complex_float> ul_iq_ifft;
   ul_iq_ifft.Calloc(this->frame_.NumULSyms(),
                     this->ofdm_ca_num_ * this->ue_ant_num_,
@@ -1444,7 +1446,8 @@ void Config::GenData() {
           AGORA_LOG_ERROR("Config: Failed to write ul sc data file\n");
         }
       }
-      CommsLib::IFFT(&ul_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
+      /*CHSim Bypass Uplink*/
+      //CommsLib::IFFT(&ul_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
     }
   }
   if (kOutputUlScData) {
@@ -1533,7 +1536,9 @@ void Config::GenData() {
                                                 : sc + ofdm_ca_num_ / 2;
         dl_iq_ifft[i][u * ofdm_ca_num_ + k] = dl_iq_f_[i][q + j];
       }
-      CommsLib::IFFT(&dl_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
+      
+      /*CHSim Bypass Downlink*/
+      //CommsLib::IFFT(&dl_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
     }
   }
 
@@ -1635,7 +1640,9 @@ void Config::GenData() {
           }
         }
         pilot_ue_sc_.at(ue_id) = arma::uvec(pilot_sc_list);
-        CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
+
+        /*CHSim Bypass*/
+        //CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
         CommsLib::Ifft2tx(pilot_ifft_,
                           this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).data(),
                           ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
@@ -1774,7 +1781,7 @@ void Config::GenBroadcastSlots(
     auto mapped_symbol = DataGenerator::MapOFDMSymbol(
         this, modulated_vector, pilots_, SymbolType::kControl);
     auto ofdm_symbol = DataGenerator::BinForIfft(this, mapped_symbol, true);
-    CommsLib::IFFT(&ofdm_symbol[0], ofdm_ca_num_, false);
+    //CommsLib::IFFT(&ofdm_symbol[0], ofdm_ca_num_, false);
     // additional 2^2 (6dB) power backoff
     float dl_bcast_scale =
         2 * CommsLib::FindMaxAbs(&ofdm_symbol[0], ofdm_symbol.size());

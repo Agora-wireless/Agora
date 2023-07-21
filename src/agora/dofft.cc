@@ -97,8 +97,8 @@ EventData DoFFT::Launch(size_t tag) {
   const size_t cell_id = pkt->cell_id_;
   const SymbolType sym_type = cfg_->GetSymbolType(symbol_id);
 
-  //const bool bypass_FFT = (cfg_->FreqDomainChannel() || cfg_->FftInRru()); //TODO
-  const bool bypass_FFT = false;
+  const bool bypass_FFT = (cfg_->FreqDomainChannel() || cfg_->FftInRru()); //TODO
+  //const bool bypass_FFT = false;
   
   if (bypass_FFT) {
     SimdConvertShortToFloat(
