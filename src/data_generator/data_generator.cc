@@ -11,6 +11,7 @@
 
 #include "comms-lib.h"
 #include "crc.h"
+#include "datatype_conversion.h"
 #include "logger.h"
 #include "modulation.h"
 #include "phy_ldpc_decoder_5gnr.h"
@@ -77,6 +78,7 @@ std::vector<complex_float> DataGenerator::GetCommonPilotFreqDomain() const {
   const std::vector<std::complex<float>> zc_common_pilot =
       CommsLib::SeqCyclicShift(zc_seq, M_PI / 4.0);  // Used in LTE SRS
 
+  //auto ret = DataGenerator::BinForIfft(this->cfg_, zc_common_pilot, false);
   std::vector<complex_float> ret(cfg_->OfdmCaNum());  // Zeroed
   for (size_t i = 0; i < cfg_->OfdmDataNum(); i++) {
     ret[i + cfg_->OfdmDataStart()] = {zc_common_pilot[i].real(),
@@ -204,7 +206,7 @@ std::vector<complex_float> DataGenerator::GetModulation(
 
 std::vector<complex_float> DataGenerator::MapOFDMSymbol(
     Config* cfg, const std::vector<complex_float>& modulated_codeword,
-    complex_float* pilot_seq, SymbolType symbol_type) {
+    const complex_float* pilot_seq, SymbolType symbol_type) {
   std::vector<complex_float> ofdm_symbol;
   for (size_t i = 0; i < cfg->OfdmDataNum(); i++) {
     if (symbol_type == SymbolType::kUL) {
@@ -331,6 +333,118 @@ void DataGenerator::GetDecodedDataBatch(Table<int8_t>& demoded_data,
     }
   }
   std::free(resp_var_nodes);
+}
+
+size_t DataGenerator::DecodeBroadcastSlots(
+    Config* cfg, const int16_t* const bcast_iq_samps) {
+  size_t start_tsc = GetTime::WorkerRdtsc();
+  size_t delay_offset = (cfg->OfdmRxZeroPrefixClient() + cfg->CpLen()) * 2;
+  complex_float* bcast_fft_buff = static_cast<complex_float*>(
+      Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
+                                       cfg->OfdmCaNum() * sizeof(float) * 2));
+  SimdConvertShortToFloat(&bcast_iq_samps[delay_offset],
+                          reinterpret_cast<float*>(bcast_fft_buff),
+                          cfg->OfdmCaNum() * 2);
+  CommsLib::FFT(bcast_fft_buff, cfg->OfdmCaNum());
+  CommsLib::FFTShift(bcast_fft_buff, cfg->OfdmCaNum());
+  auto* bcast_buff_complex = reinterpret_cast<arma::cx_float*>(bcast_fft_buff);
+
+  const size_t sc_num = cfg->GetOFDMCtrlNum();
+  const size_t ctrl_sc_num =
+      cfg->BcLdpcConfig().NumCbCodewLen() / cfg->BcModOrderBits();
+  std::vector<arma::cx_float> csi_buff(cfg->OfdmDataNum());
+  arma::cx_float* eq_buff =
+      static_cast<arma::cx_float*>(Agora_memory::PaddedAlignedAlloc(
+          Agora_memory::Alignment_t::kAlign64, sc_num * sizeof(float) * 2));
+
+  // estimate channel from pilot subcarriers
+  float phase_shift = 0;
+  for (size_t j = 0; j < cfg->OfdmDataNum(); j++) {
+    size_t sc_id = j + cfg->OfdmDataStart();
+    complex_float p = cfg->pilots()[j];
+    if (j % cfg->OfdmPilotSpacing() == 0) {
+      csi_buff.at(j) = (bcast_buff_complex[sc_id] / arma::cx_float(p.re, p.im));
+    } else {
+      ///\todo not correct when 0th subcarrier is not pilot
+      csi_buff.at(j) = csi_buff.at(j - 1);
+      if (j % cfg->OfdmPilotSpacing() == 1) {
+        phase_shift += arg((bcast_buff_complex[sc_id] / csi_buff.at(j)) *
+                           arma::cx_float(p.re, -p.im));
+      }
+    }
+  }
+  phase_shift /= cfg->GetOFDMPilotNum();
+  for (size_t j = 0; j < cfg->OfdmDataNum(); j++) {
+    size_t sc_id = j + cfg->OfdmDataStart();
+    if (cfg->IsControlSubcarrier(j) == true) {
+      eq_buff[cfg->GetOFDMCtrlIndex(j)] =
+          (bcast_buff_complex[sc_id] / csi_buff.at(j)) *
+          exp(arma::cx_float(0, -phase_shift));
+    }
+  }
+  int8_t* demod_buff_ptr = static_cast<int8_t*>(
+      Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
+                                       cfg->BcModOrderBits() * ctrl_sc_num));
+  Demodulate(reinterpret_cast<float*>(&eq_buff[0]), demod_buff_ptr,
+             2 * ctrl_sc_num, cfg->BcModOrderBits(), false);
+
+  const int num_bcast_bytes = BitsToBytes(cfg->BcLdpcConfig().NumCbLen());
+  std::vector<uint8_t> decode_buff(num_bcast_bytes, 0u);
+
+  DataGenerator::GetDecodedData(demod_buff_ptr, &decode_buff.at(0),
+                                cfg->BcLdpcConfig(), num_bcast_bytes,
+                                cfg->ScrambleEnabled());
+  FreeBuffer1d(&bcast_fft_buff);
+  FreeBuffer1d(&eq_buff);
+  FreeBuffer1d(&demod_buff_ptr);
+  const double duration =
+      GetTime::CyclesToUs(GetTime::WorkerRdtsc() - start_tsc, cfg->FreqGhz());
+  if (kDebugPrintInTask) {
+    std::printf("DecodeBroadcast completed in %2.2f us\n", duration);
+  }
+  return (reinterpret_cast<size_t*>(decode_buff.data()))[0];
+}
+
+void DataGenerator::GenBroadcastSlots(
+    Config* cfg, std::vector<std::complex<int16_t>*>& bcast_iq_samps,
+    std::vector<size_t> ctrl_msg) {
+  ///\todo enable a vector of bytes to TX'ed in each symbol
+  assert(bcast_iq_samps.size() == cfg->Frame().NumDlControlSyms());
+  const size_t start_tsc = GetTime::WorkerRdtsc();
+
+  int num_bcast_bytes = BitsToBytes(cfg->BcLdpcConfig().NumCbLen());
+  std::vector<int8_t> bcast_bits_buffer(num_bcast_bytes, 0);
+
+  Table<complex_float> dl_bcast_mod_table;
+  InitModulationTable(dl_bcast_mod_table, cfg->BcModOrderBits());
+
+  for (size_t i = 0; i < cfg->Frame().NumDlControlSyms(); i++) {
+    std::memcpy(bcast_bits_buffer.data(), ctrl_msg.data(), sizeof(size_t));
+
+    const auto coded_bits_ptr = DataGenerator::GenCodeblock(
+        cfg->BcLdpcConfig(), &bcast_bits_buffer.at(0), num_bcast_bytes,
+        cfg->ScrambleEnabled());
+
+    auto modulated_vector =
+        DataGenerator::GetModulation(&coded_bits_ptr[0], dl_bcast_mod_table,
+                                     cfg->BcLdpcConfig().NumCbCodewLen(),
+                                     cfg->OfdmDataNum(), cfg->BcModOrderBits());
+    auto mapped_symbol = DataGenerator::MapOFDMSymbol(
+        cfg, modulated_vector, cfg->pilots(), SymbolType::kControl);
+    auto ofdm_symbol = DataGenerator::BinForIfft(cfg, mapped_symbol, true);
+    CommsLib::IFFT(&ofdm_symbol[0], cfg->OfdmCaNum(), false);
+    // additional 2^2 (6dB) power backoff
+    float dl_bcast_scale =
+        2 * CommsLib::FindMaxAbs(&ofdm_symbol[0], ofdm_symbol.size());
+    CommsLib::Ifft2tx(&ofdm_symbol[0], bcast_iq_samps[i], cfg->OfdmCaNum(),
+                      cfg->OfdmTxZeroPrefix(), cfg->CpLen(), dl_bcast_scale);
+  }
+  dl_bcast_mod_table.Free();
+  const double duration =
+      GetTime::CyclesToUs(GetTime::WorkerRdtsc() - start_tsc, cfg->FreqGhz());
+  if (kDebugPrintInTask) {
+    std::printf("GenBroadcast completed in %2.2f us\n", duration);
+  }
 }
 
 void DataGenerator::GenerateUlTxTestVectors(Config* const cfg) {

@@ -287,6 +287,9 @@ class Config {
   inline const LDPCconfig& BcLdpcConfig() const {
     return dl_bcast_ldpc_config_;
   }
+  inline size_t BcModOrderBits() const {
+    return this->dl_bcast_mod_order_bits_;
+  }
   inline Table<complex_float>& ModTable(Direction dir) {
     return dir == Direction::kUplink ? this->ul_mod_table_
                                      : this->dl_mod_table_;
@@ -361,7 +364,7 @@ class Config {
 
   inline const std::vector<uint32_t>& Pilot() const { return this->pilot_; };
   inline const std::vector<uint32_t>& Beacon() const { return this->beacon_; };
-  // inline const complex_float *pilots (void ) const { return this->pilots_; };
+  inline const complex_float* pilots(void) const { return this->pilots_; };
   inline const complex_float* PilotsSgn() const { return this->pilots_sgn_; };
   inline const std::vector<std::complex<float>>& CommonPilot() const {
     return this->common_pilot_;
@@ -415,9 +418,6 @@ class Config {
   void LoadUplinkData();
   void LoadDownlinkData();
   void GenData();
-  void GenBroadcastSlots(std::vector<std::complex<int16_t>*>& bcast_iq_samps,
-                         std::vector<size_t> ctrl_msg);
-  size_t DecodeBroadcastSlots(const int16_t* const bcast_iq_samps);
   void UpdateUlMCS(const nlohmann::json& ul_mcs_params);
   void UpdateDlMCS(const nlohmann::json& dl_mcs_params);
   void UpdateCtrlMCS();
