@@ -24,6 +24,7 @@ static constexpr bool kPrintDlTxData = false;
 static constexpr bool kPrintDlModData = false;
 static constexpr bool kPrintUplinkInformationBytes = false;
 static constexpr bool kPrintDownlinkInformationBytes = false;
+static constexpr bool kPrintFreqDomainSamples = false;
 
 DEFINE_string(profile, "random",
               "The profile of the input user bytes (e.g., 'random', '123')");
@@ -154,9 +155,10 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
     std::vector<std::vector<complex_float>> ul_modulated_symbols(
         num_ul_codeblocks);
     for (size_t i = 0; i < num_ul_codeblocks; i++) {
-      ul_modulated_codewords.at(i).resize(cfg_->OfdmDataNum());
+      ul_modulated_codewords.at(i).resize(cfg_->OfdmDataNum(), 0);
       auto ofdm_symbol = DataGenerator::GetModulation(
-          &ul_encoded_codewords.at(i)[0], &ul_modulated_codewords.at(i).at(0),
+          &ul_encoded_codewords.at(i).at(0),
+          &ul_modulated_codewords.at(i).at(0),
           cfg_->ModTable(Direction::kUplink),
           cfg_->LdpcConfig(Direction::kUplink).NumCbCodewLen(),
           cfg_->OfdmDataNum(), cfg_->ModOrderBits(Direction::kUplink));
@@ -170,6 +172,21 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
     for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
       pre_ifft_data_syms.at(i) =
           DataGenerator::BinForIfft(cfg_, ul_modulated_symbols.at(i));
+    }
+
+    {
+      if (kPrintFreqDomainSamples) {
+        std::printf("Uplink Frequency-Domain Samples\n");
+        for (size_t n = 0; n < num_ul_codeblocks; n++) {
+          std::printf("Symbol %zu, UE %zu\n", n / cfg_->UeAntNum(),
+                      n % cfg_->UeAntNum());
+          for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
+            complex_float iq_s = pre_ifft_data_syms.at(n).at(i);
+            std::printf("%.4f+%.4fi, ", iq_s.re, iq_s.im);
+          }
+          std::printf("\n");
+        }
+      }
     }
 
     {
