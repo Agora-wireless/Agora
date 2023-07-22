@@ -1621,6 +1621,7 @@ void Config::GenData() {
       this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).resize(samps_per_symbol_, 0);
       if (this->freq_orthogonal_pilot_ || ue_id == pilot_idx) {
         std::vector<arma::uword> pilot_sc_list;
+
         for (size_t sc_id = 0; sc_id < ofdm_data_num_; sc_id++) {
           const size_t org_sc = sc_id + ofdm_data_start_;          
           if (this->freq_orthogonal_pilot_ == false ||
@@ -1631,6 +1632,8 @@ void Config::GenData() {
             pilot_ifft_[org_sc].re = 0.0f;
             pilot_ifft_[org_sc].im = 0.0f;
           }
+
+
         }
 
         pilot_ue_sc_.at(ue_id) = arma::uvec(pilot_sc_list);
