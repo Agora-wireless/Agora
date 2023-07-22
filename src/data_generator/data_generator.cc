@@ -150,6 +150,7 @@ std::vector<int8_t> DataGenerator::GenCodeblock(const LDPCconfig& lc,
     auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
     scrambler->Scramble(scramble_buffer.data(), input_size);
   }
+  scramble_buffer.resize(Roundup<64>(input_size), 0);
 
   std::vector<int8_t> parity;
   parity.resize(
@@ -189,7 +190,8 @@ std::vector<complex_float> DataGenerator::GetModulation(
     const int8_t* encoded_codeword, uint8_t* modulation_data,
     Table<complex_float> mod_table, const size_t num_bits,
     const size_t num_subcarriers, const size_t mod_order_bits) {
-  std::vector<complex_float> modulated_codeword(num_subcarriers);
+  std::vector<complex_float> modulated_codeword(num_subcarriers,
+                                                {0, 0});  // Zeroed
 
   AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
                   modulation_data, BitsToBytes(num_bits), mod_order_bits);
@@ -203,29 +205,29 @@ std::vector<complex_float> DataGenerator::GetModulation(
 std::vector<complex_float> DataGenerator::MapOFDMSymbol(
     Config* cfg, const std::vector<complex_float>& modulated_codeword,
     complex_float* pilot_seq, SymbolType symbol_type) {
-  std::vector<complex_float> ofdm_symbol(cfg->OfdmDataNum(), {0, 0});  // Zeroed
+  std::vector<complex_float> ofdm_symbol;
   for (size_t i = 0; i < cfg->OfdmDataNum(); i++) {
     if (symbol_type == SymbolType::kUL) {
       if (i < modulated_codeword.size()) {
-        ofdm_symbol.at(i) = modulated_codeword.at(i);
+        ofdm_symbol.push_back(modulated_codeword.at(i));
       }
     } else if (symbol_type == SymbolType::kDL) {
       if (cfg->IsDataSubcarrier(i) == true) {
         size_t data_idx = cfg->GetOFDMDataIndex(i);
         if (data_idx < modulated_codeword.size()) {
-          ofdm_symbol.at(i) = modulated_codeword.at(data_idx);
+          ofdm_symbol.push_back(modulated_codeword.at(data_idx));
         }
       } else {
-        ofdm_symbol.at(i) = pilot_seq[i];
+        ofdm_symbol.push_back(pilot_seq[i]);
       }
     } else if (symbol_type == SymbolType::kControl) {
       if (cfg->IsControlSubcarrier(i) == true) {
         size_t ctrl_idx = cfg->GetOFDMCtrlIndex(i);
         if (ctrl_idx < modulated_codeword.size()) {
-          ofdm_symbol.at(i) = modulated_codeword.at(ctrl_idx);
+          ofdm_symbol.push_back(modulated_codeword.at(ctrl_idx));
         }
       } else {
-        ofdm_symbol.at(i) = pilot_seq[i];
+        ofdm_symbol.push_back(pilot_seq[i]);
       }
     }
   }

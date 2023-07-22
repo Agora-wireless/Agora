@@ -547,10 +547,10 @@ void UeWorker::DoModul(size_t tag) {
     complex_float* modul_buf =
         &modul_buffer_[total_ul_data_symbol_id][ant_id * config_.OfdmDataNum()];
 
-    auto* ul_bits =
-        config_.GetModBitsBuf(encoded_buffer_, Direction::kUplink, frame_id,
-                              ul_data_symbol_idx, ant_id, 0);
-
+    auto* ul_bits = config_.GetModBitsBuf(
+        kDebugBypassEncode ? config_.UlModBits() : encoded_buffer_,
+        Direction::kUplink, kDebugBypassEncode ? 0 : frame_id,
+        ul_data_symbol_idx, ant_id, 0);
     if (kDebugPrintModul) {
       AGORA_LOG_INFO(
           "UeWorker[%zu]: Modul  (frame %zu, symbol %zu, ant %zu) - getting "

@@ -1206,8 +1206,8 @@ void Config::LoadUplinkData() {
                     ul_data_file.c_str());
 
     // \todo assumes one code block per symbol
-    size_t code_block_in_symbol_i = 0;
-    size_t seek_offset = 0;
+    const size_t code_block_in_symbol_i = 0u;
+    size_t seek_offset = 0u;
     for (size_t i = 0; i < this->frame_.NumUlDataSyms(); i++) {
       seek_offset +=
           ul_data_bytes_num_persymbol_ * this->ue_ant_offset_ * sizeof(int8_t);
@@ -1233,12 +1233,14 @@ void Config::LoadUplinkData() {
         kExperimentFilepath + kUlModDataPrefix +
         std::to_string(this->ofdm_ca_num_) + "_ue" +
         std::to_string(this->ue_ant_total_) + ".bin";
+    // reset seek offset for new file read
     seek_offset = 0;
+    const size_t subcarr_i = 0u;
     for (size_t i = 0; i < this->frame_.NumUlDataSyms(); i++) {
       seek_offset += ofdm_data_num_ * this->ue_ant_offset_ * sizeof(int8_t);
       for (size_t j = 0; j < this->ue_ant_num_; j++) {
         int8_t* ul_mod_data_ptr = this->GetModBitsBuf(
-            ul_mod_bits_, Direction::kUplink, 0, i, j, code_block_in_symbol_i);
+            ul_mod_bits_, Direction::kUplink, 0u, i, j, subcarr_i);
         Utils::ReadBinaryFile(ul_mod_data_file, sizeof(int8_t), ofdm_data_num_,
                               seek_offset, ul_mod_data_ptr);
         seek_offset += ofdm_data_num_ * sizeof(int8_t);
@@ -1268,7 +1270,7 @@ void Config::LoadDownlinkData() {
                     dl_data_file.c_str());
 
     // \todo assumes one code block per symbol
-    size_t code_block_in_symbol_i = 0;
+    const size_t code_block_in_symbol_i = 0;
     size_t seek_offset = 0;
     for (size_t i = 0; i < this->frame_.NumDlDataSyms(); i++) {
       seek_offset +=
@@ -1296,14 +1298,15 @@ void Config::LoadDownlinkData() {
         kExperimentFilepath + kDlModDataPrefix +
         std::to_string(this->ofdm_ca_num_) + "_ue" +
         std::to_string(this->ue_ant_total_) + ".bin";
+    // reset seek offset for new file read
     seek_offset = 0;
+    const size_t subcarr_i = 0u;
     for (size_t i = 0; i < this->frame_.NumDlDataSyms(); i++) {
       seek_offset +=
           this->GetOFDMDataNum() * this->ue_ant_offset_ * sizeof(int8_t);
       for (size_t j = 0; j < this->ue_ant_num_; j++) {
-        int8_t* dl_mod_data_ptr =
-            this->GetModBitsBuf(dl_mod_bits_, Direction::kDownlink, 0, i, j,
-                                code_block_in_symbol_i);
+        int8_t* dl_mod_data_ptr = this->GetModBitsBuf(
+            dl_mod_bits_, Direction::kDownlink, 0, i, j, subcarr_i);
         Utils::ReadBinaryFile(dl_mod_data_file, sizeof(int8_t),
                               this->GetOFDMDataNum(), seek_offset,
                               dl_mod_data_ptr);

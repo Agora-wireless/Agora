@@ -72,29 +72,7 @@ EventData DoPrecode::Launch(size_t tag) {
   const size_t symbol_idx_dl = cfg_->Frame().GetDLSymbolIdx(symbol_id);
   const size_t total_symbol_idx =
       cfg_->GetTotalSymbolIdxDl(frame_id, symbol_idx_dl);
-  const size_t data_symbol_idx_dl =
-      symbol_idx_dl - cfg_->Frame().ClientDlPilotSymbols();
-  const size_t total_data_symbol_idx =
-      cfg_->GetTotalDataSymbolIdxDl(frame_id, data_symbol_idx_dl);
   const size_t frame_slot = frame_id % kFrameWnd;
-
-  // Mark pilot subcarriers in this block
-  // In downlink pilot symbols, all subcarriers are used as pilots
-  // In downlink data symbols, pilot subcarriers are every
-  // OfdmPilotSpacing() subcarriers
-  // if (symbol_idx_dl < cfg->Frame().ClientDlPilotSymbols()) {
-  //     std::memset(pilot_sc_flags, 1, cfg->DemulBlockSize() *
-  //     sizeof(size_t));
-  // } else {
-  //     // Find subcarriers used as pilot in this block
-  //     std::memset(pilot_sc_flags, 0, cfg->DemulBlockSize() *
-  //     sizeof(size_t)); size_t remainder = base_sc_id %
-  //     cfg->OfdmPilotSpacing(); size_t first_pilot_sc
-  //         = remainder > 0 ? (cfg->OfdmPilotSpacing() - remainder) : 0;
-  //     for (size_t i = first_pilot_sc; i < cfg->DemulBlockSize();
-  //          i += cfg->OfdmPilotSpacing())
-  //         pilot_sc_flags[i] = 1;
-  // }
 
   if (kDebugPrintInTask) {
     std::printf(
@@ -111,8 +89,8 @@ EventData DoPrecode::Launch(size_t tag) {
       size_t start_tsc1 = GetTime::WorkerRdtsc();
       for (size_t sp_id = 0; sp_id < cfg_->SpatialStreamsNum(); sp_id++) {
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
-          LoadInputData(symbol_idx_dl, total_data_symbol_idx, sp_id,
-                        ue_list.at(sp_id), base_sc_id + i + j, j);
+          LoadInputData(frame_id, symbol_idx_dl, sp_id, ue_list.at(sp_id),
+                        base_sc_id + i + j, j);
         }
       }
 
@@ -130,8 +108,8 @@ EventData DoPrecode::Launch(size_t tag) {
       size_t start_tsc1 = GetTime::WorkerRdtsc();
       int cur_sc_id = base_sc_id + i;
       for (size_t sp_id = 0; sp_id < cfg_->SpatialStreamsNum(); sp_id++) {
-        LoadInputData(symbol_idx_dl, total_data_symbol_idx, sp_id,
-                      ue_list.at(sp_id), cur_sc_id, 0);
+        LoadInputData(frame_id, symbol_idx_dl, sp_id, ue_list.at(sp_id),
+                      cur_sc_id, 0);
       }
       size_t start_tsc2 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
@@ -171,9 +149,8 @@ EventData DoPrecode::Launch(size_t tag) {
   return EventData(EventType::kPrecode, tag);
 }
 
-void DoPrecode::LoadInputData(size_t symbol_idx_dl,
-                              size_t total_data_symbol_idx, size_t sp_id,
-                              size_t user_id, size_t sc_id,
+void DoPrecode::LoadInputData(size_t frame_id, size_t symbol_idx_dl,
+                              size_t sp_id, size_t user_id, size_t sc_id,
                               size_t sc_id_in_block) {
   complex_float* data_ptr =
       modulated_buffer_temp_ + sc_id_in_block * cfg_->SpatialStreamsNum();
@@ -181,10 +158,12 @@ void DoPrecode::LoadInputData(size_t symbol_idx_dl,
       (cfg_->IsDataSubcarrier(sc_id) == false)) {
     data_ptr[sp_id] = cfg_->UeSpecificPilot()[user_id][sc_id];
   } else {
-    int8_t* raw_data_ptr =
-        &dl_raw_data_[total_data_symbol_idx]
-                     [cfg_->GetOFDMDataIndex(sc_id) +
-                      Roundup<64>(cfg_->GetOFDMDataNum()) * sp_id];
+    size_t data_symbol_idx_dl =
+        symbol_idx_dl - cfg_->Frame().ClientDlPilotSymbols();
+    int8_t* raw_data_ptr = cfg_->GetModBitsBuf(
+        kDebugBypassEncode ? cfg_->DlModBits() : dl_raw_data_,
+        Direction::kDownlink, kDebugBypassEncode ? 0 : frame_id,
+        data_symbol_idx_dl, sp_id, cfg_->GetOFDMDataIndex(sc_id));
     data_ptr[sp_id] = ModSingleUint8((uint8_t)(*raw_data_ptr),
                                      cfg_->ModTable(Direction::kDownlink));
   }
