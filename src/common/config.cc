@@ -1182,11 +1182,11 @@ void Config::GenPilots() {
                 Agora_memory::Alignment_t::kAlign64, 1);
 
   complex_float* ifft_ptr_ = pilot_ifft_;
-  std::memcpy( ifft_ptr_ + ofdm_data_start_ , this->pilots_, ofdm_data_num_ * sizeof(complex_float) );
+  std::memcpy(ifft_ptr_ + ofdm_data_start_, this->pilots_,
+              ofdm_data_num_ * sizeof(complex_float));
 
-  if( this->freq_domain_channel_ == false )
-  {
-    CommsLib::FFTShift( ifft_ptr_ , ofdm_ca_num_ );
+  if (this->freq_domain_channel_ == false) {
+    CommsLib::FFTShift(ifft_ptr_, ofdm_ca_num_);
     CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
   }
 
@@ -1209,14 +1209,13 @@ void Config::GenPilots() {
     }
 
     complex_float* ifft_ptr_ = ue_pilot_ifft_[i];
-    std::memcpy( ifft_ptr_ + ofdm_data_start_ , this->ue_specific_pilot_[i], ofdm_data_num_ * sizeof(complex_float) );
+    std::memcpy(ifft_ptr_ + ofdm_data_start_, this->ue_specific_pilot_[i],
+                ofdm_data_num_ * sizeof(complex_float));
 
-    if( this->freq_domain_channel_ == false )
-    {
-      CommsLib::FFTShift( ifft_ptr_ , ofdm_ca_num_ );
+    if (this->freq_domain_channel_ == false) {
+      CommsLib::FFTShift(ifft_ptr_, ofdm_ca_num_);
       CommsLib::IFFT(ue_pilot_ifft_[i], ofdm_ca_num_, false);
     }
-
   }
 }
 
@@ -1438,13 +1437,13 @@ void Config::GenData() {
       }
 
       complex_float* ifft_ptr_ = &ul_iq_ifft[i][u * ofdm_ca_num_];
-      std::memcpy( ifft_ptr_ + ofdm_data_start_ , ul_iq_f_[i] + q, ofdm_data_num_ * sizeof(complex_float) );
+      std::memcpy(ifft_ptr_ + ofdm_data_start_, ul_iq_f_[i] + q,
+                  ofdm_data_num_ * sizeof(complex_float));
 
-      if( this->freq_domain_channel_  == false ) {
-        CommsLib::FFTShift( ifft_ptr_ , ofdm_ca_num_ );
-        CommsLib::IFFT( ifft_ptr_, ofdm_ca_num_, false);
+      if (this->freq_domain_channel_ == false) {
+        CommsLib::FFTShift(ifft_ptr_, ofdm_ca_num_);
+        CommsLib::IFFT(ifft_ptr_, ofdm_ca_num_, false);
       }
-
     }
   }
   if (kOutputUlScData) {
@@ -1528,15 +1527,15 @@ void Config::GenData() {
           dl_iq_f_[i][q + j] = ue_specific_pilot_[u][j];
         }
       }
-      
-      complex_float* ifft_ptr_ = &dl_iq_ifft[i][u * ofdm_ca_num_];
-      std::memcpy( ifft_ptr_ + ofdm_data_start_ , dl_iq_f_[i] + q, ofdm_data_num_ * sizeof(complex_float) );
 
-      if( this->freq_domain_channel_  == false ) {
-        CommsLib::FFTShift( ifft_ptr_ , ofdm_ca_num_ );
-        CommsLib::IFFT( ifft_ptr_, ofdm_ca_num_, false);
+      complex_float* ifft_ptr_ = &dl_iq_ifft[i][u * ofdm_ca_num_];
+      std::memcpy(ifft_ptr_ + ofdm_data_start_, dl_iq_f_[i] + q,
+                  ofdm_data_num_ * sizeof(complex_float));
+
+      if (this->freq_domain_channel_ == false) {
+        CommsLib::FFTShift(ifft_ptr_, ofdm_ca_num_);
+        CommsLib::IFFT(ifft_ptr_, ofdm_ca_num_, false);
       }
-      
     }
   }
 
@@ -1623,7 +1622,7 @@ void Config::GenData() {
         std::vector<arma::uword> pilot_sc_list;
 
         for (size_t sc_id = 0; sc_id < ofdm_data_num_; sc_id++) {
-          const size_t org_sc = sc_id + ofdm_data_start_;          
+          const size_t org_sc = sc_id + ofdm_data_start_;
           if (this->freq_orthogonal_pilot_ == false ||
               sc_id % this->pilot_sc_group_size_ == ue_id) {
             pilot_ifft_[org_sc] = this->pilots_[sc_id];
@@ -1632,13 +1631,10 @@ void Config::GenData() {
             pilot_ifft_[org_sc].re = 0.0f;
             pilot_ifft_[org_sc].im = 0.0f;
           }
-
-
         }
 
         pilot_ue_sc_.at(ue_id) = arma::uvec(pilot_sc_list);
-        if( this->freq_domain_channel_ == false )
-        {
+        if (this->freq_domain_channel_ == false) {
           CommsLib::FFTShift(pilot_ifft_, this->ofdm_ca_num_);
           CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
         }
@@ -1646,7 +1642,6 @@ void Config::GenData() {
         CommsLib::Ifft2tx(pilot_ifft_,
                           this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).data(),
                           ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
-
       }
     }
   }
@@ -1782,9 +1777,8 @@ void Config::GenBroadcastSlots(
     auto mapped_symbol = DataGenerator::MapOFDMSymbol(
         this, modulated_vector, pilots_, SymbolType::kControl);
     auto ofdm_symbol = DataGenerator::BinForIfft(this, mapped_symbol, true);
-    
-    if( this->freq_domain_channel_ == false )
-    {
+
+    if (this->freq_domain_channel_ == false) {
       CommsLib::IFFT(&ofdm_symbol[0], ofdm_ca_num_, false);
     }
     // additional 2^2 (6dB) power backoff
@@ -1973,7 +1967,8 @@ void Config::Print() const {
               << "UL Bytes per CB: " << ul_num_bytes_per_cb_ << std::endl
               << "DL Bytes per CB: " << dl_num_bytes_per_cb_ << std::endl
               << "FFT in rru: " << fft_in_rru_ << std::endl
-              << "Frequency domain channel: " << freq_domain_channel_ << std::endl;
+              << "Frequency domain channel: " << freq_domain_channel_
+              << std::endl;
   }
 }
 

@@ -544,7 +544,6 @@ void ChannelSim::DoTxBs(ChSimWorkerStorage* local, size_t tag) {
           "(Frame %zu, Symbol %zu)\n",
           local->Id(), apply_channel_time, frame_id, symbol_id);
     }
-    
   }
   AGORA_LOG_TRACE("Noisy dimensions %lld x %lld : %lld\n", fmat_noisy->n_rows,
                   fmat_noisy->n_cols, fmat_noisy->n_elem);

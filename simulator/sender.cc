@@ -618,5 +618,5 @@ void Sender::RunFft(Packet* pkt, complex_float* fft_inout,
 
   SimdConvertFloatToShort(reinterpret_cast<float*>(fft_inout),
                           reinterpret_cast<short*>(pkt->data_),
-                              cfg_->OfdmCaNum() * 2);
+                          cfg_->OfdmCaNum() * 2);
 }
