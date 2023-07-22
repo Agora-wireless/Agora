@@ -97,9 +97,10 @@ EventData DoFFT::Launch(size_t tag) {
   const size_t cell_id = pkt->cell_id_;
   const SymbolType sym_type = cfg_->GetSymbolType(symbol_id);
 
-  const bool bypass_FFT = (cfg_->FreqDomainChannel() || cfg_->FftInRru()); //TODO
+  const bool bypass_FFT =
+      (cfg_->FreqDomainChannel() || cfg_->FftInRru());  //TODO
   //const bool bypass_FFT = false;
-  
+
   if (kUse12BitIQ) {
     SimdConvert12bitIqToFloat(
         (uint8_t*)pkt->data_ + 3 * cfg_->OfdmRxZeroPrefixBs(),
@@ -117,16 +118,15 @@ EventData DoFFT::Launch(size_t tag) {
                             cfg_->OfdmCaNum() * 2);
   }
   if (kDebugPrintInTask) {
-    std::printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n",
-                tid_, frame_id, symbol_id, ant_id);
+    std::printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n", tid_,
+                frame_id, symbol_id, ant_id);
   }
 
   if ((kPrintPilotCorrStats == true) &&
       ((sym_type == SymbolType::kPilot) || (sym_type == SymbolType::kCalUL) ||
-        ((sym_type == SymbolType::kCalDL) &&
+       ((sym_type == SymbolType::kCalDL) &&
         (ant_id == cfg_->RefAnt(cell_id))))) {
-    SimdConvertShortToFloat(pkt->data_,
-                            reinterpret_cast<float*>(rx_samps_tmp_),
+    SimdConvertShortToFloat(pkt->data_, reinterpret_cast<float*>(rx_samps_tmp_),
                             2 * cfg_->SampsPerSymbol());
     std::vector<std::complex<float>> samples_vec(
         rx_samps_tmp_, rx_samps_tmp_ + cfg_->SampsPerSymbol());
@@ -158,7 +158,7 @@ EventData DoFFT::Launch(size_t tag) {
     ss << "FFT_input_" << symbol_id << "_" << ant_id << "=[";
     for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
       ss << std::fixed << std::setw(5) << std::setprecision(3)
-          << fft_inout_[i].re << "+1j*" << fft_inout_[i].im << " ";
+         << fft_inout_[i].re << "+1j*" << fft_inout_[i].im << " ";
     }
     ss << "];" << std::endl;
     std::cout << ss.str();
@@ -188,7 +188,6 @@ EventData DoFFT::Launch(size_t tag) {
                 sizeof(float) * cfg_->OfdmCaNum());
     std::memcpy(fft_inout_ + cfg_->OfdmCaNum() / 2, fft_shift_tmp_,
                 sizeof(float) * cfg_->OfdmCaNum());
-
   }
 
   size_t start_tsc2 = GetTime::WorkerRdtsc();

@@ -629,7 +629,7 @@ class Config {
   nlohmann::json Parse(const nlohmann::json& in_json,
                        const std::string& json_handle);
   void DumpMcsInfo();
-  
+
   /* Class constants */
   inline static const size_t kDefaultSymbolNumPerFrame = 70;
   inline static const size_t kDefaultFreqOrthPilotSymbolNum = 1;
@@ -998,7 +998,7 @@ class Config {
   std::string timestamp_;
   std::vector<std::string> ul_tx_f_data_files_;
 
-  bool freq_domain_channel_; // If true, channel matrix H will be applied in the frequency domain
-
+  bool
+      freq_domain_channel_;  // If true, channel matrix H will be applied in the frequency domain
 };
 #endif /* CONFIG_HPP_ */

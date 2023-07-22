@@ -162,7 +162,7 @@ void UeWorker::DoFftPilot(size_t tag) {
   const size_t frame_slot = frame_id % kFrameWnd;
   const size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
 
-  const bool bypass_FFT = config_.FreqDomainChannel(); 
+  const bool bypass_FFT = config_.FreqDomainChannel();
 
   if (mac_sched_.IsUeScheduled(frame_id, 0u, ant_id)) {
     if (kDebugPrintInTask || kDebugPrintFft) {
@@ -209,7 +209,7 @@ void UeWorker::DoFftPilot(size_t tag) {
     SimdConvertShortToFloat(&pkt->data_[delay_offset], fft_buff,
                             config_.OfdmCaNum() * 2);
 
-    if(bypass_FFT == false){
+    if (bypass_FFT == false) {
       // perform fft
       DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 
@@ -299,7 +299,7 @@ void UeWorker::DoFftData(size_t tag) {
     SimdConvertShortToFloat(&pkt->data_[delay_offset], fft_buff,
                             config_.OfdmCaNum() * 2);
 
-    if(bypass_FFT == false) {
+    if (bypass_FFT == false) {
       // perform fft
       DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 
@@ -635,7 +635,7 @@ void UeWorker::DoIfft(size_t tag) {
   const size_t frame_slot = (frame_id % kFrameWnd);
 
   const bool bypass_iFFT = config_.FreqDomainChannel();
-  
+
   const size_t ul_symbol_perframe = config_.Frame().NumULSyms();
   const size_t ul_symbol_idx = config_.Frame().GetULSymbolIdx(symbol_id);
   const size_t total_ul_symbol_id =
@@ -692,7 +692,7 @@ void UeWorker::DoIfft(size_t tag) {
     std::memset(ifft_buff + config_.OfdmDataStop(), 0,
                 sizeof(complex_float) * config_.OfdmDataStart());
 
-    if(bypass_iFFT == false) {
+    if (bypass_iFFT == false) {
       CommsLib::FFTShift(ifft_buff, config_.OfdmCaNum());
       CommsLib::IFFT(ifft_buff, config_.OfdmCaNum(), false);
     }
