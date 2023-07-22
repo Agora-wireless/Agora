@@ -10,6 +10,7 @@
 #include <complex>
 
 #include "comms-lib.h"
+#include "data_generator.h"
 #include "datatype_conversion.h"
 #include "gettime.h"
 #include "logger.h"
@@ -267,8 +268,8 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(
 
               if (Configuration()->GetSymbolType(global_symbol_id) ==
                   SymbolType::kControl) {
-                size_t ctrl_frame_id =
-                    Configuration()->DecodeBroadcastSlots(raw_pkt->data_);
+                size_t ctrl_frame_id = DataGenerator::DecodeBroadcastSlots(
+                    Configuration(), raw_pkt->data_);
                 if (ctrl_frame_id != global_frame_id) {
                   AGORA_LOG_WARN(
                       "RecvEnqueue: Ctrl channel frame_id %zu/%zu mismatch "

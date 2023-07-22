@@ -9,6 +9,7 @@
 #include <cassert>
 
 #include "comms-lib.h"
+#include "data_generator.h"
 #include "gettime.h"
 #include "logger.h"
 #include "message.h"
@@ -350,7 +351,8 @@ void TxRxWorkerHw::TxBcastSymbolsHw(size_t frame_id, size_t radio_id,
   }
 
   std::vector<size_t> ctrl_data(1, frame_id);
-  Configuration()->GenBroadcastSlots(ctrl_samp_buffer, ctrl_data);
+  DataGenerator::GenBroadcastSlots(Configuration(), ctrl_samp_buffer,
+                                   ctrl_data);
 
   const size_t bcast_radio =
       Configuration()->BeaconAnt() / Configuration()->NumChannels();

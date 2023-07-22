@@ -6,6 +6,7 @@
 
 #include "comms-lib.h"
 #include "concurrent_queue_wrapper.h"
+#include "data_generator.h"
 #include "datatype_conversion.h"
 #include "logger.h"
 
@@ -48,7 +49,7 @@ void DoBroadcast::GenerateBroadcastSymbols(size_t frame_id) {
     ///\todo: later ctrl data might include other info
     ctrl_data.at(symbol_idx_dl) = frame_id + (kUseArgos ? TX_FRAME_DELTA : 0);
   }
-  cfg_->GenBroadcastSlots(bcast_iq_samps, ctrl_data);
+  DataGenerator::GenBroadcastSlots(cfg_, bcast_iq_samps, ctrl_data);
 
   if (kPrintSocketOutput) {
     for (size_t symbol_idx_dl = 0; symbol_idx_dl < num_control_syms;

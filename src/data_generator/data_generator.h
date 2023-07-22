@@ -97,7 +97,7 @@ class DataGenerator {
 
   static std::vector<complex_float> MapOFDMSymbol(
       Config* cfg, const std::vector<complex_float>& modulated_codeword,
-      complex_float* pilot_seq, SymbolType symbol_type);
+      const complex_float* pilot_seq, SymbolType symbol_type);
 
   /**
    * @param modulated_codeword The modulated codeword with OfdmDataNum()
@@ -136,6 +136,11 @@ class DataGenerator {
                                   size_t num_codeblocks,
                                   size_t num_decoded_bytes,
                                   bool scramble_enabled = false);
+  static size_t DecodeBroadcastSlots(Config* cfg,
+                                     const int16_t* const bcast_iq_samps);
+  static void GenBroadcastSlots(
+      Config* cfg, std::vector<std::complex<int16_t>*>& bcast_iq_samps,
+      std::vector<size_t> ctrl_msg);
   static void GenerateUlTxTestVectors(Config* const cfg);
   static void GenerateDlTxTestVectors(Config* const cfg,
                                       Table<complex_float>& dmrs);
