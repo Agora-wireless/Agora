@@ -417,7 +417,7 @@ class Config {
   void GenPilots();
   void LoadUplinkData();
   void LoadDownlinkData();
-  void GenData();
+  void LoadTestVectors();
   void UpdateUlMCS(const nlohmann::json& ul_mcs_params);
   void UpdateDlMCS(const nlohmann::json& dl_mcs_params);
   void UpdateCtrlMCS();

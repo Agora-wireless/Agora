@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
   }
 
   std::unique_ptr<Config> cfg = std::make_unique<Config>(conf_file.c_str());
-  cfg->GenData();
+  cfg->GenPilots();
 
   int ret;
   try {

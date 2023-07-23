@@ -118,7 +118,7 @@ TEST(TestDemul, VaryingConfig) {
   static constexpr size_t kNumIters = 10000;
   auto cfg = std::make_unique<Config>("files/config/ci/tddconfig-sim-ul.json");
   DataGenerator::GenerateUlTxTestVectors(cfg.get());
-  cfg->GenData();
+  cfg->LoadTestVectors();
 
   auto event_queue = moodycamel::ConcurrentQueue<EventData>(2 * kNumIters);
   moodycamel::ProducerToken* ptoks[kNumWorkers];

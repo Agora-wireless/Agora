@@ -1320,7 +1320,7 @@ void Config::LoadDownlinkData() {
   }
 }
 
-void Config::GenData() {
+void Config::LoadTestVectors() {
   this->GenPilots();
 
   // Freq-domain uplink symbols
@@ -1631,7 +1631,7 @@ void Config::Print() const {
 extern "C" {
 __attribute__((visibility("default"))) Config* ConfigNew(char* filename) {
   auto* cfg = new Config(filename);
-  cfg->GenData();
+  cfg->LoadTestVectors();
   return cfg;
 }
 }
