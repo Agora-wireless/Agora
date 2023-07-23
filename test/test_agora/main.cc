@@ -195,7 +195,7 @@ int main(int argc, char* argv[]) {
   }
 
   auto cfg = std::make_unique<Config>(conf_file.c_str());
-  cfg->GenData();
+  cfg->LoadTestVectors();
 
   int ret;
   try {
