@@ -97,7 +97,7 @@ void Simulator::Start() {
             rx_packet->Free();
 
             // Only process the dl symbols & ignore beacon frames
-            SymbolType symbol_type = config_->GetSymbolType(symbol_id);
+            SymbolType symbol_type = config_->Frame().GetSymbolType(symbol_id);
             if (symbol_type == SymbolType::kDL) {
               if (kDebugPrintAllRxSymbols) {
                 std::printf(

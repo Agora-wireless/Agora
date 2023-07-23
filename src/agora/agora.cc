@@ -869,7 +869,7 @@ finish:
 void Agora::HandleEventFft(size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  const SymbolType sym_type = config_->GetSymbolType(symbol_id);
+  const SymbolType sym_type = config_->Frame().GetSymbolType(symbol_id);
 
   if (sym_type == SymbolType::kPilot) {
     const bool last_fft_task =
@@ -957,7 +957,8 @@ void Agora::UpdateRanConfig(RanConfig rc) {
 
 void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
   const size_t frame_slot = frame_id % kFrameWnd;
-  if (config_->IsPilot(frame_id, symbol_id)) {
+  auto symbol_type = config_->Frame().GetSymbolType(symbol_id);
+  if (symbol_type == SymbolType::kPilot) {
     rx_counters_.num_pilot_pkts_[frame_slot]++;
     if (rx_counters_.num_pilot_pkts_.at(frame_slot) ==
         rx_counters_.num_pilot_pkts_per_frame_) {
@@ -965,8 +966,8 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
       this->stats_->MasterSetTsc(TsType::kPilotAllRX, frame_id);
       stats_->PrintPerFrameDone(PrintType::kPacketRXPilots, frame_id);
     }
-  } else if (config_->IsCalDlPilot(frame_id, symbol_id) ||
-             config_->IsCalUlPilot(frame_id, symbol_id)) {
+  } else if (symbol_type == SymbolType::kCalDL ||
+             symbol_type == SymbolType::kCalUL) {
     rx_counters_.num_reciprocity_pkts_.at(frame_slot)++;
     if (rx_counters_.num_reciprocity_pkts_.at(frame_slot) ==
         rx_counters_.num_reciprocity_pkts_per_frame_) {

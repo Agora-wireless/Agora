@@ -196,7 +196,7 @@ size_t Sender::FindNextSymbol(size_t start_symbol) {
   size_t next_symbol_id;
   for (next_symbol_id = start_symbol;
        (next_symbol_id < cfg_->Frame().NumTotalSyms()); next_symbol_id++) {
-    SymbolType symbol_type = cfg_->GetSymbolType(next_symbol_id);
+    SymbolType symbol_type = cfg_->Frame().GetSymbolType(next_symbol_id);
     if ((symbol_type == SymbolType::kPilot) ||
         (symbol_type == SymbolType::kUL)) {
       break;
@@ -412,8 +412,10 @@ void* Sender::WorkerThread(int tid) {
       for (size_t tag_id = 0; (tag_id < num_tags); tag_id++) {
         const size_t start_tsc_send = GetTime::Rdtsc();
         const auto tag = gen_tag_t(tags[tag_id]);
-        assert((cfg_->GetSymbolType(tag.symbol_id_) == SymbolType::kPilot) ||
-               (cfg_->GetSymbolType(tag.symbol_id_) == SymbolType::kUL));
+        assert(
+            (cfg_->Frame().GetSymbolType(tag.symbol_id_) ==
+             SymbolType::kPilot) ||
+            (cfg_->Frame().GetSymbolType(tag.symbol_id_) == SymbolType::kUL));
 
         // Send a message to the server. We assume that the server is running.
         Packet* pkt = nullptr;
@@ -434,7 +436,7 @@ void* Sender::WorkerThread(int tid) {
           AGORA_LOG_INFO(
               "Sender worker [%d]: processing frame %d symbol %d, type %d\n",
               tid, tag.frame_id_, tag.symbol_id_,
-              static_cast<int>(cfg_->GetSymbolType(tag.symbol_id_)));
+              static_cast<int>(cfg_->Frame().GetSymbolType(tag.symbol_id_)));
         }
 
         // Update the TX buffer

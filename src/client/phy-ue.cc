@@ -395,7 +395,7 @@ void PhyUe::Start() {
             }
           }
 
-          if (config_->IsDlPilot(frame_id, symbol_id)) {
+          if (config_->Frame().IsDlPilot(symbol_id)) {
             rx_counters_.num_pilot_pkts_.at(frame_slot)++;
             if (rx_counters_.num_pilot_pkts_.at(frame_slot) ==
                 rx_counters_.num_pilot_pkts_per_frame_) {
@@ -448,7 +448,7 @@ void PhyUe::Start() {
             }
           }
 
-          SymbolType symbol_type = config_->GetSymbolType(symbol_id);
+          SymbolType symbol_type = config_->Frame().GetSymbolType(symbol_id);
           if (symbol_type == SymbolType::kDL) {
             // Defer downlink processing (all pilot symbols must be fft'd
             // first)

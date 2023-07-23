@@ -136,8 +136,9 @@ std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(
   std::vector<RxPacket*> memory_tracking;
 
   const size_t total_channels = discard_locs.size();
-  const bool publish_symbol = Configuration()->IsPilot(frame_id, symbol_id) ||
-                              Configuration()->IsUplink(frame_id, symbol_id);
+  auto symbol_type = Configuration()->Frame().GetSymbolType(symbol_id);
+  const bool publish_symbol =
+      (symbol_type == SymbolType::kPilot || symbol_type == SymbolType::kUL);
 
   std::vector<void*> rx_locs(total_channels);
   // std::cout<<"in txrx worker usrp recv enqueue, total number of channel is: " << total_channels << std::endl;

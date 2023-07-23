@@ -645,7 +645,7 @@ ssize_t TxRxWorkerClientUhd::FindSyncBeacon(
 }
 
 bool TxRxWorkerClientUhd::IsRxSymbol(size_t symbol_id) {
-  auto symbol_type = Configuration()->GetSymbolType(symbol_id);
+  auto symbol_type = Configuration()->Frame().GetSymbolType(symbol_id);
   bool is_rx;
 
   if ((symbol_type == SymbolType::kBeacon) ||

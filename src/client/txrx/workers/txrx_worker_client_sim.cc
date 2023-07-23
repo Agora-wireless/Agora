@@ -116,7 +116,8 @@ std::vector<Packet*> TxRxWorkerClientSim::RecvEnqueue(size_t interface_id) {
           tid_, pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
     }
     size_t symbol_id = pkt->symbol_id_;
-    if (Configuration()->GetSymbolType(symbol_id) == SymbolType::kControl) {
+    if (Configuration()->Frame().GetSymbolType(symbol_id) ==
+        SymbolType::kControl) {
       size_t ctrl_frame_id =
           DataGenerator::DecodeBroadcastSlots(Configuration(), pkt->data_);
       if (ctrl_frame_id != pkt->frame_id_) {

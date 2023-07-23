@@ -248,18 +248,16 @@ std::vector<RxPacket*> TxRxWorkerHw::DoRx(size_t interface_id,
             symbol_id, rx_info.SamplesAvailable(),
             Configuration()->SampsPerSymbol());
       }
-
-      const bool cal_rx =
-          (radio_id != Configuration()->RefRadio(cell_id) &&
-           Configuration()->IsCalUlPilot(global_frame_id, global_symbol_id)) ||
-          (radio_id == Configuration()->RefRadio(cell_id) &&
-           Configuration()->IsCalDlPilot(global_frame_id, global_symbol_id));
-      const bool ignore_rx_data =
-          (invalid_rx_symbol == true) ||
-          ((Configuration()->HwFramer() == false) &&
-           (!Configuration()->IsPilot(global_frame_id, global_symbol_id) &&
-            !Configuration()->IsUplink(global_frame_id, global_symbol_id) &&
-            !cal_rx));
+      auto symbol_type =
+          Configuration()->Frame().GetSymbolType(global_symbol_id);
+      const bool cal_rx = (radio_id != Configuration()->RefRadio(cell_id) &&
+                           symbol_type == SymbolType::kCalUL) ||
+                          (radio_id == Configuration()->RefRadio(cell_id) &&
+                           symbol_type == SymbolType::kCalDL);
+      const bool ignore_rx_data = (invalid_rx_symbol == true) ||
+                                  ((Configuration()->HwFramer() == false) &&
+                                   (symbol_type != SymbolType::kPilot &&
+                                    symbol_type != SymbolType::kUL && !cal_rx));
 
       // Update global frame_id and symbol_id
       global_symbol_id++;
@@ -638,7 +636,8 @@ bool TxRxWorkerHw::IsTxSymbolNext(size_t radio_id, size_t current_symbol) {
   const auto reference_radio = Configuration()->RefRadio(cell_id);
 
   if (current_symbol != Configuration()->Frame().NumTotalSyms()) {
-    auto next_symbol = Configuration()->GetSymbolType(current_symbol + 1);
+    auto next_symbol =
+        Configuration()->Frame().GetSymbolType(current_symbol + 1);
     if ((next_symbol == SymbolType::kDL) ||
         (next_symbol == SymbolType::kBeacon) ||
         (next_symbol == SymbolType::kControl)) {
@@ -698,7 +697,7 @@ TxRxWorkerRx::RxParameters TxRxWorkerHw::UpdateRxInterface(
 }
 
 bool TxRxWorkerHw::IsRxSymbol(size_t interface, size_t symbol_id) {
-  auto symbol_type = Configuration()->GetSymbolType(symbol_id);
+  auto symbol_type = Configuration()->Frame().GetSymbolType(symbol_id);
   const auto cell_id =
       Configuration()->CellId().at(interface + interface_offset_);
   const auto reference_radio = Configuration()->RefRadio(cell_id);

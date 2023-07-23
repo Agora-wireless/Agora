@@ -152,9 +152,9 @@ class ChSimRxBuffer {
 
   inline size_t GetSymbolIdx(size_t symbol_id) const {
     if (type_ == ChSimRxType::kRxTypePilotUl) {
-      return cfg_->GetPilotUlIdx(symbol_id);
+      return cfg_->Frame().GetPilotUlIdx(symbol_id);
     } else if (type_ == ChSimRxType::kRxTypeBcastDl) {
-      return cfg_->GetBeaconDlIdx(symbol_id);
+      return cfg_->Frame().GetBeaconDlIdx(symbol_id);
     } else {
       return SIZE_MAX;
     }
