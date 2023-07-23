@@ -120,7 +120,7 @@ class Config {
   // Returns antenna number for rec cal dl symbol
   // Assumes that there are the same number of dl cal symbols in each frame
   inline size_t RecipCalDlAnt(size_t frame_id, size_t dl_cal_symbol) const {
-    assert(GetSymbolType(dl_cal_symbol) == SymbolType::kCalDL);
+    assert(this->Frame().GetSymbolType(dl_cal_symbol) == SymbolType::kCalDL);
     const size_t dl_cal_offset = (frame_id * frame_.NumDLCalSyms()) +
                                  frame_.GetDLCalSymbolIdx(dl_cal_symbol);
 
@@ -422,22 +422,6 @@ class Config {
   void UpdateDlMCS(const nlohmann::json& dl_mcs_params);
   void UpdateCtrlMCS();
 
-  /// TODO document and review
-  size_t GetSymbolId(size_t input_id) const;
-
-  bool IsBeacon(size_t /*frame_id*/, size_t /*symbol_id*/) const;
-  bool IsPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
-  bool IsDlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
-  bool IsCalDlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
-  bool IsCalUlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
-  bool IsDownlink(size_t /*frame_id*/, size_t /*symbol_id*/) const;
-  bool IsDownlinkBroadcast(size_t /*frame_id*/, size_t /*symbol_id*/) const;
-  bool IsUplink(size_t /*unused*/, size_t /*symbol_id*/) const;
-
-  /* Public functions that do not meet coding standard format */
-  /// Return the symbol type of this symbol in this frame
-  SymbolType GetSymbolType(size_t symbol_id) const;
-
   /// Return total number of data symbols of all frames in a buffer
   /// that holds data of kFrameWnd frames
   inline size_t GetTotalDataSymbolIdx(size_t frame_id, size_t symbol_id) const {
@@ -485,39 +469,6 @@ class Config {
     return (frame_id % kFrameWnd) *
                (this->frame_.NumDlControlSyms() + this->frame_.NumDLSyms()) +
            symbol_idx_dl;
-  }
-
-  //Returns Beacon+Dl symbol index
-  inline size_t GetBeaconDlIdx(size_t symbol_id) const {
-    size_t symbol_idx = SIZE_MAX;
-    const auto type = GetSymbolType(symbol_id);
-    if (type == SymbolType::kBeacon) {
-      symbol_idx = Frame().GetBeaconSymbolIdx(symbol_id);
-    } else if (type == SymbolType::kControl) {
-      symbol_idx =
-          Frame().GetDLControlSymbolIdx(symbol_id) + Frame().NumBeaconSyms();
-    } else if (type == SymbolType::kDL) {
-      symbol_idx = Frame().GetDLSymbolIdx(symbol_id) + Frame().NumDlBcastSyms();
-    } else {
-      throw std::runtime_error("Invalid BS Beacon or DL symbol id " +
-                               std::to_string(symbol_id));
-    }
-    return symbol_idx;
-  }
-
-  //Returns Pilot+Ul symbol index
-  inline size_t GetPilotUlIdx(size_t symbol_id) const {
-    size_t symbol_idx = SIZE_MAX;
-    const auto type = GetSymbolType(symbol_id);
-    if (type == SymbolType::kPilot) {
-      symbol_idx = Frame().GetPilotSymbolIdx(symbol_id);
-    } else if (type == SymbolType::kUL) {
-      symbol_idx = Frame().GetULSymbolIdx(symbol_id) + Frame().NumPilotSyms();
-    } else {
-      throw std::runtime_error("Invalid Ue Pilot or UL symbol id " +
-                               std::to_string(symbol_id));
-    }
-    return symbol_idx;
   }
 
   /// Return the frame duration in seconds

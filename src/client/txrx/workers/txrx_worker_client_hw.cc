@@ -692,7 +692,8 @@ bool TxRxWorkerClientHw::IsTxSymbolNext(size_t radio_id,
 
   if (current_symbol != Configuration()->Frame().NumTotalSyms()) {
     const auto next_symbol = current_symbol + 1;
-    const auto next_symbol_type = Configuration()->GetSymbolType(next_symbol);
+    const auto next_symbol_type =
+        Configuration()->Frame().GetSymbolType(next_symbol);
     if (next_symbol_type == SymbolType::kUL) {
       tx_symbol_next = true;
     } else if (next_symbol_type == SymbolType::kPilot) {

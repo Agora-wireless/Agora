@@ -47,7 +47,7 @@ int RecorderWorkerMultiFile::Record(const Packet* pkt) {
   const size_t symbol_id = pkt->symbol_id_;
 
   if ((frame_id % interval_) == 0) {
-    auto rx_symbol_type = cfg_->GetSymbolType(symbol_id);
+    auto rx_symbol_type = cfg_->Frame().GetSymbolType(symbol_id);
     const size_t ant_id = pkt->ant_id_;
     const size_t radio_id = ant_id / cfg_->NumUeChannels();
 

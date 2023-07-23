@@ -440,7 +440,7 @@ int RecorderWorkerHDF5::Record(const Packet* pkt) {
           pkt->data_[5u], pkt->data_[6u], pkt->data_[7u]);
     }
 
-    auto rx_symbol_type = cfg_->GetSymbolType(symbol_id);
+    auto rx_symbol_type = cfg_->Frame().GetSymbolType(symbol_id);
     switch (rx_symbol_type) {
       case SymbolType::kBeacon: {
         const size_t beacon_symbol_id =

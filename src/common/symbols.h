@@ -276,6 +276,7 @@ enum class SymbolType {
   kGuard,
   kUnknown
 };
+
 static const std::map<char, SymbolType> kSymbolMap = {
     {'B', SymbolType::kBeacon}, {'C', SymbolType::kCalDL},
     {'D', SymbolType::kDL},     {'G', SymbolType::kGuard},
