@@ -51,6 +51,7 @@ class TxRxWorkerHw : public TxRxWorker {
   void ScheduleTxInit(size_t frames_to_schedule, long long time0);
   void TxDownlinkZeros(size_t frame_id, size_t radio_id, long long time0);
 
+  void TxBcastSymbolsHw(size_t frame_id, size_t interface_id, long long time0);
   void TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
                                 long long time0);
 

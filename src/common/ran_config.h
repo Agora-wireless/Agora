@@ -13,9 +13,9 @@
  */
 class RanConfig {
  public:
-  size_t n_antennas_;      /// Number of active antennas at the base station
-  size_t mod_order_bits_;  /// modulation type (number of bits)
-  size_t frame_id_;        /// frame ID
+  size_t n_antennas_;  /// Number of active antennas at the base station
+  size_t mcs_index_;   /// MCS index
+  size_t frame_id_;    /// frame ID
 };
 
 /**
@@ -29,8 +29,8 @@ class RanConfig {
  */
 class RBIndicator {
  public:
-  size_t ue_id_;           /// UE ID
-  size_t mod_order_bits_;  /// modulation type (number of bits)
+  size_t ue_id_;      /// UE ID
+  size_t mcs_index_;  /// MCS Index
 };
 
 #endif  // RAN_CONFIG_H_

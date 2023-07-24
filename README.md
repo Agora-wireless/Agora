@@ -23,7 +23,7 @@ Some highlights:
  
  
 # Building Agora
-  Agora currently only builds and runs on Linux, and has been tested on Ubuntu 16.04, 18.04, and 20.04. 
+  Agora currently only builds and runs on Linux, and has been tested on Ubuntu 16.04, 18.04, 20.04 (Recommended), and 22.04 LTS. 
   Agora requires CMake 2.8+ and works with both GNU and Intel compilers with C++17 support. 
 ## Setting up the build environment
   * Setup CI: run

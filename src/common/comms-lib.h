@@ -26,6 +26,34 @@
 static const std::map<std::string, size_t> kBeamformingStr{
     {"ZF", 0}, {"MMSE", 1}, {"MRC", 2}};
 
+//  38.214  - Table 5.1.3.1-1: MCS index table 1 for PDSCH >
+//  Last 3 from < 38.214 - Table 5.1.3.1-2: MCS index table 2 for PDSCH >
+/*static const std::map<size_t, std::pair<size_t, size_t>> kMCS = {
+    {0, {2, 120}},  {1, {2, 157}},  {2, {2, 193}},  {3, {2, 251}},
+    {4, {2, 308}},  {5, {2, 379}},  {6, {2, 449}},  {7, {2, 526}},
+    {8, {2, 602}},  {9, {2, 679}},  {10, {4, 340}}, {11, {4, 378}},
+    {12, {4, 434}}, {13, {4, 490}}, {14, {4, 553}}, {15, {4, 616}},
+    {16, {4, 658}}, {17, {6, 438}}, {18, {6, 466}}, {19, {6, 517}},
+    {20, {6, 567}}, {21, {6, 616}}, {22, {6, 666}}, {23, {6, 719}},
+    {24, {6, 772}}, {25, {6, 822}}, {26, {6, 873}}, {27, {6, 910}},
+    {28, {6, 948}}, {29, {8, 754}}, {30, {8, 797}}, {31, {8, 841}}};*/
+static const std::pair<size_t, size_t> kMCS[32u] = {
+    {2, 120}, {2, 157}, {2, 193}, {2, 251}, {2, 308}, {2, 379}, {2, 449},
+    {2, 526}, {2, 602}, {2, 679}, {4, 340}, {4, 378}, {4, 434}, {4, 490},
+    {4, 553}, {4, 616}, {4, 658}, {6, 438}, {6, 466}, {6, 517}, {6, 567},
+    {6, 616}, {6, 666}, {6, 719}, {6, 772}, {6, 822}, {6, 873}, {6, 910},
+    {6, 948}, {8, 754}, {8, 797}, {8, 841}};
+
+inline size_t GetCodeRate(size_t mcs_index) {
+  std::pair mcs = kMCS[mcs_index];
+  return std::get<1>(mcs);
+}
+
+inline size_t GetModOrderBits(size_t mcs_index) {
+  std::pair mcs = kMCS[mcs_index];
+  return std::get<0>(mcs);
+}
+
 class CommsLib {
  public:
   enum SequenceType {
@@ -51,6 +79,8 @@ class CommsLib {
   ~CommsLib();
 
   static std::vector<std::vector<double>> GetSequence(size_t seq_len, int type);
+  static std::vector<std::vector<size_t>> GetAvailableMcs();
+  static size_t GetMcsIndex(size_t mod_order, size_t code_rate);
   static std::vector<std::complex<float>> Modulate(
       const std::vector<int8_t>& in, int type);
 
@@ -75,7 +105,9 @@ class CommsLib {
       const std::vector<std::complex<float>>& in);
   static std::vector<complex_float> FFTShift(
       const std::vector<complex_float>& in);
-  static void FFTShift(complex_float* in, complex_float* tmp, int fft_size);
+
+  static void FFTShift(complex_float* inout, complex_float* tmp, int fft_size);
+  static void FFTShift(complex_float* inout, int fft_size);
 
   static float ComputeOfdmSnr(const std::vector<std::complex<float>>& data_t,
                               size_t data_start_index, size_t data_stop_index);

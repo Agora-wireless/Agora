@@ -50,7 +50,9 @@ class DoIFFTClient : public Doer {
   char* socket_buffer_;
   DurationStat* duration_stat_;
   DFTI_DESCRIPTOR_HANDLE mkl_handle_;
-  float* ifft_out_;  // Buffer for IFFT output
+  // Buffer for IFFT output
+  float* ifft_out_;
+  // scratch buffer to reduce memory allocation
   complex_float* ifft_shift_tmp_;
   float ifft_scale_factor_;
 };

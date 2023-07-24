@@ -296,12 +296,11 @@ std::vector<RxPacket*> TxRxWorkerHw::DoRx(size_t interface_id,
   return result_packets;
 }
 
-void TxRxWorkerHw::TxBeaconHw(size_t frame_id, size_t interface_id,
+void TxRxWorkerHw::TxBeaconHw(size_t frame_id, size_t radio_id,
                               long long time0) {
   RtAssert(Configuration()->HwFramer() == false,
            "HwFramer == true when TxBeaconHw was called");
   const auto beacon_symbol_id = Configuration()->Frame().GetBeaconSymbol(0);
-  const size_t radio_id = interface_id + interface_offset_;
 
   //We can just point the tx to the same zeros location, no need to make more
   std::vector<const void*> tx_buffs(Configuration()->NumChannels(),
@@ -329,6 +328,56 @@ void TxRxWorkerHw::TxBeaconHw(size_t frame_id, size_t interface_id,
     std::cerr << "BAD Transmit on radio " << radio_id << " - status " << tx_ret
               << ",  expected " << Configuration()->SampsPerSymbol()
               << " at Time " << frame_time << std::endl;
+  }
+}
+
+void TxRxWorkerHw::TxBcastSymbolsHw(size_t frame_id, size_t radio_id,
+                                    long long time0) {
+  RtAssert(Configuration()->Frame().NumDlControlSyms() > 0,
+           "Number of broadcast symbols = 0 when TxBcastSymbolHw was called");
+
+  //We can just point the tx to the same zeros location, no need to make more
+  std::vector<const void*> tx_buffs(Configuration()->NumChannels(),
+                                    zeros_.data());
+
+  std::vector<std::complex<int16_t>*> ctrl_samp_buffer(
+      Configuration()->Frame().NumDlControlSyms());
+  for (size_t i = 0; i < Configuration()->Frame().NumDlControlSyms(); i++) {
+    ctrl_samp_buffer.at(i) =
+        static_cast<std::complex<int16_t>*>(Agora_memory::PaddedAlignedAlloc(
+            Agora_memory::Alignment_t::kAlign64,
+            2 * Configuration()->SampsPerSymbol() * sizeof(int16_t)));
+  }
+
+  std::vector<size_t> ctrl_data(1, frame_id);
+  Configuration()->GenBroadcastSlots(ctrl_samp_buffer, ctrl_data);
+
+  const size_t bcast_radio =
+      Configuration()->BeaconAnt() / Configuration()->NumChannels();
+  const size_t bcast_ch =
+      Configuration()->BeaconAnt() % Configuration()->NumChannels();
+
+  // TX broadcast symbols
+  for (size_t i = 0; i < Configuration()->Frame().NumDlControlSyms(); i++) {
+    size_t symbol_id = Configuration()->Frame().GetDLControlSymbol(i);
+    long long frame_time =
+        time0 +
+        (Configuration()->SampsPerSymbol() *
+         ((frame_id * Configuration()->Frame().NumTotalSyms()) + symbol_id));
+    if (bcast_radio == radio_id) {
+      tx_buffs.at(bcast_ch) = reinterpret_cast<void*>(ctrl_samp_buffer.at(i));
+    }
+    int tx_ret = radio_config_.RadioTx(
+        radio_id, tx_buffs.data(), GetTxFlags(radio_id, symbol_id), frame_time);
+
+    if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
+      std::cerr << "BAD Transmit on radio " << radio_id << " - status "
+                << tx_ret << ",  expected " << Configuration()->SampsPerSymbol()
+                << " at Time " << frame_time << std::endl;
+    }
+  }
+  for (size_t i = 0; i < Configuration()->Frame().NumDlControlSyms(); i++) {
+    FreeBuffer1d(&ctrl_samp_buffer.at(i));
   }
 }
 
@@ -493,6 +542,10 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
           TxBeaconHw(tx_frame_id, radio_id, time0);
         }
 
+        if (Configuration()->Frame().NumDlControlSyms() > 0) {
+          TxBcastSymbolsHw(tx_frame_id, radio_id, time0);
+        }
+
         if (Configuration()->Frame().IsRecCalEnabled()) {
           TxReciprocityCalibPilots(tx_frame_id, radio_id, time0);
         }
@@ -582,7 +635,8 @@ bool TxRxWorkerHw::IsTxSymbolNext(size_t radio_id, size_t current_symbol) {
   if (current_symbol != Configuration()->Frame().NumTotalSyms()) {
     auto next_symbol = Configuration()->GetSymbolType(current_symbol + 1);
     if ((next_symbol == SymbolType::kDL) ||
-        (next_symbol == SymbolType::kBeacon)) {
+        (next_symbol == SymbolType::kBeacon) ||
+        (next_symbol == SymbolType::kControl)) {
       tx_symbol_next = true;
     } else {
       if ((radio_id == reference_radio) &&
@@ -846,11 +900,17 @@ void TxRxWorkerHw::ScheduleTxInit(size_t frames_to_schedule, long long time0) {
       if (Configuration()->HwFramer() == false) {
         TxBeaconHw(frame, radio, time0);
       }
+
       //Keep the assumption that Cal is before an 'D' symbols
       // Maybe a good idea to combine / optimize the schedule by iterating through the entire frame symbol by symbol
       if (Configuration()->Frame().IsRecCalEnabled() == true) {
         TxReciprocityCalibPilots(frame, radio, time0);
       }
+
+      if (Configuration()->Frame().NumDlControlSyms() > 0) {
+        TxBcastSymbolsHw(frame, radio, time0);
+      }
+
       TxDownlinkZeros(frame, radio, time0);
     }  // for each radio
   }    // fpr each frame

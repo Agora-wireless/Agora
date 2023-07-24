@@ -12,6 +12,7 @@
 #include "common_typedef_sdk.h"
 #include "config.h"
 #include "doer.h"
+#include "mac_scheduler.h"
 #include "memory_manage.h"
 #include "message.h"
 #include "mkl_dfti.h"
@@ -23,7 +24,8 @@ class DoPrecode : public Doer {
   DoPrecode(Config* in_config, int in_tid,
             PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_,
             Table<complex_float>& in_dl_ifft_buffer,
-            Table<int8_t>& dl_encoded_or_raw_data, Stats* in_stats_manager);
+            Table<int8_t>& dl_encoded_or_raw_data, MacScheduler* mac_sched,
+            Stats* in_stats_manager);
   ~DoPrecode() override;
 
   /**
@@ -56,13 +58,15 @@ class DoPrecode : public Doer {
 
   // Load input data for a single UE and a single subcarrier
   void LoadInputData(size_t symbol_idx_dl, size_t total_data_symbol_idx,
-                     size_t user_id, size_t sc_id, size_t sc_id_in_block);
+                     size_t sp_id, size_t user_id, size_t sc_id,
+                     size_t sc_id_in_block);
   void PrecodingPerSc(size_t frame_slot, size_t sc_id, size_t sc_id_in_block);
 
  private:
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_;
   Table<complex_float>& dl_ifft_buffer_;
   Table<int8_t>& dl_raw_data_;
+  MacScheduler* mac_sched_;
   Table<float> qam_table_;
   DurationStat* duration_stat_;
   complex_float* modulated_buffer_temp_;

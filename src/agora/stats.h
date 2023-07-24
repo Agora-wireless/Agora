@@ -51,6 +51,7 @@ enum class TsType : size_t {
   kDecodeDone,  // Completed all LDPC decoding for this frame
   kPrecodeDone,
   kIFFTDone,
+  kBroadcastDone,
   kTXProcessedFirst,
   kTXDone,
   kModulDone,
