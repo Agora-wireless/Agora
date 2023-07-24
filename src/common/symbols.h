@@ -286,7 +286,7 @@ static const std::map<char, SymbolType> kSymbolMap = {
 enum class SubcarrierType { kNull, kDMRS, kPTRS, kData };
 
 // Maximum number of symbols per frame allowed by Agora
-static constexpr size_t kMaxSymbols = 70;
+static constexpr size_t kMaxSymbols = 140;
 
 // Maximum number of OFDM data subcarriers in the 5G spec
 static constexpr size_t kMaxDataSCs = 3300;

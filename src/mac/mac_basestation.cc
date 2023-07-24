@@ -118,12 +118,12 @@ int main(int argc, char* argv[]) {
       if (cfg->Frame().NumUlDataSyms() > 0) {
         if ((FLAGS_fwd_udp_port != 0) && (!FLAGS_fwd_udp_address.empty())) {
           receiver = std::make_unique<MacReceiver>(
-              cfg.get(), cfg->MacDataBytesNumPerframe(Direction::kDownlink),
+              cfg.get(), cfg->MacDataBytesNumPerframe(Direction::kUplink),
               cfg->BsServerAddr(), cfg->BsMacTxPort(), FLAGS_fwd_udp_address,
               FLAGS_fwd_udp_port, FLAGS_num_receiver_threads, thread_start);
         } else {
           receiver = std::make_unique<MacReceiver>(
-              cfg.get(), cfg->MacDataBytesNumPerframe(Direction::kDownlink),
+              cfg.get(), cfg->MacDataBytesNumPerframe(Direction::kUplink),
               cfg->BsServerAddr(), cfg->BsMacTxPort(),
               FLAGS_num_receiver_threads, thread_start);
         }
@@ -151,8 +151,8 @@ int main(int argc, char* argv[]) {
       ret = EXIT_FAILURE;
     }
   }  // end context Config
-  delete[](frame_start);
-  delete[](frame_end);
+  delete[] (frame_start);
+  delete[] (frame_end);
   std::printf("Mac basestation application terminated!\n");
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
