@@ -98,9 +98,8 @@ EventData DoFFT::Launch(size_t tag) {
   const SymbolType sym_type = cfg_->GetSymbolType(symbol_id);
 
   const bool bypass_FFT =
-      (cfg_->FreqDomainChannel() || cfg_->FftInRru());  //TODO
-  //const bool bypass_FFT = false;
-
+      (cfg_->FreqDomainChannel() || cfg_->FftInRru());  
+      
   if (kUse12BitIQ) {
     SimdConvert12bitIqToFloat(
         (uint8_t*)pkt->data_ + 3 * cfg_->OfdmRxZeroPrefixBs(),
