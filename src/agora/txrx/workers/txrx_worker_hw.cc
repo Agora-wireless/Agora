@@ -537,18 +537,19 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
           "for radio %zu has tx data for all antennas / channels\n",
           tid_, frame_id, symbol_id, ant_id, radio_id);
 
-      // When the first Tx symbol of the frame is ready (for a specific radio), schedule beacon and cals
-      // assumes the symbols are in the correct order (ie get symbol 0 before symbol 1)
-      if (symbol_id == Configuration()->Frame().GetDLSymbol(0)) {
+      // When the first Tx symbol of the frame for a specific radio is ready (control or data),
+      // schedule beacon and cals
+      // Assumes the symbols are in the order: beacon, control, cal, data
+      if ((Configuration()->Frame().NumDlControlSyms() > 0 &&
+           symbol_id == Configuration()->Frame().GetDLControlSymbol(0)) ||
+          (Configuration()->Frame().NumDlControlSyms() == 0 &&
+           symbol_id == Configuration()->Frame().GetDLSymbol(0))) {
         // Schedule beacon in the future
         if (Configuration()->HwFramer() == false) {
           TxBeaconHw(tx_frame_id, radio_id, time0);
         }
-
-        if (Configuration()->Frame().NumDlControlSyms() > 0) {
-          TxBcastSymbolsHw(tx_frame_id, radio_id, time0);
-        }
-
+      }
+      if (symbol_id == Configuration()->Frame().GetDLSymbol(0)) {
         if (Configuration()->Frame().IsRecCalEnabled()) {
           TxReciprocityCalibPilots(tx_frame_id, radio_id, time0);
         }
