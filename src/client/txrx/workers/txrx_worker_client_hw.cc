@@ -266,7 +266,7 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(
                                    first_ant_id + ch);
               result_packets.push_back(raw_pkt);
 
-              if (Configuration()->GetSymbolType(global_symbol_id) ==
+              if (Configuration()->Frame().GetSymbolType(global_symbol_id) ==
                   SymbolType::kControl) {
                 size_t ctrl_frame_id = DataGenerator::DecodeBroadcastSlots(
                     Configuration(), raw_pkt->data_);
@@ -507,7 +507,7 @@ ssize_t TxRxWorkerClientHw::FindSyncBeacon(
 }
 
 bool TxRxWorkerClientHw::IsRxSymbol(size_t symbol_id) {
-  auto symbol_type = Configuration()->GetSymbolType(symbol_id);
+  auto symbol_type = Configuration()->Frame().GetSymbolType(symbol_id);
   bool is_rx;
 
   if ((symbol_type == SymbolType::kBeacon) ||
@@ -541,7 +541,7 @@ void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
       tx_data.at(ch) = reinterpret_cast<void*>(pkt->data_);
 
       if (kDebugTxData) {
-        complex_float* data_truth;
+        std::complex<int16_t>* data_truth;
         if (ul_symbol_idx < Configuration()->Frame().ClientUlPilotSymbols()) {
           data_truth = Configuration()->UeSpecificPilotT()[tx_ant];
         } else {
