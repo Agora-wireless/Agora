@@ -67,7 +67,7 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
 }
 
 void Channel::Awgn(const arma::cx_fmat& src, arma::cx_fmat& dst) const {
-  if (channel_snr_db_ < 120.0f) {
+  if (channel_snr_db_ < 120.0f && cfg_->FreqDomainChannel() == false) {
     const int n_row = src.n_rows;
     const int n_col = src.n_cols;
 
@@ -81,10 +81,9 @@ void Channel::Awgn(const arma::cx_fmat& src, arma::cx_fmat& dst) const {
     // arma::cx_fmat noise = arma::cx_fmat(x, y);
 
     // Add noise to signal
-    //noise *= noise_samp_std_;
-    //dst = src + noise;
-    dst = src;
-
+    noise *= noise_samp_std_;
+    dst = src + noise;
+    
     // Check SNR
     if (kPrintSNRCheck) {
       arma::fmat noise_sq = arma::square(abs(noise));
