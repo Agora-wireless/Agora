@@ -834,7 +834,7 @@ Config::Config(std::string jsonfilename)
 
   if (frame_.IsRecCalEnabled()) {
     AGORA_LOG_INFO(
-        "Reciprical Calibration Enabled.  Full calibration data ready every "
+        "Reciprocal Calibration Enabled.  Full calibration data ready every "
         "%zu frame(s) using %zu symbols per frame\n",
         RecipCalFrameCnt(), frame_.NumDLCalSyms());
   }
