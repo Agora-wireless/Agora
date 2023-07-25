@@ -14,8 +14,7 @@
   "fft_size": 2048,
   "ofdm_data_num": 1200,
   "ul_mcs": {
-    "modulation": "16QAM",
-    "code_rate": 0.333
+    "mcs": 10
   },
   "ofdm_tx_zero_prefix": 160,
   "ofdm_tx_zero_postfix": 160,

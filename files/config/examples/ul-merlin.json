@@ -18,12 +18,10 @@
     "fft_size": 512,
     "ofdm_data_num": 304,
     "dl_mcs": {
-        "modulation": "16QAM",
-        "Zc": 16
+        "mcs" : 10
     },
     "ul_mcs": {
-        "modulation": "16QAM",
-        "Zc": 18
+        "mcs" : 10
     },
     "beamsweep": true,
     "beacon_antenna": 0,

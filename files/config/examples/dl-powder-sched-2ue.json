@@ -1,7 +1,7 @@
 {
-  "serial_file": "files/topology/topology-mww-1ue.json",
+  "serial_file": "files/topology/topology-mww-2ue.json",
   "cells": 1,
-  "channel": "AB",
+  "channel": "A",
   "frequency": 3.545e9,
   "single_gain": true,
   "rx_gain_a": 75,
@@ -10,40 +10,53 @@
   "tx_gain_b": 81,
   "sample_rate": 7.68e6,
   "ofdm_tx_zero_prefix": 160,
-  "ofdm_tx_zero_postfix": 160,
+  /* 192 / 160 */
+  "ofdm_tx_zero_postfix": 192,
   "ofdm_rx_zero_prefix_bs": 160,
+  "ofdm_rx_zero_prefix_client": 160,
+  /* 288 / 324 */
+  "ofdm_rx_zero_prefix_cal_dl": 324,
+  /* 168 / 136 */
+  "ofdm_rx_zero_prefix_cal_ul": 136,
   "cp_size": 32,
   "fft_size": 512,
   "ofdm_data_num": 304,
   "demul_block_size": 48,
   "ue_demul_block_size": 48,
-  "ul_mcs": {
+  "dl_mcs": {
     "mcs": 10
   },
   "beamsweep": true,
   "beacon_antenna": 0,
   "frame_schedule": [
-    "BGGGGGPGGGUUUGGG"
+    "BSCLGGPGGGDDDGGG"
   ],
-  "client_ul_pilot_syms": 2,
+  "client_dl_pilot_syms": 1,
+  "spatial_streams" : 1,
   /* UE configuration */
-  "ue_channel": "AB",
+  "ue_channel": "A",
   "ue_rx_gain_a": [
+    78,
     78
   ],
   "ue_tx_gain_a": [
+    81,
     81
   ],
   "ue_rx_gain_b": [
+    78,
     78
   ],
   "ue_tx_gain_b": [
+    81,
     81
   ],
   "tx_advance": [
+    140,
     140
   ],
   "corr_scale": [
+    10,
     10
   ],
   "ue_hw_framer": false,
@@ -51,12 +64,12 @@
   /* Compute configuration */
   "exclude_cores": [],
   "ue_core_offset": 48,
-  "ue_worker_thread_num": 4,
+  "ue_worker_thread_num": 2,
   "ue_socket_thread_num": 2,
   "core_offset": 16,
-  "worker_thread_num": 8,
-  /* 18 bs radios */
-  "socket_thread_num": 4,
+  "worker_thread_num": 16,
+  /* 18 bs radios + 1 ref*/
+  "socket_thread_num": 5,
   "max_frame": 1000,
   "calibrate_digital": true,
   "freq_orthogonal_pilot": true

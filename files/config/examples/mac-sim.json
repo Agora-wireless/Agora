@@ -3,12 +3,10 @@
   "ofdm_data_num": 1200,
   "demul_block_size": 48,
   "ul_mcs": {
-      "modulation": "64QAM",
-      "code_rate": 0.333
+      "mcs" : 17
   },
   "dl_mcs": {
-      "modulation": "64QAM",
-      "code_rate": 0.333
+      "mcs" : 17
   },
   "ue_radio_num": 1,
   "bs_radio_num": 8,
