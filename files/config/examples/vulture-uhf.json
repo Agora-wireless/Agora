@@ -21,12 +21,10 @@
   "ofdm_data_num": 304,
   /*"ofdm_data_start": 0,*/
   "dl_mcs": {
-    "modulation": "16QAM",
-    "Zc": 16
+    "mcs": 10
   },
   "ul_mcs": {
-    "modulation": "16QAM",
-    "Zc": 18
+    "mcs": 10
   },
   "beamsweep": false,
   "beacon_antenna": 1,

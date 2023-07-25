@@ -22,12 +22,10 @@
   "ofdm_rx_zero_prefix_cal_dl": 0,
   /* Modulation and Coding settings */
   "ul_mcs" : {
-    "modulation": "64QAM",
-    "code_rate": 0.333
+    "mcs" : 17
   },
   "dl_mcs" : {
-    "modulation": "64QAM",
-    "code_rate": 0.333
+    "mcs" : 17
   },
   /* General settings */
   "beamforming": "ZF",
