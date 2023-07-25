@@ -27,11 +27,14 @@ class ChSimWorkerStorage {
     const size_t ue_output_storage_size =
         (bs_ant_count * samples_per_symbol * sizeof(arma::cx_float));
 
+    AGORA_LOG_INFO("UE_Input = %lld \n", ue_input_storage_size);
+
     auto* ue_input_float_storage = PaddedAlignedAlloc(
         Agora_memory::Alignment_t::kAlign64, ue_input_storage_size);
     ue_input_matrix_ = std::make_unique<arma::cx_fmat>(
         reinterpret_cast<arma::cx_float*>(ue_input_float_storage),
         samples_per_symbol, ue_ant_count, false, true);
+
     AGORA_LOG_TRACE("Ue input location %zu:%zu  diff %zu size %zu\n",
                     reinterpret_cast<intptr_t>(ue_input_matrix_->memptr()),
                     reinterpret_cast<intptr_t>(ue_input_float_storage),
