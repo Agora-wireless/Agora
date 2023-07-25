@@ -39,10 +39,10 @@ void DatasetModel::InstantiateDataset(const std::string& dataset_path) {
     H5::DataSpace im_dataspace = h_i_dataset.getSpace();
 
     hsize_t real_dimensions[4];
-    real_dataspace.getSimpleExtentDims(real_dimensions, NULL);
+    real_dataspace.getSimpleExtentDims(real_dimensions);
 
     hsize_t im_dimensions[4];
-    im_dataspace.getSimpleExtentDims(im_dimensions, NULL);
+    im_dataspace.getSimpleExtentDims(im_dimensions);
 
     //Check the Matrix types dimensions
     if (im_dimensions[0] != real_dimensions[0] ||
@@ -57,38 +57,34 @@ void DatasetModel::InstantiateDataset(const std::string& dataset_path) {
     ues_num = real_dimensions[3];
 
     //Instantiate the matrices data
-    float* real_temp_data = new float[frames_num * scs_num * bss_num * ues_num];
-    float* im_temp_data = new float[frames_num * scs_num * bss_num * ues_num];
+    const size_t data_read_size = frames_num * scs_num * bss_num * ues_num;
+    std::vector<float> real_temp_data(data_read_size);
+    std::vector<float> im_temp_data(data_read_size);
 
-    h_r_dataset.read(real_temp_data, H5::PredType::NATIVE_FLOAT);
-    h_i_dataset.read(im_temp_data, H5::PredType::NATIVE_FLOAT);
+    h_r_dataset.read(real_temp_data.data(), H5::PredType::NATIVE_FLOAT);
+    h_i_dataset.read(im_temp_data.data(), H5::PredType::NATIVE_FLOAT);
 
     hsize_t data_index = 0;
 
     for (hsize_t frame = 0; frame < frames_num; frame++) {
-      std::vector<arma::cx_fmat> h_subcarrier_matrices;
+      auto& h_subcarrier_matrices = h_matrices_frames_.emplace_back();
 
       for (hsize_t subcarrier = 0; subcarrier < scs_num; subcarrier++) {
-        arma::cx_fmat h_(ues_num, bss_num);
+        auto& h_mat = h_subcarrier_matrices.emplace_back(ues_num, bss_num);
 
         for (hsize_t bs = 0; bs < bss_num; bs++) {
           for (hsize_t ue = 0; ue < ues_num; ue++) {
-            h_(ue, bs) = arma::cx_float(real_temp_data[data_index],
-                                        im_temp_data[data_index]);
+            h_mat(ue, bs) = arma::cx_float(real_temp_data.at(data_index),
+                                           im_temp_data.at(data_index));
             data_index++;
           }
         }
-
-        h_subcarrier_matrices.push_back(h_);
       }
-
-      h_matrices_frames_.push_back(h_subcarrier_matrices);
 
       if (kPrintDatasetOutput) {
         std::printf(
             "Dataset Frame = %ld with %ld Subcarriers loaded successfully \n",
             h_matrices_frames_.size(), h_subcarrier_matrices.size());
-
         //Utils::PrintMat( h_matrices_frames_[0][0], "H_");
       }
     }
