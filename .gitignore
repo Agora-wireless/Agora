@@ -32,6 +32,7 @@ build/*
 tags
 out
 files/experiment/*
+files/log/*
 
 # OS generated files #
 ######################

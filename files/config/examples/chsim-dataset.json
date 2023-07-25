@@ -1,5 +1,4 @@
 {
-    /* Use case for dataset example_32_4_512_10_rayleigh_dataset.hdf5 */
     "freq_domain_channel": true,
     "max_frame": 5,
     "fft_size": 512,
