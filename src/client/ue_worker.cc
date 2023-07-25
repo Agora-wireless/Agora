@@ -332,7 +332,7 @@ void UeWorker::DoFftData(size_t tag) {
       theta /= config_.GetOFDMPilotNum();
     }
     auto phc = exp(arma::cx_float(0, -theta));
-    float evm = 0;
+    float evms = 0;
     for (size_t j = 0; j < config_.OfdmDataNum(); j++) {
       if (config_.IsDataSubcarrier(j) == true) {
         // divide fft output by pilot data to get CSI estimation
@@ -349,12 +349,12 @@ void UeWorker::DoFftData(size_t tag) {
         }
         complex_float tx =
             config_.DlIqF()[dl_symbol_id][ant * config_.OfdmDataNum() + j];
-        evm += std::norm(equ_buffer_ptr[data_sc_id] -
-                         arma::cx_float(tx.re, tx.im));
+        evms += std::norm(equ_buffer_ptr[data_sc_id] -
+                          arma::cx_float(tx.re, tx.im));
       }
     }
 
-    evm = evm / config_.GetOFDMDataNum();
+    evms = evms / config_.GetOFDMDataNum();
     if (kPrintEqualizedSymbols) {
       complex_float* tx =
           &config_.DlIqF()[dl_symbol_id][ant_id * config_.OfdmDataNum()];
@@ -370,8 +370,8 @@ void UeWorker::DoFftData(size_t tag) {
     }
     if (kPrintPhyStats) {
       AGORA_LOG_INFO("Frame: %zu, Symbol: %zu, User: %zu, EVM: %f, SNR: %f\n",
-                     frame_id, symbol_id, ant_id, (100.0f * evm),
-                     (-10.0f * std::log10(evm)));
+                     frame_id, symbol_id, ant_id, (100.0f * std::sqrt(evms)),
+                     (-10.0f * std::log10(evms)));
     }
   }
 
