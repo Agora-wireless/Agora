@@ -416,6 +416,9 @@ if (${ENABLE_HDF5})
       ${RECORDER_SOURCES}
       src/recorder/hdf5_lib.cc
       src/recorder/recorder_worker_hdf5.cc)
+  set(CHSIM_SOURCES
+      ${CHSIM_SOURCES}
+      simulator/channel_models/dataset_model.cc)
 endif()
 add_library(recorder_sources_lib OBJECT ${RECORDER_SOURCES})
 
@@ -535,10 +538,13 @@ add_executable(sim
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sim ${COMMON_LIBS})
 
+include_directories(simulator/channel_models)
 add_executable(chsim
+  ${CHSIM_SOURCES}
   simulator/chsim_main.cc
   simulator/channel_sim.cc
   simulator/channel.cc
+  simulator/channel_models/channel_model.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(chsim ${COMMON_LIBS})
 
