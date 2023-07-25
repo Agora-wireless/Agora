@@ -25,7 +25,7 @@ class DatasetModel : public ChannelModel {
   * Access to H_Matrix using:
   * h_matrices_frames_[ FrameIndex ][ SubcarrierIndex ]
   */
-  std::vector<std::vector<arma::cx_fmat> > h_matrices_frames_;
+  std::vector<std::vector<arma::cx_fmat>> h_matrices_frames_;
   hsize_t current_frame_num_;
 };
 

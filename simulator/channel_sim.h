@@ -111,7 +111,6 @@ class ChannelSim {
 
   std::string channel_type_;
   double channel_snr_;
-
   std::string dataset_path_;
 
   TimeFrameCounters ue_rx_;
