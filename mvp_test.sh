@@ -77,7 +77,11 @@ function exe_bs {
 
 function exe_user {
     echo "Running the user..."
-    $user --conf_file $config
+    # $user --conf_file $config
+    $user --conf_file $config   \
+          --num_threads=2       \
+          --core_offset=10      \
+          --enable_slow_start=0
     # script -q -c "$user --conf_file $config" $logfile
 }
 
