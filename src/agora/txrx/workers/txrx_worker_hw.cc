@@ -636,7 +636,7 @@ bool TxRxWorkerHw::IsTxSymbolNext(size_t radio_id, size_t current_symbol) {
   const auto cell_id = Configuration()->CellId().at(radio_id);
   const auto reference_radio = Configuration()->RefRadio(cell_id);
 
-  if (current_symbol != Configuration()->Frame().NumTotalSyms()) {
+  if (current_symbol < Configuration()->Frame().NumTotalSyms() - 1) {
     auto next_symbol =
         Configuration()->Frame().GetSymbolType(current_symbol + 1);
     if ((next_symbol == SymbolType::kDL) ||
