@@ -66,3 +66,5 @@ CTestTestfile.cmake
 .vscode
 sftp-config.json
 1000_512_32_4_mob.hdf5
+500_512_32_4_mob.hdf5
+rayleigh_flat_dataset.hdf5
