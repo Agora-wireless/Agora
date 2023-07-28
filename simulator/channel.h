@@ -25,13 +25,16 @@ class Channel {
 
   // Additive White Gaussian Noise. Dimensions of src: ( bscfg->sampsPerSymbol,
   // uecfg->UE_ANT_NUM )
-  void Awgn(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst) const;
+  void Awgn(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst, bool is_downlink) const;
 
  private:
   const Config* const cfg_;
   std::string sim_chan_model_;
   double channel_snr_db_;
   double noise_samp_std_;
+  arma::cx_fmat noise_dl;
+  arma::cx_fmat noise_ul;
+  
   std::unique_ptr<ChannelModel> channel_model_;
 };
 
