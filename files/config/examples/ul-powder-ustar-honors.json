@@ -1,0 +1,64 @@
+{
+  "serial_file": "files/topology/topology-ustar.json",
+  "cells": 1,
+  "channel": "AB",
+  "frequency": 3.545e9,
+  "single_gain": true,
+  "rx_gain_a": 75,
+  "tx_gain_a": 80,
+  "rx_gain_b": 75,
+  "tx_gain_b": 80,
+  "sample_rate": 7.68e6,
+  "ofdm_tx_zero_prefix": 160,
+  "ofdm_tx_zero_postfix": 160,
+  "ofdm_rx_zero_prefix_bs": 160,
+  "cp_size": 32,
+  "fft_size": 512,
+  "ofdm_data_num": 304,
+  "demul_block_size": 48,
+  "ue_demul_block_size": 48,
+  "ul_mcs": {
+    "modulation": "16QAM",
+    "code_rate": 0.333
+  },
+  "beamsweep": false,
+  "beacon_antenna": 0,
+  "frame_schedule": [
+    "BGGGGGPGGGUUUGGG"
+  ],
+  "client_ul_pilot_syms": 2,
+  /* UE configuration */
+  "ue_channel": "AB",
+  "ue_rx_gain_a": [
+    78
+  ],
+  "ue_tx_gain_a": [
+    81
+  ],
+  "ue_rx_gain_b": [
+    78
+  ],
+  "ue_tx_gain_b": [
+    81
+  ],
+  "tx_advance": [
+    140
+  ],
+  "corr_scale": [
+    10
+  ],
+  "ue_hw_framer": false,
+  "hw_framer": true,
+  /* Compute configuration */
+  "exclude_cores": [],
+  "ue_core_offset": 48,
+  "ue_worker_thread_num": 4,
+  "ue_socket_thread_num": 2,
+  "core_offset": 16,
+  "worker_thread_num": 8,
+  /* 18 bs radios */
+  "socket_thread_num": 4,
+  "max_frame": 1000,
+  "calibrate_digital": true,
+  "freq_orthogonal_pilot": true
+}
