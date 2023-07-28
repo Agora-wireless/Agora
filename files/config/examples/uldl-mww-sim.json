@@ -3,10 +3,10 @@
   "ofdm_data_num": 304,
   "demul_block_size": 48,
   "ul_mcs" : {
-    "mcs": 10
+    "mcs_index": 10
   },
   "dl_mcs" : {
-    "mcs": 10
+    "mcs_index": 10
   },
   /* set sample rate to 1Ms
   to make sure tests pass*/

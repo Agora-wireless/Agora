@@ -22,10 +22,10 @@
   "ofdm_rx_zero_prefix_cal_dl": 0,
   /* Modulation and Coding settings */
   "ul_mcs" : {
-    "mcs" : 17
+    "mcs_index" : 17
   },
   "dl_mcs" : {
-    "mcs" : 17
+    "mcs_index" : 17
   },
   /* General settings */
   "beamforming": "ZF",

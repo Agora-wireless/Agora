@@ -23,10 +23,10 @@
     "demul_block_size": 48,
     "ue_demul_block_size": 48,
     "dl_mcs": {
-        "mcs": 10
+        "mcs_index": 10
     },
     "ul_mcs": {
-        "mcs": 10
+        "mcs_index": 10
     },
     "beamsweep": true,
     "beacon_antenna": 0,

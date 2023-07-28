@@ -30,10 +30,10 @@
   "ofdm_rx_zero_prefix_cal_dl": 0,
   /* Modulation and Coding settings */
   "ul_mcs" : {
-    "mcs": 10
+    "mcs_index": 10
   },
   "dl_mcs" : {
-    "mcs": 10
+    "mcs_index": 10
   },
   /* General settings */
   "beamforming": "ZF",
