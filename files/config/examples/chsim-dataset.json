@@ -1,6 +1,5 @@
 {
     "freq_domain_channel": true,
-    "max_frame": 5000,
     "fft_size": 512,
     "ofdm_data_num": 304,
     "demul_block_size": 48,
