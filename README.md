@@ -1,4 +1,4 @@
-[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fchsim-optimizations)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/chsim-optimizations/)
+[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Ffreq-domain-channel)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/freq-domain-channel/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
