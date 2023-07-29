@@ -849,8 +849,7 @@ class Config {
 
   float scale_;  // Scaling factor for all transmit symbols
 
-  bool bigstation_mode_;      // If true, use pipeline-parallel scheduling
-  bool correct_phase_shift_;  // If true, do phase shift correction
+  bool bigstation_mode_;  // If true, use pipeline-parallel scheduling
 
   // The total number of uncoded uplink data bytes in each OFDM symbol
   size_t ul_data_bytes_num_persymbol_;

@@ -362,7 +362,6 @@ Config::Config(std::string jsonfilename)
              "user antennas must be no more than pilot_sc_group_size " +
                  std::to_string(pilot_sc_group_size_));
   }
-  correct_phase_shift_ = tdd_conf.value("correct_phase_shift", false);
 
   hw_framer_ = tdd_conf.value("hw_framer", true);
   if (kUseUHD || kUsePureUHD) {

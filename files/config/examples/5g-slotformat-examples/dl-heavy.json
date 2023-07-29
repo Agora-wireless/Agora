@@ -33,7 +33,6 @@
         "calibrate_digital": false,
         "calibrate_analog": false,
         "init_calib_repeat": 1,
-        "correct_phase_shift": false,
         /* Hardware specific information */
         "frequency": 3.6e9,
         /* 0.75*rate */
