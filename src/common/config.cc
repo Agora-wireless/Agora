@@ -532,10 +532,13 @@ Config::Config(std::string jsonfilename)
     if (frame.find(",") != std::string::npos) {
       std::vector<std::string> flex_formats =
           tdd_conf.value("flex_formats", json::array());
-      FiveGConfig fivegconfig = FiveGConfig(tdd_conf);
+      FiveGConfig fivegconfig = FiveGConfig(tdd_conf, ue_ant_num_);
       frame = fivegconfig.FiveGFormat();
       rate_ = fivegconfig.SamplingRate();
+      ofdm_ca_num_ = fivegconfig.FftSize();
+      ofdm_data_num_ = fivegconfig.OfdmDataNum();
       ofdm_data_start_ = fivegconfig.OfdmDataStart();
+      ofdm_data_stop_ = ofdm_data_start_ + ofdm_data_num_;
     }
     frame_ = FrameStats(frame);
   }

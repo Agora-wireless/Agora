@@ -22,12 +22,14 @@ class FiveGConfig {
   static constexpr size_t kFormatTableSize = 56;
 
  public:
-  explicit FiveGConfig(const nlohmann::json &tdd_conf);
+  explicit FiveGConfig(const nlohmann::json &tdd_conf, size_t user_num);
   ~FiveGConfig();
 
   std::string FiveGFormat();
   double SamplingRate() const;
   size_t OfdmDataStart() const;
+  size_t OfdmDataNum() const;
+  size_t FftSize() const;
 
  private:
   nlohmann::json tdd_conf_;

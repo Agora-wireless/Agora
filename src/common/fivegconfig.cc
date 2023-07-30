@@ -19,10 +19,11 @@ static constexpr bool kDebug = false;
 
 static constexpr size_t kNumerology = 0;
 
-FiveGConfig::FiveGConfig(const nlohmann::json& tdd_conf)
+FiveGConfig::FiveGConfig(const nlohmann::json& tdd_conf, size_t user_num)
     : valid_ffts_({512, 1024, 1536, 2048}),
       supported_channel_bandwidths_({5, 10, 15, 20}),
-      supported_formats_({0, 1, 2, 3, 4, 27, 28, 34, 39}) {
+      supported_formats_({0, 1, 2, 3, 4, 27, 28, 34, 39}),
+      user_num_(user_num) {
   tdd_conf_ = tdd_conf;
   subcarrier_spacing_ = 15e3 * pow(2, kNumerology);
   /*
@@ -108,8 +109,6 @@ void FiveGConfig::ReadAndVerifyValues() {
            "The sampling rate is calculated using the fft_size and the "
            "subcarrier spacing which is a result of the numerology and should "
            "not be specified by the user in a 5G schema.");
-  RtAssert(tdd_conf_.contains("ue_radio_num"), "ue_radio_num not specified.");
-  user_num_ = tdd_conf_.value("ue_radio_num", 0);
   nlohmann::json jframes =
       tdd_conf_.value("frame_schedule", nlohmann::json::array());
   assert(jframes.size() == 1);
@@ -135,6 +134,7 @@ void FiveGConfig::ReadAndVerifyValues() {
     for (size_t i = 0; i < valid_ffts_.size(); i++) {
       if (valid_ffts_.at(i) > ofdm_data_num_) {
         fft_size_ = valid_ffts_.at(i);
+        break;
       }
     }
   } else {
@@ -166,6 +166,7 @@ void FiveGConfig::ReadAndVerifyValues() {
     for (size_t i = 0; i < valid_ffts_.size(); i++) {
       if (fft_size_ == valid_ffts_.at(i)) {
         fft_is_valid = true;
+        break;
       }
     }
     RtAssert(fft_is_valid, "Specified fft_size is not a valid fft size,\n");
@@ -200,7 +201,7 @@ std::string FiveGConfig::FormBeaconSubframe(int format_num, size_t user_num) {
   RtAssert(subframe.at(0) == 'D',
            "First symbol of selected format doesn't start with a downlink "
            "symbol.");
-  RtAssert(user_num_ < 12, "Number of users exceeds pilot symbol limit of 12.");
+  RtAssert(user_num < 12, "Number of users exceeds pilot symbol limit of 12.");
   //Replace the first symbol with a beacon symbol.
   subframe.replace(0, 1, "B");
   //Add in the pilot symbols.
@@ -214,7 +215,7 @@ std::string FiveGConfig::FormBeaconSubframe(int format_num, size_t user_num) {
       pilot_num++;
     }
   }
-  RtAssert(pilot_num == user_num_,
+  RtAssert(pilot_num == user_num,
            "More users specified than the "
            "chosen slot format can support.");
   /*
@@ -257,7 +258,7 @@ std::string FiveGConfig::FormFrame(std::string frame_schedule, size_t user_num,
   RtAssert(subframe_idx == 9,
            "Entered frame_schedule has less than 10 subframes.");
   // Create the frame based on the format nums in the subframe array.
-  frame += FormBeaconSubframe(subframes[0], user_num_);
+  frame += FormBeaconSubframe(subframes[0], user_num);
   for (size_t i = 1; i < kSubframesPerFrame; i++) {
     if (subframes[i] == kFlexibleSlotFormatIdx) {
       frame += flex_formats.at(flex_format_idx);
@@ -303,4 +304,6 @@ bool FiveGConfig::SetChannelBandwidth() {
 }
 //Accessors for sampling rate and ofdm data start.
 double FiveGConfig::SamplingRate() const { return sampling_rate_; }
+size_t FiveGConfig::FftSize() const { return fft_size_; }
+size_t FiveGConfig::OfdmDataNum() const { return ofdm_data_num_; }
 size_t FiveGConfig::OfdmDataStart() const { return ofdm_data_start_; }

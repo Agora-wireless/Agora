@@ -438,7 +438,8 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
     for (size_t i = 0; i < num_dl_codeblocks; i++) {
       const size_t sym_offset = i % (symbol_blocks);
       const size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
-      dl_modulated_codewords.at(i).resize(cfg_->GetOFDMDataNum());
+      //dl_modulated_codewords.at(i).resize(cfg_->GetOFDMDataNum());
+      dl_modulated_codewords.at(i).resize(cfg_->OfdmDataNum());
       auto ofdm_symbol = DataGenerator::GetModulation(
           &dl_encoded_codewords.at(i)[0], &dl_modulated_codewords.at(i)[0],
           cfg_->ModTable(Direction::kDownlink),
