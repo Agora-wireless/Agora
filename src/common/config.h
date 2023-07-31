@@ -250,6 +250,17 @@ class Config {
     return dir == Direction::kUplink ? this->ul_mod_order_bits_
                                      : this->dl_mod_order_bits_;
   }
+  inline size_t SlotScheduling() const {
+    return this->slot_scheduling_;
+  }
+  inline size_t NumPrbPerCb(Direction dir) const {
+    return dir == Direction::kUplink ? this->ul_num_prb_per_cb_
+                                     : this->dl_num_prb_per_cb_;
+  }
+  inline size_t NumCbPerSlot(Direction dir) const {
+    return dir == Direction::kUplink ? this->ul_num_cb_per_slot_
+                                     : this->dl_num_cb_per_slot_;
+  }
   inline size_t NumBytesPerCb(Direction dir) const {
     return dir == Direction::kUplink ? this->ul_num_bytes_per_cb_
                                      : this->dl_num_bytes_per_cb_;
@@ -537,8 +548,12 @@ class Config {
       num_bytes_per_cb = this->ul_num_bytes_per_cb_;
       num_blocks_in_symbol = this->ul_ldpc_config_.NumBlocksInSymbol();
     }
-    return &info_bits[symbol_id][Roundup<64>(num_bytes_per_cb) *
-                                 (num_blocks_in_symbol * ue_id + cb_id)];
+    if (slot_scheduling_ == false) {
+      return &info_bits[symbol_id][Roundup<64>(num_bytes_per_cb) *
+                                   (num_blocks_in_symbol * ue_id + cb_id)];
+    } else {
+      return &info_bits[ue_id][Roundup<64>(num_bytes_per_cb) * cb_id];
+    }
   }
 
   /// Get encoded_buffer for this frame, symbol, user and code block ID
@@ -622,6 +637,9 @@ class Config {
 
   // The total number of OFDM subcarriers, which is a power of two
   size_t ofdm_ca_num_;
+
+  // Code blocks are scheduled over a complete slot in time domain
+  size_t slot_scheduling_;
 
   // The number of cyclic prefix IQ samples. These are taken from the tail of
   // the time-domain OFDM samples and prepended to the beginning.
@@ -833,6 +851,12 @@ class Config {
   bool bigstation_mode_;      // If true, use pipeline-parallel scheduling
   bool correct_phase_shift_;  // If true, do phase shift correction
 
+  // The total number of uplink PRBs allocated per code bloack in a subframe
+  size_t ul_num_prb_per_cb_;
+
+  // The total number of uplink code blocks allocated per slot
+  size_t ul_num_cb_per_slot_;
+
   // The total number of uncoded uplink data bytes in each OFDM symbol
   size_t ul_data_bytes_num_persymbol_;
 
@@ -847,6 +871,12 @@ class Config {
 
   // The length (in bytes) of a uplink MAC packet payload (data)
   size_t ul_mac_data_length_max_;
+
+  // The total number of downlink PRBs allocated per code bloack in a subframe
+  size_t dl_num_prb_per_cb_;
+
+  // The total number of downlink code blocks allocated per slot
+  size_t dl_num_cb_per_slot_;
 
   // The total number of uncoded downlink data bytes in each OFDM symbol
   size_t dl_data_bytes_num_persymbol_;

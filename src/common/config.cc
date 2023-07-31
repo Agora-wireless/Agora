@@ -289,6 +289,7 @@ Config::Config(std::string jsonfilename)
   log_timestamp_ = tdd_conf.value("log_timestamp", false);
 
   /* frame configurations */
+  slot_scheduling_ = tdd_conf.value("slot_scheduling", false);
   cp_len_ = tdd_conf.value("cp_size", 0);
   ofdm_ca_num_ = tdd_conf.value("fft_size", 2048);
   ofdm_data_num_ = tdd_conf.value("ofdm_data_num", 1200);
@@ -648,6 +649,12 @@ Config::Config(std::string jsonfilename)
   // Scrambler and descrambler configurations
   scramble_enabled_ = tdd_conf.value("wlan_scrambler", true);
 
+  ul_num_prb_per_cb_ = tdd_conf.value("ul_num_prb_per_cb", 8);
+  ul_num_cb_per_slot_ = ofdm_data_num_ / (ul_num_prb_per_cb_ * kNumScPerPRB);
+
+  dl_num_prb_per_cb_ = tdd_conf.value("dl_num_prb_per_cb", 8);
+  dl_num_cb_per_slot_ = ofdm_data_num_ / (dl_num_prb_per_cb_ * kNumScPerPRB);
+
   // LDPC Coding and Modulation configurations
   ul_mcs_params_ = this->Parse(tdd_conf, "ul_mcs");
   this->UpdateUlMCS(ul_mcs_params_);
@@ -683,7 +690,11 @@ Config::Config(std::string jsonfilename)
   ul_mac_data_length_max_ =
       ul_mac_packet_length_ - sizeof(MacPacketHeaderPacked);
 
-  ul_mac_packets_perframe_ = this->frame_.NumUlDataSyms();
+  if (slot_scheduling_ == false) {
+    ul_mac_packets_perframe_ = this->frame_.NumUlDataSyms();
+  } else {
+    ul_mac_packets_perframe_ = ul_num_cb_per_slot_;
+  }
   ul_mac_data_bytes_num_perframe_ =
       ul_mac_data_length_max_ * ul_mac_packets_perframe_;
   ul_mac_bytes_num_perframe_ = ul_mac_packet_length_ * ul_mac_packets_perframe_;
@@ -700,7 +711,11 @@ Config::Config(std::string jsonfilename)
   dl_mac_data_length_max_ =
       dl_mac_packet_length_ - sizeof(MacPacketHeaderPacked);
 
-  dl_mac_packets_perframe_ = this->frame_.NumDlDataSyms();
+  if (slot_scheduling_ == false) {
+    dl_mac_packets_perframe_ = this->frame_.NumDlDataSyms();
+  } else {
+    dl_mac_packets_perframe_ = dl_num_cb_per_slot_;
+  }
   dl_mac_data_bytes_num_perframe_ =
       dl_mac_data_length_max_ * dl_mac_packets_perframe_;
   dl_mac_bytes_num_perframe_ = dl_mac_packet_length_ * dl_mac_packets_perframe_;
@@ -734,8 +749,11 @@ Config::Config(std::string jsonfilename)
       "frame,\n"
       "\t%zu uplink data symbols per frame, %zu downlink data symbols "
       "per frame,\n"
+      "\tuplink data symbol start: %zu, downlink data symbol start: %zu \n"
       "\t%zu OFDM subcarriers (%zu data subcarriers),\n"
-      "\tUL modulation %s, DL modulation %s, Beamforming %s, \n"
+      "\t%zu UL PRBs per code block, %zu DL PRBs per code block,\n"
+      "\t%zu UL code blocks per slot, %zu DL code blocks per slot,\n"
+      "\tUL modulation %s, DL modulation %s, Beamforming %s,\n"
       "\t%zu UL codeblocks per symbol, "
       "%zu UL bytes per code block,\n"
       "\t%zu DL codeblocks per symbol, %zu DL bytes per code block,\n"
@@ -752,9 +770,12 @@ Config::Config(std::string jsonfilename)
       "UE Network Traffic Avg  (Mbps): %.3f\n"
       "All UEs Network Traffic Avg (Mbps): %.3f\n"
       "All UEs Network Traffic Avg (Mbps): %.3f\n",
-      bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
-      frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, ul_modulation_.c_str(),
-      dl_modulation_.c_str(), beamforming_str_.c_str(),
+      bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(),
+      frame_.NumULSyms(), frame_.NumDLSyms(),
+      frame_.GetULDataSymbolStart(), frame_.GetDLDataSymbolStart(),
+      ofdm_ca_num_, ofdm_data_num_,
+      ul_num_prb_per_cb_, dl_num_prb_per_cb_, ul_num_cb_per_slot_, dl_num_cb_per_slot_,
+      ul_modulation_.c_str(), dl_modulation_.c_str(), beamforming_str_.c_str(),
       ul_ldpc_config_.NumBlocksInSymbol(), ul_num_bytes_per_cb_,
       dl_ldpc_config_.NumBlocksInSymbol(), dl_num_bytes_per_cb_,
       ul_mac_data_bytes_num_perframe_, ul_mac_bytes_num_perframe_,
@@ -1081,9 +1102,15 @@ void Config::GenData() {
   const size_t ul_num_bytes_per_ue_pad =
       Roundup<64>(this->ul_num_bytes_per_cb_) *
       this->ul_ldpc_config_.NumBlocksInSymbol();
-  ul_bits_.Calloc(this->frame_.NumULSyms(),
-                  ul_num_bytes_per_ue_pad * this->ue_ant_num_,
-                  Agora_memory::Alignment_t::kAlign64);
+  if (slot_scheduling_ == false){
+    ul_bits_.Calloc(this->frame_.NumULSyms(),
+                    ul_num_bytes_per_ue_pad * this->ue_ant_num_,
+                    Agora_memory::Alignment_t::kAlign64);
+  } else {
+    ul_bits_.Calloc(this->ue_ant_num_,
+                    ul_num_bytes_per_ue_pad * ul_num_cb_per_slot_,
+                    Agora_memory::Alignment_t::kAlign64);
+  }
   ul_iq_f_.Calloc(this->frame_.NumULSyms(),
                   this->ofdm_data_num_ * this->ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
@@ -1117,36 +1144,70 @@ void Config::GenData() {
       throw std::runtime_error("Config: Failed to open antenna file");
     }
 
-    for (size_t i = this->frame_.ClientUlPilotSymbols();
-         i < this->frame_.NumULSyms(); i++) {
-      if (std::fseek(fd, (ul_data_bytes_num_persymbol_ * this->ue_ant_offset_),
-                     SEEK_CUR) != 0) {
-        AGORA_LOG_ERROR(
+    if (slot_scheduling_ == false) {
+      for (size_t i = this->frame_.ClientUlPilotSymbols();
+        i < this->frame_.NumULSyms(); i++) {
+        if (std::fseek(fd, (ul_data_bytes_num_persymbol_ * this->ue_ant_offset_),
+          SEEK_CUR) != 0) {
+          AGORA_LOG_ERROR(
             " *** Error: failed to seek propertly (pre) into %s file\n",
             ul_data_file.c_str());
-        RtAssert(false,
+          RtAssert(false,
                  "Failed to seek propertly into " + ul_data_file + "file\n");
-      }
-      for (size_t j = 0; j < this->ue_ant_num_; j++) {
-        size_t r = std::fread(this->ul_bits_[i] + (j * ul_num_bytes_per_ue_pad),
-                              sizeof(int8_t), ul_data_bytes_num_persymbol_, fd);
-        if (r < ul_data_bytes_num_persymbol_) {
-          AGORA_LOG_ERROR(
+        }
+        for (size_t j = 0; j < this->ue_ant_num_; j++) {
+          size_t r = std::fread(this->ul_bits_[i] + (j * ul_num_bytes_per_ue_pad),
+                                sizeof(int8_t), ul_data_bytes_num_persymbol_, fd);
+          if (r < ul_data_bytes_num_persymbol_) {
+            AGORA_LOG_ERROR(
               " *** Error: Uplink bad read from file %s (batch %zu : %zu) "
               "%zu : %zu\n",
               ul_data_file.c_str(), i, j, r, ul_data_bytes_num_persymbol_);
+          }
         }
-      }
-      if (std::fseek(fd,
-                     ul_data_bytes_num_persymbol_ *
-                         (this->ue_ant_total_ - this->ue_ant_offset_ -
-                          this->ue_ant_num_),
-                     SEEK_CUR) != 0) {
-        AGORA_LOG_ERROR(
+        if (std::fseek(fd,
+                       ul_data_bytes_num_persymbol_ *
+                       (this->ue_ant_total_ - this->ue_ant_offset_ -
+                       this->ue_ant_num_),
+                       SEEK_CUR) != 0) {
+          AGORA_LOG_ERROR(
             " *** Error: failed to seek propertly (post) into %s file\n",
             ul_data_file.c_str());
-        RtAssert(false,
+          RtAssert(false,
+                   "Failed to seek propertly into " + ul_data_file + "file\n");
+        }
+      }
+    } else {
+      for (size_t i = 0; i < this->ue_ant_num_; i++) {
+        if (std::fseek(fd, (ul_data_bytes_num_persymbol_ * this->ue_ant_offset_),
+          SEEK_CUR) != 0) {
+          AGORA_LOG_ERROR(
+            " *** Error: failed to seek propertly (pre) into %s file\n",
+            ul_data_file.c_str());
+          RtAssert(false,
                  "Failed to seek propertly into " + ul_data_file + "file\n");
+        }
+        for (size_t j = 0; j < ul_num_cb_per_slot_; j++) {
+          size_t r = std::fread(&this->ul_bits_[i][j * ul_num_bytes_per_ue_pad],
+                                sizeof(int8_t), ul_data_bytes_num_persymbol_, fd);
+          if (r < ul_data_bytes_num_persymbol_) {
+            AGORA_LOG_ERROR(
+              " *** Error: Uplink bad read from file %s (batch %zu : %zu) "
+              "%zu : %zu\n",
+              ul_data_file.c_str(), i, j, r, ul_data_bytes_num_persymbol_);
+          }
+        }
+        if (std::fseek(fd,
+                       ul_data_bytes_num_persymbol_ *
+                       (this->ue_ant_total_ - this->ue_ant_offset_ -
+                       this->ue_ant_num_),
+                       SEEK_CUR) != 0) {
+          AGORA_LOG_ERROR(
+            " *** Error: failed to seek propertly (post) into %s file\n",
+            ul_data_file.c_str());
+          RtAssert(false,
+                   "Failed to seek propertly into " + ul_data_file + "file\n");
+        }
       }
     }
     std::fclose(fd);

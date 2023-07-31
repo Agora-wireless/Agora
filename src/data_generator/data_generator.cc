@@ -26,6 +26,7 @@
 #include "utils_ldpc.h"
 
 static constexpr bool kPrintDebugCSI = false;
+static constexpr bool kDebugPrintPreIfftData = false;
 static constexpr bool kDebugPrintRxData = false;
 static constexpr bool kPrintDlTxData = false;
 static constexpr bool kPrintDlModData = false;
@@ -129,29 +130,45 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     }
 
     const size_t symbol_blocks =
-        ul_ldpc_config.NumBlocksInSymbol() * this->cfg_->UeAntNum();
-    const size_t num_ul_codeblocks =
+      ul_ldpc_config.NumBlocksInSymbol() * this->cfg_->UeAntNum();
+    size_t num_ul_codeblocks;
+
+    if (cfg_->SlotScheduling() == false) {
+      num_ul_codeblocks =
         this->cfg_->Frame().NumUlDataSyms() * symbol_blocks;
+    } else {
+      num_ul_codeblocks =
+        cfg_->NumCbPerSlot(Direction::kUplink) * this->cfg_->UeAntNum();
+    }
+
     AGORA_LOG_SYMBOL("Total number of ul blocks: %zu\n", num_ul_codeblocks);
 
     std::vector<std::vector<int8_t>> ul_information(num_ul_codeblocks);
     std::vector<std::vector<int8_t>> ul_encoded_codewords(num_ul_codeblocks);
 
+    size_t ue_id, ue_cb_id, ue_cb_cnt;
     for (size_t cb = 0; cb < num_ul_codeblocks; cb++) {
-      // i : symbol -> ue -> cb (repeat)
-      size_t sym_id = cb / (symbol_blocks);
-      // ue antenna for code block
-      size_t sym_offset = cb % (symbol_blocks);
-      size_t ue_id = sym_offset / ul_ldpc_config.NumBlocksInSymbol();
-      size_t ue_cb_id = sym_offset % ul_ldpc_config.NumBlocksInSymbol();
-      size_t ue_cb_cnt =
+      if (cfg_->SlotScheduling() == false) {
+        // i : symbol -> ue -> cb (repeat)
+        size_t sym_id = cb / (symbol_blocks);
+        // ue antenna for code block
+        size_t sym_offset = cb % (symbol_blocks);
+        ue_id = sym_offset / ul_ldpc_config.NumBlocksInSymbol();
+        ue_cb_id = sym_offset % ul_ldpc_config.NumBlocksInSymbol();
+        ue_cb_cnt =
           (sym_id * ul_ldpc_config.NumBlocksInSymbol()) + ue_cb_id;
+      } else {
+        ue_id = cb / cfg_->NumCbPerSlot(Direction::kUplink);
+        ue_cb_id = cb % cfg_->NumCbPerSlot(Direction::kUplink);
+        ue_cb_cnt = ue_cb_id;
+      }
 
       AGORA_LOG_TRACE(
           "cb %zu -- user %zu -- user block %zu -- user cb id %zu -- input "
           "size %zu, index %zu, total size %zu\n",
           cb, ue_id, ue_cb_id, ue_cb_cnt, ul_cb_bytes, ue_cb_cnt * ul_cb_bytes,
           ul_mac_info.at(ue_id).size());
+
       int8_t* cb_start = &ul_mac_info.at(ue_id).at(ue_cb_cnt * ul_cb_bytes);
       ul_information.at(cb) =
           std::vector<int8_t>(cb_start, cb_start + ul_cb_bytes);
@@ -203,8 +220,13 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       if (kPrintUplinkInformationBytes) {
         std::printf("Uplink information bytes\n");
         for (size_t n = 0; n < num_ul_codeblocks; n++) {
-          std::printf("Symbol %zu, UE %zu\n", n / this->cfg_->UeAntNum(),
-                      n % this->cfg_->UeAntNum());
+          if (cfg_->SlotScheduling() == false) {
+            std::printf("Symbol %zu, UE %zu\n", n / this->cfg_->UeAntNum(),
+                        n % this->cfg_->UeAntNum());
+          } else {
+            std::printf("UE %zu, CB %zu\n", n / cfg_->NumCbPerSlot(Direction::kUplink),
+                        n % cfg_->NumCbPerSlot(Direction::kUplink));
+          }
           for (size_t i = 0; i < ul_cb_bytes; i++) {
             std::printf("%u ",
                         static_cast<uint8_t>(ul_information.at(n).at(i)));
@@ -288,10 +310,63 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
     // Place modulated uplink data codewords into central IFFT bins
     RtAssert(ul_ldpc_config.NumBlocksInSymbol() == 1);  // TODO: Assumption
-    pre_ifft_data_syms.resize(this->cfg_->UeAntNum() *
-                              this->cfg_->Frame().NumUlDataSyms());
-    for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
-      pre_ifft_data_syms.at(i) = this->BinForIfft(ul_modulated_codewords.at(i));
+    if (cfg_->SlotScheduling() == false) {
+      pre_ifft_data_syms.resize(this->cfg_->UeAntNum() *
+                                this->cfg_->Frame().NumUlDataSyms());
+      for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
+        pre_ifft_data_syms.at(i) = this->BinForIfft(ul_modulated_codewords.at(i));
+      }
+      if (kDebugPrintPreIfftData) {
+        std::printf("pre ifft data: num ul data sym: %zu\n", this->cfg_->Frame().NumUlDataSyms());
+        for (size_t symb = 0; symb < 12; symb++) {
+          for (size_t sc = 0; sc < this->cfg_->OfdmCaNum(); sc++) {
+            if (sc % this->cfg_->OfdmCaNum() == 0) {
+              std::printf("\nsymbol %zu ant %zu\n", symb, sc / this->cfg_->OfdmCaNum());
+            }
+            std::printf("symb: %zu, sc: %zu, %.4f+%.4fi \n", symb, sc, pre_ifft_data_syms[symb][sc].re,
+                        pre_ifft_data_syms[symb][sc].im);
+          }
+          std::printf("\n");
+        }
+      }
+    }
+    else {
+      pre_ifft_data_syms.resize(this->cfg_->Frame().NumUlDataSyms(),
+                                std::vector<complex_float> (this->cfg_->UeAntNum() *
+                                this->cfg_->OfdmCaNum()));
+
+      size_t NumUlScPerCB = this->cfg_->NumPrbPerCb(Direction::kUplink) * kNumScPerPRB;
+      for (size_t ue = 0; ue < this->cfg_->UeAntNum(); ue++) {
+        size_t OfdmDataOffset = cfg_->OfdmDataStart();
+        for (size_t ue_cb = 0; ue_cb < cfg_->NumCbPerSlot(Direction::kUplink); ue_cb++){
+          size_t CbDataIndex = 0;
+          // for (size_t symb = 0; symb < this->cfg_->Frame().NumUlDataSyms(); symb++){
+          for (size_t symb = 0; symb < 12; symb++){
+            // std::printf("DEBUG: cb: %zu, ue: %zu, ue_cb: %zu, symb: %zu, OfdmDataOffset: %zu, CbDataIndex: %zu\n", (ue * cfg_->NumCbPerSlot(Direction::kUplink) + ue_cb), ue, ue_cb, symb, OfdmDataOffset, CbDataIndex);
+            for (size_t OfdmDataIndex = 0; OfdmDataIndex < NumUlScPerCB; OfdmDataIndex++) {
+              pre_ifft_data_syms.at(symb).at(ue * this->cfg_->OfdmCaNum() + OfdmDataOffset + OfdmDataIndex) = ul_modulated_codewords.at(ue * cfg_->NumCbPerSlot(Direction::kUplink) + ue_cb).at(CbDataIndex++);
+            }
+          }
+          OfdmDataOffset += NumUlScPerCB;
+        }
+      }
+      if (kDebugPrintPreIfftData) {
+        size_t OfdmDataOffset = cfg_->OfdmDataStart();
+        std::printf("pre ifft data: num ue: %zu, num ul data sym: %zu\n", this->cfg_->UeAntNum(), this->cfg_->Frame().NumUlDataSyms());
+        for (size_t ue = 0; ue < this->cfg_->UeAntNum(); ue++) {
+          for (size_t symb = 0; symb < 12; symb++){
+            for (size_t sc = OfdmDataOffset; sc < (OfdmDataOffset + NumUlScPerCB * cfg_->NumCbPerSlot(Direction::kUplink)); sc++) {
+              if (sc % this->cfg_->OfdmDataNum() == 0) {
+                std::printf("\nsymbol %zu ue %zu\n", symb, ue);
+              }
+              std::printf("ue: %zu, symb: %zu, sc: %zu, %.4f+%.4fi \n", ue, symb, sc,
+                          pre_ifft_data_syms[symb][ue * this->cfg_->OfdmCaNum() + sc].re,
+                          pre_ifft_data_syms[symb][ue * this->cfg_->OfdmCaNum() + sc].im);
+            }
+            std::printf("\n");
+          }
+        }
+      }
     }
   }
 
@@ -358,10 +433,17 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
                     this->cfg_->OfdmDataNum() * sizeof(complex_float));
       } else {
         size_t k = i - this->cfg_->Frame().ClientUlPilotSymbols();
-        std::memcpy(
+        if (cfg_->SlotScheduling() == false) {
+          std::memcpy(
             tx_data_all_symbols[data_sym_id] + (j * this->cfg_->OfdmCaNum()),
             &pre_ifft_data_syms.at(k * this->cfg_->UeAntNum() + j).at(0),
             this->cfg_->OfdmCaNum() * sizeof(complex_float));
+        } else {
+          std::memcpy(
+            tx_data_all_symbols[data_sym_id] + (j * this->cfg_->OfdmCaNum()),
+            &pre_ifft_data_syms.at(k).at(j * this->cfg_->OfdmCaNum()),
+            this->cfg_->OfdmCaNum() * sizeof(complex_float));
+        }
       }
     }
   }

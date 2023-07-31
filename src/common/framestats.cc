@@ -103,12 +103,20 @@ size_t FrameStats::NumDataSyms() const {
           (this->pilot_symbols_.size() + this->beacon_symbols_.size()));
 }
 
+size_t FrameStats::GetDLDataSymbolStart() const {
+  return this->dl_symbols_.size();
+}
+
 size_t FrameStats::GetDLSymbol(size_t location) const {
   return this->dl_symbols_.at(location);
 }
 
 size_t FrameStats::GetDLCalSymbol(size_t location) const {
   return this->dl_cal_symbols_.at(location);
+}
+
+size_t FrameStats::GetULDataSymbolStart() const {
+  return this->ul_symbols_.size();
 }
 
 size_t FrameStats::GetULSymbol(size_t location) const {
