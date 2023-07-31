@@ -17,10 +17,11 @@ DoDecode::DoDecode(
     Config* in_config, int in_tid,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffers,
-    PhyStats* in_phy_stats, Stats* in_stats_manager)
+    MacScheduler* mac_sched, PhyStats* in_phy_stats, Stats* in_stats_manager)
     : Doer(in_config, in_tid),
       demod_buffers_(demod_buffers),
       decoded_buffers_(decoded_buffers),
+      mac_sched_(mac_sched),
       phy_stats_(in_phy_stats),
       scrambler_(std::make_unique<AgoraScrambler::Scrambler>()) {
   duration_stat_ = in_stats_manager->GetDurationStat(DoerType::kDecode, in_tid);
@@ -38,7 +39,8 @@ EventData DoDecode::Launch(size_t tag) {
   const size_t symbol_idx_ul = cfg_->Frame().GetULSymbolIdx(symbol_id);
   const size_t symbol_offset =
       cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
-  size_t cur_cb_id, ue_id;
+  size_t cur_cb_id, sched_ue_id;
+  const size_t ue_id = mac_sched_->ScheduledUeIndex(frame_id, 0, sched_ue_id);
   const size_t frame_slot = (frame_id % kFrameWnd);
   const size_t num_bytes_per_cb = cfg_->NumBytesPerCb(Direction::kUplink);
 
@@ -68,7 +70,7 @@ EventData DoDecode::Launch(size_t tag) {
 
   if (cfg_->SlotScheduling() == false) {
     cur_cb_id = (cb_id % ldpc_config.NumBlocksInSymbol());
-    ue_id = (cb_id / ldpc_config.NumBlocksInSymbol());
+    sched_ue_id = (cb_id / ldpc_config.NumBlocksInSymbol());
 
     if (kDebugPrintInTask == true) {
       std::printf(
@@ -77,9 +79,10 @@ EventData DoDecode::Launch(size_t tag) {
         tid_, frame_id, symbol_id, cur_cb_id, ue_id, symbol_offset);
     }
 
-    int8_t* llr_buffer_ptr = demod_buffers_[frame_slot][symbol_idx_ul][ue_id] +
-                             (cfg_->ModOrderBits(Direction::kUplink) *
-                             (ldpc_config.NumCbCodewLen() * cur_cb_id));
+    int8_t* llr_buffer_ptr =
+      demod_buffers_[frame_slot][symbol_idx_ul][sched_ue_id] +
+        (cfg_->ModOrderBits(Direction::kUplink) *
+        (ldpc_config.NumCbCodewLen() * cur_cb_id));
 
     ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
 
@@ -97,7 +100,7 @@ EventData DoDecode::Launch(size_t tag) {
   }
   else {
     size_t NumUlScPerCB = this->cfg_->NumPrbPerCb(Direction::kUplink) * kNumScPerPRB;
-    ue_id = cb_id / this->cfg_->NumCbPerSlot(Direction::kUplink);
+    sched_ue_id = cb_id / this->cfg_->NumCbPerSlot(Direction::kUplink);
     cur_cb_id = cb_id % cfg_->NumCbPerSlot(Direction::kUplink);
 
     if (kDebugPrintInTask == true) {

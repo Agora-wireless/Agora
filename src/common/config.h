@@ -109,6 +109,7 @@ class Config {
   inline bool ImbalanceCalEn() const { return this->imbalance_cal_en_; }
   inline size_t BeamformingAlgo() const { return this->beamforming_algo_; }
   inline std::string Beamforming() const { return this->beamforming_str_; }
+  inline size_t SpatialStreamsNum() const { return this->num_spatial_streams_; }
   inline bool ExternalRefNode(size_t id) const {
     return this->external_ref_node_.at(id);
   }
@@ -294,6 +295,9 @@ class Config {
     return dir == Direction::kUplink ? this->ul_ldpc_config_
                                      : this->dl_ldpc_config_;
   }
+  inline const LDPCconfig& BcLdpcConfig() const {
+    return dl_bcast_ldpc_config_;
+  }
   inline Table<complex_float>& ModTable(Direction dir) {
     return dir == Direction::kUplink ? this->ul_mod_table_
                                      : this->dl_mod_table_;
@@ -304,6 +308,10 @@ class Config {
   }
   inline size_t SubcarrierPerCodeBlock(Direction dir) const {
     return this->LdpcConfig(dir).NumCbCodewLen() / this->ModOrderBits(dir);
+  }
+  inline size_t McsIndex(Direction dir) const {
+    return dir == Direction::kUplink ? this->ul_mcs_index_
+                                     : this->dl_mcs_index_;
   }
 
   inline bool ScrambleEnabled() const { return this->scramble_enabled_; }
@@ -414,9 +422,14 @@ class Config {
   inline Table<std::complex<int16_t>>& DlIqT() { return this->dl_iq_t_; }
 
   // Public functions
+  void GenPilots();
   void GenData();
-  void UpdateUlMCS(const nlohmann::json& mcs);
-  void UpdateDlMCS(const nlohmann::json& mcs);
+  void GenBroadcastSlots(std::vector<std::complex<int16_t>*>& bcast_iq_samps,
+                         std::vector<size_t> ctrl_msg);
+  size_t DecodeBroadcastSlots(const int16_t* const bcast_iq_samps);
+  void UpdateUlMCS(const nlohmann::json& ul_mcs_params);
+  void UpdateDlMCS(const nlohmann::json& dl_mcs_params);
+  void UpdateCtrlMCS();
 
   /// TODO document and review
   size_t GetSymbolId(size_t input_id) const;
@@ -427,6 +440,7 @@ class Config {
   bool IsCalDlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
   bool IsCalUlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
   bool IsDownlink(size_t /*frame_id*/, size_t /*symbol_id*/) const;
+  bool IsDownlinkBroadcast(size_t /*frame_id*/, size_t /*symbol_id*/) const;
   bool IsUplink(size_t /*unused*/, size_t /*symbol_id*/) const;
 
   /* Public functions that do not meet coding standard format */
@@ -453,14 +467,28 @@ class Config {
     return ((frame_id % kFrameWnd) * this->frame_.NumDLSyms() + symbol_idx_dl);
   }
 
+  inline size_t GetTotalSymbolIdxDl(size_t frame_id, size_t symbol_id) {
+    const size_t symbol_idx_dl =
+        symbol_id < this->frame_.GetDLSymbol(0)
+            ? this->frame_.GetDLControlSymbolIdx(symbol_id)
+            : this->frame_.GetDLSymbolIdx(symbol_id) +
+                  this->frame_.NumDlControlSyms();
+    return (frame_id % kFrameWnd) *
+               (this->frame_.NumDlControlSyms() + this->frame_.NumDLSyms()) +
+           symbol_idx_dl;
+  }
+
   //Returns Beacon+Dl symbol index
   inline size_t GetBeaconDlIdx(size_t symbol_id) const {
     size_t symbol_idx = SIZE_MAX;
     const auto type = GetSymbolType(symbol_id);
     if (type == SymbolType::kBeacon) {
       symbol_idx = Frame().GetBeaconSymbolIdx(symbol_id);
+    } else if (type == SymbolType::kControl) {
+      symbol_idx =
+          Frame().GetDLControlSymbolIdx(symbol_id) + Frame().NumBeaconSyms();
     } else if (type == SymbolType::kDL) {
-      symbol_idx = Frame().GetDLSymbolIdx(symbol_id) + Frame().NumBeaconSyms();
+      symbol_idx = Frame().GetDLSymbolIdx(symbol_id) + Frame().NumDlBcastSyms();
     } else {
       throw std::runtime_error("Invalid BS Beacon or DL symbol id " +
                                std::to_string(symbol_id));
@@ -584,12 +612,23 @@ class Config {
     return ofdm_data_num_ - GetOFDMPilotNum();
   }
 
+  inline size_t GetOFDMCtrlNum() const {
+    return ofdm_data_num_ - 2 * GetOFDMPilotNum();
+  }
+
   inline size_t GetOFDMDataIndex(size_t sc_id) const {
-    return symbol_data_id_.at(sc_id);
+    return dl_symbol_data_id_.at(sc_id);
+  }
+
+  inline size_t GetOFDMCtrlIndex(size_t sc_id) const {
+    return dl_symbol_ctrl_id_.at(sc_id);
   }
 
   inline bool IsDataSubcarrier(size_t sc_id) const {
-    return symbol_map_.at(sc_id) == SubcarrierType::kData;
+    return dl_symbol_map_.at(sc_id) == SubcarrierType::kData;
+  }
+  inline bool IsControlSubcarrier(size_t sc_id) const {
+    return control_symbol_map_.at(sc_id) == SubcarrierType::kData;
   }
   inline const std::string& ConfigFilename() const { return config_filename_; }
   inline const std::string& TraceFilename() const { return trace_file_; }
@@ -660,21 +699,24 @@ class Config {
 
   std::string ul_modulation_;  // Modulation order as a string, e.g., "16QAM"
   size_t
-      ul_mod_order_;  // Modulation order (e.g., 4: QPSK, 16: 16QAM, 64: 64QAM)
-  size_t
       ul_mod_order_bits_;  // Number of binary bits used for a modulation order
   std::string dl_modulation_;
-  size_t dl_mod_order_;
   size_t dl_mod_order_bits_;
+  size_t dl_bcast_mod_order_bits_;
 
   // Modulation lookup table for mapping binary bits to constellation points
   Table<complex_float> ul_mod_table_;
   Table<complex_float> dl_mod_table_;
 
-  LDPCconfig ul_ldpc_config_;     // Uplink LDPC parameters
-  LDPCconfig dl_ldpc_config_;     // Downlink LDPC parameters
-  nlohmann::json ul_mcs_params_;  // Uplink Modulation and Coding (MCS)
-  nlohmann::json dl_mcs_params_;  // Downlink Modulation and Coding (MCS)
+  LDPCconfig ul_ldpc_config_;        // Uplink LDPC parameters
+  LDPCconfig dl_ldpc_config_;        // Downlink LDPC parameters
+  LDPCconfig dl_bcast_ldpc_config_;  // Downlink Broadcast LDPC parameters
+  nlohmann::json ul_mcs_params_;     // Uplink Modulation and Coding (MCS)
+  nlohmann::json dl_mcs_params_;     // Downlink Modulation and Coding (MCS)
+  size_t ul_mcs_index_;
+  size_t dl_mcs_index_;
+  size_t dl_code_rate_;
+  size_t ul_code_rate_;
   bool scramble_enabled_;
 
   // A class that holds the frame configuration the id contains letters
@@ -686,8 +728,11 @@ class Config {
 
   size_t dl_packet_length_;  // HAS_TIME & END_BURST, fixme
 
-  std::vector<SubcarrierType> symbol_map_;
-  std::vector<size_t> symbol_data_id_;
+  std::vector<SubcarrierType> ul_symbol_map_;
+  std::vector<SubcarrierType> dl_symbol_map_;
+  std::vector<SubcarrierType> control_symbol_map_;
+  std::vector<size_t> dl_symbol_data_id_;
+  std::vector<size_t> dl_symbol_ctrl_id_;
 
   Table<int8_t> dl_bits_;
   Table<int8_t> ul_bits_;
@@ -717,7 +762,9 @@ class Config {
   std::vector<uint32_t> beacon_;
   complex_float* pilots_;
   complex_float* pilots_sgn_;
+  complex_float* pilot_ifft_;
   Table<complex_float> ue_specific_pilot_;
+  Table<complex_float> ue_pilot_ifft_;
   Table<std::complex<int16_t>> ue_specific_pilot_t_;
   std::vector<std::complex<float>> common_pilot_;
 
@@ -770,6 +817,7 @@ class Config {
   bool sample_cal_en_;
   bool imbalance_cal_en_;
   size_t beamforming_algo_;
+  size_t num_spatial_streams_;
   std::string beamforming_str_;
   std::vector<bool> external_ref_node_;
   std::string channel_;

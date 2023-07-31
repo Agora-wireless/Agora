@@ -25,6 +25,11 @@ FrameStats::FrameStats(std::string new_frame_id)
         break;
       }
 
+      case 'S': {
+        dl_control_symbols_.push_back(i);
+        break;
+      }
+
       case 'C': {
         dl_cal_symbols_.push_back(i);
         break;
@@ -88,6 +93,14 @@ size_t FrameStats::NumBeaconSyms() const {
   return this->beacon_symbols_.size();
 }
 
+size_t FrameStats::NumDlControlSyms() const {
+  return this->dl_control_symbols_.size();
+}
+
+size_t FrameStats::NumDlBcastSyms() const {
+  return this->beacon_symbols_.size() + this->dl_control_symbols_.size();
+}
+
 size_t FrameStats::NumPilotSyms() const { return this->pilot_symbols_.size(); }
 
 size_t FrameStats::NumTotalSyms() const {
@@ -135,6 +148,10 @@ size_t FrameStats::GetBeaconSymbol(size_t location) const {
   return this->beacon_symbols_.at(location);
 }
 
+size_t FrameStats::GetDLControlSymbol(size_t location) const {
+  return this->dl_control_symbols_.at(location);
+}
+
 size_t FrameStats::GetSymbolIdx(const std::vector<size_t>& search_vector,
                                 size_t symbol_number) {
   /* TODO: Optimize this, probably with a precomputed table -- assumes sorted
@@ -155,6 +172,10 @@ size_t FrameStats::GetSymbolIdx(const std::vector<size_t>& search_vector,
 
 size_t FrameStats::GetBeaconSymbolIdx(size_t symbol_number) const {
   return FrameStats::GetSymbolIdx(this->beacon_symbols_, symbol_number);
+}
+
+size_t FrameStats::GetDLControlSymbolIdx(size_t symbol_number) const {
+  return FrameStats::GetSymbolIdx(this->dl_control_symbols_, symbol_number);
 }
 
 size_t FrameStats::GetDLSymbolIdx(size_t symbol_number) const {

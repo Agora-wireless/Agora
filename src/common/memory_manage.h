@@ -49,6 +49,15 @@ class Table {
                 (this->dim1_ * this->dim2_ * sizeof(T)));
   }
 
+  // Allocate the table and fill it with ones
+  void AllocAndSet(size_t dim1, size_t dim2,
+                   Agora_memory::Alignment_t alignment) {
+    this->Malloc(dim1, dim2, alignment);
+    for (size_t i = 0; i < (dim1 * dim2); i++) {
+      this->data_[i] = 1;
+    }
+  }
+
   // Allocate the table and fill it with random floating point values between
   // -1.0 and 1.0
   void RandAllocFloat(size_t dim1, size_t dim2,

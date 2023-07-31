@@ -35,8 +35,8 @@ class TxRxWorkerClientHw : public TxRxWorker {
  private:
   size_t DoTx(const long long time0);
   std::vector<Packet*> DoRx(size_t interface_id, size_t& global_frame_id,
-                            size_t& global_symbol_id, long long& receive_time,
-                            ssize_t& sample_offset);
+                            size_t& global_symbol_id, size_t& local_frame_id,
+                            long long& receive_time, ssize_t& sample_offset);
 
   ssize_t SyncBeacon(size_t local_interface, size_t sample_window);
   ssize_t FindSyncBeacon(const std::complex<int16_t>* check_data,
@@ -44,7 +44,7 @@ class TxRxWorkerClientHw : public TxRxWorker {
   void AdjustRx(size_t local_interface, size_t discard_samples);
   bool IsRxSymbol(size_t symbol_id);
   void TxUplinkSymbols(size_t radio_id, size_t frame_id, long long time0);
-  void TxPilot(size_t pilot_ant, size_t frame_id, long long time0);
+  void TxPilot(size_t pilot_radio, size_t frame_id, long long time0);
   bool IsTxSymbolNext(size_t radio_id, size_t current_symbol);
   Radio::TxFlags GetTxFlags(size_t radio_id, size_t tx_symbol_id);
   void WaitDetectBeacon(size_t local_interface);

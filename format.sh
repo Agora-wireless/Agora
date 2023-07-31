@@ -1,12 +1,11 @@
-
 clang-format-11 -i src/agora/txrx/*.cc
 clang-format-11 -i src/agora/txrx/*.h
 
 clang-format-11 -i src/agora/txrx/workers/*.cc
 clang-format-11 -i src/agora/txrx/workers/*.h
 
-clang-format-11 -i src/agora/radio/*.cc
-clang-format-11 -i src/agora/radio/*.h
+clang-format-11 -i src/radio/*.cc
+clang-format-11 -i src/radio/*.h
 
 clang-format-11 -i src/agora/*.cc
 clang-format-11 -i src/agora/*.h
@@ -40,6 +39,8 @@ clang-format-11 -i src/mac/*.h
 
 clang-format-11 -i simulator/*.cc
 clang-format-11 -i simulator/*.h
+clang-format-11 -i simulator/channel_models/*.cc
+clang-format-11 -i simulator/channel_models/*.h
 
 clang-format-11 -i src/data_generator/*.cc
 clang-format-11 -i src/data_generator/*.h

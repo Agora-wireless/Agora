@@ -100,7 +100,7 @@ endif()
 #Settable values
 message(STATUS "\n-- ----- Configuration values -----")
 message(STATUS "DEBUG:            ${DEBUG}")
-set(RADIO_TYPE SIMULATION CACHE STRING "RADIO_TYPE defaulting to 'SIMULATION', valid types are SIMULATION / SOAPY_IRIS / SOAPY_UHD / PURE_UHD")
+set(RADIO_TYPE SIMULATION CACHE STRING "RADIO_TYPE defaulting to 'SIMULATION', valid types are SIMULATION / SOAPY_IRIS / PURE_UHD")
 message(STATUS "RADIO_TYPE:       ${RADIO_TYPE}")
 set(LOG_LEVEL "info" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 message(STATUS "LOG_LEVEL:        ${LOG_LEVEL}")
@@ -195,14 +195,38 @@ set(PYTHON_LIB ${PYTHON_LIBRARIES})
 include_directories(${PYTHON_INCLUDE_DIRS})
 message(VERBOSE "  PythonLibs Includes: ${PYTHON_INCLUDE_DIRS} Libraries: ${PYTHON_LIBRARIES}")
 
-#Soapy (optional based on radio type, need to finish decoupling requirements)
-find_package(SoapySDR "0.8.0" CONFIG)
-if(NOT SoapySDR_FOUND)
-  message(FATAL_ERROR "SoapySDR development files not found")
+#Soapy (optional based on radio type)
+if(RADIO_TYPE STREQUAL SOAPY_IRIS)
+  find_package(SoapySDR "0.8.0" CONFIG)
+  if(NOT SoapySDR_FOUND)
+    message(FATAL_ERROR "SoapySDR development files not found")
+  endif()
+  set(SOAPY_LIB ${SoapySDR_LIBRARIES})
+  include_directories(${SOAPY_INCLUDE_DIRS})
+  message(VERBOSE "  SoapySDR Includes: ${SoapySDR_INCLUDE_DIRS} Libraries: ${SoapySDR_LIBRARIES}")
+
+  set(RADIO_SOURCES
+      src/radio/radio.cc
+      src/radio/radio_soapysdr.cc
+      src/radio/radio_data_plane.cc
+      src/radio/radio_socket.cc
+      src/radio/radio_data_plane_soapy.cc
+      src/radio/radio_data_plane_socket.cc
+      src/radio/radio_set/radio_set.cc
+      )
+
+  set(RADIO_SOURCES_AGORA
+      src/agora/txrx/packet_txrx_radio.cc
+      src/agora/txrx/workers/txrx_worker_hw.cc
+      src/radio/radio_set/radio_set_bs.cc
+      )
+
+  set(RADIO_SOURCES_CLIENT
+      src/radio/radio_set/radio_set_ue.cc
+      src/client/txrx/packet_txrx_client_radio.cc
+      src/client/txrx/workers/txrx_worker_client_hw.cc
+      )
 endif()
-set(SOAPY_LIB ${SoapySDR_LIBRARIES})
-include_directories(${SOAPY_INCLUDE_DIRS})
-message(VERBOSE "  SoapySDR Includes: ${SoapySDR_INCLUDE_DIRS} Libraries: ${SoapySDR_LIBRARIES}")
 
 #SPDLOG
 if(USE_SPDLOG)
@@ -333,15 +357,15 @@ if(RADIO_TYPE STREQUAL PURE_UHD)
   find_package(Boost "1.65" REQUIRED ${BOOST_REQUIRED_COMPONENTS})
   message(STATUS "Using Boost Version: ${Boost_VERSION}")
 
-  set(PUREUHD_SOURCES
-      src/agora/radio/radio_set/radio_set_uhd.cc
-      src/agora/radio/radio_uhdsdr.cc
+  set(RADIO_SOURCES
+      src/radio/radio_set/radio_set_uhd.cc
+      src/radio/radio_uhdsdr.cc
       )
-  set(PUREUHD_SOURCES_AGORA
+  set(RADIO_SOURCES_AGORA
       src/agora/txrx/workers/txrx_worker_usrp.cc
       )
 
-  set(PUREUHD_SOURCES_CLIENT
+  set(RADIO_SOURCES_CLIENT
       src/client/txrx/workers/txrx_worker_client_uhd.cc
       )
   message(STATUS "pure_uhd_lib library initialized")
@@ -372,9 +396,9 @@ include_directories(
   src/common/loggers
   src/recorder
   src/mac/
+  src/radio
+  src/radio/radio_set
   src/agora/
-  src/agora/radio
-  src/agora/radio/radio_set
   src/agora/txrx
   src/agora/txrx/workers
   src/client
@@ -392,17 +416,21 @@ if (${ENABLE_HDF5})
       ${RECORDER_SOURCES}
       src/recorder/hdf5_lib.cc
       src/recorder/recorder_worker_hdf5.cc)
+  set(CHSIM_SOURCES
+      ${CHSIM_SOURCES}
+      simulator/channel_models/dataset_model.cc)
 endif()
 add_library(recorder_sources_lib OBJECT ${RECORDER_SOURCES})
 
 set(COMMON_SOURCES
-  ${PUREUHD_SOURCES}
+  ${RADIO_SOURCES}
   src/agora/stats.cc
   src/common/phy_stats.cc
   src/common/framestats.cc
   src/agora/doencode.cc
   src/common/utils.cc
   src/common/config.cc
+  src/common/fivegconfig.cc
   src/common/comms-lib.cc
   src/common/comms-lib-avx.cc
   src/common/signal_handler.cc
@@ -412,20 +440,15 @@ set(COMMON_SOURCES
   src/common/crc.cc
   src/common/memory_manage.cc
   src/common/scrambler.cc
-  src/agora/radio/radio.cc
-  src/agora/radio/radio_soapysdr.cc
-  src/agora/radio/radio_data_plane.cc
-  src/agora/radio/radio_socket.cc
-  src/agora/radio/radio_data_plane_soapy.cc
-  src/agora/radio/radio_data_plane_socket.cc
-  src/agora/radio/radio_set/radio_set.cc
+  src/mac/mac_scheduler.cc
   src/common/ipc/udp_comm.cc
   src/common/ipc/network_utils.cc
   src/common/loggers/csv_logger.cc
   src/common/loggers/mat_logger.cc
   src/encoder/cyclic_shift.cc
   src/encoder/encoder.cc
-  src/encoder/iobuffer.cc)
+  src/encoder/iobuffer.cc
+  src/data_generator/data_generator.cc)
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(SHARED_TXRX_SOURCES
@@ -442,36 +465,31 @@ if(${USE_DPDK})
 endif()
 
 set(AGORA_SOURCES ${AGORA_SOURCES}
-  ${PUREUHD_SOURCES_AGORA}
+  ${RADIO_SOURCES_AGORA}
   src/agora/agora.cc
   src/agora/agora_buffer.cc
   src/agora/agora_worker.cc
   src/agora/dofft.cc
   src/agora/doifft.cc
+  src/agora/dobroadcast.cc
   src/agora/dobeamweights.cc
   src/agora/dodemul.cc
   src/agora/doprecode.cc
   src/agora/dodecode.cc
-  src/agora/radio/radio_set/radio_set_bs.cc
   src/mac/mac_thread_basestation.cc
   src/agora/txrx/packet_txrx_sim.cc
-  src/agora/txrx/packet_txrx_radio.cc
-  src/agora/txrx/workers/txrx_worker_sim.cc
-  src/agora/txrx/workers/txrx_worker_hw.cc)
+  src/agora/txrx/workers/txrx_worker_sim.cc)
 
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
 set(CLIENT_SOURCES
-  ${PUREUHD_SOURCES_CLIENT}
+  ${RADIO_SOURCES_CLIENT}
   src/client/doifft_client.cc
   src/client/dodecode_client.cc
-  src/client/radio_set_ue.cc
   src/client/ue_worker.cc
   src/client/phy-ue.cc
   src/client/txrx/packet_txrx_client_sim.cc
-  src/client/txrx/packet_txrx_client_radio.cc
   src/client/txrx/workers/txrx_worker_client_sim.cc
-  src/client/txrx/workers/txrx_worker_client_hw.cc
   src/mac/mac_thread_client.cc)
 add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
 
@@ -490,18 +508,8 @@ add_executable(agora
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(agora ${COMMON_LIBS})
 
-add_executable(calibrate
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/calibrate_main.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/radio_set_calibrate.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/radio_calibrate_digital.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/agora/radio/radio_set/radio_calibrate_analog.cc
-  $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(calibrate ${COMMON_LIBS})
-target_compile_definitions(calibrate PRIVATE CALIBRATE)
-
 add_executable(data_generator
   ${CMAKE_CURRENT_SOURCE_DIR}/src/data_generator/data_generator_main.cc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/data_generator/data_generator.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(data_generator ${COMMON_LIBS})
 target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
@@ -530,10 +538,13 @@ add_executable(sim
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sim ${COMMON_LIBS})
 
+include_directories(simulator/channel_models)
 add_executable(chsim
+  ${CHSIM_SOURCES}
   simulator/chsim_main.cc
   simulator/channel_sim.cc
   simulator/channel.cc
+  simulator/channel_models/channel_model.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(chsim ${COMMON_LIBS})
 
@@ -548,14 +559,23 @@ add_executable(macbs
 target_link_libraries(macbs ${COMMON_LIBS})
 
 if(RADIO_TYPE STREQUAL SOAPY_IRIS)
-add_executable(radio_test
-    test/radio_test/main.cc
-    $<TARGET_OBJECTS:recorder_sources_lib>
-    $<TARGET_OBJECTS:agora_sources_lib>
-    $<TARGET_OBJECTS:client_sources_lib>
-    $<TARGET_OBJECTS:shared_txrx_sources_lib>
+  add_executable(radio_test
+      test/radio_test/main.cc
+      $<TARGET_OBJECTS:recorder_sources_lib>
+      $<TARGET_OBJECTS:agora_sources_lib>
+      $<TARGET_OBJECTS:client_sources_lib>
+      $<TARGET_OBJECTS:shared_txrx_sources_lib>
+      $<TARGET_OBJECTS:common_sources_lib>)
+  target_link_libraries(radio_test ${COMMON_LIBS})
+
+  add_executable(calibrate
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/radio/radio_set/calibrate_main.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/radio/radio_set/radio_set_calibrate.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/radio/radio_set/radio_calibrate_digital.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/radio/radio_set/radio_calibrate_analog.cc
     $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(radio_test ${COMMON_LIBS})
+  target_link_libraries(calibrate ${COMMON_LIBS})
+  target_compile_definitions(calibrate PRIVATE CALIBRATE)
 endif()
 
 # End-to-end test
@@ -582,7 +602,7 @@ endforeach()
 set(UNIT_TESTS test_armadillo test_datatype_conversion test_udp_client_server
   test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
   test_ptr_grid test_avx512_complex_mul test_scrambler
-  test_256qam_demod)
+  test_256qam_demod test_ctrl_channel)
 
 foreach(test_name IN LISTS UNIT_TESTS)
   add_executable(${test_name}

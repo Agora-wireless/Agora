@@ -65,7 +65,7 @@ function [data_phase_corr, data_sc_idx, evm, snr, rf_snr_db, tx_waveform] = proc
         clear d
 
         snr(u) = 10*log10(1./mean(aevms)); % calculate in dB scale.
-        evm(u) = mean(aevms) * 100;
+        evm(u) = sqrt(mean(aevms)) * 100;
         rf_snr_db(u) = 10*log10(rf_snr);
     end
 

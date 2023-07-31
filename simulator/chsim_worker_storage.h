@@ -27,11 +27,14 @@ class ChSimWorkerStorage {
     const size_t ue_output_storage_size =
         (bs_ant_count * samples_per_symbol * sizeof(arma::cx_float));
 
+    AGORA_LOG_INFO("UE_Input = %lld \n", ue_input_storage_size);
+
     auto* ue_input_float_storage = PaddedAlignedAlloc(
         Agora_memory::Alignment_t::kAlign64, ue_input_storage_size);
     ue_input_matrix_ = std::make_unique<arma::cx_fmat>(
         reinterpret_cast<arma::cx_float*>(ue_input_float_storage),
         samples_per_symbol, ue_ant_count, false, true);
+
     AGORA_LOG_TRACE("Ue input location %zu:%zu  diff %zu size %zu\n",
                     reinterpret_cast<intptr_t>(ue_input_matrix_->memptr()),
                     reinterpret_cast<intptr_t>(ue_input_float_storage),
@@ -114,7 +117,7 @@ class ChSimWorkerStorage {
 
 class ChSimRxBuffer {
  public:
-  enum ChSimRxType { kRxTypePilotUl, kRxTypeBeaconDl };
+  enum ChSimRxType { kRxTypePilotUl, kRxTypeBcastDl };
   ChSimRxBuffer(ChSimRxType type, const Config* cfg, size_t max_frames,
                 size_t max_symbols, size_t max_antennas,
                 size_t symbol_size_bytes)
@@ -153,7 +156,7 @@ class ChSimRxBuffer {
   inline size_t GetSymbolIdx(size_t symbol_id) const {
     if (type_ == ChSimRxType::kRxTypePilotUl) {
       return cfg_->GetPilotUlIdx(symbol_id);
-    } else if (type_ == ChSimRxType::kRxTypeBeaconDl) {
+    } else if (type_ == ChSimRxType::kRxTypeBcastDl) {
       return cfg_->GetBeaconDlIdx(symbol_id);
     } else {
       return SIZE_MAX;
