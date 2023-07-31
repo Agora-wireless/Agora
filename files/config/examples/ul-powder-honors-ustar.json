@@ -18,8 +18,7 @@
   "demul_block_size": 48,
   "ue_demul_block_size": 48,
   "ul_mcs": {
-    "modulation": "16QAM",
-    "code_rate": 0.333
+    "mcs_index": 10
   },
   "beamsweep": false,
   "beacon_antenna": 21,

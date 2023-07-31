@@ -926,7 +926,8 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
           ul_code_rate_);
     }
   } else {
-    ul_mcs_index_ = ul_mcs.value("mcs_index", 10);  // 16QAM, 340/1024
+    // 16QAM, 340/1024
+    ul_mcs_index_ = ul_mcs.value("mcs_index", kDefaultMcsIndex);
     ul_mod_order_bits_ = GetModOrderBits(ul_mcs_index_);
     ul_modulation_ = MapModToStr(ul_mod_order_bits_);
     ul_code_rate_ = GetCodeRate(ul_mcs_index_);
@@ -978,7 +979,8 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
           dl_code_rate_);
     }
   } else {
-    dl_mcs_index_ = dl_mcs.value("mcs_index", 10);  // 16QAM, 340/1024
+    // 16QAM, 340/1024
+    dl_mcs_index_ = dl_mcs.value("mcs_index", kDefaultMcsIndex);
     dl_mod_order_bits_ = GetModOrderBits(dl_mcs_index_);
     dl_modulation_ = MapModToStr(dl_mod_order_bits_);
     dl_code_rate_ = GetCodeRate(dl_mcs_index_);
