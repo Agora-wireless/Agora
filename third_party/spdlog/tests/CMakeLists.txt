@@ -13,6 +13,16 @@ if(PkgConfig_FOUND)
     pkg_check_modules(systemd libsystemd)
 endif()
 
+find_package(Catch2 3 QUIET)
+if(Catch2_FOUND)
+    message(STATUS "Packaged version of Catch will be used.")
+else()
+    message(STATUS "Bundled version of Catch will be downloaded and used.")
+    include(FetchContent)
+    FetchContent_Declare(Catch2 GIT_REPOSITORY https://github.com/catchorg/Catch2.git GIT_TAG v3.3.2)
+    FetchContent_MakeAvailable(Catch2)
+endif()
+
 set(SPDLOG_UTESTS_SOURCES
     test_file_helper.cpp
     test_file_logging.cpp
@@ -31,6 +41,7 @@ set(SPDLOG_UTESTS_SOURCES
     test_stdout_api.cpp
     test_backtrace.cpp
     test_create_dir.cpp
+    test_custom_callbacks.cpp
     test_cfg.cpp
     test_time_point.cpp
     test_stopwatch.cpp)
@@ -43,6 +54,10 @@ if(systemd_FOUND)
     list(APPEND SPDLOG_UTESTS_SOURCES test_systemd.cpp)
 endif()
 
+if(NOT SPDLOG_USE_STD_FORMAT)
+    list(APPEND SPDLOG_UTESTS_SOURCES test_bin_to_hex.cpp)
+endif()
+
 enable_testing()
 
 function(spdlog_prepare_test test_target spdlog_lib)
@@ -52,6 +67,7 @@ function(spdlog_prepare_test test_target spdlog_lib)
     if(systemd_FOUND)
         target_link_libraries(${test_target} PRIVATE ${systemd_LIBRARIES})
     endif()
+    target_link_libraries(${test_target} PRIVATE Catch2::Catch2WithMain)
     if(SPDLOG_SANITIZE_ADDRESS)
         spdlog_enable_sanitizer(${test_target})
     endif()
