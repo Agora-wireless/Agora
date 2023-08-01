@@ -138,6 +138,57 @@ class FrameStats {
     return is_pilot;
   }
 
+  inline std::string GetBsRadioFrameString(bool is_ref_radio) const {
+    std::string radio_frame = FrameIdentifier();
+    for (size_t s = 0; s < FrameIdentifier().length(); s++) {
+      char c = FrameIdentifier().at(s);
+      if (c == 'C') {
+        radio_frame.replace(s, 1, is_ref_radio ? "R" : "T");
+      } else if (c == 'L') {
+        radio_frame.replace(s, 1, is_ref_radio ? "T" : "R");
+      } else if (c == 'P') {
+        radio_frame.replace(s, 1, "R");
+      } else if (c == 'U') {
+        radio_frame.replace(s, 1, "R");
+      } else if (c == 'D') {
+        radio_frame.replace(s, 1, "T");
+      } else if (c == 'S') {
+        radio_frame.replace(s, 1, "T");
+      } else if (c != 'B') {
+        radio_frame.replace(s, 1, "G");
+      }
+    }
+    return radio_frame;
+  }
+
+  inline std::string GetUeRadioFrameString(size_t ue_id,
+                                           size_t num_channels) const {
+    std::string radio_frame = FrameIdentifier();
+    for (size_t s = 0; s < FrameIdentifier().length(); s++) {
+      char c = FrameIdentifier().at(s);
+      if (c == 'B') {
+        // Dummy RX used in PHY scheduler
+        radio_frame.replace(s, 1, "R");
+      } else if (c == 'P') {
+        // TODO: change this for orthogonal pilots
+        if (((num_channels == 1 && GetPilotSymbol(ue_id) != s) ||
+             (num_channels == 2 && (GetPilotSymbol(2 * ue_id) != s &&
+                                    GetPilotSymbol(2 * ue_id + 1) != s)))) {
+          radio_frame.replace(s, 1, "G");
+        }
+      } else if (c == 'U') {
+        radio_frame.replace(s, 1, "T");
+      } else if (c == 'D') {
+        radio_frame.replace(s, 1, "R");
+      } else if (c == 'S') {
+        radio_frame.replace(s, 1, "R");
+      } else if (c != 'P') {
+        radio_frame.replace(s, 1, "G");
+      }
+    }
+    return radio_frame;
+  }
+
   /* Public functions that do not meet coding standard format */
   /// Return the symbol type of this symbol in this frame
   SymbolType GetSymbolType(size_t symbol_id) const;

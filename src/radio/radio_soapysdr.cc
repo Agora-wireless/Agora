@@ -777,26 +777,7 @@ void RadioSoapySdr::ConfigureTddModeBs(bool is_ref_radio) {
   dev_->writeSetting("TDD_MODE", "true");
   std::vector<std::string> tdd_sched;
 
-  std::string sched = cfg_->Frame().FrameIdentifier();
-  size_t sched_size = sched.length();
-  for (size_t s = 0; s < sched_size; s++) {
-    char c = cfg_->Frame().FrameIdentifier().at(s);
-    if (c == 'C') {
-      sched.replace(s, 1, is_ref_radio ? "R" : "T");
-    } else if (c == 'L') {
-      sched.replace(s, 1, is_ref_radio ? "T" : "R");
-    } else if (c == 'P') {
-      sched.replace(s, 1, "R");
-    } else if (c == 'U') {
-      sched.replace(s, 1, "R");
-    } else if (c == 'D') {
-      sched.replace(s, 1, "T");
-    } else if (c == 'S') {
-      sched.replace(s, 1, "T");
-    } else if (c != 'B') {
-      sched.replace(s, 1, "G");
-    }
-  }
+  std::string sched = cfg_->Frame().GetBsRadioFrameString(is_ref_radio);
   std::cout << "Radio " << Id() << " Frame 1: " << sched << std::endl;
   tdd_sched.push_back(sched);
 
@@ -851,29 +832,8 @@ void RadioSoapySdr::ConfigureTddModeUe() {
                     cfg_->Rate()));
   conf["max_frame"] = max_frame;
   conf["dual_pilot"] = (cfg_->NumUeChannels() == 2);
-  auto tdd_sched = cfg_->Frame().FrameIdentifier();
-  for (size_t s = 0; s < cfg_->Frame().FrameIdentifier().length(); s++) {
-    char c = cfg_->Frame().FrameIdentifier().at(s);
-    if (c == 'B') {
-      tdd_sched.replace(s, 1, "R");  // Dummy RX used in PHY scheduler
-    } else if (c == 'P' and ((cfg_->NumUeChannels() == 1 and
-                              cfg_->Frame().GetPilotSymbol(Id()) != s) or
-                             (cfg_->NumUeChannels() == 2 and
-                              (cfg_->Frame().GetPilotSymbol(2 * Id()) != s and
-                               cfg_->Frame().GetPilotSymbol(Id() * 2 + 1) !=
-                                   s)))) {  // TODO: change this for
-      // orthogonal pilots
-      tdd_sched.replace(s, 1, "G");
-    } else if (c == 'U') {
-      tdd_sched.replace(s, 1, "T");
-    } else if (c == 'D') {
-      tdd_sched.replace(s, 1, "R");
-    } else if (c == 'S') {
-      tdd_sched.replace(s, 1, "R");
-    } else if (c != 'P') {
-      tdd_sched.replace(s, 1, "G");
-    }
-  }
+  auto tdd_sched =
+      cfg_->Frame().GetUeRadioFrameString(Id(), cfg_->NumUeChannels());
   std::cout << "UE " << SerialNumber() << "(" << Id()
             << ") Frame: " << tdd_sched << std::endl;
   std::vector<std::string> jframes;
