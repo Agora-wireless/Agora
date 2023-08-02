@@ -567,9 +567,9 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
     dl_ifft_data.Calloc(cfg_->Frame().NumDLSyms(),
                         cfg_->OfdmCaNum() * cfg_->BsAntNum(),
                         Agora_memory::Alignment_t::kAlign64);
-    Table<short> dl_tx_data;
+    Table<std::complex<int16_t>> dl_tx_data;
     dl_tx_data.Calloc(cfg_->Frame().NumDLSyms(),
-                      2 * cfg_->SampsPerSymbol() * cfg_->BsAntNum(),
+                      cfg_->SampsPerSymbol() * cfg_->BsAntNum(),
                       Agora_memory::Alignment_t::kAlign64);
 
     for (size_t i = 0; i < cfg_->Frame().NumDLSyms(); i++) {
@@ -588,35 +588,15 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
             cfg_->BsAntNum(), false);
         mat_precoder /= abs(mat_precoder).max();
         mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
-
-        // std::printf("symbol %d, sc: %d\n", i, j -
-        // cfg_->ofdm_data_start()); cout << "Precoder: \n" <<
-        // mat_precoder
-        // << endl; cout << "Data: \n" << mat_input_data.row(j) << endl; cout <<
-        // "Precoded data: \n" << mat_output.row(j) << endl;
       }
+
       for (size_t j = 0; j < cfg_->BsAntNum(); j++) {
         complex_float* ptr_ifft = dl_ifft_data[i] + j * cfg_->OfdmCaNum();
         CommsLib::FFTShift(ptr_ifft, cfg_->OfdmCaNum());
         CommsLib::IFFT(ptr_ifft, cfg_->OfdmCaNum(), false);
-
-        short* tx_symbol = dl_tx_data[i] + j * cfg_->SampsPerSymbol() * 2;
-        std::memset(tx_symbol, 0, sizeof(short) * 2 * cfg_->OfdmTxZeroPrefix());
-        for (size_t k = 0; k < cfg_->OfdmCaNum(); k++) {
-          tx_symbol[2 * (k + cfg_->CpLen() + cfg_->OfdmTxZeroPrefix())] =
-              static_cast<short>(kShrtFltConvFactor * ptr_ifft[k].re);
-          tx_symbol[2 * (k + cfg_->CpLen() + cfg_->OfdmTxZeroPrefix()) + 1] =
-              static_cast<short>(kShrtFltConvFactor * ptr_ifft[k].im);
-        }
-        for (size_t k = 0; k < (2 * cfg_->CpLen()); k++) {
-          tx_symbol[2 * cfg_->OfdmTxZeroPrefix() + k] =
-              tx_symbol[2 * (cfg_->OfdmTxZeroPrefix() + cfg_->OfdmCaNum()) + k];
-        }
-
-        const size_t tx_zero_postfix_offset =
-            2 * (cfg_->OfdmTxZeroPrefix() + cfg_->CpLen() + cfg_->OfdmCaNum());
-        std::memset(tx_symbol + tx_zero_postfix_offset, 0,
-                    sizeof(short) * 2 * cfg_->OfdmTxZeroPostfix());
+        CommsLib::Ifft2tx(ptr_ifft, &dl_tx_data[i][j * cfg_->SampsPerSymbol()],
+                          cfg_->OfdmCaNum(), cfg_->OfdmTxZeroPrefix(),
+                          cfg_->CpLen(), 1u);
       }
     }
 
@@ -640,8 +620,6 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
             if (j % cfg_->OfdmCaNum() == 0) {
               std::printf("symbol %zu ant %zu\n", i, j / cfg_->OfdmCaNum());
             }
-            // TODO keep and fix or remove
-            // std::printf("%d+%di ", dl_tx_data[i][j], dl_tx_data[i][j]);
           }
         }
         std::printf("\n");
