@@ -55,6 +55,7 @@ Config::Config(std::string jsonfilename)
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_bcast_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       frame_(""),
+      pilot_pre_ifft_(nullptr),
       pilot_ifft_(nullptr),
       config_filename_(std::move(jsonfilename)) {
   auto time = std::time(nullptr);
@@ -696,7 +697,6 @@ Config::Config(std::string jsonfilename)
   this->DumpMcsInfo();
   this->UpdateCtrlMCS();
 
-  fft_in_rru_ = tdd_conf.value("fft_in_rru", false);
   freq_domain_channel_ = tdd_conf.value("freq_domain_channel", false);
 
   samps_per_symbol_ =
@@ -1181,6 +1181,9 @@ void Config::GenPilots() {
   AllocBuffer1d(&pilot_ifft_, this->ofdm_ca_num_,
                 Agora_memory::Alignment_t::kAlign64, 1);
 
+  AllocBuffer1d(&pilot_pre_ifft_, this->ofdm_ca_num_,
+                Agora_memory::Alignment_t::kAlign64, 1);
+
   complex_float* ifft_ptr_ = pilot_ifft_;
   std::memcpy(ifft_ptr_ + ofdm_data_start_, this->pilots_,
               ofdm_data_num_ * sizeof(complex_float));
@@ -1212,10 +1215,11 @@ void Config::GenPilots() {
     std::memcpy(ifft_ptr_ + ofdm_data_start_, this->ue_specific_pilot_[i],
                 ofdm_data_num_ * sizeof(complex_float));
 
-    if (this->freq_domain_channel_ == false) {
-      CommsLib::FFTShift(ifft_ptr_, ofdm_ca_num_);
-      CommsLib::IFFT(ue_pilot_ifft_[i], ofdm_ca_num_, false);
-    }
+    ue_pilot_pre_ifft_ = ue_pilot_ifft_;
+    
+    CommsLib::FFTShift(ifft_ptr_, ofdm_ca_num_);
+    CommsLib::IFFT(ue_pilot_ifft_[i], ofdm_ca_num_, false);
+
   }
 }
 
@@ -1586,7 +1590,8 @@ void Config::GenData() {
 
   // Generate time domain ue-specific pilot symbols
   for (size_t i = 0; i < this->ue_ant_num_; i++) {
-    CommsLib::Ifft2tx(ue_pilot_ifft_[i], this->ue_specific_pilot_t_[i],
+    complex_float* ue_pilot_ = (this->freq_domain_channel_) ? ue_pilot_pre_ifft_[i] : ue_pilot_ifft_[i];
+    CommsLib::Ifft2tx(ue_pilot_, this->ue_specific_pilot_t_[i],
                       this->ofdm_ca_num_, this->ofdm_tx_zero_prefix_,
                       this->cp_len_, kDebugDownlink ? 1 : this->scale_);
   }
@@ -1634,12 +1639,15 @@ void Config::GenData() {
         }
 
         pilot_ue_sc_.at(ue_id) = arma::uvec(pilot_sc_list);
-        if (this->freq_domain_channel_ == false) {
-          CommsLib::FFTShift(pilot_ifft_, this->ofdm_ca_num_);
-          CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
-        }
 
-        CommsLib::Ifft2tx(pilot_ifft_,
+        std::memcpy( pilot_pre_ifft_, pilot_ifft_, ofdm_ca_num_ * sizeof(complex_float) );
+
+        CommsLib::FFTShift(pilot_ifft_, this->ofdm_ca_num_);
+        CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
+
+        complex_float* pilot_ = (this->freq_domain_channel_) ? pilot_pre_ifft_ : pilot_ifft_;
+
+        CommsLib::Ifft2tx(pilot_,
                           this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).data(),
                           ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
       }
@@ -1966,7 +1974,6 @@ void Config::Print() const {
               << "Noise Level: " << noise_level_ << std::endl
               << "UL Bytes per CB: " << ul_num_bytes_per_cb_ << std::endl
               << "DL Bytes per CB: " << dl_num_bytes_per_cb_ << std::endl
-              << "FFT in rru: " << fft_in_rru_ << std::endl
               << "Frequency domain channel: " << freq_domain_channel_
               << std::endl;
   }
