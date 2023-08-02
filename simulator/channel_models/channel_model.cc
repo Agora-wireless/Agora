@@ -22,13 +22,15 @@ std::unique_ptr<ChannelModel> ChannelModel::CreateChannelModel(
     return std::make_unique<RayleighModel>(
         config->BsAntNum(), config->UeAntNum(), config->SampsPerSymbol());
   } else if (channel_type == "DATASET") {
-    #if defined(ENABLE_HDF5)
+#if defined(ENABLE_HDF5)
     return std::make_unique<DatasetModel>(
         config->BsAntNum(), config->UeAntNum(), config->SampsPerSymbol(),
         dataset_path);
-    #else
-    AGORA_LOG_ERROR("DATASET Model cannot be instantiated, HDF5 disabled... Set -DENABLE_HDF5=True\n");
-    #endif
+#else
+    AGORA_LOG_ERROR(
+        "DATASET Model cannot be instantiated, HDF5 disabled... Set "
+        "-DENABLE_HDF5=True\n");
+#endif
   } else {
     AGORA_LOG_WARN(
         "Invalid channel model (%s) at CHSim, assuming AWGN Model... \n",
