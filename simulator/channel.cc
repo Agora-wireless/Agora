@@ -1,5 +1,5 @@
 /**
- * @file channel.h
+ * @file channel.cc
  * @brief Implementation file for the channel class
  */
 #include "channel.h"
@@ -11,8 +11,6 @@
 static constexpr bool kPrintChannelOutput = false;
 static constexpr bool kPrintSNRCheck = false;
 static constexpr double kMeanChannelGain = 0.1f;
-
-static constexpr hsize_t kNoiseVectorSize = 100;
 
 Channel::~Channel() = default;
 

@@ -1216,10 +1216,9 @@ void Config::GenPilots() {
                 ofdm_data_num_ * sizeof(complex_float));
 
     ue_pilot_pre_ifft_ = ue_pilot_ifft_;
-    
+
     CommsLib::FFTShift(ifft_ptr_, ofdm_ca_num_);
     CommsLib::IFFT(ue_pilot_ifft_[i], ofdm_ca_num_, false);
-
   }
 }
 
@@ -1590,7 +1589,9 @@ void Config::GenData() {
 
   // Generate time domain ue-specific pilot symbols
   for (size_t i = 0; i < this->ue_ant_num_; i++) {
-    complex_float* ue_pilot_ = (this->freq_domain_channel_) ? ue_pilot_pre_ifft_[i] : ue_pilot_ifft_[i];
+    complex_float* ue_pilot_ = (this->freq_domain_channel_)
+                                   ? ue_pilot_pre_ifft_[i]
+                                   : ue_pilot_ifft_[i];
     CommsLib::Ifft2tx(ue_pilot_, this->ue_specific_pilot_t_[i],
                       this->ofdm_ca_num_, this->ofdm_tx_zero_prefix_,
                       this->cp_len_, kDebugDownlink ? 1 : this->scale_);
@@ -1640,12 +1641,14 @@ void Config::GenData() {
 
         pilot_ue_sc_.at(ue_id) = arma::uvec(pilot_sc_list);
 
-        std::memcpy( pilot_pre_ifft_, pilot_ifft_, ofdm_ca_num_ * sizeof(complex_float) );
+        std::memcpy(pilot_pre_ifft_, pilot_ifft_,
+                    ofdm_ca_num_ * sizeof(complex_float));
 
         CommsLib::FFTShift(pilot_ifft_, this->ofdm_ca_num_);
         CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
 
-        complex_float* pilot_ = (this->freq_domain_channel_) ? pilot_pre_ifft_ : pilot_ifft_;
+        complex_float* pilot_ =
+            (this->freq_domain_channel_) ? pilot_pre_ifft_ : pilot_ifft_;
 
         CommsLib::Ifft2tx(pilot_,
                           this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).data(),
