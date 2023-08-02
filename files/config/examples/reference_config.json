@@ -97,7 +97,6 @@
   /* */
   "noise_level": 0.03,
   "wlan_scrambler": true,
-  "fft_in_rru": false,
   "zf_batch_size": 1,
   "zf_block_size": 1,
   "fft_block_size": 1,

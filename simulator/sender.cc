@@ -446,10 +446,6 @@ void* Sender::WorkerThread(int tid) {
             pkt->data_,
             iq_data_short_[(pkt->symbol_id_ * cfg_->BsAntNum()) + tag.ant_id_],
             (cfg_->SampsPerSymbol()) * (kUse12BitIQ ? 3 : 4));
-        if (cfg_->FftInRru() == true) {
-          RunFft(pkt, fft_inout, mkl_handle);
-        }
-
         const size_t dest_port = cfg_->BsServerPort() + cur_radio;
 
 #if (defined(USE_DPDK) && !defined(DPDK_BURST_BULK))
