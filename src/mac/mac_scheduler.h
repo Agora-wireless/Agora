@@ -21,8 +21,8 @@ class MacScheduler {
 
  private:
   size_t num_groups_;
-  Table<int> schedule_buffer_;
-  Table<size_t> schedule_buffer_index_;
+  Table<arma::uword> schedule_buffer_;
+  Table<arma::uword> schedule_buffer_index_;
   Table<size_t> ul_mcs_buffer_;
   Table<size_t> dl_mcs_buffer_;
   Config* const cfg_;

@@ -37,8 +37,8 @@ EventData DoDecode::Launch(size_t tag) {
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t cb_id = gen_tag_t(tag).cb_id_;
   const size_t cur_cb_id = (cb_id % ldpc_config.NumBlocksInSymbol());
-  const size_t sched_ue_id = (cb_id / ldpc_config.NumBlocksInSymbol());
-  const size_t ue_id = mac_sched_->ScheduledUeIndex(frame_id, 0, sched_ue_id);
+  const size_t stream_id = (cb_id / ldpc_config.NumBlocksInSymbol());
+  const size_t ue_id = mac_sched_->ScheduledUeIndex(frame_id, 0, stream_id);
   const size_t frame_slot = (frame_id % kFrameWnd);
   const size_t num_bytes_per_cb = cfg_->NumBytesPerCb(Direction::kUplink);
   /*RtAssert(symbol_id >=
@@ -79,7 +79,7 @@ EventData DoDecode::Launch(size_t tag) {
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes_;
 
     int8_t* llr_buffer_ptr =
-        demod_buffers_[frame_slot][data_symbol_idx_ul][sched_ue_id] +
+        demod_buffers_[frame_slot][data_symbol_idx_ul][stream_id] +
         (cfg_->ModOrderBits(Direction::kUplink) *
          (ldpc_config.NumCbCodewLen() * cur_cb_id));
 

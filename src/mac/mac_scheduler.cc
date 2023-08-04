@@ -14,6 +14,7 @@ MacScheduler::MacScheduler(Config* const cfg) : cfg_(cfg) {
                                 Agora_memory::Alignment_t::kAlign64);
   // Create round-robin schedule
   for (size_t gp = 0u; gp < num_groups_; gp++) {
+    // \todo change this to resource block
     for (size_t sc = 0; sc < cfg_->OfdmDataNum(); sc++) {
       for (size_t ue = gp; ue < gp + cfg_->SpatialStreamsNum(); ue++) {
         size_t cur_ue = ue % cfg_->UeAntNum();
@@ -50,23 +51,21 @@ bool MacScheduler::IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id) {
 }
 
 size_t MacScheduler::ScheduledUeIndex(size_t frame_id, size_t sc_id,
-                                      size_t sched_ue_id) {
-  return (size_t)this->ScheduledUeList(frame_id, sc_id)[sched_ue_id];
+                                      size_t stream_id) {
+  return (size_t)this->ScheduledUeList(frame_id, sc_id)[stream_id];
 }
 
 arma::uvec MacScheduler::ScheduledUeMap(size_t frame_id, size_t sc_id) {
   size_t gp = frame_id % num_groups_;
-  return arma::uvec(reinterpret_cast<unsigned long long*>(
-                        &schedule_buffer_[gp][cfg_->UeAntNum() * sc_id]),
+  return arma::uvec(&schedule_buffer_[gp][cfg_->UeAntNum() * sc_id],
                     cfg_->UeAntNum(), false);
 }
 
 arma::uvec MacScheduler::ScheduledUeList(size_t frame_id, size_t sc_id) {
   size_t gp = frame_id % num_groups_;
-  return sort(arma::uvec(
-      reinterpret_cast<unsigned long long*>(
-          &schedule_buffer_index_[gp][cfg_->SpatialStreamsNum() * sc_id]),
-      cfg_->SpatialStreamsNum(), false));
+  return arma::sort(
+      arma::uvec(&schedule_buffer_index_[gp][cfg_->SpatialStreamsNum() * sc_id],
+                 cfg_->SpatialStreamsNum(), false));
 }
 
 size_t MacScheduler::ScheduledUeUlMcs(size_t frame_id, size_t ue_id) {
