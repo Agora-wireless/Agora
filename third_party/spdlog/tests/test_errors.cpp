@@ -21,8 +21,11 @@ protected:
         throw std::runtime_error("some error happened during flush");
     }
 };
+struct custom_ex
+{};
 
-TEST_CASE("default_error_handler", "[errors]]")
+#if !defined(SPDLOG_USE_STD_FORMAT) // std formt doesn't fully support tuntime strings
+TEST_CASE("default_error_handler", "[errors]")
 {
     prepare_logdir();
     spdlog::filename_t filename = SPDLOG_FILENAME_T(SIMPLE_LOG);
@@ -32,15 +35,12 @@ TEST_CASE("default_error_handler", "[errors]]")
     logger->info(SPDLOG_FMT_RUNTIME("Test message {} {}"), 1);
     logger->info("Test message {}", 2);
     logger->flush();
-
     using spdlog::details::os::default_eol;
     REQUIRE(file_contents(SIMPLE_LOG) == spdlog::fmt_lib::format("Test message 2{}", default_eol));
     REQUIRE(count_lines(SIMPLE_LOG) == 1);
 }
 
-struct custom_ex
-{};
-TEST_CASE("custom_error_handler", "[errors]]")
+TEST_CASE("custom_error_handler", "[errors]")
 {
     prepare_logdir();
     spdlog::filename_t filename = SPDLOG_FILENAME_T(SIMPLE_LOG);
@@ -53,8 +53,9 @@ TEST_CASE("custom_error_handler", "[errors]]")
     logger->info("Good message #2");
     require_message_count(SIMPLE_LOG, 2);
 }
+#endif
 
-TEST_CASE("default_error_handler2", "[errors]]")
+TEST_CASE("default_error_handler2", "[errors]")
 {
     spdlog::drop_all();
     auto logger = spdlog::create<failing_sink>("failed_logger");
@@ -62,7 +63,7 @@ TEST_CASE("default_error_handler2", "[errors]]")
     REQUIRE_THROWS_AS(logger->info("Some message"), custom_ex);
 }
 
-TEST_CASE("flush_error_handler", "[errors]]")
+TEST_CASE("flush_error_handler", "[errors]")
 {
     spdlog::drop_all();
     auto logger = spdlog::create<failing_sink>("failed_logger");
@@ -70,7 +71,8 @@ TEST_CASE("flush_error_handler", "[errors]]")
     REQUIRE_THROWS_AS(logger->flush(), custom_ex);
 }
 
-TEST_CASE("async_error_handler", "[errors]]")
+#if !defined(SPDLOG_USE_STD_FORMAT)
+TEST_CASE("async_error_handler", "[errors]")
 {
     prepare_logdir();
     std::string err_msg("log failed with some msg");
@@ -96,9 +98,10 @@ TEST_CASE("async_error_handler", "[errors]]")
     require_message_count(SIMPLE_ASYNC_LOG, 2);
     REQUIRE(file_contents("test_logs/custom_err.txt") == err_msg);
 }
+#endif
 
 // Make sure async error handler is executed
-TEST_CASE("async_error_handler2", "[errors]]")
+TEST_CASE("async_error_handler2", "[errors]")
 {
     prepare_logdir();
     std::string err_msg("This is async handler error message");

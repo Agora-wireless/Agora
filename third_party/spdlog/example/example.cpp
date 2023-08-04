@@ -12,6 +12,7 @@ void stdout_logger_example();
 void basic_example();
 void rotating_example();
 void daily_example();
+void callback_example();
 void async_example();
 void binary_example();
 void vector_example();
@@ -29,6 +30,7 @@ void replace_default_logger_example();
 #include "spdlog/spdlog.h"
 #include "spdlog/cfg/env.h"  // support for loading levels from the environment variable
 #include "spdlog/fmt/ostr.h" // support for user defined types
+
 
 int main(int, char *[])
 {
@@ -72,6 +74,7 @@ int main(int, char *[])
         basic_example();
         rotating_example();
         daily_example();
+        callback_example();
         async_example();
         binary_example();
         vector_example();
@@ -136,6 +139,15 @@ void daily_example()
     auto daily_logger = spdlog::daily_logger_mt("daily_logger", "logs/daily.txt", 2, 30);
 }
 
+#include "spdlog/sinks/callback_sink.h"
+void callback_example()
+{
+    // Create the logger
+    auto logger = spdlog::callback_logger_mt("custom_callback_logger", [](const spdlog::details::log_msg & /*msg*/) {
+        // do what you need to do with msg
+    });
+}
+
 #include "spdlog/cfg/env.h"
 void load_levels_example()
 {
@@ -172,6 +184,7 @@ void async_example()
 // {:p} - don't print the position on each line start.
 // {:n} - don't split the output to lines.
 
+#if !defined SPDLOG_USE_STD_FORMAT || defined(_MSC_VER)
 #include "spdlog/fmt/bin_to_hex.h"
 void binary_example()
 {
@@ -189,6 +202,11 @@ void binary_example()
     // logger->info("hexdump style: {:a}", spdlog::to_hex(buf));
     // logger->info("hexdump style, 20 chars per line {:a}", spdlog::to_hex(buf, 20));
 }
+#else
+void binary_example() {
+    // not supported with std::format yet
+}
+#endif
 
 // Log a vector of numbers
 #ifndef SPDLOG_USE_STD_FORMAT
@@ -268,7 +286,7 @@ struct fmt::formatter<my_type> : fmt::formatter<std::string>
 {
     auto format(my_type my, format_context &ctx) -> decltype(ctx.out())
     {
-        return format_to(ctx.out(), "[my_type i={}]", my.i);
+        return fmt::format_to(ctx.out(), "[my_type i={}]", my.i);
     }
 };
 
@@ -276,7 +294,7 @@ struct fmt::formatter<my_type> : fmt::formatter<std::string>
 template<>
 struct std::formatter<my_type> : std::formatter<std::string>
 {
-    auto format(my_type my, format_context &ctx) -> decltype(ctx.out())
+    auto format(my_type my, format_context &ctx) const -> decltype(ctx.out())
     {
         return format_to(ctx.out(), "[my_type i={}]", my.i);
     }
