@@ -52,7 +52,6 @@ EventData DoIFFT::Launch(size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ant_id = gen_tag_t(tag).ant_id_;
-
   const bool bypass_iFFT = cfg_->FreqDomainChannel();
 
   if (kDebugPrintInTask) {
