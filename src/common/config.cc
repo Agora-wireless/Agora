@@ -1201,6 +1201,8 @@ void Config::GenPilots() {
 
   ue_pilot_ifft_.Calloc(this->ue_ant_num_, this->ofdm_ca_num_,
                         Agora_memory::Alignment_t::kAlign64);
+  ue_pilot_pre_ifft_.Calloc(this->ue_ant_num_, this->ofdm_ca_num_,
+                            Agora_memory::Alignment_t::kAlign64);
   for (size_t i = 0; i < ue_ant_num_; i++) {
     auto zc_ue_pilot_i = CommsLib::SeqCyclicShift(
         zc_seq,
@@ -1211,13 +1213,15 @@ void Config::GenPilots() {
                                         zc_ue_pilot_i[j].imag()};
     }
 
-    complex_float* ifft_ptr_ = ue_pilot_ifft_[i];
-    std::memcpy(ifft_ptr_ + ofdm_data_start_, this->ue_specific_pilot_[i],
+    std::memcpy(ue_pilot_ifft_[i] + ofdm_data_start_,
+                this->ue_specific_pilot_[i],
+                ofdm_data_num_ * sizeof(complex_float));
+    //Save a copy of the frequency domain info
+    std::memcpy(ue_pilot_pre_ifft_[i] + ofdm_data_start_,
+                ue_pilot_ifft_[i] + ofdm_data_start_,
                 ofdm_data_num_ * sizeof(complex_float));
 
-    ue_pilot_pre_ifft_ = ue_pilot_ifft_;
-
-    CommsLib::FFTShift(ifft_ptr_, ofdm_ca_num_);
+    CommsLib::FFTShift(ue_pilot_ifft_[i], ofdm_ca_num_);
     CommsLib::IFFT(ue_pilot_ifft_[i], ofdm_ca_num_, false);
   }
 }
@@ -1643,14 +1647,12 @@ void Config::GenData() {
 
         std::memcpy(pilot_pre_ifft_, pilot_ifft_,
                     ofdm_ca_num_ * sizeof(complex_float));
-
         CommsLib::FFTShift(pilot_ifft_, this->ofdm_ca_num_);
         CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
 
-        complex_float* pilot_ =
+        const complex_float* pilot_to_tx =
             (this->freq_domain_channel_) ? pilot_pre_ifft_ : pilot_ifft_;
-
-        CommsLib::Ifft2tx(pilot_,
+        CommsLib::Ifft2tx(pilot_to_tx,
                           this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).data(),
                           ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
       }
@@ -1684,6 +1686,10 @@ void Config::GenData() {
   if (pilot_ifft_ != nullptr) {
     FreeBuffer1d(&pilot_ifft_);
   }
+  if (pilot_pre_ifft_ != nullptr) {
+    FreeBuffer1d(&pilot_pre_ifft_);
+  }
+
   delete[](ul_temp_parity_buffer);
   delete[](dl_temp_parity_buffer);
   ul_iq_ifft.Free();
@@ -1819,6 +1825,7 @@ Config::~Config() {
   ue_specific_pilot_t_.Free();
   ue_specific_pilot_.Free();
   ue_pilot_ifft_.Free();
+  ue_pilot_pre_ifft_.Free();
 
   ul_mod_table_.Free();
   dl_mod_table_.Free();
