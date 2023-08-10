@@ -161,7 +161,6 @@ void UeWorker::DoFftPilot(size_t tag) {
   const size_t ant_id = pkt->ant_id_;
   const size_t frame_slot = frame_id % kFrameWnd;
   const size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
-
   const bool bypass_FFT = config_.FreqDomainChannel();
 
   if (mac_sched_.IsUeScheduled(frame_id, 0u, ant_id)) {
@@ -272,7 +271,6 @@ void UeWorker::DoFftData(size_t tag) {
   const size_t symbol_id = pkt->symbol_id_;
   const size_t ant_id = pkt->ant_id_;
   const size_t frame_slot = frame_id % kFrameWnd;
-
   const bool bypass_FFT = config_.FreqDomainChannel();
 
   if (mac_sched_.IsUeScheduled(frame_id, 0u, ant_id)) {
@@ -633,7 +631,6 @@ void UeWorker::DoIfft(size_t tag) {
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ant_id = gen_tag_t(tag).ue_id_;
   const size_t frame_slot = (frame_id % kFrameWnd);
-
   const bool bypass_iFFT = config_.FreqDomainChannel();
 
   const size_t ul_symbol_perframe = config_.Frame().NumULSyms();
