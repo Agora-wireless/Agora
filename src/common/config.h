@@ -321,8 +321,8 @@ class Config {
 
   inline size_t FramesToTest() const { return this->frames_to_test_; }
   inline float NoiseLevel() const { return this->noise_level_; }
-  inline bool FftInRru() const { return this->fft_in_rru_; }
 
+  inline bool FreqDomainChannel() const { return this->freq_domain_channel_; }
   inline uint16_t DpdkNumPorts() const { return this->dpdk_num_ports_; }
   inline uint16_t DpdkPortOffset() const { return this->dpdk_port_offset_; }
 
@@ -715,8 +715,10 @@ class Config {
   std::vector<uint32_t> beacon_;
   complex_float* pilots_;
   complex_float* pilots_sgn_;
+  complex_float* pilot_pre_ifft_;
   complex_float* pilot_ifft_;
   Table<complex_float> ue_specific_pilot_;
+  Table<complex_float> ue_pilot_pre_ifft_;
   Table<complex_float> ue_pilot_ifft_;
   Table<std::complex<int16_t>> ue_specific_pilot_t_;
   std::vector<std::complex<float>> common_pilot_;
@@ -960,10 +962,12 @@ class Config {
   size_t ul_num_padding_bytes_per_cb_;
   size_t dl_num_padding_bytes_per_cb_;
 
-  bool fft_in_rru_;  // If true, the RRU does FFT instead of Agora
   const std::string config_filename_;
   std::string trace_file_;
   std::string timestamp_;
   std::vector<std::string> ul_tx_f_data_files_;
+
+  // If true, channel matrix H will be applied in the frequency domain
+  bool freq_domain_channel_;
 };
 #endif /* CONFIG_HPP_ */

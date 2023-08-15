@@ -162,6 +162,7 @@ void UeWorker::DoFftPilot(size_t tag) {
   const size_t ant_id = pkt->ant_id_;
   const size_t frame_slot = frame_id % kFrameWnd;
   const size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
+  const bool bypass_FFT = config_.FreqDomainChannel();
 
   if (mac_sched_.IsUeScheduled(frame_id, 0u, ant_id)) {
     if (kDebugPrintInTask || kDebugPrintFft) {
@@ -208,11 +209,13 @@ void UeWorker::DoFftPilot(size_t tag) {
     SimdConvertShortToFloat(&pkt->data_[delay_offset], fft_buff,
                             config_.OfdmCaNum() * 2);
 
-    // perform fft
-    DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
+    if (bypass_FFT == false) {
+      // perform fft
+      DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 
-    // FFT shift the buffer
-    CommsLib::FFTShift(fft_buffer_[fft_buffer_target_id], config_.OfdmCaNum());
+      //// FFT shift the buffer
+      CommsLib::FFTShift(fft_buffer_[fft_buffer_target_id], config_.OfdmCaNum());
+    }
 
     size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
     auto* csi_buffer_ptr =
@@ -267,6 +270,8 @@ void UeWorker::DoFftData(size_t tag) {
   const size_t symbol_id = pkt->symbol_id_;
   const size_t ant_id = pkt->ant_id_;
   const size_t frame_slot = frame_id % kFrameWnd;
+  const bool bypass_FFT = config_.FreqDomainChannel();
+
   if (mac_sched_.IsUeScheduled(frame_id, 0u, ant_id)) {
     if (kDebugPrintInTask || kDebugPrintFft) {
       AGORA_LOG_INFO(
@@ -293,14 +298,14 @@ void UeWorker::DoFftData(size_t tag) {
     SimdConvertShortToFloat(&pkt->data_[delay_offset], fft_buff,
                             config_.OfdmCaNum() * 2);
 
-    // perform fft
-    DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
+    if (bypass_FFT == false) {
+      // perform fft
+      DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 
-    //// FFT shift the buffer
-    CommsLib::FFTShift(fft_buffer_[fft_buffer_target_id], config_.OfdmCaNum());
+      //// FFT shift the buffer
+      CommsLib::FFTShift(fft_buffer_[fft_buffer_target_id], config_.OfdmCaNum());
+    }
 
-    auto* fft_buffer_ptr =
-        reinterpret_cast<arma::cx_float*>(fft_buffer_[fft_buffer_target_id]);
     size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
     auto* csi_buffer_ptr =
         reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset]);
@@ -625,6 +630,7 @@ void UeWorker::DoIfft(size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ant_id = gen_tag_t(tag).ue_id_;
+  const bool bypass_iFFT = config_.FreqDomainChannel();
 
   const size_t ul_symbol_idx = config_.Frame().GetULSymbolIdx(symbol_id);
   const size_t total_ul_symbol_id =
@@ -685,14 +691,14 @@ void UeWorker::DoIfft(size_t tag) {
       std::memset(ifft_buff + config_.OfdmDataStop(), 0,
                   sizeof(complex_float) * config_.OfdmDataStart());
 
+    if (bypass_iFFT == false) {
       CommsLib::FFTShift(ifft_buff, config_.OfdmCaNum());
       CommsLib::IFFT(ifft_buff, config_.OfdmCaNum(), false);
+    }
 
       if (kDebugTxMemory) {
         AGORA_LOG_INFO(
-            "Tx data for (Frame %zu Symbol %zu Ant %zu) is located at tx "
-            "offset "
-            "%zu:%zu at location %ld\n",
+            "Tx data for (Frame %zu Symbol %zu Ant %zu) is located at tx offset %zu:%zu at location %ld\n",
             frame_id, symbol_id, ant_id, buff_offset, tx_offset,
             (intptr_t)cur_tx_buffer);
       }
