@@ -55,6 +55,7 @@ Config::Config(std::string jsonfilename)
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_bcast_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       frame_(""),
+      pilot_pre_ifft_(nullptr),
       pilot_ifft_(nullptr),
       config_filename_(std::move(jsonfilename)) {
   auto time = std::time(nullptr);
@@ -696,7 +697,7 @@ Config::Config(std::string jsonfilename)
   this->DumpMcsInfo();
   this->UpdateCtrlMCS();
 
-  fft_in_rru_ = tdd_conf.value("fft_in_rru", false);
+  freq_domain_channel_ = tdd_conf.value("freq_domain_channel", false);
 
   samps_per_symbol_ =
       ofdm_tx_zero_prefix_ + ofdm_ca_num_ + cp_len_ + ofdm_tx_zero_postfix_;
@@ -1180,14 +1181,17 @@ void Config::GenPilots() {
   AllocBuffer1d(&pilot_ifft_, this->ofdm_ca_num_,
                 Agora_memory::Alignment_t::kAlign64, 1);
 
-  for (size_t j = 0; j < ofdm_data_num_; j++) {
-    // FFT Shift
-    const size_t k = j + ofdm_data_start_ >= ofdm_ca_num_ / 2
-                         ? j + ofdm_data_start_ - ofdm_ca_num_ / 2
-                         : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
-    pilot_ifft_[k] = this->pilots_[j];
+  AllocBuffer1d(&pilot_pre_ifft_, this->ofdm_ca_num_,
+                Agora_memory::Alignment_t::kAlign64, 1);
+
+  complex_float* ifft_ptr_ = pilot_ifft_;
+  std::memcpy(ifft_ptr_ + ofdm_data_start_, this->pilots_,
+              ofdm_data_num_ * sizeof(complex_float));
+
+  if (this->freq_domain_channel_ == false) {
+    CommsLib::FFTShift(ifft_ptr_, ofdm_ca_num_);
+    CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
   }
-  CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
 
   // Generate UE-specific pilots based on Zadoff-Chu sequence for phase tracking
   this->ue_specific_pilot_.Malloc(this->ue_ant_num_, this->ofdm_data_num_,
@@ -1197,19 +1201,27 @@ void Config::GenPilots() {
 
   ue_pilot_ifft_.Calloc(this->ue_ant_num_, this->ofdm_ca_num_,
                         Agora_memory::Alignment_t::kAlign64);
+  ue_pilot_pre_ifft_.Calloc(this->ue_ant_num_, this->ofdm_ca_num_,
+                            Agora_memory::Alignment_t::kAlign64);
   for (size_t i = 0; i < ue_ant_num_; i++) {
     auto zc_ue_pilot_i = CommsLib::SeqCyclicShift(
         zc_seq,
         (i + this->ue_ant_offset_) * (float)M_PI / 6);  // LTE DMRS
+
     for (size_t j = 0; j < this->ofdm_data_num_; j++) {
       this->ue_specific_pilot_[i][j] = {zc_ue_pilot_i[j].real(),
                                         zc_ue_pilot_i[j].imag()};
-      // FFT Shift
-      const size_t k = j + ofdm_data_start_ >= ofdm_ca_num_ / 2
-                           ? j + ofdm_data_start_ - ofdm_ca_num_ / 2
-                           : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
-      ue_pilot_ifft_[i][k] = this->ue_specific_pilot_[i][j];
     }
+
+    std::memcpy(ue_pilot_ifft_[i] + ofdm_data_start_,
+                this->ue_specific_pilot_[i],
+                ofdm_data_num_ * sizeof(complex_float));
+    //Save a copy of the frequency domain info
+    std::memcpy(ue_pilot_pre_ifft_[i] + ofdm_data_start_,
+                ue_pilot_ifft_[i] + ofdm_data_start_,
+                ofdm_data_num_ * sizeof(complex_float));
+
+    CommsLib::FFTShift(ue_pilot_ifft_[i], ofdm_ca_num_);
     CommsLib::IFFT(ue_pilot_ifft_[i], ofdm_ca_num_, false);
   }
 }
@@ -1391,7 +1403,7 @@ void Config::GenData() {
     }
   }
 
-  // Generate freq-domain uplink symbols
+  // Generate freq or-domain uplink symbols
   Table<complex_float> ul_iq_ifft;
   ul_iq_ifft.Calloc(this->frame_.NumULSyms(),
                     this->ofdm_ca_num_ * this->ue_ant_num_,
@@ -1422,7 +1434,6 @@ void Config::GenData() {
       const size_t q = u * ofdm_data_num_;
 
       for (size_t j = 0; j < ofdm_data_num_; j++) {
-        const size_t sc = j + ofdm_data_start_;
         if (i >= this->frame_.ClientUlPilotSymbols()) {
           int8_t* mod_input_ptr =
               GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, u, j);
@@ -1430,20 +1441,16 @@ void Config::GenData() {
         } else {
           ul_iq_f_[i][q + j] = ue_specific_pilot_[u][j];
         }
-        // FFT Shift
-        const size_t k = sc >= ofdm_ca_num_ / 2 ? sc - ofdm_ca_num_ / 2
-                                                : sc + ofdm_ca_num_ / 2;
-        ul_iq_ifft[i][u * ofdm_ca_num_ + k] = ul_iq_f_[i][q + j];
       }
-      if (kOutputUlScData) {
-        const auto write_status =
-            std::fwrite(&ul_iq_ifft[i][u * ofdm_ca_num_], sizeof(complex_float),
-                        ofdm_ca_num_, vec_fp_tx.at(u / num_ue_channels_));
-        if (write_status != ofdm_ca_num_) {
-          AGORA_LOG_ERROR("Config: Failed to write ul sc data file\n");
-        }
+
+      complex_float* ifft_ptr_ = &ul_iq_ifft[i][u * ofdm_ca_num_];
+      std::memcpy(ifft_ptr_ + ofdm_data_start_, ul_iq_f_[i] + q,
+                  ofdm_data_num_ * sizeof(complex_float));
+
+      if (this->freq_domain_channel_ == false) {
+        CommsLib::FFTShift(ifft_ptr_, ofdm_ca_num_);
+        CommsLib::IFFT(ifft_ptr_, ofdm_ca_num_, false);
       }
-      CommsLib::IFFT(&ul_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
     }
   }
   if (kOutputUlScData) {
@@ -1518,7 +1525,6 @@ void Config::GenData() {
       size_t q = u * ofdm_data_num_;
 
       for (size_t j = 0; j < ofdm_data_num_; j++) {
-        size_t sc = j + ofdm_data_start_;
         if (IsDataSubcarrier(j) == true) {
           int8_t* mod_input_ptr =
               GetModBitsBuf(dl_mod_bits_, Direction::kDownlink, 0, i, u,
@@ -1527,12 +1533,16 @@ void Config::GenData() {
         } else {
           dl_iq_f_[i][q + j] = ue_specific_pilot_[u][j];
         }
-        // FFT Shift
-        const size_t k = sc >= ofdm_ca_num_ / 2 ? sc - ofdm_ca_num_ / 2
-                                                : sc + ofdm_ca_num_ / 2;
-        dl_iq_ifft[i][u * ofdm_ca_num_ + k] = dl_iq_f_[i][q + j];
       }
-      CommsLib::IFFT(&dl_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
+
+      complex_float* ifft_ptr_ = &dl_iq_ifft[i][u * ofdm_ca_num_];
+      std::memcpy(ifft_ptr_ + ofdm_data_start_, dl_iq_f_[i] + q,
+                  ofdm_data_num_ * sizeof(complex_float));
+
+      if (this->freq_domain_channel_ == false) {
+        CommsLib::FFTShift(ifft_ptr_, ofdm_ca_num_);
+        CommsLib::IFFT(ifft_ptr_, ofdm_ca_num_, false);
+      }
     }
   }
 
@@ -1583,7 +1593,10 @@ void Config::GenData() {
 
   // Generate time domain ue-specific pilot symbols
   for (size_t i = 0; i < this->ue_ant_num_; i++) {
-    CommsLib::Ifft2tx(ue_pilot_ifft_[i], this->ue_specific_pilot_t_[i],
+    complex_float* ue_pilot_ = (this->freq_domain_channel_)
+                                   ? ue_pilot_pre_ifft_[i]
+                                   : ue_pilot_ifft_[i];
+    CommsLib::Ifft2tx(ue_pilot_, this->ue_specific_pilot_t_[i],
                       this->ofdm_ca_num_, this->ofdm_tx_zero_prefix_,
                       this->cp_len_, kDebugDownlink ? 1 : this->scale_);
   }
@@ -1617,25 +1630,29 @@ void Config::GenData() {
       this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).resize(samps_per_symbol_, 0);
       if (this->freq_orthogonal_pilot_ || ue_id == pilot_idx) {
         std::vector<arma::uword> pilot_sc_list;
+
         for (size_t sc_id = 0; sc_id < ofdm_data_num_; sc_id++) {
           const size_t org_sc = sc_id + ofdm_data_start_;
-          const size_t center_sc = ofdm_ca_num_ / 2;
-          // FFT Shift
-          const size_t shifted_sc = (org_sc >= center_sc)
-                                        ? (org_sc - center_sc)
-                                        : (org_sc + center_sc);
           if (this->freq_orthogonal_pilot_ == false ||
               sc_id % this->pilot_sc_group_size_ == ue_id) {
-            pilot_ifft_[shifted_sc] = this->pilots_[sc_id];
+            pilot_ifft_[org_sc] = this->pilots_[sc_id];
             pilot_sc_list.push_back(org_sc);
           } else {
-            pilot_ifft_[shifted_sc].re = 0.0f;
-            pilot_ifft_[shifted_sc].im = 0.0f;
+            pilot_ifft_[org_sc].re = 0.0f;
+            pilot_ifft_[org_sc].im = 0.0f;
           }
         }
+
         pilot_ue_sc_.at(ue_id) = arma::uvec(pilot_sc_list);
+
+        std::memcpy(pilot_pre_ifft_, pilot_ifft_,
+                    ofdm_ca_num_ * sizeof(complex_float));
+        CommsLib::FFTShift(pilot_ifft_, this->ofdm_ca_num_);
         CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
-        CommsLib::Ifft2tx(pilot_ifft_,
+
+        const complex_float* pilot_to_tx =
+            (this->freq_domain_channel_) ? pilot_pre_ifft_ : pilot_ifft_;
+        CommsLib::Ifft2tx(pilot_to_tx,
                           this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).data(),
                           ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
       }
@@ -1669,6 +1686,10 @@ void Config::GenData() {
   if (pilot_ifft_ != nullptr) {
     FreeBuffer1d(&pilot_ifft_);
   }
+  if (pilot_pre_ifft_ != nullptr) {
+    FreeBuffer1d(&pilot_pre_ifft_);
+  }
+
   delete[](ul_temp_parity_buffer);
   delete[](dl_temp_parity_buffer);
   ul_iq_ifft.Free();
@@ -1773,7 +1794,10 @@ void Config::GenBroadcastSlots(
     auto mapped_symbol = DataGenerator::MapOFDMSymbol(
         this, modulated_vector, pilots_, SymbolType::kControl);
     auto ofdm_symbol = DataGenerator::BinForIfft(this, mapped_symbol, true);
-    CommsLib::IFFT(&ofdm_symbol[0], ofdm_ca_num_, false);
+
+    if (this->freq_domain_channel_ == false) {
+      CommsLib::IFFT(&ofdm_symbol[0], ofdm_ca_num_, false);
+    }
     // additional 2^2 (6dB) power backoff
     float dl_bcast_scale =
         2 * CommsLib::FindMaxAbs(&ofdm_symbol[0], ofdm_symbol.size());
@@ -1801,6 +1825,7 @@ Config::~Config() {
   ue_specific_pilot_t_.Free();
   ue_specific_pilot_.Free();
   ue_pilot_ifft_.Free();
+  ue_pilot_pre_ifft_.Free();
 
   ul_mod_table_.Free();
   dl_mod_table_.Free();
@@ -1959,7 +1984,8 @@ void Config::Print() const {
               << "Noise Level: " << noise_level_ << std::endl
               << "UL Bytes per CB: " << ul_num_bytes_per_cb_ << std::endl
               << "DL Bytes per CB: " << dl_num_bytes_per_cb_ << std::endl
-              << "FFT in rru: " << fft_in_rru_ << std::endl;
+              << "Frequency domain channel: " << freq_domain_channel_
+              << std::endl;
   }
 }
 

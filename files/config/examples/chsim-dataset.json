@@ -1,5 +1,5 @@
 {
-    "max_frame": 10, 
+    "freq_domain_channel": true,
     "fft_size": 512,
     "ofdm_data_num": 304,
     "demul_block_size": 48,
@@ -30,4 +30,3 @@
     "ue_worker_thread_num": 2,
     "ue_socket_thread_num": 1
 }
-  
