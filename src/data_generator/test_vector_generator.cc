@@ -84,10 +84,10 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kUplink));
         data_generator->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
-                                pkt->Data(),
-                                cfg_->MacPayloadMaxLength(Direction::kUplink)) &
-                            0xFFFF));
+        pkt->Crc((uint16_t)(
+            crc_obj->CalculateCrc24(
+                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kUplink)) &
+            0xFFFF));
       }
     }
 
@@ -374,10 +374,10 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kDownlink));
         data_generator->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(pkt->Data(),
-                                                    cfg_->MacPayloadMaxLength(
-                                                        Direction::kDownlink)) &
-                            0xFFFF));
+        pkt->Crc((uint16_t)(
+            crc_obj->CalculateCrc24(
+                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kDownlink)) &
+            0xFFFF));
       }
     }
 

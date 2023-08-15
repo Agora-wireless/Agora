@@ -1175,16 +1175,20 @@ void Config::GenPilots() {
   AllocBuffer1d(&pilot_ifft_, this->ofdm_ca_num_,
                 Agora_memory::Alignment_t::kAlign64, 1);
 
+  RtAssert(pilot_pre_ifft_ == nullptr, "pilot_pre_ifft_ should be null");
   AllocBuffer1d(&pilot_pre_ifft_, this->ofdm_ca_num_,
                 Agora_memory::Alignment_t::kAlign64, 1);
 
-  complex_float* ifft_ptr_ = pilot_ifft_;
-  std::memcpy(ifft_ptr_ + ofdm_data_start_, this->pilots_,
+  std::memcpy(pilot_pre_ifft_ + ofdm_data_start_, this->pilots_,
               ofdm_data_num_ * sizeof(complex_float));
 
+  //pilot_pre_ifft_ == pilot_ifft_;
+  std::memcpy(pilot_ifft_, pilot_pre_ifft_,
+              ofdm_ca_num_ * sizeof(complex_float));
+
   if (this->freq_domain_channel_ == false) {
-    CommsLib::FFTShift(ifft_ptr_, ofdm_ca_num_);
-    CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
+    CommsLib::FFTShift(pilot_ifft_, ofdm_ca_num_);
+    CommsLib::IFFT(pilot_ifft_, ofdm_ca_num_, false);
   }
 
   // Generate UE-specific pilots based on Zadoff-Chu sequence for phase tracking
@@ -1583,13 +1587,11 @@ void Config::LoadTestVectors() {
   if (pilot_ifft_ != nullptr) {
     FreeBuffer1d(&pilot_ifft_);
   }
-  //delete[](ul_temp_parity_buffer);
+  if (pilot_pre_ifft_ != nullptr) {
+    FreeBuffer1d(&pilot_pre_ifft_);
+  }
   ul_iq_ifft.Free();
   dl_iq_ifft.Free();
-  //ul_encoded_bits.Free();
-
-    if (this->freq_domain_channel_ == false) {
-    }
 }
 
 Config::~Config() {

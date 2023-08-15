@@ -214,7 +214,8 @@ void UeWorker::DoFftPilot(size_t tag) {
       DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 
       //// FFT shift the buffer
-      CommsLib::FFTShift(fft_buffer_[fft_buffer_target_id], config_.OfdmCaNum());
+      CommsLib::FFTShift(fft_buffer_[fft_buffer_target_id],
+                         config_.OfdmCaNum());
     }
 
     size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
@@ -303,9 +304,12 @@ void UeWorker::DoFftData(size_t tag) {
       DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 
       //// FFT shift the buffer
-      CommsLib::FFTShift(fft_buffer_[fft_buffer_target_id], config_.OfdmCaNum());
+      CommsLib::FFTShift(fft_buffer_[fft_buffer_target_id],
+                         config_.OfdmCaNum());
     }
 
+    auto* fft_buffer_ptr =
+        reinterpret_cast<arma::cx_float*>(fft_buffer_[fft_buffer_target_id]);
     size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
     auto* csi_buffer_ptr =
         reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset]);
@@ -691,14 +695,15 @@ void UeWorker::DoIfft(size_t tag) {
       std::memset(ifft_buff + config_.OfdmDataStop(), 0,
                   sizeof(complex_float) * config_.OfdmDataStart());
 
-    if (bypass_iFFT == false) {
-      CommsLib::FFTShift(ifft_buff, config_.OfdmCaNum());
-      CommsLib::IFFT(ifft_buff, config_.OfdmCaNum(), false);
-    }
+      if (bypass_iFFT == false) {
+        CommsLib::FFTShift(ifft_buff, config_.OfdmCaNum());
+        CommsLib::IFFT(ifft_buff, config_.OfdmCaNum(), false);
+      }
 
       if (kDebugTxMemory) {
         AGORA_LOG_INFO(
-            "Tx data for (Frame %zu Symbol %zu Ant %zu) is located at tx offset %zu:%zu at location %ld\n",
+            "Tx data for (Frame %zu Symbol %zu Ant %zu) is located at tx "
+            "offset %zu:%zu at location %ld\n",
             frame_id, symbol_id, ant_id, buff_offset, tx_offset,
             (intptr_t)cur_tx_buffer);
       }
