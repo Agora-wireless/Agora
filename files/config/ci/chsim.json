@@ -1,4 +1,5 @@
 {
+  "freq_domain_channel": false,
   "fft_size": 512,
   "ofdm_data_num": 304,
   "demul_block_size": 48,

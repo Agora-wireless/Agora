@@ -446,7 +446,7 @@ void* Sender::WorkerThread(int tid) {
             pkt->data_,
             iq_data_short_[(pkt->symbol_id_ * cfg_->BsAntNum()) + tag.ant_id_],
             (cfg_->SampsPerSymbol()) * (kUse12BitIQ ? 3 : 4));
-        if (cfg_->FftInRru() == true) {
+        if (cfg_->FreqDomainChannel()) {
           RunFft(pkt, fft_inout, mkl_handle);
         }
 
@@ -616,7 +616,7 @@ void Sender::RunFft(Packet* pkt, complex_float* fft_inout,
 
   DftiComputeForward(mkl_handle, reinterpret_cast<float*>(fft_inout));
 
-  SimdConvertFloat32ToFloat16(reinterpret_cast<float*>(pkt->data_),
-                              reinterpret_cast<float*>(fft_inout),
-                              cfg_->OfdmCaNum() * 2);
+  SimdConvertFloatToShort(reinterpret_cast<float*>(fft_inout),
+                          reinterpret_cast<short*>(pkt->data_),
+                          cfg_->OfdmCaNum() * 2);
 }
