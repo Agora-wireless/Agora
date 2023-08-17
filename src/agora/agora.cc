@@ -106,6 +106,7 @@ void Agora::Stop() {
   packet_tx_rx_.reset();
 }
 
+#if !defined(TIME_EXCLUSIVE)
 void Agora::SendSnrReport(EventType event_type, size_t frame_id,
                           size_t symbol_id) {
   assert(event_type == EventType::kSNRReport);
@@ -120,6 +121,7 @@ void Agora::SendSnrReport(EventType event_type, size_t frame_id,
     base_tag.ue_id_++;
   }
 }
+#endif
 
 void Agora::ScheduleDownlinkProcessing(size_t frame_id) {
   // Schedule broadcast symbols generation
@@ -462,6 +464,7 @@ void Agora::Start() {
               stats_->PrintPerFrameDone(PrintType::kDemul, frame_id);
               auto ue_map = mac_sched_->ScheduledUeMap(frame_id, 0u);
               auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+#if !defined(TIME_EXCLUSIVE)
               if (kPrintPhyStats) {
                 this->phy_stats_->PrintEvmStats(frame_id, ue_list);
               }
@@ -469,11 +472,14 @@ void Agora::Start() {
               this->phy_stats_->RecordEvm(frame_id, config_->LogScNum(),
                                           ue_map);
               this->phy_stats_->RecordEvmSnr(frame_id, ue_map);
+#endif
               if (kUplinkHardDemod) {
                 this->phy_stats_->RecordBer(frame_id, ue_map);
                 this->phy_stats_->RecordSer(frame_id, ue_map);
               }
+#if !defined(TIME_EXCLUSIVE)
               this->phy_stats_->ClearEvmBuffer(frame_id);
+#endif
 
               // skip Decode when hard demod is enabled
               if (kUplinkHardDemod) {
@@ -882,6 +888,7 @@ void Agora::HandleEventFft(size_t tag) {
           this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
           stats_->PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
           this->pilot_fft_counters_.Reset(frame_id);
+#if !defined(TIME_EXCLUSIVE)
           if (kPrintPhyStats == true) {
             this->phy_stats_->PrintUlSnrStats(frame_id);
           }
@@ -889,6 +896,7 @@ void Agora::HandleEventFft(size_t tag) {
           if (kEnableMac == true) {
             SendSnrReport(EventType::kSNRReport, frame_id, symbol_id);
           }
+#endif
           ScheduleSubcarriers(EventType::kBeam, frame_id, 0);
         }
       }
@@ -927,6 +935,7 @@ void Agora::HandleEventFft(size_t tag) {
       this->stats_->MasterSetTsc(TsType::kRCDone, frame_id);
       this->rc_last_frame_ = frame_id;
 
+#if !defined(TIME_EXCLUSIVE)
       // See if the calibration has completed
       if (kPrintPhyStats) {
         const size_t frames_for_cal = config_->RecipCalFrameCnt();
@@ -938,6 +947,7 @@ void Agora::HandleEventFft(size_t tag) {
           phy_stats_->PrintCalibSnrStats(previous_cal_slot);
         }
       }  // kPrintPhyStats
+#endif
     }    // last_rc_task
   }      // kCaLDL || kCalUl
 }

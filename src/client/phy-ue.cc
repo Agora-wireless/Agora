@@ -472,12 +472,14 @@ void PhyUe::Start() {
             if (pilot_fft_complete) {
               auto ue_map = mac_sched_->ScheduledUeMap(frame_id, 0u);
               auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+#if !defined(TIME_EXCLUSIVE)
               if (kPrintPhyStats) {
                 this->phy_stats_->PrintDlSnrStats(frame_id, ue_list);
               }
               this->phy_stats_->RecordDlCsi(frame_id, config_->LogScNum(),
                                             csi_buffer_, ue_list);
               this->phy_stats_->RecordDlPilotSnr(frame_id, ue_map);
+#endif
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
               PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
               ScheduleDefferedDownlinkSymbols(frame_id);

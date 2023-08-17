@@ -178,7 +178,7 @@ static constexpr bool kEnableCsvLog = true;
 static constexpr bool kEnableCsvLog = false;
 #endif
 
-#if defined(ENABLE_MAT_LOG)
+#if defined(ENABLE_MAT_LOG) && !defined(TIME_EXCLUSIVE)
 static constexpr bool kEnableMatLog = true;
 #else
 static constexpr bool kEnableMatLog = false;
@@ -199,8 +199,13 @@ static constexpr bool kUplinkHardDemod = false;
 
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = true;
+#if !defined(TIME_EXCLUSIVE)
 static constexpr bool kCollectPhyStats = true;
 static constexpr bool kPrintBeamStats = true;
+#else
+static constexpr bool kCollectPhyStats = false;
+static constexpr bool kPrintBeamStats = false;
+#endif
 
 static constexpr bool kStatsPrintFrameSummary = true;
 static constexpr bool kDebugPrintPerFrameDone = true;

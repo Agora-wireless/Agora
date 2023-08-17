@@ -253,7 +253,9 @@ EventData DoFFT::Launch(size_t tag) {
           &calib_ul_buffer_[cal_index][ant_id * cfg_->OfdmDataNum()];
 
       PartialTranspose(calib_ul_ptr, ant_id, sym_type);
+#if !defined(TIME_EXCLUSIVE)
       phy_stats_->UpdateCalibPilotSnr(cal_index, 1, ant_id, fft_inout_);
+#endif
     }
     RtAssert(radio_id != cfg_->RefRadio(cell_id),
              "Received a Cal Ul symbol for an antenna on the reference radio");
@@ -272,7 +274,9 @@ EventData DoFFT::Launch(size_t tag) {
       complex_float* calib_dl_ptr =
           &calib_dl_buffer_[cal_index][pilot_tx_ant * cfg_->OfdmDataNum()];
       PartialTranspose(calib_dl_ptr, pilot_tx_ant, sym_type);
+#if !defined(TIME_EXCLUSIVE)
       phy_stats_->UpdateCalibPilotSnr(cal_index, 0, pilot_tx_ant, fft_inout_);
+#endif
     }
     RtAssert(
         radio_id == cfg_->RefRadio(cell_id),
