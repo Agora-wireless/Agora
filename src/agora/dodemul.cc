@@ -25,7 +25,8 @@ DoDemul::DoDemul(
       demod_buffers_(demod_buffers),
       mac_sched_(mac_sched),
       phy_stats_(in_phy_stats) {
-  duration_stat_ = stats_manager->GetDurationStat(DoerType::kDemul, tid);
+  duration_stat_equal_ = stats_manager->GetDurationStat(DoerType::kEqual, tid);
+  duration_stat_demul_ = stats_manager->GetDurationStat(DoerType::kDemul, tid);
 
   data_gather_buffer_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
@@ -91,7 +92,7 @@ EventData DoDemul::Launch(size_t tag) {
   const complex_float* data_buf = data_buffer_[total_data_symbol_idx_ul];
 
   const size_t frame_slot = frame_id % kFrameWnd;
-  size_t start_tsc = GetTime::WorkerRdtsc();
+  size_t start_equal_tsc = GetTime::WorkerRdtsc();
 
   if (kDebugPrintInTask == true) {
     std::printf(
@@ -106,7 +107,7 @@ EventData DoDemul::Launch(size_t tag) {
   assert(max_sc_ite % kSCsPerCacheline == 0);
   // Iterate through cache lines
   for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
-    size_t start_tsc0 = GetTime::WorkerRdtsc();
+    size_t start_equal_tsc0 = GetTime::WorkerRdtsc();
 
     // Step 1: Populate data_gather_buffer as a row-major matrix with
     // kSCsPerCacheline rows and BsAntNum() columns
@@ -192,12 +193,14 @@ EventData DoDemul::Launch(size_t tag) {
         }
       }
     }
-    duration_stat_->task_duration_[1] += GetTime::WorkerRdtsc() - start_tsc0;
+
+    duration_stat_equal_->task_duration_[1] += GetTime::WorkerRdtsc() - start_equal_tsc0;
 
     // Step 2: For each subcarrier, perform equalization by multiplying the
     // subcarrier's data from each antenna with the subcarrier's precoder
     for (size_t j = 0; j < kSCsPerCacheline; j++) {
       const size_t cur_sc_id = base_sc_id + i + j;
+      size_t start_equal_tsc2 = GetTime::WorkerRdtsc();
 
       arma::cx_float* equal_ptr = nullptr;
       if (kExportConstellation) {
@@ -214,11 +217,9 @@ EventData DoDemul::Launch(size_t tag) {
 
       arma::cx_float* data_ptr = reinterpret_cast<arma::cx_float*>(
           &data_gather_buffer_[j * cfg_->BsAntNum()]);
-      // size_t start_tsc2 = worker_rdtsc();
       arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
           ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
 
-      size_t start_tsc2 = GetTime::WorkerRdtsc();
 #if defined(USE_MKL_JIT)
       mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_beam_ptr,
                      (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
@@ -229,6 +230,8 @@ EventData DoDemul::Launch(size_t tag) {
                                 cfg_->BsAntNum(), false);
       mat_equaled = mat_ul_beam * mat_data;
 #endif
+      size_t start_equal_tsc3 = GetTime::WorkerRdtsc();
+      duration_stat_equal_->task_duration_[2] += start_equal_tsc3 - start_equal_tsc2;
       auto ue_list = mac_sched_->ScheduledUeList(frame_id, cur_sc_id);
       if (symbol_idx_ul <
           cfg_->Frame().ClientUlPilotSymbols()) {  // Calc new phase shift
@@ -285,13 +288,16 @@ EventData DoDemul::Launch(size_t tag) {
         }
 #endif
       }
-      size_t start_tsc3 = GetTime::WorkerRdtsc();
-      duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
-      duration_stat_->task_count_++;
+
+      duration_stat_equal_->task_duration_[3] += GetTime::WorkerRdtsc() - start_equal_tsc3;
+      duration_stat_equal_->task_count_++;
     }
+    // Note there might be ~0.1ms difference if we put the timestamp into the for-loop
   }
 
-  size_t start_tsc3 = GetTime::WorkerRdtsc();
+  duration_stat_equal_->task_duration_[0] += GetTime::WorkerRdtsc() - start_equal_tsc;
+  size_t start_demul_tsc = GetTime::WorkerRdtsc();
+
   __m256i index2 = _mm256_setr_epi32(
       0, 1, cfg_->SpatialStreamsNum() * 2, cfg_->SpatialStreamsNum() * 2 + 1,
       cfg_->SpatialStreamsNum() * 4, cfg_->SpatialStreamsNum() * 4 + 1,
@@ -316,8 +322,11 @@ EventData DoDemul::Launch(size_t tag) {
     equal_t_ptr = (float*)(equaled_buffer_temp_transposed_);
     int8_t* demod_ptr = demod_buffers_[frame_slot][symbol_idx_ul][ss_id] +
                         (cfg_->ModOrderBits(Direction::kUplink) * base_sc_id);
+    size_t start_demul_tsc0 = GetTime::WorkerRdtsc();
     Demodulate(equal_t_ptr, demod_ptr, max_sc_ite,
                cfg_->ModOrderBits(Direction::kUplink), kUplinkHardDemod);
+    duration_stat_demul_->task_duration_[1] = GetTime::WorkerRdtsc() - start_demul_tsc0;
+    duration_stat_demul_->task_count_++;
     // if hard demod is enabled calculate BER with modulated bits
     if (((kPrintPhyStats || kEnableCsvLog) && kUplinkHardDemod) &&
         (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols())) {
@@ -353,8 +362,6 @@ EventData DoDemul::Launch(size_t tag) {
     //   std::printf("%i ", demul_ptr[k]);
     // cout << endl;
   }
-
-  duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
-  duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
+  duration_stat_demul_->task_duration_[0] += GetTime::WorkerRdtsc() - start_demul_tsc;
   return EventData(EventType::kDemul, tag);
 }

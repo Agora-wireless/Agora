@@ -70,6 +70,7 @@ enum class DoerType : size_t {
   kFFT,
   kCSI,
   kBeam,
+  kEqual,
   kDemul,
   kDecode,
   kEncode,
@@ -80,15 +81,18 @@ enum class DoerType : size_t {
 };
 
 static constexpr std::array<DoerType, (static_cast<size_t>(DoerType::kRC) + 1)>
-    kAllDoerTypes = {DoerType::kFFT,   DoerType::kCSI,     DoerType::kBeam,
-                     DoerType::kDemul, DoerType::kDecode,  DoerType::kEncode,
-                     DoerType::kIFFT,  DoerType::kPrecode, DoerType::kRC};
+    kAllDoerTypes = {DoerType::kFFT,    DoerType::kCSI,     DoerType::kBeam,
+                     DoerType::kEqual,  DoerType::kDemul,   DoerType::kDecode,
+                     DoerType::kEncode, DoerType::kIFFT,    DoerType::kPrecode,
+                     DoerType::kRC,
+                     };
 static constexpr size_t kNumDoerTypes = kAllDoerTypes.size();
 
 static const std::map<DoerType, std::string> kDoerNames = {
     {DoerType::kFFT, std::string("FFT")},
     {DoerType::kCSI, std::string("CSI")},
     {DoerType::kBeam, std::string("Beamweights")},
+    {DoerType::kEqual, std::string("Equal")},
     {DoerType::kDemul, std::string("Demul")},
     {DoerType::kDecode, std::string("Decode")},
     {DoerType::kEncode, std::string("Encode")},
