@@ -21,7 +21,7 @@ class ChannelModel {
   virtual ~ChannelModel() = default;
 
   //Function called every frame
-  virtual void UpdateModel() = 0;
+  virtual void UpdateModel(const float mean_channel_gain) = 0;
 
   /*
   * Returns H Matrix, if selective fading apply h_slice_index for each subcarrier

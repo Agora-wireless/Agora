@@ -21,8 +21,15 @@ Channel::Channel(const Config* const config, std::string& in_channel_type,
       channel_snr_db_(in_channel_snr) {
   channel_model_ = std::move(
       ChannelModel::CreateChannelModel(cfg_, sim_chan_model_, dataset_path));
+  
+  float snr_lin = std::pow(10, channel_snr_db_ / 10.0f);
 
-  const float snr_lin = std::pow(10, channel_snr_db_ / 10.0f);
+  if( cfg_->FreqDomainChannel() )
+  {
+    //Adapt the SNR to the signal scale, when FFTs are bypassed, the signal is downscaled by OfdmCaNum.
+    snr_lin = snr_lin * cfg_->OfdmCaNum();
+  }
+
   noise_samp_std_ = std::sqrt(kMeanChannelGain / (snr_lin * 2.0f));
 
   std::cout << "Noise level to be used is: " << std::fixed << std::setw(5)
@@ -34,7 +41,7 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
   arma::cx_fmat fmat_h;
 
   if (is_newChan) {
-    channel_model_->UpdateModel();
+    channel_model_->UpdateModel( kMeanChannelGain );
   }
 
   switch (channel_model_->GetFadingType()) {
@@ -66,7 +73,7 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
 
   // Add noise
   Awgn(fmat_h, fmat_dst);
-
+  
   if (kPrintChannelOutput) {
     Utils::PrintMat(fmat_dst, "H");
   }

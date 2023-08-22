@@ -120,7 +120,7 @@ void DatasetModel::InstantiateDataset(const std::string& dataset_path) {
       dataset_path.c_str(), frames_num, scs_num, bss_num, ues_num);
 }
 
-void DatasetModel::UpdateModel() {
+void DatasetModel::UpdateModel( const float mean_channel_gain ) {
   h_selective_ = h_matrices_frames_[current_frame_num_];
   current_frame_num_++;
 }

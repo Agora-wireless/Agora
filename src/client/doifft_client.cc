@@ -59,6 +59,8 @@ EventData DoIFFTClient::Launch(size_t tag) {
 
   const size_t symbol_idx_ul = cfg_->Frame().GetULSymbolIdx(symbol_id);
 
+  const bool bypass_iFFT = cfg_->FreqDomainChannel();
+
   if (kDebugPrintInTask) {
     AGORA_LOG_INFO(
         "In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n", tid_,
@@ -79,20 +81,26 @@ EventData DoIFFTClient::Launch(size_t tag) {
   std::memset(ifft_in_ptr, 0, sizeof(float) * cfg_->OfdmDataStart() * 2);
   std::memset(ifft_in_ptr + (cfg_->OfdmDataStop()) * 2, 0,
               sizeof(float) * cfg_->OfdmDataStart() * 2);
-  CommsLib::FFTShift(reinterpret_cast<complex_float*>(ifft_in_ptr),
-                     ifft_shift_tmp_, cfg_->OfdmCaNum());
-  if (kMemcpyBeforeIFFT) {
+
+  if (bypass_iFFT && kMemcpyBeforeIFFT) {
     std::memcpy(ifft_out_ptr, ifft_in_ptr,
                 sizeof(float) * cfg_->OfdmCaNum() * 2);
-    DftiComputeBackward(mkl_handle_, ifft_out_ptr);
   } else {
-    if (kUseOutOfPlaceIFFT) {
-      // Use out-of-place IFFT here is faster than in place IFFT
-      // There is no need to reset non-data subcarriers in ifft input
-      // to 0 since their values are not changed after IFFT
-      DftiComputeBackward(mkl_handle_, ifft_in_ptr, ifft_out_ptr);
+    CommsLib::FFTShift(reinterpret_cast<complex_float*>(ifft_in_ptr),
+                      ifft_shift_tmp_, cfg_->OfdmCaNum());
+    if (kMemcpyBeforeIFFT) {
+      std::memcpy(ifft_out_ptr, ifft_in_ptr,
+                  sizeof(float) * cfg_->OfdmCaNum() * 2);
+      DftiComputeBackward(mkl_handle_, ifft_out_ptr);
     } else {
-      DftiComputeBackward(mkl_handle_, ifft_in_ptr);
+      if (kUseOutOfPlaceIFFT) {
+        // Use out-of-place IFFT here is faster than in place IFFT
+        // There is no need to reset non-data subcarriers in ifft input
+        // to 0 since their values are not changed after IFFT
+        DftiComputeBackward(mkl_handle_, ifft_in_ptr, ifft_out_ptr);
+      } else {
+        DftiComputeBackward(mkl_handle_, ifft_in_ptr);
+      }
     }
   }
 
