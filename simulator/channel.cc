@@ -27,7 +27,7 @@ Channel::Channel(const Config* const config, std::string& in_channel_type,
   if( cfg_->FreqDomainChannel() )
   {
     //Adapt the SNR to the signal scale, when FFTs are bypassed, the signal is downscaled by OfdmCaNum.
-    snr_lin = snr_lin * cfg_->OfdmCaNum();
+    snr_lin = snr_lin * cfg_->OfdmCaNum()  / 4;
   }
 
   noise_samp_std_ = std::sqrt(kMeanChannelGain / (snr_lin * 2.0f));

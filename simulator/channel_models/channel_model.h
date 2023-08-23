@@ -44,6 +44,8 @@ class ChannelModel {
   const size_t ues_num_;
   const size_t n_samps_;
 
+  size_t max_frame_num_;
+
   //H Matrix, MUST be of size UEs x BSs
   arma::cx_fmat h_flat_;
   // Vector MUST be of size NSubcarriers or OFDMSamples

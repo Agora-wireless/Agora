@@ -20,7 +20,6 @@ class RayleighModel : public ChannelModel {
     arma::fmat imat(ues_num_, bss_num_, arma::fill::randn);
 
     h_flat_ = arma::cx_fmat(rmat, imat);
-    //h_flat_ = sqrt( mean_channel_gain / 2.0F ) * h_flat_;
   }
 };
 
