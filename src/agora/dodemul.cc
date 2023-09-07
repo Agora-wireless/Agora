@@ -203,13 +203,10 @@ EventData DoDemul::Launch(size_t tag) {
       }
     }
 
-    // duration_stat_equal_->task_duration_[1] += GetTime::WorkerRdtsc() - start_equal_tsc0;
-
     // Step 2: For each subcarrier, perform equalization by multiplying the
     // subcarrier's data from each antenna with the subcarrier's precoder
     for (size_t j = 0; j < kSCsPerCacheline; j++) {
       const size_t cur_sc_id = base_sc_id + i + j;
-      // size_t start_equal_tsc2 = GetTime::WorkerRdtsc();
 
       arma::cx_float* equal_ptr = nullptr;
       if (kExportConstellation) {
@@ -239,9 +236,6 @@ EventData DoDemul::Launch(size_t tag) {
                                 cfg_->BsAntNum(), false);
       mat_equaled = mat_ul_beam * mat_data;
 #endif
-      // size_t start_equal_tsc3 = GetTime::WorkerRdtsc();
-      // duration_stat_equal_->task_duration_[2] += start_equal_tsc3 - start_equal_tsc2;
-      auto ue_list = mac_sched_->ScheduledUeList(frame_id, cur_sc_id);
 
       // Enable phase shift calibration
       if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
@@ -285,21 +279,17 @@ EventData DoDemul::Launch(size_t tag) {
           mat_equaled %= mat_phase_correct;
 
 #if !defined(TIME_EXCLUSIVE)
+          auto ue_list = mac_sched_->ScheduledUeList(frame_id, cur_sc_id);
           const size_t data_symbol_idx_ul =
               symbol_idx_ul - this->cfg_->Frame().ClientUlPilotSymbols();
           // Measure EVM from ground truth
-          if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
-            phy_stats_->UpdateEvm(frame_id, data_symbol_idx_ul, cur_sc_id,
-                                  mat_equaled.col(0), ue_list);
-          }
+          phy_stats_->UpdateEvm(frame_id, data_symbol_idx_ul, cur_sc_id,
+                                mat_equaled.col(0), ue_list);
 #endif
         }
       }
-
-      // duration_stat_equal_->task_duration_[3] += GetTime::WorkerRdtsc() - start_equal_tsc3;
       duration_stat_equal_->task_count_++;
     }
-    // Note there might be ~0.1ms difference if we put the timestamp into the for-loop
   }
 
   duration_stat_equal_->task_duration_[0] += GetTime::WorkerRdtsc() - start_equal_tsc;
