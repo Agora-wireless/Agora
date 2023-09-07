@@ -77,6 +77,19 @@ class DoDemul : public Doer {
   arma::cx_fmat ue_pilot_data_;
   int ue_num_simd256_;
 
+  // For efficient phase shift calibration
+  arma::fmat theta_mat;
+  arma::fmat theta_inc;
+
+  // // For efficient sin/cos with LUT
+  // static const int lut_size = 1000;
+  // const double lut_max_angle = 2 * arma::datum::pi;
+  // const double lut_step = lut_max_angle / lut_size;
+  // arma::fvec sin_lut;
+  // arma::fvec cos_lut;
+  // arma::fmat sin_lut_func(const arma::fmat&);
+  // arma::fmat cos_lut_func(const arma::fmat&);
+
 #if defined(USE_MKL_JIT)
   void* jitter_;
   cgemm_jit_kernel_t mkl_jit_cgemm_;
