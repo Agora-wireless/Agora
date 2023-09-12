@@ -77,15 +77,16 @@ Config::Config(std::string jsonfilename)
 
   // Initialize the compute configuration
   // Default exclude 1 core with id = 0
-  std::vector<size_t> excluded(1, 0);
+  excluded_.emplace_back(0);
   if (tdd_conf.contains("exclude_cores")) {
     auto exclude_cores = tdd_conf.at("exclude_cores");
-    excluded.resize(exclude_cores.size());
+    excluded_.resize(exclude_cores.size());
     for (size_t i = 0; i < exclude_cores.size(); i++) {
-      excluded.at(i) = exclude_cores.at(i);
+      excluded_.at(i) = exclude_cores.at(i);
     }
   }
-  SetCpuLayoutOnNumaNodes(true, excluded);
+  SetCpuLayoutOnNumaNodes(true, excluded_);
+  dynamic_core_allocation_ = tdd_conf.value("dynamic_core", false);
 
   num_cells_ = tdd_conf.value("cells", 1);
   num_radios_ = 0;
@@ -292,6 +293,10 @@ Config::Config(std::string jsonfilename)
   ue_mac_rx_port_ = tdd_conf.value("ue_mac_rx_port", kMacUserLocalPort);
   bs_mac_tx_port_ = tdd_conf.value("bs_mac_tx_port", kMacBaseRemotePort);
   bs_mac_rx_port_ = tdd_conf.value("bs_mac_rx_port", kMacBaseLocalPort);
+
+  rp_remote_host_name_ = tdd_conf.value("rp_remote_host_name", "127.0.0.1");
+  rp_rx_port_ = tdd_conf.value("rp_rx_port", 7777);
+  rp_tx_port_ = tdd_conf.value("rp_tx_port", 7070);
 
   log_listener_addr_ = tdd_conf.value("log_listener_addr", "");
   log_listener_port_ = tdd_conf.value("log_listener_port", 33300);
@@ -635,6 +640,11 @@ Config::Config(std::string jsonfilename)
   // Agora configurations
   frames_to_test_ = tdd_conf.value("max_frame", 9600);
   core_offset_ = tdd_conf.value("core_offset", 0);
+  if (dynamic_core_allocation_) {
+    worker_thread_num_ = sysconf(_SC_NPROCESSORS_ONLN) - (core_offset_ + socket_thread_num_ + dynamic_core_allocation_ + 1); // use all available cores
+  } else {
+    worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
+  }
   worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
   socket_thread_num_ = tdd_conf.value("socket_thread_num", 4);
   ue_core_offset_ = tdd_conf.value("ue_core_offset", 0);

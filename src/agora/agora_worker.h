@@ -17,6 +17,8 @@
 #include "mat_logger.h"
 #include "phy_stats.h"
 #include "stats.h"
+#include "rp_config.h"
+#include "utils.h"
 
 class AgoraWorker {
  public:
@@ -24,6 +26,8 @@ class AgoraWorker {
                        PhyStats* phy_stats, MessageInfo* message,
                        AgoraBuffer* buffer, FrameInfo* frame);
   ~AgoraWorker();
+  void UpdateCores(RPControlMsg rcm);
+  size_t GetCoresInfo();
 
  private:
   void WorkerThread(int tid);
@@ -32,7 +36,9 @@ class AgoraWorker {
   const size_t base_worker_core_offset_;
 
   Config* const config_;
+
   std::vector<std::thread> workers_;
+  std::vector<bool> active_core_;
 
   MacScheduler* mac_sched_;
   Stats* stats_;

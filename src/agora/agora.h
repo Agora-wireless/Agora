@@ -6,6 +6,7 @@
 #ifndef AGORA_H_
 #define AGORA_H_
 
+#include <numa.h>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -19,6 +20,7 @@
 #include "concurrentqueue.h"
 #include "mac_scheduler.h"
 #include "mac_thread_basestation.h"
+#include "resource_provisioner_thread.h"
 #include "message.h"
 #include "packet_txrx.h"
 #include "phy_stats.h"
@@ -71,6 +73,9 @@ class Agora {
   size_t FetchEvent(std::vector<EventData>& events_list,
                     bool is_turn_to_dequeue_from_io);
 
+  /// Dynamically (de)allocate cores during runtime
+  void UpdateCores(RPControlMsg rcm);
+
   void InitializeQueues();
   void InitializeCounters();
   void InitializeThreads();
@@ -120,6 +125,12 @@ class Agora {
   std::unique_ptr<MacThreadBaseStation> mac_thread_;
   // Handle for the MAC thread
   std::thread mac_std_thread_;
+
+  // The thread running RP thread functions
+  std::unique_ptr<ResourceProvisionerThread> rp_thread_;
+  std::thread rp_std_thread_;
+
+  // std::thread dynamic_core_thread_;
 
   std::unique_ptr<MacScheduler> mac_sched_;
   std::unique_ptr<Stats> stats_;
@@ -177,6 +188,10 @@ class Agora {
 
   // Worker-to-master queue for MAC
   moodycamel::ConcurrentQueue<EventData> mac_response_queue_;
+
+  // Resource Provisioner queue
+  moodycamel::ConcurrentQueue<EventData> rp_request_queue_;
+  moodycamel::ConcurrentQueue<EventData> rp_response_queue_;
 
   moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
