@@ -31,6 +31,8 @@ void SetCpuLayoutOnNumaNodes(
     bool verbose = false,
     const std::vector<size_t>& cores_to_exclude = std::vector<size_t>(1, 0));
 
+void UpdateCpuLayout(const std::vector<size_t>& cores_to_exclude);
+
 size_t GetPhysicalCoreId(size_t core_id);
 
 /* Pin this thread to core with global index = core_id */
@@ -40,6 +42,12 @@ int PinToCore(size_t core_id);
 void PinToCoreWithOffset(ThreadType thread, size_t base_core_offset,
                          size_t thread_id, bool allow_reuse = false,
                          bool verbose = false);
+
+/* Remove core from core_list at (core_id + core_offset) */
+void RemoveCoreFromList(int core_id, int core_offset);
+
+/* Get the number of available cores in the machine */
+size_t GetAvailableCores();
 
 void PrintCoreAssignmentSummary();
 

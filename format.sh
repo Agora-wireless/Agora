@@ -37,6 +37,9 @@ clang-format-11 -i src/encoder/*.h
 clang-format-11 -i src/mac/*.cc
 clang-format-11 -i src/mac/*.h
 
+clang-format-11 -i src/resource_provisioner/*.cc
+clang-format-11 -i src/resource_provisioner/*.h
+
 clang-format-11 -i simulator/*.cc
 clang-format-11 -i simulator/*.h
 clang-format-11 -i simulator/channel_models/*.cc
