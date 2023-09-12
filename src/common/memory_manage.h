@@ -30,6 +30,7 @@ class Table {
   size_t dim2_{0};
   size_t dim1_{0};
   T* data_;
+  Agora_memory::Alignment_t alignment;
 
  public:
   Table() : data_(nullptr) {}
@@ -37,6 +38,7 @@ class Table {
   void Malloc(size_t dim1, size_t dim2, Agora_memory::Alignment_t alignment) {
     this->dim2_ = dim2;
     this->dim1_ = dim1;
+    this->alignment = alignment;
     // RtAssert(((dim1 > 0) && (dim2 == 0)), "Table: Malloc one dimension = 0");
     size_t alloc_size = (this->dim1_ * this->dim2_ * sizeof(T));
     this->data_ = static_cast<T*>(
@@ -62,7 +64,7 @@ class Table {
   // -1.0 and 1.0
   void RandAllocFloat(size_t dim1, size_t dim2,
                       Agora_memory::Alignment_t alignment) {
-    std::default_random_engine generator;
+    std::default_random_engine generator(std::random_device{}());
     std::uniform_real_distribution<float> distribution(-1.0, 1.0);
 
     assert(sizeof(T) >= sizeof(float));
@@ -77,7 +79,7 @@ class Table {
   // between -1.0 and 1.0
   void RandAllocCxFloat(size_t dim1, size_t dim2,
                         Agora_memory::Alignment_t alignment) {
-    std::default_random_engine generator;
+    std::default_random_engine generator(std::random_device{}());
     std::uniform_real_distribution<float> distribution(-1.0, 1.0);
 
     assert(sizeof(T) >= sizeof(std::complex<float>));
@@ -122,6 +124,17 @@ class Table {
       }
     }
     return true;
+  }
+  Agora_memory::Alignment_t get_alignment() { return (this->alignment); }
+  T* get_data_ptr() {return data_; }
+  Table& operator=(Table& other) {
+    if (this == &other) { // Check for self-assignment
+      return *this;
+    }
+    this->Malloc(other.Dim1(), other.Dim2(), other.get_alignment());
+    size_t alloc_size = (this->dim1_ * this->dim2_ * sizeof(T));
+    std::memcpy(this->data_, other.get_data_ptr(), alloc_size);
+    return *this;
   }
 };
 
