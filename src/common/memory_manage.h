@@ -108,6 +108,21 @@ class Table {
 
   size_t Dim1() { return (this->dim1_); }
   size_t Dim2() { return (this->dim2_); }
+
+  // Functions for unit tests (functional/correctness verification)
+  const std::type_info& get_typeid() { return typeid(T); }
+  bool operator==(Table& other) {
+    if (this->dim1_ != other.Dim1()) { return false; }
+    if (this->dim2_ != other.Dim2()) { return false; }
+    if (typeid(T) != other.get_typeid()) { return false; }
+    for (size_t i = 0; i < dim1_; i++) {
+      T* other_vec = other[i];
+      for (size_t j = 0; j < dim2_; j++) {
+        if (data_[i*dim2_+j] != other_vec[j]) { return false; }
+      }
+    }
+    return true;
+  }
 };
 
 template <typename T, typename U>

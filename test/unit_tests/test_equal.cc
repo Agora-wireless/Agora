@@ -10,37 +10,23 @@
 #include "phy_stats.h"
 #include "utils.h"
 
-TEST(TestPhaseShiftCalib, Perf) {
-  auto cfg_ = std::make_unique<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
-  cfg_->GenData();
+// Operator overload for correctness comparison
+bool operator==(const complex_float lhs, const complex_float& rhs)
+{
+  return (lhs.re == rhs.re) && (lhs.im == rhs.im);
+}
 
-  static constexpr size_t kFrameWnd = 3;
+bool operator!=(const complex_float lhs, const complex_float& rhs)
+{
+  return (lhs.re != rhs.re) || (lhs.im != rhs.im);
+}
+
+void equal_org(Config* cfg_,
+               Table<complex_float>& data_buffer_,
+               Table<complex_float>& equal_buffer_,
+               Table<complex_float>& ue_spec_pilot_buffer_) {
+  
   bool kUseSIMDGather = true;
-
-  // ---------------------------------------------------------------------------
-  // Prepare buffers
-  // ---------------------------------------------------------------------------
-
-  // From agora_buffer.h
-  Table<complex_float> data_buffer_;
-  Table<complex_float> equal_buffer_;
-  Table<complex_float> ue_spec_pilot_buffer_;
-
-  // From agora_buffer.cc
-  const size_t task_buffer_symbol_num_ul =
-    cfg_->Frame().NumULSyms() * kFrameWnd;
-  data_buffer_.Malloc(task_buffer_symbol_num_ul,
-                     cfg_->OfdmDataNum() * cfg_->BsAntNum(),
-                     Agora_memory::Alignment_t::kAlign64);
-
-  equal_buffer_.Malloc(task_buffer_symbol_num_ul,
-                       cfg_->OfdmDataNum() * cfg_->SpatialStreamsNum(),
-                       Agora_memory::Alignment_t::kAlign64);
-  ue_spec_pilot_buffer_.Calloc(
-      kFrameWnd,
-      cfg_->Frame().ClientUlPilotSymbols() * cfg_->SpatialStreamsNum(),
-      Agora_memory::Alignment_t::kAlign64);
-
   // ---------------------------------------------------------------------------
   // Class definition of DoDemul
   // ---------------------------------------------------------------------------
@@ -298,6 +284,77 @@ TEST(TestPhaseShiftCalib, Perf) {
       }
     }
   }
+}
+
+TEST(TestPhaseShiftCalib, Perf) {
+  auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
+  cfg_->GenData();
+
+  static constexpr size_t kFrameWnd = 3;
+
+  // ---------------------------------------------------------------------------
+  // Prepare buffers
+  // ---------------------------------------------------------------------------
+
+  // From agora_buffer.h
+  Table<complex_float> data_buffer_;
+  Table<complex_float> equal_buffer_;
+  Table<complex_float> ue_spec_pilot_buffer_;
+
+  // From agora_buffer.cc
+  const size_t task_buffer_symbol_num_ul =
+    cfg_->Frame().NumULSyms() * kFrameWnd;
+  data_buffer_.Malloc(task_buffer_symbol_num_ul,
+                     cfg_->OfdmDataNum() * cfg_->BsAntNum(),
+                     Agora_memory::Alignment_t::kAlign64);
+  equal_buffer_.Malloc(task_buffer_symbol_num_ul,
+                       cfg_->OfdmDataNum() * cfg_->SpatialStreamsNum(),
+                       Agora_memory::Alignment_t::kAlign64);
+  ue_spec_pilot_buffer_.Calloc(
+      kFrameWnd,
+      cfg_->Frame().ClientUlPilotSymbols() * cfg_->SpatialStreamsNum(),
+      Agora_memory::Alignment_t::kAlign64);
+
+  equal_org(cfg_.get(), data_buffer_, equal_buffer_, ue_spec_pilot_buffer_);
+}
+
+TEST(TestPhaseShiftCalib, Correctness) {
+  auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
+  cfg_->GenData();
+
+  static constexpr size_t kFrameWnd = 3;
+
+  // ---------------------------------------------------------------------------
+  // Prepare buffers
+  // ---------------------------------------------------------------------------
+
+  // From agora_buffer.h
+  Table<complex_float> data_buffer_;
+  Table<complex_float> equal_buffer_;
+  Table<complex_float> equal_buffer_test_;
+  Table<complex_float> ue_spec_pilot_buffer_;
+
+  // From agora_buffer.cc
+  const size_t task_buffer_symbol_num_ul =
+    cfg_->Frame().NumULSyms() * kFrameWnd;
+  data_buffer_.Malloc(task_buffer_symbol_num_ul,
+                     cfg_->OfdmDataNum() * cfg_->BsAntNum(),
+                     Agora_memory::Alignment_t::kAlign64);
+  equal_buffer_.Malloc(task_buffer_symbol_num_ul,
+                       cfg_->OfdmDataNum() * cfg_->SpatialStreamsNum(),
+                       Agora_memory::Alignment_t::kAlign64);
+  equal_buffer_test_.Malloc(task_buffer_symbol_num_ul,
+                       cfg_->OfdmDataNum() * cfg_->SpatialStreamsNum(),
+                       Agora_memory::Alignment_t::kAlign64);
+  ue_spec_pilot_buffer_.Calloc(
+      kFrameWnd,
+      cfg_->Frame().ClientUlPilotSymbols() * cfg_->SpatialStreamsNum(),
+      Agora_memory::Alignment_t::kAlign64);
+
+  equal_org(cfg_.get(), data_buffer_, equal_buffer_, ue_spec_pilot_buffer_);
+  equal_org(cfg_.get(), data_buffer_, equal_buffer_test_, ue_spec_pilot_buffer_);
+
+  EXPECT_EQ(equal_buffer_ == equal_buffer_test_, true);
 }
 
 int main(int argc, char** argv) {
