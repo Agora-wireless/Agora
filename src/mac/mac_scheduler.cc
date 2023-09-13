@@ -44,6 +44,13 @@ MacScheduler::~MacScheduler() {
   dl_mcs_buffer_.Free();
 }
 
+void MacScheduler::UpdateCSI( const arma::cx_fmat& mat_in )
+{
+
+  
+
+}
+
 bool MacScheduler::IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id) {
   size_t gp = frame_id % num_groups_;
   return (schedule_buffer_[gp][ue_id + cfg_->UeAntNum() * sc_id] != 0);

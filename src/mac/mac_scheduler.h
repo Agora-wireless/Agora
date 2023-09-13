@@ -19,6 +19,9 @@ class MacScheduler {
   size_t ScheduledUeUlMcs(size_t frame_id, size_t ue_id);
   size_t ScheduledUeDlMcs(size_t frame_id, size_t ue_id);
 
+  //Used for Proportional Fairness Algorithm
+  void UpdateCSI( const arma::cx_fmat& mat_in );
+
  private:
   size_t num_groups_;
   Table<int> schedule_buffer_;

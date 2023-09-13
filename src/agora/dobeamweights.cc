@@ -100,6 +100,10 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
   if (kEnableMatLog) {
     phy_stats_->UpdateUlCsi(frame_id, cur_sc_id, mat_csi);
   }
+
+  //Based on the CSI, Update the MacScheduler
+  mac_sched_->UpdateCSI( mat_csi );
+
   arma::cx_fmat mat_ul_beam(reinterpret_cast<arma::cx_float*>(ul_beam_mem),
                             cfg_->SpatialStreamsNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_beam_tmp;
