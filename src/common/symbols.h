@@ -201,7 +201,7 @@ static constexpr bool kUsePartialTrans = true;
 static constexpr bool kDownlinkHardDemod = false;
 static constexpr bool kUplinkHardDemod = false;
 
-static constexpr bool kExportConstellation = false;
+static constexpr bool kExportConstellation = true;
 static constexpr bool kPrintPhyStats = true;
 #if !defined(TIME_EXCLUSIVE)
 static constexpr bool kCollectPhyStats = true;

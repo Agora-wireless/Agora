@@ -204,7 +204,7 @@ class PtrGrid {
     static_assert(sizeof(T) == 2 * sizeof(float), "T must be complex_float");
     Alloc(ROWS, COLS, n_entries);
 
-    std::default_random_engine generator;
+    std::default_random_engine generator(std::random_device{}());
     std::uniform_real_distribution<float> distribution(-1.0, 1.0);
 
     for (auto& row : mat_) {
