@@ -551,6 +551,45 @@ void equal_fast(Config* cfg_,
   }
 }
 
+// Feasibility test. It can be viewed as the dummy test to avoid the
+// initilization effect. We have verified that the first test can take 30% more
+// processing time (10 ms -> 13 ms). With this init test, 2nd and 3rd perf test
+// work as expected (both 10 ms).
+TEST(TestPhaseShiftCalib, Init) {
+  auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
+  cfg_->GenData();
+
+  static constexpr size_t kFrameWnd = 3;
+
+  // ---------------------------------------------------------------------------
+  // Prepare buffers
+  // ---------------------------------------------------------------------------
+
+  // From agora_buffer.h
+  Table<complex_float> data_buffer_;
+  Table<complex_float> equal_buffer_;
+  Table<complex_float> ue_spec_pilot_buffer_;
+  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrices_;
+
+  // From agora_buffer.cc
+  const size_t task_buffer_symbol_num_ul =
+    cfg_->Frame().NumULSyms() * kFrameWnd;
+  data_buffer_.RandAllocCxFloat(task_buffer_symbol_num_ul,
+                     cfg_->OfdmDataNum() * cfg_->BsAntNum(),
+                     Agora_memory::Alignment_t::kAlign64);
+  equal_buffer_.RandAllocCxFloat(task_buffer_symbol_num_ul,
+                       cfg_->OfdmDataNum() * cfg_->SpatialStreamsNum(),
+                       Agora_memory::Alignment_t::kAlign64);
+  ue_spec_pilot_buffer_.RandAllocCxFloat(
+      kFrameWnd,
+      cfg_->Frame().ClientUlPilotSymbols() * cfg_->SpatialStreamsNum(),
+      Agora_memory::Alignment_t::kAlign64);
+
+  ul_beam_matrices_.RandAllocCxFloat(cfg_->BsAntNum() * cfg_->SpatialStreamsNum());
+
+  equal_org(cfg_.get(), data_buffer_, equal_buffer_, ue_spec_pilot_buffer_ ,ul_beam_matrices_);
+}
+
 TEST(TestPhaseShiftCalib, OrgPerf) {
   auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
   cfg_->GenData();
