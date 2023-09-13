@@ -22,7 +22,8 @@ static constexpr size_t kNumerology = 0;
 FiveGConfig::FiveGConfig(const nlohmann::json& tdd_conf, size_t user_num)
     : valid_ffts_({512, 1024, 1536, 2048}),
       supported_channel_bandwidths_({5, 10, 15, 20}),
-      supported_formats_({0, 1, 2, 3, 4, 27, 28, 34, 39}),
+      /*supported_formats_({0, 1, 2, 3, 4, 27, 28, 34, 39}),*/
+      supported_formats_({0, 1, 2, 10, 19, 40}),
       user_num_(user_num) {
   tdd_conf_ = tdd_conf;
   subcarrier_spacing_ = 15e3 * pow(2, kNumerology);
@@ -51,10 +52,10 @@ FiveGConfig::FiveGConfig(const nlohmann::json& tdd_conf, size_t user_num)
   format_table_.at(13) = "GGGGUUUUUUUUUU";
   format_table_.at(14) = "GGGGGUUUUUUUUU";
   format_table_.at(15) = "GGGGGGUUUUUUUU";
-  format_table_.at(16) = "DGGGGGGGGGGGGGG";
-  format_table_.at(17) = "DDGGGGGGGGGGGGG";
-  format_table_.at(18) = "DDDGGGGGGGGGGGG";
-  format_table_.at(19) = "DGGGGGGGGGGGGGU";
+  format_table_.at(16) = "DGGGGGGGGGGGGG";
+  format_table_.at(17) = "DDGGGGGGGGGGGG";
+  format_table_.at(18) = "DDDGGGGGGGGGGG";
+  format_table_.at(19) = "DGGGGGGGGGGGGU";
   format_table_.at(20) = "DDGGGGGGGGGGGU";
   format_table_.at(21) = "DDDGGGGGGGGGGU";
   format_table_.at(22) = "DGGGGGGGGGGGUU";

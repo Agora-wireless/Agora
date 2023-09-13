@@ -769,8 +769,9 @@ void RadioSoapySdr::ConfigureTddModeBs(bool is_ref_radio) {
   conf["frame_mode"] = "free_running";
   conf["max_frame"] = 0;
   conf["symbol_size"] = cfg_->SampsPerSymbol();
-  conf["beacon_start"] = cfg_->OfdmTxZeroPrefix();
-  conf["beacon_stop"] = cfg_->OfdmTxZeroPrefix() + cfg_->BeaconLen();
+  conf["beacon_start"] = cfg_->OfdmTxZeroPrefix() + cfg_->TddSwitchingGap();
+  conf["beacon_stop"] =
+      cfg_->OfdmTxZeroPrefix() + cfg_->TddSwitchingGap() + cfg_->BeaconLen();
 
   // experimentally good value for dev front-end
   dev_->writeSetting("TX_SW_DELAY", "30");

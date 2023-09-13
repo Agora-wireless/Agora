@@ -65,15 +65,13 @@ PhyUe::PhyUe(Config* config)
 
   ue_pilot_vec_.resize(config_->UeAntNum());
   for (size_t i = 0; i < config_->UeAntNum(); i++) {
-    const size_t pilot_len_samples =
-        config_->SampsPerSymbol() -
-        (config->OfdmTxZeroPostfix() + config->OfdmTxZeroPrefix());
-    auto& ue_pilot_f = ue_pilot_vec_.at(i);
-    ue_pilot_f.resize(pilot_len_samples);
-    ConvertShortToFloat(
-        reinterpret_cast<const short*>(
-            &config_->UeSpecificPilotT()[i][config->OfdmTxZeroPrefix()]),
-        reinterpret_cast<float*>(ue_pilot_f.data()), pilot_len_samples * 2);
+    const size_t pilot_len_samples = config_->OfdmCaNum() - config->CpLen();
+    auto& ue_pilot_t = ue_pilot_vec_.at(i);
+    ue_pilot_t.resize(pilot_len_samples);
+    ConvertShortToFloat(reinterpret_cast<const short*>(
+                            &config_->UeSpecificPilotT()[i][config->CpLen()]),
+                        reinterpret_cast<float*>(ue_pilot_t.data()),
+                        pilot_len_samples * 2);
   }
 
   complete_queue_ = moodycamel::ConcurrentQueue<EventData>(

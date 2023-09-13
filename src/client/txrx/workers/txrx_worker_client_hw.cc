@@ -113,6 +113,8 @@ void TxRxWorkerClientHw::DoTxRx() {
   ///\todo make sure we are "real time"
   AGORA_LOG_INFO("DoTxRx[%zu]: radio %zu established time0 %lld\n", tid_,
                  local_interface + interface_offset_, time0);
+  AGORA_LOG_INFO("DoTxRx[%zu]: Resynchronizing every %zu frames\n", tid_,
+                 frame_sync_period);
 
   size_t rx_frame_id = 0;
   size_t rx_symbol_id = 0;
@@ -628,8 +630,26 @@ void TxRxWorkerClientHw::TxPilot(size_t pilot_radio, size_t frame_id,
       tx_time = time0 + (tx_frame_id * samples_per_frame) +
                 (pilot_symbol_id * samples_per_symbol) -
                 Configuration()->ClTxAdvance().at(pilot_radio);
+      size_t tdd_switching_samps = Configuration()->TddSwitchingGap();
+      std::vector<std::complex<int16_t>> zeros(tdd_switching_samps, 0);
+      std::vector<void*> tx_switching(channels_per_interface_);
+      for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+        tx_switching.at(ch) = zeros.data();
+      }
+      long long tx_switching_time = tx_time - tdd_switching_samps;
+      // todo check there is guard before the first transmit
+      const int tx_switching_status =
+          radio_.RadioTx(pilot_radio, tx_switching.data(), tdd_switching_samps,
+                         Radio::TxFlags::kTxFlagNone, tx_switching_time);
+      if (tx_switching_status < static_cast<int>(tdd_switching_samps)) {
+        AGORA_LOG_ERROR(
+            "TxRxWorkerClientHw[%zu]: RadioTx (Warm-up) status failed with "
+            "code: "
+            "%d For Ue radio %zu for %zu bytes and flags %d\n",
+            tid_, tx_switching_status, pilot_radio, tdd_switching_samps,
+            static_cast<int>(Radio::TxFlags::kTxFlagNone));
+      }
     }
-
     Radio::TxFlags flags_tx = GetTxFlags(pilot_radio, pilot_symbol_id);
     const int tx_status = radio_.RadioTx(pilot_radio, tx_data.data(),
                                          samples_per_symbol, flags_tx, tx_time);
@@ -690,7 +710,7 @@ bool TxRxWorkerClientHw::IsTxSymbolNext(size_t radio_id,
                                         size_t current_symbol) {
   bool tx_symbol_next = false;
 
-  if (current_symbol != Configuration()->Frame().NumTotalSyms()) {
+  if (current_symbol < Configuration()->Frame().NumTotalSyms() - 1) {
     const auto next_symbol = current_symbol + 1;
     const auto next_symbol_type =
         Configuration()->Frame().GetSymbolType(next_symbol);
@@ -741,9 +761,10 @@ void TxRxWorkerClientHw::WaitDetectBeacon(size_t local_interface) {
     const ssize_t sync_index =
         SyncBeacon(local_interface, beacon_detect_window);
     if (sync_index >= 0) {
-      const size_t rx_adjust_samples = sync_index -
-                                       Configuration()->BeaconLen() -
-                                       Configuration()->OfdmTxZeroPrefix();
+      const size_t rx_adjust_samples =
+          sync_index -
+          (Configuration()->BeaconLen() + Configuration()->OfdmTxZeroPrefix() +
+           Configuration()->TddSwitchingGap());
       AGORA_LOG_INFO(
           "TxRxWorkerClientHw [%zu]: Beacon detected for radio %zu, "
           "sync_index: %ld, rx sample offset: %ld, window %zu, samples in "
@@ -785,8 +806,9 @@ long long TxRxWorkerClientHw::EstablishTime0(size_t local_interface) {
               reinterpret_cast<std::complex<int16_t>*>(rx_pkts.at(ch)->data_),
               samples_per_symbol, Configuration()->ClCorrScale().at(tid_));
           if (sync_index >= 0) {
-            adjust_samples = sync_index - Configuration()->BeaconLen() -
-                             Configuration()->OfdmTxZeroPrefix();
+            adjust_samples = sync_index - (Configuration()->BeaconLen() +
+                                           Configuration()->OfdmTxZeroPrefix() +
+                                           Configuration()->TddSwitchingGap());
             AGORA_LOG_INFO(
                 "TxRxWorkerClientHw [%zu]: Initial Sync - ant %zu, frame "
                 "%zu, symbol %zu sync_index: %ld, rx sample offset: %ld time0 "
@@ -816,8 +838,9 @@ bool TxRxWorkerClientHw::DoResync(const std::vector<Packet*>& check_pkts,
       samples_per_symbol, Configuration()->ClCorrScale().at(tid_));
   if (sync_index >= 0) {
     beacon_detected = true;
-    const ssize_t adjust = sync_index - Configuration()->BeaconLen() -
-                           Configuration()->OfdmTxZeroPrefix();
+    const ssize_t adjust = sync_index - (Configuration()->BeaconLen() +
+                                         Configuration()->OfdmTxZeroPrefix() +
+                                         Configuration()->TddSwitchingGap());
     if (std::abs(adjust) > kMaxBeaconAdjust) {
       adjust_samples = 0;
       AGORA_LOG_WARN(
@@ -843,7 +866,8 @@ bool TxRxWorkerClientHw::DoResync(const std::vector<Packet*>& check_pkts,
                 "sync_index: %ld, rx sample offset: %ld\n",
                 tid_, ch, aux_channel_sync,
                 aux_channel_sync - (Configuration()->BeaconLen() +
-                                    Configuration()->OfdmTxZeroPrefix()));
+                                    Configuration()->OfdmTxZeroPrefix() +
+                                    Configuration()->TddSwitchingGap()));
           }
         }
       }

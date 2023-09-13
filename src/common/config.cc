@@ -29,6 +29,8 @@
 
 using json = nlohmann::json;
 
+static constexpr double kTddSwitchingTime = 20e-6;  // in sec
+static constexpr size_t kBeaconTxZeroPostfix = 64;  // arbitrary
 static constexpr size_t kMacAlignmentBytes = 64u;
 static constexpr bool kDebugPrintConfiguration = false;
 static constexpr size_t kMaxSupportedZc = 256;
@@ -318,6 +320,9 @@ Config::Config(std::string jsonfilename)
   RtAssert(ofdm_data_start_ % kSCsPerCacheline == 0,
            "ofdm_data_start must be a multiple of subcarriers per cacheline");
   ofdm_data_stop_ = ofdm_data_start_ + ofdm_data_num_;
+  tdd_switching_gap_ =
+      16 * (static_cast<size_t>(kTddSwitchingTime * rate_ + 15.0) / 16);
+  AGORA_LOG_INFO("TDD Switching: %zu samples.\n", tdd_switching_gap_);
 
   // Build subcarrier map for data ofdm symbols
   ul_symbol_map_.resize(ofdm_data_num_, SubcarrierType::kData);
@@ -335,13 +340,11 @@ Config::Config(std::string jsonfilename)
     } else {
       dl_symbol_map_.at(i) = SubcarrierType::kData;
       dl_symbol_data_id_.at(i) = data_idx++;
-      //data_idx++;
       if (i % ofdm_pilot_spacing_ == 1) {
         control_symbol_map_.at(i) = SubcarrierType::kPTRS;
       } else {
         control_symbol_map_.at(i) = SubcarrierType::kData;
         dl_symbol_ctrl_id_.at(i) = ctrl_idx++;
-        //ctrl_idx++;
       }
     }
   }
@@ -1104,18 +1107,6 @@ void Config::GenPilots() {
       this->gold_cf32_.emplace_back(gold_ifft[0][i], gold_ifft[1][i]);
     }
 
-    std::vector<std::vector<double>> sts_seq =
-        CommsLib::GetSequence(0, CommsLib::kStsSeq);
-    std::vector<std::complex<int16_t>> sts_seq_ci16 =
-        Utils::DoubleToCint16(sts_seq);
-
-    // Populate STS (stsReps repetitions)
-    int sts_reps = 15;
-    for (int i = 0; i < sts_reps; i++) {
-      this->beacon_ci16_.insert(this->beacon_ci16_.end(), sts_seq_ci16.begin(),
-                                sts_seq_ci16.end());
-    }
-
     // Populate gold sequence (two reps, 128 each)
     int gold_reps = 2;
     for (int i = 0; i < gold_reps; i++) {
@@ -1123,29 +1114,56 @@ void Config::GenPilots() {
                                 gold_ifft_ci16.begin(), gold_ifft_ci16.end());
     }
 
-    this->beacon_len_ = this->beacon_ci16_.size();
+    std::vector<std::vector<double>> sts_seq =
+        CommsLib::GetSequence(0, CommsLib::kStsSeq);
+    std::vector<std::complex<int16_t>> sts_seq_ci16 =
+        Utils::DoubleToCint16(sts_seq);
 
+    auto beacon_sym_size = beacon_ci16_.size() + ofdm_tx_zero_prefix_ +
+                           tdd_switching_gap_ + kBeaconTxZeroPostfix;
+    int sts_reps = (samps_per_symbol_ - beacon_sym_size) / sts_seq_ci16.size();
     if (this->samps_per_symbol_ <
-        (this->beacon_len_ + this->ofdm_tx_zero_prefix_ +
-         this->ofdm_tx_zero_postfix_)) {
-      std::string msg = "Minimum supported symbol_size is ";
-      msg += std::to_string(this->beacon_len_);
+        (beacon_sym_size + sts_reps * sts_seq_ci16.size())) {
+      std::string msg = "Beacon content does not fit into one symbol size ";
+      msg += std::to_string(samps_per_symbol_);
       throw std::invalid_argument(msg);
+    } else {
+      AGORA_LOG_INFO(
+          "Forming the beacon symbol with %zu reps of STS and 2 reps of gold "
+          "code.\n",
+          sts_reps);
     }
+
+    // Populate STS (stsReps repetitions)
+    for (int i = 0; i < sts_reps; i++) {
+      this->beacon_ci16_.insert(this->beacon_ci16_.begin(),
+                                sts_seq_ci16.begin(), sts_seq_ci16.end());
+    }
+
+    this->beacon_len_ = this->beacon_ci16_.size();
 
     this->beacon_ = Utils::Cint16ToUint32(this->beacon_ci16_, false, "QI");
     this->coeffs_ = Utils::Cint16ToUint32(gold_ifft_ci16, true, "QI");
 
     // Add addition padding for beacon sent from host
-    int frac_beacon = this->samps_per_symbol_ % this->beacon_len_;
-    std::vector<std::complex<int16_t>> pre_beacon(this->ofdm_tx_zero_prefix_,
-                                                  0);
-    std::vector<std::complex<int16_t>> post_beacon(
-        this->ofdm_tx_zero_postfix_ + frac_beacon, 0);
+    std::vector<std::complex<int16_t>> pre_beacon(
+        this->ofdm_tx_zero_prefix_ + tdd_switching_gap_, 0);
     this->beacon_ci16_.insert(this->beacon_ci16_.begin(), pre_beacon.begin(),
                               pre_beacon.end());
+
+    int post_pad = samps_per_symbol_ - this->beacon_ci16_.size();
+    std::vector<std::complex<int16_t>> post_beacon(post_pad, 0);
     this->beacon_ci16_.insert(this->beacon_ci16_.end(), post_beacon.begin(),
                               post_beacon.end());
+
+    if (kDebugPrintPilot) {
+      std::cout << "beacon_slot = [";
+      for (size_t i = 0; i < beacon_ci16_.size(); i++) {
+        std::cout << beacon_ci16_.at(i).real() << "+"
+                  << beacon_ci16_.at(i).imag() << "i ";
+      }
+      std::cout << "];" << std::endl;
+    }
   }
 
   // Generate common pilots based on Zadoff-Chu sequence for channel estimation
@@ -1565,10 +1583,8 @@ void Config::LoadTestVectors() {
   if (pilot_ifft_ != nullptr) {
     FreeBuffer1d(&pilot_ifft_);
   }
-  //delete[](ul_temp_parity_buffer);
   ul_iq_ifft.Free();
   dl_iq_ifft.Free();
-  //ul_encoded_bits.Free();
 }
 
 Config::~Config() {

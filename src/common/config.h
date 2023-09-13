@@ -211,6 +211,7 @@ class Config {
     return this->freq_orthogonal_pilot_;
   }
   inline size_t PilotScGroupSize() const { return this->pilot_sc_group_size_; }
+  inline size_t TddSwitchingGap() const { return this->tdd_switching_gap_; }
   inline size_t OfdmTxZeroPrefix() const { return this->ofdm_tx_zero_prefix_; }
   inline size_t OfdmTxZeroPostfix() const {
     return this->ofdm_tx_zero_postfix_;
@@ -809,6 +810,8 @@ class Config {
 
   // Frequency orthogonal pilot subcarrier group size
   size_t pilot_sc_group_size_;
+
+  size_t tdd_switching_gap_;
 
   // The number of zero IQ samples prepended to a time-domain symbol (i.e.,
   // before the cyclic prefix) before transmission. Its value depends on

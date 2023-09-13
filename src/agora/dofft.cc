@@ -133,21 +133,24 @@ EventData DoFFT::Launch(size_t tag) {
                               2 * cfg_->SampsPerSymbol());
       std::vector<std::complex<float>> samples_vec(
           rx_samps_tmp_, rx_samps_tmp_ + cfg_->SampsPerSymbol());
+      std::vector<std::complex<float>> tx_seq(
+          cfg_->PilotCf32().begin() + cfg_->CpLen(),
+          cfg_->PilotCf32().end() - cfg_->CpLen());
       std::vector<std::complex<float>> pilot_corr =
-          CommsLib::CorrelateAvx(samples_vec, cfg_->PilotCf32());
+          CommsLib::CorrelateAvx(samples_vec, tx_seq);
       std::vector<float> pilot_corr_abs = CommsLib::Abs2Avx(pilot_corr);
       size_t peak_offset =
           std::max_element(pilot_corr_abs.begin(), pilot_corr_abs.end()) -
           pilot_corr_abs.begin();
       float peak = pilot_corr_abs[peak_offset];
-      size_t seq_len = cfg_->PilotCf32().size();
+      size_t seq_len = tx_seq.size();
       size_t sig_offset = peak_offset < seq_len ? 0 : peak_offset - seq_len;
       printf(
           "In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu, "
           "sig_offset %zu, peak %2.4f\n",
           tid_, frame_id, symbol_id, ant_id, sig_offset, peak);
     }
-    if (kPrintInputPilot) {
+    if (kPrintInputPilot && sym_type == SymbolType::kPilot) {
       std::stringstream ss;
       ss << "FFT_input_" << symbol_id << "_" << ant_id << "=[";
       for (size_t i = 0; i < cfg_->SampsPerSymbol(); i++) {
