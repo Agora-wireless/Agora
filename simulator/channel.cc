@@ -24,12 +24,6 @@ Channel::Channel(const Config* const config, std::string& in_channel_type,
   
   float snr_lin = std::pow(10, channel_snr_db_ / 10.0f);
 
-  if( cfg_->FreqDomainChannel() )
-  {
-    //Adapt the SNR to the signal scale, when FFTs are bypassed, the signal is downscaled by OfdmCaNum.
-    snr_lin = snr_lin * cfg_->OfdmCaNum()  / cfg_->UeAntNum();
-  }
-
   noise_samp_std_ = std::sqrt(kMeanChannelGain / (snr_lin * 2.0f));
 
   std::cout << "Noise level to be used is: " << std::fixed << std::setw(5)
