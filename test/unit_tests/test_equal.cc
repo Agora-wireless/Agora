@@ -296,6 +296,7 @@ void equal_fast(Config* cfg_,
                 PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_) {
   
   bool kUseSIMDGather = true;
+
   // ---------------------------------------------------------------------------
   // Class definition of DoDemul
   // ---------------------------------------------------------------------------
@@ -326,7 +327,8 @@ void equal_fast(Config* cfg_,
   data_gather_buffer_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::kAlign64,
-          kSCsPerCacheline * kMaxAntennas * sizeof(complex_float)));
+          kSCsPerCacheline * cfg_->BsAntNum() * sizeof(complex_float)));
+  printf("data_gether_buffer_ = %ld x %ld\n", kSCsPerCacheline, cfg_->BsAntNum());
   equaled_buffer_temp_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::kAlign64,
@@ -390,91 +392,18 @@ void equal_fast(Config* cfg_,
     // Step 1: Populate data_gather_buffer as a row-major matrix with
     // kSCsPerCacheline rows and BsAntNum() columns
 
-    // Since kSCsPerCacheline divides demul_block_size and
-    // kTransposeBlockSize, all subcarriers (base_sc_id + i) lie in the
-    // same partial transpose block.
-    const size_t partial_transpose_block_base =
-        ((base_sc_id + i) / kTransposeBlockSize) *
-        (kTransposeBlockSize * cfg_->BsAntNum());
-
-#ifdef __AVX512F__
-    static constexpr size_t kAntNumPerSimd = 8;
-#else
-    static constexpr size_t kAntNumPerSimd = 4;
-#endif
-
-    size_t ant_start = 0;
-    if (kUseSIMDGather && kUsePartialTrans &&
-        (cfg_->BsAntNum() % kAntNumPerSimd) == 0) {
-      // Gather data for all antennas and 8 subcarriers in the same cache
-      // line, 1 subcarrier and 4 (AVX2) or 8 (AVX512) ants per iteration
-      size_t cur_sc_offset =
-          partial_transpose_block_base + (base_sc_id + i) % kTransposeBlockSize;
-      const float* src =
-          reinterpret_cast<const float*>(&data_buf[cur_sc_offset]);
-      float* dst = reinterpret_cast<float*>(data_gather_buffer_);
-#ifdef __AVX512F__
-      __m512i index = _mm512_setr_epi32(
-          0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
-          kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
-          kTransposeBlockSize * 6, kTransposeBlockSize * 6 + 1,
-          kTransposeBlockSize * 8, kTransposeBlockSize * 8 + 1,
-          kTransposeBlockSize * 10, kTransposeBlockSize * 10 + 1,
-          kTransposeBlockSize * 12, kTransposeBlockSize * 12 + 1,
-          kTransposeBlockSize * 14, kTransposeBlockSize * 14 + 1);
-      for (size_t ant_i = 0; ant_i < cfg_->BsAntNum();
-           ant_i += kAntNumPerSimd) {
-        for (size_t j = 0; j < kSCsPerCacheline; j++) {
-          __m512 data_rx = kTransposeBlockSize == 1
-                               ? _mm512_load_ps(&src[j * cfg_->BsAntNum() * 2])
-                               : _mm512_i32gather_ps(index, &src[j * 2], 4);
-
-          assert((reinterpret_cast<intptr_t>(&dst[j * cfg_->BsAntNum() * 2]) %
-                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
-          assert((reinterpret_cast<intptr_t>(&src[j * cfg_->BsAntNum() * 2]) %
-                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
-          _mm512_store_ps(&dst[j * cfg_->BsAntNum() * 2], data_rx);
-        }
-        src += kAntNumPerSimd * kTransposeBlockSize * 2;
-        dst += kAntNumPerSimd * 2;
-      }
-#else
-      __m256i index = _mm256_setr_epi32(
-          0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
-          kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
-          kTransposeBlockSize * 6, kTransposeBlockSize * 6 + 1);
-      for (size_t ant_i = 0; ant_i < cfg_->BsAntNum();
-           ant_i += kAntNumPerSimd) {
-        for (size_t j = 0; j < kSCsPerCacheline; j++) {
-          assert((reinterpret_cast<intptr_t>(&dst[j * cfg_->BsAntNum() * 2]) %
-                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
-          __m256 data_rx = _mm256_i32gather_ps(&src[j * 2], index, 4);
-          _mm256_store_ps(&dst[j * cfg_->BsAntNum() * 2], data_rx);
-        }
-        src += kAntNumPerSimd * kTransposeBlockSize * 2;
-        dst += kAntNumPerSimd * 2;
-      }
-#endif
-      // Set the remaining number of antennas for non-SIMD gather
-      ant_start = cfg_->BsAntNum() - (cfg_->BsAntNum() % kAntNumPerSimd);
-    }
-    if (ant_start < cfg_->BsAntNum()) {
-      complex_float* dst = data_gather_buffer_ + ant_start;
-      for (size_t j = 0; j < kSCsPerCacheline; j++) {
-        for (size_t ant_i = ant_start; ant_i < cfg_->BsAntNum(); ant_i++) {
-          *dst++ =
-              kUsePartialTrans
-                  ? data_buf[partial_transpose_block_base +
-                             (ant_i * kTransposeBlockSize) +
-                             ((base_sc_id + i + j) % kTransposeBlockSize)]
-                  : data_buf[ant_i * cfg_->OfdmDataNum() + base_sc_id + i + j];
-        }
+    complex_float* dst = data_gather_buffer_;
+    for (size_t j = 0; j < kSCsPerCacheline; j++) {
+      for (size_t ant_i = 0; ant_i < cfg_->BsAntNum(); ant_i++) {
+        *dst++ = data_buf[ant_i * cfg_->OfdmDataNum() + base_sc_id + i + j];
       }
     }
 
     // Step 2: For each subcarrier, perform equalization by multiplying the
     // subcarrier's data from each antenna with the subcarrier's precoder
     for (size_t j = 0; j < kSCsPerCacheline; j++) {
+      // printf("num_sc_per_cache_line = %ld\n", kSCsPerCacheline);
+      // RtAssert(false);
       const size_t cur_sc_id = base_sc_id + i + j;
 
       arma::cx_float* equal_ptr = nullptr;
@@ -491,6 +420,8 @@ void equal_fast(Config* cfg_,
 
       arma::cx_float* data_ptr = reinterpret_cast<arma::cx_float*>(
           &data_gather_buffer_[j * cfg_->BsAntNum()]);
+      // arma::cx_float* data_ptr = (arma::cx_float*)(&data_buf[cur_sc_id]);
+      // not consider multi-antenna case
       arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
           ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
 
