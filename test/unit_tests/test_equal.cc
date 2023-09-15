@@ -230,16 +230,18 @@ void equal_org(Config* cfg_,
       arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
           ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
 
-#if defined(USE_MKL_JIT)
-      mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_beam_ptr,
-                     (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
-#else
+// #if defined(USE_MKL_JIT)
+//       mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_beam_ptr,
+//                      (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
+// #else
       arma::cx_fmat mat_data(data_ptr, cfg_->BsAntNum(), 1, false);
 
       arma::cx_fmat mat_ul_beam(ul_beam_ptr, cfg_->UeAntNum(), cfg_->BsAntNum(),
                                 false);
       mat_equaled = mat_ul_beam * mat_data;
-#endif
+// #endif
+
+      mat_ul_beam.print("mat_ul_beam");
 
       if (symbol_idx_ul <
           cfg_->Frame().ClientUlPilotSymbols()) {  // Calc new phase shift
@@ -283,11 +285,13 @@ void equal_org(Config* cfg_,
             arma::zeros<arma::cx_fmat>(size(cur_theta));
         mat_phase_correct.set_real(cos(-cur_theta));
         mat_phase_correct.set_imag(sin(-cur_theta));
-        mat_equaled %= mat_phase_correct;
+        // mat_equaled %= mat_phase_correct;
       }
     }
   }
 }
+
+
 
 void equal_fast(Config* cfg_,
                 Table<complex_float>& data_buffer_,
@@ -328,7 +332,7 @@ void equal_fast(Config* cfg_,
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::kAlign64,
           kSCsPerCacheline * cfg_->BsAntNum() * sizeof(complex_float)));
-  printf("data_gether_buffer_ = %ld x %ld\n", kSCsPerCacheline, cfg_->BsAntNum());
+  printf("data_gather_buffer_ = %ld x %ld\n", kSCsPerCacheline, cfg_->BsAntNum());
   equaled_buffer_temp_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::kAlign64,
@@ -386,6 +390,39 @@ void equal_fast(Config* cfg_,
   size_t max_sc_ite =
       std::min(cfg_->DemulBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
   assert(max_sc_ite % kSCsPerCacheline == 0);
+
+
+  arma::cx_float* equal_ptr = nullptr;
+  if (kExportConstellation) {
+    equal_ptr =
+        (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
+                                        [base_sc_id * cfg_->UeAntNum()]);
+  } else {
+    equal_ptr = (arma::cx_float*)(&equaled_buffer_temp_);
+  }
+  arma::cx_fvec vec_equaled(equal_ptr, max_sc_ite, false);
+
+  arma::cx_float* data_ptr = (arma::cx_float*)(&data_buf[base_sc_id]);
+  // not consider multi-antenna case (antena offset is omitted)
+  arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
+      ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(base_sc_id)]);
+
+// #define USE_MKL
+
+#if defined(USE_MKL) // not verified yet.
+  vcMul(max_sc_ite, (MKL_Complex8*)ul_beam_ptr,
+        (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
+#else
+  // assuming cfg->BsAntNum() == 1, reducing a dimension
+  arma::cx_fvec vec_data(data_ptr, max_sc_ite, false);
+  // arma::cx_fvec vec_ul_beam(ul_beam_ptr, max_sc_ite, false);
+  arma::cx_fvec vec_ul_beam(max_sc_ite); // init empty vec
+  for (size_t i = 0; i < max_sc_ite; ++i) {
+    vec_ul_beam.at(i) = ul_beam_ptr[cfg_->GetBeamScId(base_sc_id + i)];
+  }
+  vec_equaled = vec_ul_beam % vec_data;
+#endif
+
   // Iterate through cache lines
   for (size_t i = 0; i < max_sc_ite; ++i) {
 
@@ -405,21 +442,23 @@ void equal_fast(Config* cfg_,
     }
     arma::cx_fmat mat_equaled(equal_ptr, cfg_->UeAntNum(), 1, false);
 
-    arma::cx_float* data_ptr = (arma::cx_float*)(&data_buf[cur_sc_id]);
-    // not consider multi-antenna case
-    arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
-        ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
+//
+//     arma::cx_float* data_ptr = (arma::cx_float*)(&data_buf[cur_sc_id]);
+//     // not consider multi-antenna case (antena offset is omitted)
+//     arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
+//         ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
 
-#if defined(USE_MKL_JIT)
-    mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_beam_ptr,
-                    (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
-#else
-    arma::cx_fmat mat_data(data_ptr, cfg_->BsAntNum(), 1, false);
+// #if defined(USE_MKL_JIT)
+//     mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_beam_ptr,
+//                     (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
+// #else
+//     arma::cx_fmat mat_data(data_ptr, cfg_->BsAntNum(), 1, false);
 
-    arma::cx_fmat mat_ul_beam(ul_beam_ptr, cfg_->UeAntNum(), cfg_->BsAntNum(),
-                              false);
-    mat_equaled = mat_ul_beam * mat_data;
-#endif
+//     arma::cx_fmat mat_ul_beam(ul_beam_ptr, cfg_->UeAntNum(), cfg_->BsAntNum(),
+//                               false);
+//     mat_equaled = mat_ul_beam * mat_data;
+// #endif
+//
 
     if (symbol_idx_ul <
         cfg_->Frame().ClientUlPilotSymbols()) {  // Calc new phase shift
@@ -461,7 +500,7 @@ void equal_fast(Config* cfg_,
           arma::zeros<arma::cx_fmat>(size(cur_theta));
       mat_phase_correct.set_real(cos(-cur_theta));
       mat_phase_correct.set_imag(sin(-cur_theta));
-      mat_equaled %= mat_phase_correct;
+      // mat_equaled %= mat_phase_correct;
     }
   }
 }
