@@ -55,7 +55,7 @@ class DoBeamWeights : public Doer {
   /// mMIMO precoder using this CSI matrix and calibration buffer
   void ComputePrecoder(size_t frame_id, size_t cur_sc_id,
                        const arma::cx_fmat& mat_csi,
-                       const arma::cx_fvec& calib_sc_vec, const float noise,
+                       const arma::cx_fvec& cemvalib_sc_vec, const float noise,
                        complex_float* ul_beam_mem, complex_float* dl_beam_mem);
   void ComputeCalib(size_t frame_id, size_t sc_id, arma::cx_fvec& calib_sc_vec);
   void ComputeBeams(size_t tag);

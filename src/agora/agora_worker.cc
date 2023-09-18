@@ -66,7 +66,7 @@ void AgoraWorker::WorkerThread(int tid) {
   // Downlink workers
   auto compute_ifft = std::make_unique<DoIFFT>(config_, tid, buffer_->GetIfft(),
                                                buffer_->GetDlSocket(), stats_);
-
+  
   auto compute_precode = std::make_unique<DoPrecode>(
       config_, tid, buffer_->GetDlBeamMatrix(), buffer_->GetIfft(),
       buffer_->GetDlModBits(), mac_sched_, stats_);

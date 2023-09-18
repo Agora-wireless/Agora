@@ -37,7 +37,7 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
   if (is_newChan) {
     channel_model_->UpdateModel( kMeanChannelGain );
   }
-
+  
   switch (channel_model_->GetFadingType()) {
     case ChannelModel::kFlat: {
       fmat_h = fmat_src * channel_model_->GetMatrix(is_downlink);

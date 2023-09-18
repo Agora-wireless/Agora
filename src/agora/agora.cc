@@ -473,7 +473,10 @@ void Agora::Start() {
                 this->phy_stats_->RecordBer(frame_id, ue_map);
                 this->phy_stats_->RecordSer(frame_id, ue_map);
               }
+
               this->phy_stats_->ClearEvmBuffer(frame_id);
+
+              this->mac_sched_->UpdateScheduler(frame_id);
 
               // skip Decode when hard demod is enabled
               if (kUplinkHardDemod) {
@@ -883,6 +886,10 @@ void Agora::HandleEventFft(size_t tag) {
           if (kPrintPhyStats == true) {
             this->phy_stats_->PrintUlSnrStats(frame_id);
           }
+
+          std::vector<float> max_snr_per_ue = this->phy_stats_->GetMaxSnrPerUes( frame_id );
+          this->mac_sched_->UpdateSNR( max_snr_per_ue );
+          
           this->phy_stats_->RecordPilotSnr(frame_id);
           if (kEnableMac == true) {
             SendSnrReport(EventType::kSNRReport, frame_id, symbol_id);

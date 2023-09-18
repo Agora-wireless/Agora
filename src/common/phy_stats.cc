@@ -666,3 +666,28 @@ float PhyStats::GetNoise(size_t frame_id, const arma::uvec& ue_list) {
 
   return arma::as_scalar(arma::mean(noise_vec(ue_list)));
 }
+
+std::vector<float> PhyStats::GetMaxSnrPerUes( size_t frame_id ) {
+  std::vector<float> snr_per_ues( config_->UeAntNum() );
+  for (size_t i = 0; i < config_->UeAntNum(); i++) {
+    float max_snr = FLT_MIN;
+    const float* frame_snr =
+        &pilot_snr_[frame_id % kFrameWnd][i * config_->BsAntNum()];
+    for (size_t j = 0; j < config_->BsAntNum(); j++) {
+      const size_t radio_id = j / config_->NumChannels();
+      const size_t cell_id = config_->CellId().at(radio_id);
+      if (config_->ExternalRefNode(cell_id) == true &&
+          radio_id == config_->RefRadio(cell_id)) {
+        continue;
+      }
+      if (frame_snr[j] > max_snr) {
+        max_snr = frame_snr[j];
+      }
+    }
+    if (max_snr == FLT_MIN) {
+      max_snr = -100;
+    }
+    snr_per_ues.at(i) = max_snr;
+  }
+  return snr_per_ues;
+}

@@ -18,15 +18,20 @@ class ProportionalFairness {
   ProportionalFairness( const size_t spatial_streams, const size_t bss_num, const size_t ues_num, size_t ofdm_data_num_ );
   ~ProportionalFairness() = default;
 
-  size_t UpdateScheduler( size_t frame, std::vector<float> csi );
+  size_t UpdateScheduler( size_t frame_id, std::vector<float> ues_capacity );
 
-  //Possible Proportional Fairness actions N_Combination_R
-  size_t actions_num_;
   Table<int> schedule_buffer_;
   Table<size_t> schedule_buffer_index_;
   
+  //Possible Proportional Fairness actions N_Combination_R
+  size_t options_num_;
   //Action index range[0,N_Combination_R]
-  size_t selected_action_;
+  size_t selected_option_;
+
+  void Update( size_t frame_id, arma::cx_fmat csi, std::vector<float> snr_per_ue );
+  
+  //Returns the maximum capacity per ue 
+  std::vector<float> UEsCapacity( arma::cx_fmat csi, std::vector<float> snr_per_ue );
 
  protected:
   //Number of scheduled UEs each frame
@@ -45,18 +50,21 @@ class ProportionalFairness {
   //Matrix of size Frames x UEs, records the UEs max capacity at specific frame
   std::vector<arma::vec> pf_UEs_history_frames_;
 
-  //Vector of size 1 x UEs that records the UE Schedule, 1 = Scheduled, 0 = Non Scheduled
-  arma::vec last_flag_;
-  //Vector of size 1 x UEs that records the sum of UEs max capacity
-
   size_t current_frame = 0;
 
   std::vector<bool> ues_flags_;
   std::vector<float> pf_ues_history;
-  
-  std::vector< std::vector<size_t> > combination_vector;
+
+  //Vector of possible scheduling options
+  std::vector< std::vector<size_t> > options_vector;
   std::vector<size_t> ues_vector;
   std::vector<size_t> combination;
+
+  std::vector<float> snr_per_ue_; 
+  arma::cx_fmat csi_;
+
+  std::vector<float> capacities_per_ue_;
+  arma::cx_fcube channel_covariance_matrices_;
 
   void Schedule( size_t frame, std::vector<float> ues_capacity );
   void UpdatePF( size_t frame, std::vector<float> ues_capacity );

@@ -4,7 +4,13 @@
  */
 #include "mac_scheduler.h"
 
+static constexpr size_t kCSI_SubcarrierIdx = 0;
+
 MacScheduler::MacScheduler(Config* const cfg) : cfg_(cfg) {
+
+  proportional_fairness_ = std::make_unique<ProportionalFairness>( cfg_->SpatialStreamsNum(), 
+  cfg_->BsAntNum(), cfg_->UeAntNum(), cfg_->OfdmDataNum() );
+
   num_groups_ =
       (cfg_->SpatialStreamsNum() == cfg_->UeAntNum()) ? 1 : cfg_->UeAntNum();
   schedule_buffer_.Calloc(num_groups_, cfg_->UeAntNum() * cfg_->OfdmDataNum(),
@@ -44,11 +50,18 @@ MacScheduler::~MacScheduler() {
   dl_mcs_buffer_.Free();
 }
 
-void MacScheduler::UpdateCSI( const arma::cx_fmat& mat_in )
-{
+void MacScheduler::UpdateScheduler( size_t frame_id ) {
+  proportional_fairness_->Update( frame_id , csi_, snr_per_ue_ );  
+}
 
-  
+void MacScheduler::UpdateSNR( std::vector<float> snr_per_ue ) {
+  snr_per_ue_ = snr_per_ue;
+}
 
+void MacScheduler::UpdateCSI( size_t cur_sc_id, const arma::cx_fmat& csi_in ) {
+  if( cur_sc_id == kCSI_SubcarrierIdx ) {
+    csi_ = csi_in;
+  }
 }
 
 bool MacScheduler::IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id) {
