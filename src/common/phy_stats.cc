@@ -668,7 +668,7 @@ float PhyStats::GetNoise(size_t frame_id, const arma::uvec& ue_list) {
 }
 
 std::vector<float> PhyStats::GetMaxSnrPerUes( size_t frame_id ) {
-  std::vector<float> snr_per_ues( config_->UeAntNum() );
+  std::vector<float> max_snr_per_ues( config_->UeAntNum() );
   for (size_t i = 0; i < config_->UeAntNum(); i++) {
     float max_snr = FLT_MIN;
     const float* frame_snr =
@@ -687,7 +687,7 @@ std::vector<float> PhyStats::GetMaxSnrPerUes( size_t frame_id ) {
     if (max_snr == FLT_MIN) {
       max_snr = -100;
     }
-    snr_per_ues.at(i) = max_snr;
+    max_snr_per_ues.at(i) = max_snr;
   }
-  return snr_per_ues;
+  return max_snr_per_ues;
 }
