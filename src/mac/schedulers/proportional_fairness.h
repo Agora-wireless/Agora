@@ -9,29 +9,30 @@
 #include <cstddef>
 #include <memory>
 #include <vector>
-#include "config.h"
 
 #include "armadillo"
+#include "config.h"
 
 class ProportionalFairness {
  public:
-  ProportionalFairness( const size_t spatial_streams, const size_t bss_num, const size_t ues_num, size_t ofdm_data_num_ );
+  ProportionalFairness(const size_t spatial_streams, const size_t bss_num,
+                       const size_t ues_num, size_t ofdm_data_num_);
   ~ProportionalFairness() = default;
 
-  size_t UpdateScheduler( size_t frame_id, std::vector<float> ues_capacity );
+  size_t UpdateScheduler(size_t frame_id, std::vector<float> ues_capacity);
 
   Table<int> schedule_buffer_;
   Table<size_t> schedule_buffer_index_;
-  
-  //Possible Proportional Fairness actions N_Combination_R
-  size_t options_num_;
-  //Action index range[0,N_Combination_R]
-  size_t selected_option_;
 
-  void Update( size_t frame_id, arma::cx_fmat csi, std::vector<float> snr_per_ue );
-  
-  //Returns the maximum capacity per ue 
-  std::vector<float> UEsCapacity( arma::cx_fmat csi, std::vector<float> snr_per_ue );
+  size_t num_groups_;
+  size_t selected_group_;
+
+  void Update(size_t frame_id, arma::cx_fmat csi,
+              std::vector<float> snr_per_ue);
+
+  //Returns the maximum capacity per ue
+  std::vector<float> UEsCapacity(arma::cx_fmat csi,
+                                 std::vector<float> snr_per_ue);
 
  protected:
   //Number of scheduled UEs each frame
@@ -56,21 +57,20 @@ class ProportionalFairness {
   std::vector<float> pf_ues_history;
 
   //Vector of possible scheduling options
-  std::vector< std::vector<size_t> > options_vector;
+  std::vector<std::vector<size_t> > groups_vector;
   std::vector<size_t> ues_vector;
   std::vector<size_t> combination;
 
-  std::vector<float> snr_per_ue_; 
+  std::vector<float> snr_per_ue_;
   arma::cx_fmat csi_;
 
   std::vector<float> capacities_per_ue_;
   arma::cx_fcube channel_covariance_matrices_;
 
-  void Schedule( size_t frame, std::vector<float> ues_capacity );
-  void UpdatePF( size_t frame, std::vector<float> ues_capacity );
+  void Schedule(size_t frame, std::vector<float> ues_capacity);
+  void UpdatePF(size_t frame, std::vector<float> ues_capacity);
 
-  void Combination( int k, int offset);
-  
+  void Combination(int k, int offset);
 };
 
 #endif  //PROPORTIONAL_FAIRNESS_H_

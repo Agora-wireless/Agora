@@ -667,8 +667,8 @@ float PhyStats::GetNoise(size_t frame_id, const arma::uvec& ue_list) {
   return arma::as_scalar(arma::mean(noise_vec(ue_list)));
 }
 
-std::vector<float> PhyStats::GetMaxSnrPerUes( size_t frame_id ) {
-  std::vector<float> snr_per_ues( config_->UeAntNum() );
+std::vector<float> PhyStats::GetMaxSnrPerUes(size_t frame_id) {
+  std::vector<float> snr_per_ues(config_->UeAntNum());
   for (size_t i = 0; i < config_->UeAntNum(); i++) {
     float max_snr = FLT_MIN;
     const float* frame_snr =

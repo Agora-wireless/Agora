@@ -887,9 +887,10 @@ void Agora::HandleEventFft(size_t tag) {
             this->phy_stats_->PrintUlSnrStats(frame_id);
           }
 
-          std::vector<float> max_snr_per_ue = this->phy_stats_->GetMaxSnrPerUes( frame_id );
-          this->mac_sched_->UpdateSNR( max_snr_per_ue );
-          
+          std::vector<float> max_snr_per_ue =
+              this->phy_stats_->GetMaxSnrPerUes(frame_id);
+          this->mac_sched_->UpdateSNR(max_snr_per_ue);
+
           this->phy_stats_->RecordPilotSnr(frame_id);
           if (kEnableMac == true) {
             SendSnrReport(EventType::kSNRReport, frame_id, symbol_id);
