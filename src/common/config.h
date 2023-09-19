@@ -323,8 +323,8 @@ class Config {
   inline uint16_t DpdkNumPorts() const { return this->dpdk_num_ports_; }
   inline uint16_t DpdkPortOffset() const { return this->dpdk_port_offset_; }
 
-  inline const std::string SchedulerType() const { 
-    return this->scheduler_type_; 
+  inline const std::string SchedulerType() const {
+    return this->scheduler_type_;
   }
 
   inline const std::string& DpdkMacAddrs() const {
@@ -1005,6 +1005,5 @@ class Config {
   bool freq_domain_channel_;
 
   std::string scheduler_type_;
-
 };
 #endif /* CONFIG_HPP_ */

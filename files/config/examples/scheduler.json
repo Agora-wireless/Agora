@@ -11,7 +11,7 @@
   "sample_rate" : 1e6,
   "spatial_streams" : 2,
   /*Scheduler Types : "round_robbin" , "proportional_fairness"*/
-  "scheduler_type" : "round_robbin",
+  "scheduler_type" : "proportional_fairness",
   "ue_radio_num": 4,
   "bs_radio_num": 32,
   "symbol_num_perframe": 24,

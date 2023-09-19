@@ -12,25 +12,16 @@
 
 #include "armadillo"
 #include "config.h"
+#include "scheduler_model.h"
 
-class RoundRobbin {
+class RoundRobbin : public SchedulerModel {
  public:
-  RoundRobbin(const size_t spatial_streams, const size_t bss_num,
-                       const size_t ues_num, size_t ofdm_data_num_);
+  RoundRobbin(Config* const cfg);
   ~RoundRobbin() = default;
 
-  arma::uvec GetScheduledUeList(size_t frame_id, size_t sc_id);
-
-  Table<size_t> schedule_buffer_index_;
-  Table<int> schedule_buffer_;
-  
-  size_t selected_group_;
-  size_t num_groups_;
-
- protected: 
-  const size_t spatial_streams_;
-  const size_t bss_num_;
-  const size_t ues_num_;
+  bool IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id) final;
+  arma::uvec ScheduledUeList(size_t frame_id, size_t sc_id) final;
+  arma::uvec ScheduledUeMap(size_t frame_id, size_t sc_id) final;
 };
 
-#endif //ROUND_ROBBIN_H_
+#endif  //ROUND_ROBBIN_H_

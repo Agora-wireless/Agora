@@ -696,7 +696,7 @@ Config::Config(std::string jsonfilename)
   this->UpdateDlMCS(dl_mcs_params_);
   this->DumpMcsInfo();
   this->UpdateCtrlMCS();
-  
+
   freq_domain_channel_ = tdd_conf.value("freq_domain_channel", false);
   scheduler_type_ = tdd_conf.value("scheduler_type", "round_robbin");
 
@@ -1986,8 +1986,7 @@ void Config::Print() const {
               << "UL Bytes per CB: " << ul_num_bytes_per_cb_ << std::endl
               << "DL Bytes per CB: " << dl_num_bytes_per_cb_ << std::endl
               << "Frequency domain channel: " << freq_domain_channel_
-              << "Scheduler type: " << scheduler_type_
-              << std::endl;
+              << "Scheduler type: " << scheduler_type_ << std::endl;
   }
 }
 

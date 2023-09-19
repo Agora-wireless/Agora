@@ -6,14 +6,10 @@
 #define MAC_SCHEDULER_H_
 
 #include "config.h"
-
-#include "round_robbin.h"
-#include "proportional_fairness.h"
+#include "scheduler_model.h"
 
 class MacScheduler {
  public:
-  enum SchedulerType { kRoundRobbin, kProportionalFairness };
-
   explicit MacScheduler(Config* const cfg);
   ~MacScheduler();
 
@@ -30,20 +26,14 @@ class MacScheduler {
   void UpdateScheduler(size_t frame_id);
 
  private:
-  size_t num_groups_;
-  Table<int> schedule_buffer_;
-  Table<size_t> schedule_buffer_index_;
   Table<size_t> ul_mcs_buffer_;
   Table<size_t> dl_mcs_buffer_;
   Config* const cfg_;
 
-  arma::cx_fmat csi_;
   std::vector<float> snr_per_ue_;
-  
-  SchedulerType scheduler_type;
-  std::unique_ptr<ProportionalFairness> proportional_fairness_;
-  std::unique_ptr<RoundRobbin> round_robbin_;
+  arma::cx_fmat csi_;
 
+  std::unique_ptr<SchedulerModel> scheduler_model_;
 };
 
 #endif  // MAC_SCHEDULER_H_

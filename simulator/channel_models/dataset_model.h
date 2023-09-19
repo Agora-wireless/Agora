@@ -19,7 +19,6 @@ class DatasetModel : public ChannelModel {
  private:
   arma::cx_fmat GetMatricesByFrame(hsize_t frame);
   void InstantiateDataset(const std::string& dataset_path);
-
   /*
   * Vector of complex H Matrices x NumFrames
   * Access to H_Matrix using:

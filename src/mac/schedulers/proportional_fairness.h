@@ -12,37 +12,23 @@
 
 #include "armadillo"
 #include "config.h"
+#include "scheduler_model.h"
 
-class ProportionalFairness {
+class ProportionalFairness : public SchedulerModel {
  public:
-  ProportionalFairness(const size_t spatial_streams, const size_t bss_num,
-                       const size_t ues_num, size_t ofdm_data_num_);
+  ProportionalFairness(Config* const cfg);
   ~ProportionalFairness() = default;
 
   size_t UpdateScheduler(size_t frame_id, std::vector<float> ues_capacity);
 
-  Table<int> schedule_buffer_;
-  Table<size_t> schedule_buffer_index_;
-
-  size_t num_groups_;
-  size_t selected_group_;
-
   void Update(size_t frame_id, arma::cx_fmat csi,
-              std::vector<float> snr_per_ue);
+              std::vector<float> snr_per_ue) final;
 
-  //Returns the maximum capacity per ue
-  std::vector<float> UEsCapacity(arma::cx_fmat csi,
-                                 std::vector<float> snr_per_ue);
+  bool IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id) final;
+  arma::uvec ScheduledUeList(size_t frame_id, size_t sc_id) final;
+  arma::uvec ScheduledUeMap(size_t frame_id, size_t sc_id) final;
 
  protected:
-  //Number of scheduled UEs each frame
-  const size_t spatial_streams_;
-  const size_t bss_num_;
-  const size_t ues_num_;
-
-  //Data rate weight, range[0,1]
-  const float lamda_;
-
   arma::vec last_SE_;
 
   //Vector of size 1 x UEs that records the sum of UEs max capacity
@@ -66,6 +52,10 @@ class ProportionalFairness {
 
   std::vector<float> capacities_per_ue_;
   arma::cx_fcube channel_covariance_matrices_;
+
+  //Returns the maximum capacity per ue
+  std::vector<float> UEsCapacity(arma::cx_fmat csi,
+                                 std::vector<float> snr_per_ue);
 
   void Schedule(size_t frame, std::vector<float> ues_capacity);
   void UpdatePF(size_t frame, std::vector<float> ues_capacity);
