@@ -29,7 +29,7 @@ std::unique_ptr<ChannelModel> ChannelModel::CreateChannelModel(
 #endif
   } else {
     AGORA_LOG_WARN(
-        "Invalid channel model (%s) at CHSim, using AWGN Model... \n",
+        "Invalid channel model (%s) at CHSim, assuming AWGN Model... \n",
         channel_type.c_str());
     return std::make_unique<AwgnModel>(config->BsAntNum(), config->UeAntNum(),
                                        config->SampsPerSymbol());

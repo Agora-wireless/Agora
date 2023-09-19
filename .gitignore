@@ -65,4 +65,3 @@ CTestTestfile.cmake
 # ##################
 .vscode
 sftp-config.json
-uncorr_static_512_32_4.hdf5
