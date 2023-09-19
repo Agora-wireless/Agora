@@ -1,0 +1,33 @@
+{
+  "fft_size": 512,
+  "ofdm_data_num": 304,
+  "demul_block_size": 48,
+  "ul_mcs" : {
+    "mcs_index": 10 /*16QAM, 340/1204*/
+  },
+  "dl_mcs" : {
+    "mcs_index": 15 /*16QAM, 616/1024*/
+  },
+  "sample_rate" : 1e6,
+  "spatial_streams" : 2,
+  /*Scheduler Types : "round_robbin" , "proportional_fairness"*/
+  "scheduler_type" : "round_robbin",
+  "ue_radio_num": 4,
+  "bs_radio_num": 32,
+  "symbol_num_perframe": 24,
+  "client_ul_pilot_syms": 2,
+  "ul_data_symbol_start": 17,
+  "ul_symbol_num_perframe": 3,
+  "client_dl_pilot_syms": 2,
+  "dl_data_symbol_start": 21,
+  "dl_symbol_num_perframe": 3,
+  "beacon_position": 0,
+  "bs_server_port": 8100,
+  "bs_rru_port": 8200,
+  "core_offset": 5,
+  "worker_thread_num": 12,
+  "socket_thread_num": 1,
+  "ue_core_offset": 1,
+  "ue_worker_thread_num": 2,
+  "ue_socket_thread_num": 1
+}

@@ -87,7 +87,7 @@ EventData DoIFFTClient::Launch(size_t tag) {
                 sizeof(float) * cfg_->OfdmCaNum() * 2);
   } else {
     CommsLib::FFTShift(reinterpret_cast<complex_float*>(ifft_in_ptr),
-                      ifft_shift_tmp_, cfg_->OfdmCaNum());
+                       ifft_shift_tmp_, cfg_->OfdmCaNum());
     if (kMemcpyBeforeIFFT) {
       std::memcpy(ifft_out_ptr, ifft_in_ptr,
                   sizeof(float) * cfg_->OfdmCaNum() * 2);
