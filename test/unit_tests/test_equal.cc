@@ -497,31 +497,16 @@ void equal_fast(Config* cfg_,
             1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
       }
     }
-    // Iterate through cache lines
-    for (size_t i = 0; i < max_sc_ite; ++i) {
 
-      // Step 2: For each subcarrier, perform equalization by multiplying the
-      // subcarrier's data from each antenna with the subcarrier's precoder
-      const size_t cur_sc_id = base_sc_id + i;
+    // apply previously calc'ed phase shift to data
+    if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
+      // arma::fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
+      // arma::cx_fmat mat_phase_correct = arma::cx_fmat(cos(-cur_theta), sin(-cur_theta));
+      // arma::cx_fvec vec_phase_correct = arma::cx_fvec(max_sc_ite, arma::fill::value(as_scalar(mat_phase_correct)));
 
-      arma::cx_float* equal_ptr = nullptr;
-      if (kExportConstellation) {
-        equal_ptr =
-            (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                            [cur_sc_id * cfg_->UeAntNum()]);
-      } else {
-        equal_ptr =
-            (arma::cx_float*)(&equaled_buffer_temp_[(cur_sc_id - base_sc_id) *
-                                                    cfg_->UeAntNum()]);
-      }
-      arma::cx_fmat mat_equaled(equal_ptr, cfg_->UeAntNum(), 1, false);
-
-      // apply previously calc'ed phase shift to data
-      if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
-        arma::fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
-        arma::cx_fmat mat_phase_correct = arma::cx_fmat(cos(-cur_theta), sin(-cur_theta));
-        mat_equaled %= mat_phase_correct;
-      }
+      float cur_theta_f = as_scalar(theta_mat.col(0) + (symbol_idx_ul * theta_inc));
+      arma::cx_fvec vec_phase_correct = arma::cx_fvec(max_sc_ite, arma::fill::value(arma::cx_float(cos(-cur_theta_f), sin(-cur_theta_f))));
+      vec_equaled %= vec_phase_correct;
     }
   }
 }
