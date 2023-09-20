@@ -425,27 +425,27 @@ void equal_fast(Config* cfg_,
 
   // Step 2: Phase shift calibration
 
-  // Iterate through cache lines
-  for (size_t i = 0; i < max_sc_ite; ++i) {
+  // Enable phase shift calibration
+  if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
+    // Iterate through cache lines
+    for (size_t i = 0; i < max_sc_ite; ++i) {
 
-    // Step 2: For each subcarrier, perform equalization by multiplying the
-    // subcarrier's data from each antenna with the subcarrier's precoder
-    const size_t cur_sc_id = base_sc_id + i;
+      // Step 2: For each subcarrier, perform equalization by multiplying the
+      // subcarrier's data from each antenna with the subcarrier's precoder
+      const size_t cur_sc_id = base_sc_id + i;
 
-    arma::cx_float* equal_ptr = nullptr;
-    if (kExportConstellation) {
-      equal_ptr =
-          (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                          [cur_sc_id * cfg_->UeAntNum()]);
-    } else {
-      equal_ptr =
-          (arma::cx_float*)(&equaled_buffer_temp_[(cur_sc_id - base_sc_id) *
-                                                  cfg_->UeAntNum()]);
-    }
-    arma::cx_fmat mat_equaled(equal_ptr, cfg_->UeAntNum(), 1, false);
+      arma::cx_float* equal_ptr = nullptr;
+      if (kExportConstellation) {
+        equal_ptr =
+            (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
+                                            [cur_sc_id * cfg_->UeAntNum()]);
+      } else {
+        equal_ptr =
+            (arma::cx_float*)(&equaled_buffer_temp_[(cur_sc_id - base_sc_id) *
+                                                    cfg_->UeAntNum()]);
+      }
+      arma::cx_fmat mat_equaled(equal_ptr, cfg_->UeAntNum(), 1, false);
 
-    // Enable phase shift calibration
-    if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
       // Calc new phase shift
       if (symbol_idx_ul < cfg_->Frame().ClientUlPilotSymbols()) {  
         if (symbol_idx_ul == 0 && cur_sc_id == 0) {
@@ -466,6 +466,25 @@ void equal_fast(Config* cfg_,
             sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
         mat_phase_shift += shift_sc;
       }
+    }
+    // Iterate through cache lines
+    for (size_t i = 0; i < max_sc_ite; ++i) {
+
+      // Step 2: For each subcarrier, perform equalization by multiplying the
+      // subcarrier's data from each antenna with the subcarrier's precoder
+      const size_t cur_sc_id = base_sc_id + i;
+
+      arma::cx_float* equal_ptr = nullptr;
+      if (kExportConstellation) {
+        equal_ptr =
+            (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
+                                            [cur_sc_id * cfg_->UeAntNum()]);
+      } else {
+        equal_ptr =
+            (arma::cx_float*)(&equaled_buffer_temp_[(cur_sc_id - base_sc_id) *
+                                                    cfg_->UeAntNum()]);
+      }
+      arma::cx_fmat mat_equaled(equal_ptr, cfg_->UeAntNum(), 1, false);
       if (symbol_idx_ul == cfg_->Frame().ClientUlPilotSymbols() && cur_sc_id == 0) { 
         arma::cx_float* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
             ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
@@ -477,6 +496,25 @@ void equal_fast(Config* cfg_,
         theta_inc /= (float)std::max(
             1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
       }
+    }
+    // Iterate through cache lines
+    for (size_t i = 0; i < max_sc_ite; ++i) {
+
+      // Step 2: For each subcarrier, perform equalization by multiplying the
+      // subcarrier's data from each antenna with the subcarrier's precoder
+      const size_t cur_sc_id = base_sc_id + i;
+
+      arma::cx_float* equal_ptr = nullptr;
+      if (kExportConstellation) {
+        equal_ptr =
+            (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
+                                            [cur_sc_id * cfg_->UeAntNum()]);
+      } else {
+        equal_ptr =
+            (arma::cx_float*)(&equaled_buffer_temp_[(cur_sc_id - base_sc_id) *
+                                                    cfg_->UeAntNum()]);
+      }
+      arma::cx_fmat mat_equaled(equal_ptr, cfg_->UeAntNum(), 1, false);
 
       // apply previously calc'ed phase shift to data
       if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
