@@ -348,6 +348,7 @@ void equal_fast(Config* cfg_,
       reinterpret_cast<arma::cx_float*>(cfg_->UeSpecificPilot()[0]);
   arma::cx_fmat mat_pilot_data(ue_pilot_ptr, cfg_->OfdmDataNum(),
                                cfg_->UeAntNum(), false);
+  arma::cx_fvec vec_pilot_data(ue_pilot_ptr, cfg_->OfdmDataNum(), false);
   ue_pilot_data_ = mat_pilot_data.st();
 
 #if defined(USE_MKL_JIT)
@@ -440,25 +441,17 @@ void equal_fast(Config* cfg_,
       mat_phase_shift.fill(0);
     }
 
-    // Iterate through cache lines
-    for (size_t i = 0; i < max_sc_ite; ++i) {
+    // Calc new phase shift
+    if (symbol_idx_ul < cfg_->Frame().ClientUlPilotSymbols()) {
+      arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
+        &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
+                              [symbol_idx_ul * cfg_->UeAntNum()]);
+      arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(), 1,
+                                false);
+      arma::cx_fvec vec_ue_pilot_data_ = vec_pilot_data.subvec(base_sc_id, base_sc_id+max_sc_ite-1);
 
-      // Step 2: For each subcarrier, perform equalization by multiplying the
-      // subcarrier's data from each antenna with the subcarrier's precoder
-      const size_t cur_sc_id = base_sc_id + i;
-
-      // Calc new phase shift
-      if (symbol_idx_ul < cfg_->Frame().ClientUlPilotSymbols()) {
-        arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
-            &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
-                                  [symbol_idx_ul * cfg_->UeAntNum()]);
-        arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(), 1,
-                                      false);
-        arma::cx_float shift_sc =
-            arma::sign(vec_equaled(i) * as_scalar(conj(ue_pilot_data_.col(cur_sc_id))));
-        mat_phase_shift += arma::cx_fmat(1, 1, arma::fill::value(shift_sc));
-        mat_phase_shift.print("mat_phase_shift");
-      }
+      mat_phase_shift += sum(sign(vec_equaled % conj(vec_ue_pilot_data_)));
+      mat_phase_shift.print("mat_phase_shift");
     }
 
     // Calculate the unit phase shift based on the first subcarrier
