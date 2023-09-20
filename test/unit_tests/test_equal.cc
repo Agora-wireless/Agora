@@ -22,7 +22,12 @@ bool operator==(const complex_float lhs, const complex_float& rhs)
 
 bool operator!=(const complex_float lhs, const complex_float& rhs)
 {
-  return (lhs.re != rhs.re) || (lhs.im != rhs.im);
+  // return (lhs.re != rhs.re) || (lhs.im != rhs.im);
+
+  // approx_eq, enable this if you would like to compare between armadillo & MKL
+  float threshold = 0.0001;
+  return (fabs(lhs.re - rhs.re) > threshold) ||
+         (fabs(lhs.im - rhs.im) > threshold);
 }
 
 void equal_org(Config* cfg_,
@@ -230,18 +235,16 @@ void equal_org(Config* cfg_,
       arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
           ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
 
-// #if defined(USE_MKL_JIT)
-//       mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_beam_ptr,
-//                      (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
-// #else
+#if defined(USE_MKL_JIT)
+      mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_beam_ptr,
+                     (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
+#else
       arma::cx_fmat mat_data(data_ptr, cfg_->BsAntNum(), 1, false);
 
       arma::cx_fmat mat_ul_beam(ul_beam_ptr, cfg_->UeAntNum(), cfg_->BsAntNum(),
                                 false);
       mat_equaled = mat_ul_beam * mat_data;
-// #endif
-
-      mat_ul_beam.print("mat_ul_beam");
+#endif
 
       if (symbol_idx_ul <
           cfg_->Frame().ClientUlPilotSymbols()) {  // Calc new phase shift
@@ -290,8 +293,6 @@ void equal_org(Config* cfg_,
     }
   }
 }
-
-
 
 void equal_fast(Config* cfg_,
                 Table<complex_float>& data_buffer_,
@@ -408,7 +409,7 @@ void equal_fast(Config* cfg_,
       ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(base_sc_id)]);
 
 // #define USE_MKL
-
+// #if defined(USE_MKL_JIT)
 #if defined(USE_MKL) // not verified yet.
   vcMul(max_sc_ite, (MKL_Complex8*)ul_beam_ptr,
         (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
