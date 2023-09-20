@@ -108,7 +108,7 @@ void equal_org(Config* cfg_,
   // ---------------------------------------------------------------------------
 
   const size_t frame_id = 0;
-  const size_t symbol_id = 3;
+  const size_t symbol_id = 2;
   const size_t base_sc_id = 0; // we put 0 for now
 
   // ---------------------------------------------------------------------------
@@ -265,6 +265,7 @@ void equal_org(Config* cfg_,
         arma::cx_fmat shift_sc =
             sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
         mat_phase_shift += shift_sc;
+        mat_phase_shift.print("mat_phase_shift");
       }
       // apply previously calc'ed phase shift to data
       else if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
@@ -373,7 +374,7 @@ void equal_fast(Config* cfg_,
   // ---------------------------------------------------------------------------
 
   const size_t frame_id = 0;
-  const size_t symbol_id = 3;
+  const size_t symbol_id = 2;
   const size_t base_sc_id = 0; // we put 0 for now
 
   // ---------------------------------------------------------------------------
@@ -426,6 +427,19 @@ void equal_fast(Config* cfg_,
 
   // Enable phase shift calibration
   if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
+
+    // TODO: Need to verify the correctness after plugging back to DoDemul since
+    //       the condition is across symbols.
+    if (symbol_idx_ul == 0) {
+      // Reset previous frame
+      arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
+          ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
+      arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(),
+                                    cfg_->Frame().ClientUlPilotSymbols(),
+                                    false);
+      mat_phase_shift.fill(0);
+    }
+
     // Iterate through cache lines
     for (size_t i = 0; i < max_sc_ite; ++i) {
 
@@ -433,37 +447,17 @@ void equal_fast(Config* cfg_,
       // subcarrier's data from each antenna with the subcarrier's precoder
       const size_t cur_sc_id = base_sc_id + i;
 
-      arma::cx_float* equal_ptr = nullptr;
-      if (kExportConstellation) {
-        equal_ptr =
-            (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                            [cur_sc_id * cfg_->UeAntNum()]);
-      } else {
-        equal_ptr =
-            (arma::cx_float*)(&equaled_buffer_temp_[(cur_sc_id - base_sc_id) *
-                                                    cfg_->UeAntNum()]);
-      }
-      arma::cx_fmat mat_equaled(equal_ptr, cfg_->UeAntNum(), 1, false);
-
       // Calc new phase shift
-      if (symbol_idx_ul < cfg_->Frame().ClientUlPilotSymbols()) {  
-        if (symbol_idx_ul == 0 && cur_sc_id == 0) {
-          // Reset previous frame
-          arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
-              ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
-          arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(),
-                                        cfg_->Frame().ClientUlPilotSymbols(),
-                                        false);
-          mat_phase_shift.fill(0);
-        }
+      if (symbol_idx_ul < cfg_->Frame().ClientUlPilotSymbols()) {
         arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
             &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
                                   [symbol_idx_ul * cfg_->UeAntNum()]);
         arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(), 1,
                                       false);
-        arma::cx_fmat shift_sc =
-            sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
-        mat_phase_shift += shift_sc;
+        arma::cx_float shift_sc =
+            arma::sign(vec_equaled(i) * as_scalar(conj(ue_pilot_data_.col(cur_sc_id))));
+        mat_phase_shift += arma::cx_fmat(1, 1, arma::fill::value(shift_sc));
+        mat_phase_shift.print("mat_phase_shift");
       }
     }
 
@@ -615,6 +609,7 @@ TEST(TestPhaseShiftCalib, Correctness) {
   Table<complex_float> equal_buffer_;
   Table<complex_float> equal_buffer_test_;
   Table<complex_float> ue_spec_pilot_buffer_;
+  Table<complex_float> ue_spec_pilot_buffer_test_;
   // PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrices_(
   //   kFrameWnd, cfg_->OfdmDataNum(), cfg_->BsAntNum() * cfg_->SpatialStreamsNum());
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrices_;
@@ -633,13 +628,14 @@ TEST(TestPhaseShiftCalib, Correctness) {
       kFrameWnd,
       cfg_->Frame().ClientUlPilotSymbols() * cfg_->SpatialStreamsNum(),
       Agora_memory::Alignment_t::kAlign64);
+  ue_spec_pilot_buffer_test_ = ue_spec_pilot_buffer_;
   ul_beam_matrices_.RandAllocCxFloat(cfg_->BsAntNum() * cfg_->SpatialStreamsNum());
 
 
   printf("--------------------------------------------------\n");
   equal_org(cfg_.get(), data_buffer_, equal_buffer_, ue_spec_pilot_buffer_, ul_beam_matrices_);
   printf("--------------------------------------------------\n");
-  equal_fast(cfg_.get(), data_buffer_, equal_buffer_test_, ue_spec_pilot_buffer_, ul_beam_matrices_);
+  equal_fast(cfg_.get(), data_buffer_, equal_buffer_test_, ue_spec_pilot_buffer_test_, ul_beam_matrices_);
   printf("--------------------------------------------------\n");
 
   // Debug for single element. Note the func only process the first 64
