@@ -265,8 +265,6 @@ void equal_org(Config* cfg_,
         arma::cx_fmat shift_sc =
             sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
         mat_phase_shift += shift_sc;
-
-        mat_equaled.print();
       }
       // apply previously calc'ed phase shift to data
       else if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
@@ -283,6 +281,7 @@ void equal_org(Config* cfg_,
         }
         theta_inc /= (float)std::max(
             1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
+        theta_inc.print("theta_inc");
         arma::fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
         arma::cx_fmat mat_phase_correct =
             arma::zeros<arma::cx_fmat>(size(cur_theta));
@@ -317,8 +316,8 @@ void equal_fast(Config* cfg_,
   int ue_num_simd256_;
 
   // For efficient phase shift calibration
-  arma::fmat theta_mat;
-  arma::fmat theta_inc;
+  arma::fvec theta_vec;
+  float theta_inc;
 
 #if defined(USE_MKL_JIT)
   void* jitter_;
@@ -467,44 +466,25 @@ void equal_fast(Config* cfg_,
         mat_phase_shift += shift_sc;
       }
     }
-    // Iterate through cache lines
-    for (size_t i = 0; i < max_sc_ite; ++i) {
 
-      // Step 2: For each subcarrier, perform equalization by multiplying the
-      // subcarrier's data from each antenna with the subcarrier's precoder
-      const size_t cur_sc_id = base_sc_id + i;
-
-      arma::cx_float* equal_ptr = nullptr;
-      if (kExportConstellation) {
-        equal_ptr =
-            (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                            [cur_sc_id * cfg_->UeAntNum()]);
-      } else {
-        equal_ptr =
-            (arma::cx_float*)(&equaled_buffer_temp_[(cur_sc_id - base_sc_id) *
-                                                    cfg_->UeAntNum()]);
-      }
-      arma::cx_fmat mat_equaled(equal_ptr, cfg_->UeAntNum(), 1, false);
-      if (symbol_idx_ul == cfg_->Frame().ClientUlPilotSymbols() && cur_sc_id == 0) { 
-        arma::cx_float* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
-            ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
-        arma::cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeAntNum(),
-                                    cfg_->Frame().ClientUlPilotSymbols(),
-                                    false);
-        theta_mat = arg(pilot_corr_mat);
-        theta_inc = theta_mat.col(cfg_->Frame().ClientUlPilotSymbols()-1) - theta_mat.col(0);
-        theta_inc /= (float)std::max(
-            1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
-      }
+    // Calculate the unit phase shift based on the first subcarrier
+    // Check the special case condition to avoid reading wrong memory location
+    RtAssert(cfg_->UeAntNum() == 1 && cfg_->Frame().ClientUlPilotSymbols() == 2);
+    if (symbol_idx_ul == cfg_->Frame().ClientUlPilotSymbols()) { 
+      arma::cx_float* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
+          ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
+      arma::cx_fvec pilot_corr_vec(pilot_corr_ptr,
+                                   cfg_->Frame().ClientUlPilotSymbols(), false);
+      theta_vec = arg(pilot_corr_vec);
+      theta_inc = theta_vec(cfg_->Frame().ClientUlPilotSymbols()-1) - theta_vec(0);
+      theta_inc /= (float)std::max(
+          1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
+      printf("theta_inc = %f\n", theta_inc);
     }
 
-    // apply previously calc'ed phase shift to data
+    // Apply previously calc'ed phase shift to data
     if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
-      // arma::fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
-      // arma::cx_fmat mat_phase_correct = arma::cx_fmat(cos(-cur_theta), sin(-cur_theta));
-      // arma::cx_fvec vec_phase_correct = arma::cx_fvec(max_sc_ite, arma::fill::value(as_scalar(mat_phase_correct)));
-
-      float cur_theta_f = as_scalar(theta_mat.col(0) + (symbol_idx_ul * theta_inc));
+      float cur_theta_f = theta_vec(0) + (symbol_idx_ul * theta_inc);
       arma::cx_fvec vec_phase_correct = arma::cx_fvec(max_sc_ite, arma::fill::value(arma::cx_float(cos(-cur_theta_f), sin(-cur_theta_f))));
       vec_equaled %= vec_phase_correct;
     }
