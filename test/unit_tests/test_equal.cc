@@ -288,7 +288,7 @@ void equal_org(Config* cfg_,
             arma::zeros<arma::cx_fmat>(size(cur_theta));
         mat_phase_correct.set_real(cos(-cur_theta));
         mat_phase_correct.set_imag(sin(-cur_theta));
-        // mat_equaled %= mat_phase_correct;
+        mat_equaled %= mat_phase_correct;
       }
     }
   }
@@ -392,7 +392,7 @@ void equal_fast(Config* cfg_,
       std::min(cfg_->DemulBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
   assert(max_sc_ite % kSCsPerCacheline == 0);
 
-
+  // Step 1: Equalization
   arma::cx_float* equal_ptr = nullptr;
   if (kExportConstellation) {
     equal_ptr =
@@ -416,13 +416,14 @@ void equal_fast(Config* cfg_,
 #else
   // assuming cfg->BsAntNum() == 1, reducing a dimension
   arma::cx_fvec vec_data(data_ptr, max_sc_ite, false);
-  // arma::cx_fvec vec_ul_beam(ul_beam_ptr, max_sc_ite, false);
   arma::cx_fvec vec_ul_beam(max_sc_ite); // init empty vec
   for (size_t i = 0; i < max_sc_ite; ++i) {
     vec_ul_beam.at(i) = ul_beam_ptr[cfg_->GetBeamScId(base_sc_id + i)];
   }
   vec_equaled = vec_ul_beam % vec_data;
 #endif
+
+  // Step 2: Phase shift calibration
 
   // Iterate through cache lines
   for (size_t i = 0; i < max_sc_ite; ++i) {
@@ -443,65 +444,46 @@ void equal_fast(Config* cfg_,
     }
     arma::cx_fmat mat_equaled(equal_ptr, cfg_->UeAntNum(), 1, false);
 
-//
-//     arma::cx_float* data_ptr = (arma::cx_float*)(&data_buf[cur_sc_id]);
-//     // not consider multi-antenna case (antena offset is omitted)
-//     arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
-//         ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
-
-// #if defined(USE_MKL_JIT)
-//     mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_beam_ptr,
-//                     (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
-// #else
-//     arma::cx_fmat mat_data(data_ptr, cfg_->BsAntNum(), 1, false);
-
-//     arma::cx_fmat mat_ul_beam(ul_beam_ptr, cfg_->UeAntNum(), cfg_->BsAntNum(),
-//                               false);
-//     mat_equaled = mat_ul_beam * mat_data;
-// #endif
-//
-
-    if (symbol_idx_ul <
-        cfg_->Frame().ClientUlPilotSymbols()) {  // Calc new phase shift
-      if (symbol_idx_ul == 0 && cur_sc_id == 0) {
-        // Reset previous frame
+    // Enable phase shift calibration
+    if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
+      // Calc new phase shift
+      if (symbol_idx_ul < cfg_->Frame().ClientUlPilotSymbols()) {  
+        if (symbol_idx_ul == 0 && cur_sc_id == 0) {
+          // Reset previous frame
+          arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
+              ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
+          arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(),
+                                        cfg_->Frame().ClientUlPilotSymbols(),
+                                        false);
+          mat_phase_shift.fill(0);
+        }
         arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
-            ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
-        arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(),
-                                      cfg_->Frame().ClientUlPilotSymbols(),
+            &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
+                                  [symbol_idx_ul * cfg_->UeAntNum()]);
+        arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(), 1,
                                       false);
-        mat_phase_shift.fill(0);
+        arma::cx_fmat shift_sc =
+            sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
+        mat_phase_shift += shift_sc;
       }
-      arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
-          &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
-                                [symbol_idx_ul * cfg_->UeAntNum()]);
-      arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(), 1,
-                                    false);
-      arma::cx_fmat shift_sc =
-          sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
-      mat_phase_shift += shift_sc;
-    }
-    // apply previously calc'ed phase shift to data
-    else if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
-      arma::cx_float* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
-          ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
-      arma::cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeAntNum(),
+      if (symbol_idx_ul == cfg_->Frame().ClientUlPilotSymbols() && cur_sc_id == 0) { 
+        arma::cx_float* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
+            ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
+        arma::cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeAntNum(),
                                     cfg_->Frame().ClientUlPilotSymbols(),
                                     false);
-      arma::fmat theta_mat = arg(pilot_corr_mat);
-      arma::fmat theta_inc = arma::zeros<arma::fmat>(cfg_->UeAntNum(), 1);
-      for (size_t s = 1; s < cfg_->Frame().ClientUlPilotSymbols(); s++) {
-        arma::fmat theta_diff = theta_mat.col(s) - theta_mat.col(s - 1);
-        theta_inc += theta_diff;
+        theta_mat = arg(pilot_corr_mat);
+        theta_inc = theta_mat.col(cfg_->Frame().ClientUlPilotSymbols()-1) - theta_mat.col(0);
+        theta_inc /= (float)std::max(
+            1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
       }
-      theta_inc /= (float)std::max(
-          1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
-      arma::fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
-      arma::cx_fmat mat_phase_correct =
-          arma::zeros<arma::cx_fmat>(size(cur_theta));
-      mat_phase_correct.set_real(cos(-cur_theta));
-      mat_phase_correct.set_imag(sin(-cur_theta));
-      // mat_equaled %= mat_phase_correct;
+
+      // apply previously calc'ed phase shift to data
+      if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
+        arma::fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
+        arma::cx_fmat mat_phase_correct = arma::cx_fmat(cos(-cur_theta), sin(-cur_theta));
+        mat_equaled %= mat_phase_correct;
+      }
     }
   }
 }
