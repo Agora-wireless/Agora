@@ -108,7 +108,7 @@ void equal_org(Config* cfg_,
   // ---------------------------------------------------------------------------
 
   const size_t frame_id = 0;
-  const size_t symbol_id = 2;
+  const size_t symbol_id = 3;
   const size_t base_sc_id = 0; // we put 0 for now
 
   // ---------------------------------------------------------------------------
@@ -375,7 +375,7 @@ void equal_fast(Config* cfg_,
   // ---------------------------------------------------------------------------
 
   const size_t frame_id = 0;
-  const size_t symbol_id = 2;
+  const size_t symbol_id = 3;
   const size_t base_sc_id = 0; // we put 0 for now
 
   // ---------------------------------------------------------------------------
@@ -419,7 +419,7 @@ void equal_fast(Config* cfg_,
   arma::cx_fvec vec_data(data_ptr, max_sc_ite, false);
   arma::cx_fvec vec_ul_beam(max_sc_ite); // init empty vec
   for (size_t i = 0; i < max_sc_ite; ++i) {
-    vec_ul_beam.at(i) = ul_beam_ptr[cfg_->GetBeamScId(base_sc_id + i)];
+    vec_ul_beam(i) = ul_beam_ptr[cfg_->GetBeamScId(base_sc_id + i)];
   }
   vec_equaled = vec_ul_beam % vec_data;
 #endif
@@ -464,16 +464,15 @@ void equal_fast(Config* cfg_,
                                    cfg_->Frame().ClientUlPilotSymbols(), false);
       theta_vec = arg(pilot_corr_vec);
       theta_inc = theta_vec(cfg_->Frame().ClientUlPilotSymbols()-1) - theta_vec(0);
-      theta_inc /= (float)std::max(
-          1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
+      // theta_inc /= (float)std::max(
+      //     1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
       printf("theta_inc = %f\n", theta_inc);
     }
 
     // Apply previously calc'ed phase shift to data
     if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
       float cur_theta_f = theta_vec(0) + (symbol_idx_ul * theta_inc);
-      arma::cx_fvec vec_phase_correct = arma::cx_fvec(max_sc_ite, arma::fill::value(arma::cx_float(cos(-cur_theta_f), sin(-cur_theta_f))));
-      vec_equaled %= vec_phase_correct;
+      vec_equaled *= arma::cx_float(cos(-cur_theta_f), sin(-cur_theta_f));
     }
   }
 }
