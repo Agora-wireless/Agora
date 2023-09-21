@@ -154,6 +154,8 @@ class FrameStats {
         radio_frame.replace(s, 1, "T");
       } else if (c == 'S') {
         radio_frame.replace(s, 1, "T");
+      } else if (c == 'B' && is_ref_radio) {
+        radio_frame.replace(s, 1, "G");
       } else if (c != 'B') {
         radio_frame.replace(s, 1, "G");
       }

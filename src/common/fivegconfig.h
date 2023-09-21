@@ -61,7 +61,8 @@ class FiveGConfig {
                         std::vector<std::string> flex_formats);
   //Puts the beacon and pilot symbols in the first subframe of
   //the frame.
-  std::string FormBeaconSubframe(int format_num, size_t user_num);
+  std::string FormBeaconSubframe(int format_num, size_t user_num,
+                                 bool downlink_en);
 };
 
 #endif /* FIVEGCONFIG_HPP_ */

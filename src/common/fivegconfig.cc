@@ -20,11 +20,11 @@ static constexpr bool kDebug = false;
 static constexpr size_t kNumerology = 0;
 
 FiveGConfig::FiveGConfig(const nlohmann::json& tdd_conf, size_t user_num)
-    : valid_ffts_({512, 1024, 1536, 2048}),
+    : user_num_(user_num),
+      valid_ffts_({512, 1024, 1536, 2048}),
       supported_channel_bandwidths_({5, 10, 15, 20}),
       /*supported_formats_({0, 1, 2, 3, 4, 27, 28, 34, 39}),*/
-      supported_formats_({0, 1, 2, 10, 19, 40}),
-      user_num_(user_num) {
+      supported_formats_({0, 1, 2, 19, 22, 23, 25, 26, 37, 38, 40, 41, 54}) {
   tdd_conf_ = tdd_conf;
   subcarrier_spacing_ = 15e3 * pow(2, kNumerology);
   /*
@@ -196,17 +196,25 @@ std::string FiveGConfig::FiveGFormat() {
  * Effects: Generates a subframe that transmits a beacon symbol and as many
  * pilot symbols as there are users.
 */
-std::string FiveGConfig::FormBeaconSubframe(int format_num, size_t user_num) {
+std::string FiveGConfig::FormBeaconSubframe(int format_num, size_t user_num,
+                                            bool calib_needed) {
   std::string subframe = format_table_.at(format_num);
   size_t pilot_num = 0;
+  size_t first_guard_id = 0;
+  size_t guard_num = 0;
   RtAssert(subframe.at(0) == 'D',
            "First symbol of selected format doesn't start with a downlink "
            "symbol.");
   RtAssert(user_num < 12, "Number of users exceeds pilot symbol limit of 12.");
   //Replace the first symbol with a beacon symbol.
   subframe.replace(0, 1, "B");
+  size_t next_symbol = 1;
+  if (subframe.at(1) == 'D') {
+    subframe.replace(1, 1, "S");
+    next_symbol = 2;
+  }
   //Add in the pilot symbols.
-  for (size_t i = 1; i < subframe.size(); i++) {
+  for (size_t i = next_symbol; i < subframe.size(); i++) {
     // Break once user_num many pilot_nums have been put in the beacon subframe.
     if (pilot_num >= user_num) {
       break;
@@ -214,11 +222,22 @@ std::string FiveGConfig::FormBeaconSubframe(int format_num, size_t user_num) {
     if (subframe.at(i) == 'U') {
       subframe.replace(i, 1, "P");
       pilot_num++;
+    } else if (subframe.at(i) == 'G') {
+      guard_num++;
+      if (subframe.at(i - 1) != 'G') {
+        first_guard_id = i;
+        guard_num = 1;
+      }
     }
   }
   RtAssert(pilot_num == user_num,
            "More users specified than the "
            "chosen slot format can support.");
+  RtAssert(!calib_needed || guard_num > 4,
+           "Too few guard symbols to accomodate calibration symbols!");
+  if (calib_needed) {
+    subframe.replace(first_guard_id, 5, "GCGLG");
+  }
   /*
   If the last symbol of the first slot is a D and this D is not overwritten
   by a pilot and the first symbol of the next slot is a U we might get a DU 
@@ -237,6 +256,7 @@ std::string FiveGConfig::FormFrame(std::string frame_schedule, size_t user_num,
   size_t subframes[kSubframesPerFrame];
   size_t subframe_idx = 0;
   size_t flex_format_idx = 0;
+  bool downlink_en = false;
 
   for (size_t i = 0; i < frame_schedule.size(); i++) {
     RtAssert(subframe_idx < 10,
@@ -244,6 +264,8 @@ std::string FiveGConfig::FormFrame(std::string frame_schedule, size_t user_num,
 
     if (frame_schedule.at(i) == ',') {
       subframes[subframe_idx] = std::stoi(temp);
+      // if there is downlink slot, we need to enable calibration symbols
+      if (subframes[subframe_idx] == 0) downlink_en = true;
       RtAssert(IsSupported(subframes[subframe_idx]),
                "Format " + std::to_string(subframes[subframe_idx]) +
                    " isn't supported.");
@@ -254,12 +276,13 @@ std::string FiveGConfig::FormFrame(std::string frame_schedule, size_t user_num,
     }
     if (i == frame_schedule.size() - 1) {
       subframes[subframe_idx] = std::stoi(temp);
+      if (subframes[subframe_idx] == 0) downlink_en = true;
     }
   }
   RtAssert(subframe_idx == 9,
            "Entered frame_schedule has less than 10 subframes.");
   // Create the frame based on the format nums in the subframe array.
-  frame += FormBeaconSubframe(subframes[0], user_num);
+  frame += FormBeaconSubframe(subframes[0], user_num, downlink_en);
   for (size_t i = 1; i < kSubframesPerFrame; i++) {
     if (subframes[i] == kFlexibleSlotFormatIdx) {
       frame += flex_formats.at(flex_format_idx);
