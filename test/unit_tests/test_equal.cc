@@ -34,7 +34,8 @@ void equal_org(Config* cfg_,
                Table<complex_float>& data_buffer_,
                Table<complex_float>& equal_buffer_,
                Table<complex_float>& ue_spec_pilot_buffer_,
-               PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_) {
+               PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_,
+               size_t frame_id_, size_t symbol_id_, size_t base_sc_id_) {
   
   bool kUseSIMDGather = true;
   // ---------------------------------------------------------------------------
@@ -107,9 +108,9 @@ void equal_org(Config* cfg_,
   // First part of DoDemul: equalization + phase shift calibration
   // ---------------------------------------------------------------------------
 
-  const size_t frame_id = 0;
-  const size_t symbol_id = 3;
-  const size_t base_sc_id = 0; // we put 0 for now
+  size_t frame_id = frame_id_;
+  size_t symbol_id = symbol_id_;
+  size_t base_sc_id = base_sc_id_;
 
   // ---------------------------------------------------------------------------
 
@@ -265,7 +266,7 @@ void equal_org(Config* cfg_,
         arma::cx_fmat shift_sc =
             sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
         mat_phase_shift += shift_sc;
-        mat_phase_shift.print("mat_phase_shift");
+        // mat_phase_shift.print("mat_phase_shift");
       }
       // apply previously calc'ed phase shift to data
       else if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
@@ -282,7 +283,7 @@ void equal_org(Config* cfg_,
         }
         theta_inc /= (float)std::max(
             1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
-        theta_inc.print("theta_inc");
+        // theta_inc.print("theta_inc");
         arma::fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
         arma::cx_fmat mat_phase_correct =
             arma::zeros<arma::cx_fmat>(size(cur_theta));
@@ -294,11 +295,12 @@ void equal_org(Config* cfg_,
   }
 }
 
-void equal_fast(Config* cfg_,
+void equal_vec(Config* cfg_,
                 Table<complex_float>& data_buffer_,
                 Table<complex_float>& equal_buffer_,
                 Table<complex_float>& ue_spec_pilot_buffer_,
-                PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_) {
+                PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_,
+                size_t frame_id_, size_t symbol_id_, size_t base_sc_id_) {
   
   bool kUseSIMDGather = true;
 
@@ -317,7 +319,7 @@ void equal_fast(Config* cfg_,
   int ue_num_simd256_;
 
   // For efficient phase shift calibration
-  arma::fvec theta_vec;
+  static arma::fvec theta_vec;
   float theta_inc;
 
 #if defined(USE_MKL_JIT)
@@ -333,7 +335,7 @@ void equal_fast(Config* cfg_,
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::kAlign64,
           kSCsPerCacheline * cfg_->BsAntNum() * sizeof(complex_float)));
-  printf("data_gather_buffer_ = %ld x %ld\n", kSCsPerCacheline, cfg_->BsAntNum());
+  // printf("data_gather_buffer_ = %ld x %ld\n", kSCsPerCacheline, cfg_->BsAntNum());
   equaled_buffer_temp_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::kAlign64,
@@ -374,9 +376,9 @@ void equal_fast(Config* cfg_,
   // First part of DoDemul: equalization + phase shift calibration
   // ---------------------------------------------------------------------------
 
-  const size_t frame_id = 0;
-  const size_t symbol_id = 3;
-  const size_t base_sc_id = 0; // we put 0 for now
+  size_t frame_id = frame_id_;
+  size_t symbol_id = symbol_id_;
+  size_t base_sc_id = base_sc_id_;
 
   // ---------------------------------------------------------------------------
 
@@ -407,7 +409,7 @@ void equal_fast(Config* cfg_,
   arma::cx_float* data_ptr = (arma::cx_float*)(&data_buf[base_sc_id]);
   // not consider multi-antenna case (antena offset is omitted)
   arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
-      ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(base_sc_id)]);
+      ul_beam_matrices_[frame_slot][0]); // pick the first element
 
 // #define USE_MKL
 // #if defined(USE_MKL_JIT)
@@ -448,10 +450,11 @@ void equal_fast(Config* cfg_,
                               [symbol_idx_ul * cfg_->UeAntNum()]);
       arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(), 1,
                                 false);
+      // printf("base_sc_id = %ld, end = %ld\n", base_sc_id, base_sc_id+max_sc_ite-1);
       arma::cx_fvec vec_ue_pilot_data_ = vec_pilot_data.subvec(base_sc_id, base_sc_id+max_sc_ite-1);
 
-      mat_phase_shift += sum(sign(vec_equaled % conj(vec_ue_pilot_data_)));
-      mat_phase_shift.print("mat_phase_shift");
+      mat_phase_shift += sum(vec_equaled % conj(vec_ue_pilot_data_));
+      // mat_phase_shift.print("mat_phase_shift");
     }
 
     // Calculate the unit phase shift based on the first subcarrier
@@ -466,7 +469,7 @@ void equal_fast(Config* cfg_,
       theta_inc = theta_vec(cfg_->Frame().ClientUlPilotSymbols()-1) - theta_vec(0);
       // theta_inc /= (float)std::max(
       //     1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
-      printf("theta_inc = %f\n", theta_inc);
+      // printf("theta_inc = %f\n", theta_inc);
     }
 
     // Apply previously calc'ed phase shift to data
@@ -477,11 +480,7 @@ void equal_fast(Config* cfg_,
   }
 }
 
-// Feasibility test. It can be viewed as the dummy test to avoid the
-// initilization effect. We have verified that the first test can take 30% more
-// processing time (10 ms -> 13 ms). With this init test, 2nd and 3rd perf test
-// work as expected (both 10 ms).
-TEST(TestPhaseShiftCalib, Init) {
+TEST(TestPhaseShiftCalib, OrgSingle) {
   auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
   cfg_->GenData();
 
@@ -513,10 +512,11 @@ TEST(TestPhaseShiftCalib, Init) {
 
   ul_beam_matrices_.RandAllocCxFloat(cfg_->BsAntNum() * cfg_->SpatialStreamsNum());
 
-  equal_org(cfg_.get(), data_buffer_, equal_buffer_, ue_spec_pilot_buffer_ ,ul_beam_matrices_);
+  equal_org(cfg_.get(), data_buffer_, equal_buffer_,
+            ue_spec_pilot_buffer_, ul_beam_matrices_, 0, 1, 0);
 }
 
-TEST(TestPhaseShiftCalib, OrgPerf) {
+TEST(TestPhaseShiftCalib, OrgLoop) {
   auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
   cfg_->GenData();
 
@@ -548,10 +548,18 @@ TEST(TestPhaseShiftCalib, OrgPerf) {
 
   ul_beam_matrices_.RandAllocCxFloat(cfg_->BsAntNum() * cfg_->SpatialStreamsNum());
 
-  equal_org(cfg_.get(), data_buffer_, equal_buffer_, ue_spec_pilot_buffer_ ,ul_beam_matrices_);
+  for (size_t frame_id = 0; frame_id <= 3; ++frame_id) {
+    for (size_t symbol_id = 1; symbol_id < 17; ++symbol_id) {
+      for (size_t base_sc_id = 0; base_sc_id < cfg_->OfdmDataNum(); base_sc_id += cfg_->DemulBlockSize()) {
+        equal_org(cfg_.get(), data_buffer_, equal_buffer_,
+                  ue_spec_pilot_buffer_, ul_beam_matrices_,
+                  frame_id, symbol_id, base_sc_id);
+      }
+    }
+  }
 }
 
-TEST(TestPhaseShiftCalib, UpdatePerf) {
+TEST(TestPhaseShiftCalib, VecSingle) {
   auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
   cfg_->GenData();
 
@@ -583,10 +591,54 @@ TEST(TestPhaseShiftCalib, UpdatePerf) {
 
   ul_beam_matrices_.RandAllocCxFloat(cfg_->BsAntNum() * cfg_->SpatialStreamsNum());
 
-  equal_fast(cfg_.get(), data_buffer_, equal_buffer_, ue_spec_pilot_buffer_ ,ul_beam_matrices_);
+  equal_vec(cfg_.get(), data_buffer_, equal_buffer_,
+            ue_spec_pilot_buffer_, ul_beam_matrices_, 0, 1, 0);
 }
 
-TEST(TestPhaseShiftCalib, Correctness) {
+TEST(TestPhaseShiftCalib, VecLoop) {
+  auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
+  cfg_->GenData();
+
+  static constexpr size_t kFrameWnd = 3;
+
+  // ---------------------------------------------------------------------------
+  // Prepare buffers
+  // ---------------------------------------------------------------------------
+
+  // From agora_buffer.h
+  Table<complex_float> data_buffer_;
+  Table<complex_float> equal_buffer_;
+  Table<complex_float> ue_spec_pilot_buffer_;
+  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrices_;
+
+  // From agora_buffer.cc
+  const size_t task_buffer_symbol_num_ul =
+    cfg_->Frame().NumULSyms() * kFrameWnd;
+  data_buffer_.RandAllocCxFloat(task_buffer_symbol_num_ul,
+                     cfg_->OfdmDataNum() * cfg_->BsAntNum(),
+                     Agora_memory::Alignment_t::kAlign64);
+  equal_buffer_.RandAllocCxFloat(task_buffer_symbol_num_ul,
+                       cfg_->OfdmDataNum() * cfg_->SpatialStreamsNum(),
+                       Agora_memory::Alignment_t::kAlign64);
+  ue_spec_pilot_buffer_.RandAllocCxFloat(
+      kFrameWnd,
+      cfg_->Frame().ClientUlPilotSymbols() * cfg_->SpatialStreamsNum(),
+      Agora_memory::Alignment_t::kAlign64);
+
+  ul_beam_matrices_.RandAllocCxFloat(cfg_->BsAntNum() * cfg_->SpatialStreamsNum());
+
+  for (size_t frame_id = 0; frame_id <= 3; ++frame_id) {
+    for (size_t symbol_id = 1; symbol_id < 17; ++symbol_id) {
+      for (size_t base_sc_id = 0; base_sc_id < cfg_->OfdmDataNum(); base_sc_id += cfg_->DemulBlockSize()) {
+        equal_vec(cfg_.get(), data_buffer_, equal_buffer_,
+                  ue_spec_pilot_buffer_, ul_beam_matrices_,
+                  frame_id, symbol_id, base_sc_id);
+      }
+    }
+  }
+}
+
+TEST(TestPhaseShiftCalib, CorrectnessSingle) {
   auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
   cfg_->GenData();
 
@@ -623,11 +675,12 @@ TEST(TestPhaseShiftCalib, Correctness) {
   ue_spec_pilot_buffer_test_ = ue_spec_pilot_buffer_;
   ul_beam_matrices_.RandAllocCxFloat(cfg_->BsAntNum() * cfg_->SpatialStreamsNum());
 
-
   printf("--------------------------------------------------\n");
-  equal_org(cfg_.get(), data_buffer_, equal_buffer_, ue_spec_pilot_buffer_, ul_beam_matrices_);
+  equal_org(cfg_.get(), data_buffer_, equal_buffer_,
+            ue_spec_pilot_buffer_, ul_beam_matrices_, 0, 1, 64);
   printf("--------------------------------------------------\n");
-  equal_fast(cfg_.get(), data_buffer_, equal_buffer_test_, ue_spec_pilot_buffer_test_, ul_beam_matrices_);
+  equal_vec(cfg_.get(), data_buffer_, equal_buffer_test_,
+            ue_spec_pilot_buffer_test_, ul_beam_matrices_, 0, 1, 64);
   printf("--------------------------------------------------\n");
 
   // Debug for single element. Note the func only process the first 64
@@ -636,8 +689,8 @@ TEST(TestPhaseShiftCalib, Correctness) {
   //       calculate the phase shift, so the 2nd one is the first to be calibrated.
   // Dim2: determined by demul_block_size (64 by default).
   printf("size of equal_buffer_ = %ld x %ld\n", equal_buffer_.Dim1(), equal_buffer_.Dim2());
-  size_t idx1 = 2;
-  size_t idx2 = 60;
+  size_t idx1 = 0;
+  size_t idx2 = 64;
   printf("Test: equal_buffer_[%ld][%ld].re = %f, .im = %f\n",
     idx1, idx2, equal_buffer_[idx1][idx2].re, equal_buffer_[idx1][idx2].im);
   printf("Test: equal_buffer_test_[%ld][%ld].re = %f, .im = %f\n",
@@ -646,6 +699,76 @@ TEST(TestPhaseShiftCalib, Correctness) {
   // Check if they are the same instance
   EXPECT_FALSE(&equal_buffer_ == &equal_buffer_test_);
   EXPECT_TRUE(equal_buffer_ == equal_buffer_test_);
+}
+
+TEST(TestPhaseShiftCalib, CorrectnessLoop) {
+  auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
+  cfg_->GenData();
+
+  static constexpr size_t kFrameWnd = 3;
+
+  // ---------------------------------------------------------------------------
+  // Prepare buffers
+  // ---------------------------------------------------------------------------
+
+  // From agora_buffer.h
+  Table<complex_float> data_buffer_;
+  Table<complex_float> equal_buffer_;
+  Table<complex_float> equal_buffer_test_;
+  Table<complex_float> ue_spec_pilot_buffer_;
+  Table<complex_float> ue_spec_pilot_buffer_test_;
+  // PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrices_(
+  //   kFrameWnd, cfg_->OfdmDataNum(), cfg_->BsAntNum() * cfg_->SpatialStreamsNum());
+  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrices_;
+
+  // Similar to agora_buffer.cc
+  const size_t task_buffer_symbol_num_ul =
+    cfg_->Frame().NumULSyms() * kFrameWnd;
+  data_buffer_.RandAllocCxFloat(task_buffer_symbol_num_ul,
+                     cfg_->OfdmDataNum() * cfg_->BsAntNum(),
+                     Agora_memory::Alignment_t::kAlign64);
+  equal_buffer_.RandAllocCxFloat(task_buffer_symbol_num_ul,
+                       cfg_->OfdmDataNum() * cfg_->SpatialStreamsNum(),
+                       Agora_memory::Alignment_t::kAlign64);
+  equal_buffer_test_ = equal_buffer_;
+  ue_spec_pilot_buffer_.RandAllocCxFloat(
+      kFrameWnd,
+      cfg_->Frame().ClientUlPilotSymbols() * cfg_->SpatialStreamsNum(),
+      Agora_memory::Alignment_t::kAlign64);
+  ue_spec_pilot_buffer_test_ = ue_spec_pilot_buffer_;
+  ul_beam_matrices_.RandAllocCxFloat(cfg_->BsAntNum() * cfg_->SpatialStreamsNum());
+
+  for (size_t frame_id = 0; frame_id <= 3; ++frame_id) {
+    for (size_t symbol_id = 1; symbol_id < 17; ++symbol_id) {
+      for (size_t base_sc_id = 0; base_sc_id < cfg_->OfdmDataNum(); base_sc_id += cfg_->DemulBlockSize()) {
+        equal_org(cfg_.get(), data_buffer_, equal_buffer_,
+                  ue_spec_pilot_buffer_, ul_beam_matrices_,
+                  frame_id, symbol_id, base_sc_id);
+        equal_vec(cfg_.get(), data_buffer_, equal_buffer_test_,
+                  ue_spec_pilot_buffer_test_, ul_beam_matrices_,
+                  frame_id, symbol_id, base_sc_id);
+
+        // // Debug for single element. Note the func only process the first 64
+        // // subcarriers (dim2) for the first uplink symbol (dim1).
+        // // Dim1: the index of uplink symbols. The 0th and 1st uplink symbol is used to
+        // //       calculate the phase shift, so the 2nd one is the first to be calibrated.
+        // // Dim2: determined by demul_block_size (64 by default).
+        // printf("size of equal_buffer_ = %ld x %ld\n", equal_buffer_.Dim1(), equal_buffer_.Dim2());
+        // size_t idx1 = 2;
+        // size_t idx2 = 60;
+        // printf("Test: equal_buffer_[%ld][%ld].re = %f, .im = %f\n",
+        //   idx1, idx2, equal_buffer_[idx1][idx2].re, equal_buffer_[idx1][idx2].im);
+        // printf("Test: equal_buffer_test_[%ld][%ld].re = %f, .im = %f\n",
+        //   idx1, idx2, equal_buffer_test_[idx1][idx2].re, equal_buffer_test_[idx1][idx2].im);
+
+        // Check if they are the same instance
+        EXPECT_FALSE(&equal_buffer_ == &equal_buffer_test_);
+        ASSERT_TRUE(equal_buffer_ == equal_buffer_test_)
+         << "frame_id = " << frame_id << ", symbol_id = " << symbol_id
+         << ", base_sc_id = " << base_sc_id;
+      }
+    }
+  }
 }
 
 int main(int argc, char** argv) {
