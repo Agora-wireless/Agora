@@ -19,7 +19,7 @@
 static const std::string kMacSendFromAddress = "127.0.0.1";
 static constexpr uint16_t kMacSendFromPort = 0;
 
-//#define USE_UDP_DATA_SOURCE
+#define USE_UDP_DATA_SOURCE
 static constexpr bool kDebugPrintSender = false;
 static constexpr size_t kFrameLoadAdvance = 10;
 static constexpr size_t kBufferInit = 10;
@@ -181,8 +181,8 @@ void MacSender::StartTx() {
   // Run the master thread (from current thread)
   MasterThread(kMasterThreadId);
 
-  delete[](this->frame_start_);
-  delete[](this->frame_end_);
+  delete[] (this->frame_start_);
+  delete[] (this->frame_end_);
 }
 
 void MacSender::StartTxfromMain(double* in_frame_start, double* in_frame_end) {

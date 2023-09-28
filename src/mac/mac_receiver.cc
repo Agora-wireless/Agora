@@ -11,7 +11,7 @@
 #include "udp_client.h"
 #include "udp_server.h"
 
-static const bool kDebugMacReceiver = true;
+static const bool kDebugMacReceiver = false;
 static const std::string kMacRxAddress = "";
 static const std::string kMacTxAddress = "127.0.0.1";
 static constexpr uint16_t kMacTxPort = 0;
