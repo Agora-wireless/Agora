@@ -47,7 +47,8 @@ size_t VideoReceiver::Load(unsigned char *destination, size_t requested_bytes) {
             "[VideoReceiver] Received packet larger than max receive size -- "
             "inspect");
       } else if (rcv_ret > 0) {
-        AGORA_LOG_INFO("[VideoReceiver] data received: %zd\n", rcv_ret);
+        AGORA_LOG_INFO("[VideoReceiver] data received: %zd at port %s\n",
+                       rcv_ret, udp_video_receiver_.Port().c_str());
       }
       data_available_ += rcv_ret;
     }
