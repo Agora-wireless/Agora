@@ -53,8 +53,8 @@ void equal_org(Config* cfg_,
   int ue_num_simd256_;
 
   // For efficient phase shift calibration
-  arma::fmat theta_mat;
-  arma::fmat theta_inc;
+  static arma::fmat theta_mat;
+  static arma::fmat theta_inc;
 
 #if defined(USE_MKL_JIT)
   void* jitter_;
@@ -266,7 +266,6 @@ void equal_org(Config* cfg_,
         arma::cx_fmat shift_sc =
             sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
         mat_phase_shift += shift_sc;
-        // mat_phase_shift.print("mat_phase_shift");
       }
       // apply previously calc'ed phase shift to data
       else if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
@@ -283,7 +282,6 @@ void equal_org(Config* cfg_,
         }
         theta_inc /= (float)std::max(
             1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
-        // theta_inc.print("theta_inc");
         arma::fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
         arma::cx_fmat mat_phase_correct =
             arma::zeros<arma::cx_fmat>(size(cur_theta));
@@ -586,7 +584,7 @@ void equal_vec(Config* cfg_,
 
   // For efficient phase shift calibration
   static arma::fvec theta_vec;
-  float theta_inc;
+  static float theta_inc;
 
 #if defined(USE_MKL_JIT)
   void* jitter_;
@@ -697,9 +695,7 @@ void equal_vec(Config* cfg_,
   // Enable phase shift calibration
   if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
 
-    // TODO: Need to verify the correctness after plugging back to DoDemul since
-    //       the condition is across symbols.
-    if (symbol_idx_ul == 0) {
+    if (symbol_idx_ul == 0 && base_sc_id == 0) {
       // Reset previous frame
       arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
           ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
@@ -719,14 +715,15 @@ void equal_vec(Config* cfg_,
       // printf("base_sc_id = %ld, end = %ld\n", base_sc_id, base_sc_id+max_sc_ite-1);
       arma::cx_fvec vec_ue_pilot_data_ = vec_pilot_data.subvec(base_sc_id, base_sc_id+max_sc_ite-1);
 
-      mat_phase_shift += sum(vec_equaled % conj(vec_ue_pilot_data_));
-      // mat_phase_shift.print("mat_phase_shift");
+      // mat_phase_shift += sum(vec_equaled % conj(vec_ue_pilot_data_));
+      mat_phase_shift += sum(sign(vec_equaled % conj(vec_ue_pilot_data_)));
+      // sign should be able to optimize out but the result will be different
     }
 
     // Calculate the unit phase shift based on the first subcarrier
     // Check the special case condition to avoid reading wrong memory location
     RtAssert(cfg_->UeAntNum() == 1 && cfg_->Frame().ClientUlPilotSymbols() == 2);
-    if (symbol_idx_ul == cfg_->Frame().ClientUlPilotSymbols()) { 
+    if (symbol_idx_ul == cfg_->Frame().ClientUlPilotSymbols() && base_sc_id == 0) { 
       arma::cx_float* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
           ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
       arma::cx_fvec pilot_corr_vec(pilot_corr_ptr,
@@ -735,14 +732,12 @@ void equal_vec(Config* cfg_,
       theta_inc = theta_vec(cfg_->Frame().ClientUlPilotSymbols()-1) - theta_vec(0);
       // theta_inc /= (float)std::max(
       //     1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
-      // printf("theta_inc = %f\n", theta_inc);
     }
 
     // Apply previously calc'ed phase shift to data
     if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
       float cur_theta_f = theta_vec(0) + (symbol_idx_ul * theta_inc);
       vec_equaled *= arma::cx_float(cos(-cur_theta_f), sin(-cur_theta_f));
-      // theta_vec.print("theta_vec");
     }
   }
 }
@@ -1059,15 +1054,25 @@ TEST(TestPhaseShiftCalib, CorrectnessSingle) {
   // Run
   // ---------------------------------------------------------------------------
 
+  // Errors arise from symbol_id >= 4 or symbol_id = 0 (pilot should do nothing)
+  // The general frame schedule would be PUUU...GGG..., and the doer uses the
+  // first three symbols to calculate the phase tracking. Since we are calling
+  // the functions individually, starting from 4th symbol the phase tracking
+  // values are not calculated properly.
+  size_t frame_id = 0, symbol_id = 3, base_sc_id = 0;
+
   printf("--------------------------------------------------\n");
   equal_org(cfg_.get(), data_buffer_, equal_buffer_,
-            ue_spec_pilot_buffer_, ul_beam_matrices_, 0, 3, 0);
+            ue_spec_pilot_buffer_, ul_beam_matrices_, 
+            frame_id, symbol_id, base_sc_id);
   printf("--------------------------------------------------\n");
   equal_ifcond(cfg_.get(), data_buffer_, equal_buffer_test1_,
-            ue_spec_pilot_buffer_test1_, ul_beam_matrices_, 0, 3, 0);
+               ue_spec_pilot_buffer_test1_, ul_beam_matrices_,
+               frame_id, symbol_id, base_sc_id);
   printf("--------------------------------------------------\n");
   equal_vec(cfg_.get(), data_buffer_, equal_buffer_test2_,
-            ue_spec_pilot_buffer_test2_, ul_beam_matrices_, 0, 3, 0);
+            ue_spec_pilot_buffer_test2_, ul_beam_matrices_,
+            frame_id, symbol_id, base_sc_id);
   printf("--------------------------------------------------\n");
 
   // ---------------------------------------------------------------------------
@@ -1080,7 +1085,7 @@ TEST(TestPhaseShiftCalib, CorrectnessSingle) {
   //       calculate the phase shift, so the 2nd one is the first to be calibrated.
   // Dim2: determined by demul_block_size (64 by default).
   printf("size of equal_buffer_ = %ld x %ld\n", equal_buffer_.Dim1(), equal_buffer_.Dim2());
-  size_t idx1 = 3, idx2 = 0;
+  size_t idx1 = 2, idx2 = 0;
   printf("Test: equal_buffer_[%ld][%ld].re = %f, .im = %f\n",
     idx1, idx2, equal_buffer_[idx1][idx2].re, equal_buffer_[idx1][idx2].im);
   printf("Test: equal_buffer_test1_[%ld][%ld].re = %f, .im = %f\n",
@@ -1149,24 +1154,32 @@ TEST(TestPhaseShiftCalib, CorrectnessLoop) {
   for (size_t frame_id = 0; frame_id <= 3; ++frame_id) {
     for (size_t symbol_id = 1; symbol_id < 17; ++symbol_id) {
       for (size_t base_sc_id = 0; base_sc_id < cfg_->OfdmDataNum(); base_sc_id += cfg_->DemulBlockSize()) {
+        // printf("--------------------------------------------------\n");
         equal_org(cfg_.get(), data_buffer_, equal_buffer_,
                   ue_spec_pilot_buffer_, ul_beam_matrices_,
                   frame_id, symbol_id, base_sc_id);
+        // printf("--------------------------------------------------\n");
         equal_ifcond(cfg_.get(), data_buffer_, equal_buffer_test1_,
                   ue_spec_pilot_buffer_test1_, ul_beam_matrices_,
                   frame_id, symbol_id, base_sc_id);
+        // printf("--------------------------------------------------\n");
         equal_vec(cfg_.get(), data_buffer_, equal_buffer_test2_,
                   ue_spec_pilot_buffer_test2_, ul_beam_matrices_,
                   frame_id, symbol_id, base_sc_id);
+        // printf("--------------------------------------------------\n");
         // Check if they are the same instance
-        EXPECT_FALSE(&equal_buffer_ == &equal_buffer_test1_);
-        ASSERT_TRUE(equal_buffer_ == equal_buffer_test1_)
-         << "frame_id = " << frame_id << ", symbol_id = " << symbol_id
-         << ", base_sc_id = " << base_sc_id;
-        EXPECT_FALSE(&equal_buffer_ == &equal_buffer_test2_);
-        ASSERT_TRUE(equal_buffer_ == equal_buffer_test2_)
-         << "frame_id = " << frame_id << ", symbol_id = " << symbol_id
-         << ", base_sc_id = " << base_sc_id;
+        EXPECT_TRUE(&equal_buffer_ != &equal_buffer_test1_ &&
+                    &equal_buffer_ != &equal_buffer_test2_ &&
+                    &equal_buffer_test1_ != &equal_buffer_test2_);
+        EXPECT_TRUE(equal_buffer_ == equal_buffer_test1_)
+          << "frame_id = " << frame_id << ", symbol_id = " << symbol_id
+          << ", base_sc_id = " << base_sc_id;
+        EXPECT_TRUE(equal_buffer_ == equal_buffer_test2_)
+          << "frame_id = " << frame_id << ", symbol_id = " << symbol_id
+          << ", base_sc_id = " << base_sc_id;
+        ASSERT_TRUE(equal_buffer_test1_ == equal_buffer_test2_)
+          << "frame_id = " << frame_id << ", symbol_id = " << symbol_id
+          << ", base_sc_id = " << base_sc_id;
       }
     }
   }
