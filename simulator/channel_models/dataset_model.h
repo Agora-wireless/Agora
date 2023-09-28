@@ -17,7 +17,7 @@ class DatasetModel : public ChannelModel {
   void UpdateModel() final;
 
  private:
-  arma::cx_fmat GetMatricesByFrame(hsize_t frame);
+  arma::cx_fmat GetMatricesByFrame(size_t frame);
   void InstantiateDataset(const std::string& dataset_path);
 
   /*
