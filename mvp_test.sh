@@ -2,7 +2,7 @@
 
 # This script runs the Agora in RRU mode with USRP.
 #
-# Copyright 2023 Chung-Hsuan Tung
+# Copyright 2023 @cstandy
 #
 # This script is used to test if the code can run.
 # Thus, it does not look into if the processing is correct, nor is it meaningful
@@ -17,6 +17,7 @@
 exe=./build/agora
 user=./build/sender
 data_gen_exe=./build/data_generator
+# config=./files/config/ci/tddconfig-sim-ul.json
 config=./files/config/ci/tddconfig-sim-ul-fr2.json
 logpath=./log
 logfile=$logpath/$(date +"%Y-%m-%d_%H-%M-%S").log

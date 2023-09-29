@@ -51,7 +51,7 @@ AgoraWorker::~AgoraWorker() {
 void AgoraWorker::InitializeWorker() {
   /* Limit the number of thread to be 1 */
   if (config_->WorkerThreadNum() != 1) {
-    AGORA_LOG_ERROR("Worker: Single-core mode allows only 1 thread!\n");
+    AGORA_LOG_ERROR("Worker: Single-core mode allows only 1 worker thread!\n");
     exit(EXIT_FAILURE);
   }
 

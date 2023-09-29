@@ -1,29 +1,40 @@
 {
+    /* Simulating FlexRAN traffic load */
     "bs_radio_num": 1,
     "ue_radio_num": 1,
+    "cp_size": 64,
     "fft_size": 1024,
     "ofdm_data_num": 768,
+    /* num_subcarrier (12) * num_rb_group (4) * num_rb_per_group (16) */
     "demul_block_size": 64,
     "frame_schedule": [
-        "PUUUUUUUUUGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+        "PUUUUUUUUUUUUUUUUGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+        /* "PGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGGGUUUUUUUUUUUUUUUU" */
+        /* 70 symbols to simulate 5 slots in a frame */
+        /* "PUUUUUUGGGGGGG" */
+        /* it's actually 1 slot: 14 OFDM symbols */
     ],
-    "ul_mcs" : {
-      "modulation": "64QAM",
-      "code_rate": 0.333
-    },
-
-    "dl_mcs" : {
-        "modulation": "64QAM",
+    "ul_mcs": {
+        /* "mcs_index" : 10 */
+        "modulation": "16QAM",
         "code_rate": 0.333
     },
 
-    "sample_rate": 100e6,
-    "max_frame": 0,
+    "dl_mcs": {
+        "modulation": "16QAM",
+        "code_rate": 0.333
+    },
+
+    /* mu0 = 15 kHz, mu1 = 30 kHz, mu2 = 60 kHz, mu3 = 120 kHz */
+    /* sample_rate = mu * fft_size */
+    /* mu0: 15.36e6, mu1: 30.72e6, mu2: 61.44e6, mu3: 122.88e6 */
+    "sample_rate": 15.36e6,
+    "max_frame": 2000,
 
     "freq_orthogonal_pilot": true,
     "client_ul_pilot_syms": 2,
     /* Compute configuration */
-    "core_offset": 0,
+    "core_offset": 28,
     "exclude_cores": [
         0
     ],
