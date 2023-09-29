@@ -47,6 +47,8 @@ DoDemul::DoDemul(
   arma::cx_fmat mat_pilot_data(ue_pilot_ptr, cfg_->OfdmDataNum(),
                                cfg_->UeAntNum(), false);
   ue_pilot_data_ = mat_pilot_data.st();
+  arma::cx_fvec vec_pilot_data_(ue_pilot_ptr, cfg_->OfdmDataNum(), false);
+  vec_pilot_data = vec_pilot_data_;
 
 #if defined(USE_MKL_JIT)
   MKL_Complex8 alpha = {1, 0};
@@ -114,6 +116,88 @@ EventData DoDemul::Launch(size_t tag) {
   size_t max_sc_ite =
       std::min(cfg_->DemulBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
   assert(max_sc_ite % kSCsPerCacheline == 0);
+
+  // Accelerate (vectorized computation) 1x1 antenna config
+  if (cfg_->UeAntNum() == 1 && cfg_->BsAntNum() == 1) {
+
+    // Step 1: Equalization
+    arma::cx_float* equal_ptr = nullptr;
+    if (kExportConstellation) {
+      equal_ptr = (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
+                                                  [base_sc_id]);
+    } else {
+      equal_ptr = (arma::cx_float*)(&equaled_buffer_temp_[0]);
+    }
+    arma::cx_fvec vec_equaled(equal_ptr, max_sc_ite, false);
+
+    arma::cx_float* data_ptr = (arma::cx_float*)(&data_buf[base_sc_id]);
+    // not consider multi-antenna case (antena offset is omitted)
+    arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
+        ul_beam_matrices_[frame_slot][0]); // pick the first element
+
+    // assuming cfg->BsAntNum() == 1, reducing a dimension
+    arma::cx_fvec vec_data(data_ptr, max_sc_ite, false);
+    arma::cx_fvec vec_ul_beam(max_sc_ite); // init empty vec
+    for (size_t i = 0; i < max_sc_ite; ++i) {
+      vec_ul_beam(i) = ul_beam_ptr[cfg_->GetBeamScId(base_sc_id + i)];
+    }
+    vec_equaled = vec_ul_beam % vec_data;
+
+    // Step 2: Phase shift calibration
+
+    // Enable phase shift calibration
+    if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
+
+      // Reset previous frame
+      if (symbol_idx_ul == 0 && base_sc_id == 0) {
+        arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
+            ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
+        arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(),
+                                      cfg_->Frame().ClientUlPilotSymbols(),
+                                      false);
+        mat_phase_shift.fill(0);
+      }
+
+      // Calc new phase shift
+      if (symbol_idx_ul < cfg_->Frame().ClientUlPilotSymbols()) {
+        arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
+          &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
+                                [symbol_idx_ul * cfg_->UeAntNum()]);
+        arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(), 1,
+                                  false);
+        arma::cx_fvec vec_ue_pilot_data_ = vec_pilot_data.subvec(base_sc_id, base_sc_id+max_sc_ite-1);
+
+        // mat_phase_shift += sum(vec_equaled % conj(vec_ue_pilot_data_));
+        mat_phase_shift += sum(sign(vec_equaled % conj(vec_ue_pilot_data_)));
+        // sign should be able to optimize out but the result will be different
+      }
+
+      // Calculate the unit phase shift based on the first subcarrier
+      // Check the special case condition to avoid reading wrong memory location
+      RtAssert(cfg_->UeAntNum() == 1 && cfg_->Frame().ClientUlPilotSymbols() == 2);
+      if (symbol_idx_ul == cfg_->Frame().ClientUlPilotSymbols() && base_sc_id == 0) { 
+        arma::cx_float* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
+            ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
+        arma::cx_fvec pilot_corr_vec(pilot_corr_ptr,
+                                    cfg_->Frame().ClientUlPilotSymbols(), false);
+        theta_vec = arg(pilot_corr_vec);
+        theta_inc_f = theta_vec(cfg_->Frame().ClientUlPilotSymbols()-1) - theta_vec(0);
+        // theta_inc /= (float)std::max(
+        //     1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
+      }
+
+      // Apply previously calc'ed phase shift to data
+      if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
+        float cur_theta_f = theta_vec(0) + (symbol_idx_ul * theta_inc_f);
+        vec_equaled *= arma::cx_float(cos(-cur_theta_f), sin(-cur_theta_f));
+      }
+
+      // Not update EVM for the special, time-exclusive case
+
+      duration_stat_equal_->task_count_++;
+    }
+  } else {
+
   // Iterate through cache lines
   for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
     // size_t start_equal_tsc0 = GetTime::WorkerRdtsc();
@@ -289,6 +373,7 @@ EventData DoDemul::Launch(size_t tag) {
         }
       }
       duration_stat_equal_->task_count_++;
+    }
     }
   }
 

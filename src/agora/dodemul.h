@@ -75,11 +75,14 @@ class DoDemul : public Doer {
   complex_float* equaled_buffer_temp_;
   complex_float* equaled_buffer_temp_transposed_;
   arma::cx_fmat ue_pilot_data_;
+  arma::cx_fvec vec_pilot_data;
   int ue_num_simd256_;
 
   // For efficient phase shift calibration
   arma::fmat theta_mat;
   arma::fmat theta_inc;
+  arma::fvec theta_vec;
+  float theta_inc_f;
 
   // // For efficient sin/cos with LUT
   // static const int lut_size = 1000;
