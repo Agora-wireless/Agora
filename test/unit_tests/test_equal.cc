@@ -566,15 +566,16 @@ void equal_vec(Config* cfg_,
                 PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_beam_matrices_,
                 size_t frame_id_, size_t symbol_id_, size_t base_sc_id_) {
   
-  bool kUseSIMDGather = true;
+  RtAssert(cfg_->BsAntNum() == 1 && cfg_->UeAntNum() == 1,
+           "Correctness is only guaranteed in special case of antenna 1x1!");
+  // RtAssert(kUsePartialTrans == false,
+  //          "If set kUsePartialTrans = true, the test case might fail (with a probability)");
+  RtAssert(kExportConstellation == true,
+           "Set kExportConstellation to evaluate the correctness (export equal_buffer_)");
 
   // ---------------------------------------------------------------------------
   // Class definition of DoDemul
   // ---------------------------------------------------------------------------
-
-  /// Intermediate buffer to gather raw data. Size = subcarriers per cacheline
-  /// times number of antennas
-  complex_float* data_gather_buffer_;
 
   // Intermediate buffers for equalized data
   complex_float* equaled_buffer_temp_;
@@ -586,20 +587,10 @@ void equal_vec(Config* cfg_,
   static arma::fvec theta_vec;
   static float theta_inc;
 
-#if defined(USE_MKL_JIT)
-  void* jitter_;
-  cgemm_jit_kernel_t mkl_jit_cgemm_;
-#endif
-
   // ---------------------------------------------------------------------------
   // Constructor of DoDemul
   // ---------------------------------------------------------------------------
 
-  data_gather_buffer_ =
-      static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::kAlign64,
-          kSCsPerCacheline * cfg_->BsAntNum() * sizeof(complex_float)));
-  // printf("data_gather_buffer_ = %ld x %ld\n", kSCsPerCacheline, cfg_->BsAntNum());
   equaled_buffer_temp_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::kAlign64,
@@ -612,29 +603,7 @@ void equal_vec(Config* cfg_,
   // phase offset calibration data
   arma::cx_float* ue_pilot_ptr =
       reinterpret_cast<arma::cx_float*>(cfg_->UeSpecificPilot()[0]);
-  arma::cx_fmat mat_pilot_data(ue_pilot_ptr, cfg_->OfdmDataNum(),
-                               cfg_->UeAntNum(), false);
   arma::cx_fvec vec_pilot_data(ue_pilot_ptr, cfg_->OfdmDataNum(), false);
-  ue_pilot_data_ = mat_pilot_data.st();
-
-#if defined(USE_MKL_JIT)
-  MKL_Complex8 alpha = {1, 0};
-  MKL_Complex8 beta = {0, 0};
-
-  mkl_jit_status_t status =
-      mkl_jit_create_cgemm(&jitter_, MKL_COL_MAJOR, MKL_NOTRANS, MKL_NOTRANS,
-                           cfg_->SpatialStreamsNum(), 1, cfg_->BsAntNum(),
-                           &alpha, cfg_->SpatialStreamsNum(), cfg_->BsAntNum(),
-                           &beta, cfg_->SpatialStreamsNum());
-  if (MKL_JIT_ERROR == status) {
-    std::fprintf(
-        stderr,
-        "Error: insufficient memory to JIT and store the DGEMM kernel\n");
-    throw std::runtime_error(
-        "DoDemul: insufficient memory to JIT and store the DGEMM kernel");
-  }
-  mkl_jit_cgemm_ = mkl_jit_get_cgemm_ptr(jitter_);
-#endif
 
   // ---------------------------------------------------------------------------
   // First part of DoDemul: equalization + phase shift calibration
@@ -647,8 +616,6 @@ void equal_vec(Config* cfg_,
   // ---------------------------------------------------------------------------
 
   const size_t symbol_idx_ul = cfg_->Frame().GetULSymbolIdx(symbol_id);
-  const size_t data_symbol_idx_ul =
-      symbol_idx_ul - cfg_->Frame().ClientUlPilotSymbols();
   const size_t total_data_symbol_idx_ul =
       cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
   const complex_float* data_buf = data_buffer_[total_data_symbol_idx_ul];
@@ -662,11 +629,10 @@ void equal_vec(Config* cfg_,
   // Step 1: Equalization
   arma::cx_float* equal_ptr = nullptr;
   if (kExportConstellation) {
-    equal_ptr =
-        (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                        [base_sc_id * cfg_->UeAntNum()]);
+    equal_ptr = (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
+                                                [base_sc_id]);
   } else {
-    equal_ptr = (arma::cx_float*)(&equaled_buffer_temp_);
+    equal_ptr = (arma::cx_float*)(&equaled_buffer_temp_[0]);
   }
   arma::cx_fvec vec_equaled(equal_ptr, max_sc_ite, false);
 
@@ -675,12 +641,6 @@ void equal_vec(Config* cfg_,
   arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
       ul_beam_matrices_[frame_slot][0]); // pick the first element
 
-// #define USE_MKL
-// #if defined(USE_MKL_JIT)
-#if defined(USE_MKL) // not verified yet.
-  vcMul(max_sc_ite, (MKL_Complex8*)ul_beam_ptr,
-        (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
-#else
   // assuming cfg->BsAntNum() == 1, reducing a dimension
   arma::cx_fvec vec_data(data_ptr, max_sc_ite, false);
   arma::cx_fvec vec_ul_beam(max_sc_ite); // init empty vec
@@ -688,7 +648,6 @@ void equal_vec(Config* cfg_,
     vec_ul_beam(i) = ul_beam_ptr[cfg_->GetBeamScId(base_sc_id + i)];
   }
   vec_equaled = vec_ul_beam % vec_data;
-#endif
 
   // Step 2: Phase shift calibration
 
@@ -1184,6 +1143,92 @@ TEST(TestPhaseShiftCalib, CorrectnessLoop) {
     }
   }
 }
+
+// TEST(TestPhaseShiftCalib, MKLvsArma) {
+
+//   auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
+//   cfg_->GenData();
+//   size_t frame_id = 0, symbol_id = 1, base_sc_id = 64;
+
+//   // ---------------------------------------------------------------------------
+
+//   // From agora_buffer.h
+//   Table<complex_float> data_buffer_;
+//   Table<complex_float> equal_buffer_;
+//   Table<complex_float> equal_buffer_mkl_;
+//   Table<complex_float> equal_buffer_arma_;
+//   Table<complex_float> ue_spec_pilot_buffer_;
+//   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrices_;
+
+//   // From agora_buffer.cc
+//   const size_t task_buffer_symbol_num_ul =
+//     cfg_->Frame().NumULSyms() * kFrameWnd;
+//   data_buffer_.RandAllocCxFloat(task_buffer_symbol_num_ul,
+//                      cfg_->OfdmDataNum() * cfg_->BsAntNum(),
+//                      Agora_memory::Alignment_t::kAlign64);
+//   equal_buffer_.RandAllocCxFloat(task_buffer_symbol_num_ul,
+//                        cfg_->OfdmDataNum() * cfg_->SpatialStreamsNum(),
+//                        Agora_memory::Alignment_t::kAlign64);
+//   equal_buffer_mkl_ = equal_buffer_;
+//   equal_buffer_arma_ = equal_buffer_;
+//   ue_spec_pilot_buffer_.RandAllocCxFloat(
+//       kFrameWnd,
+//       cfg_->Frame().ClientUlPilotSymbols() * cfg_->SpatialStreamsNum(),
+//       Agora_memory::Alignment_t::kAlign64);
+
+//   // ---------------------------------------------------------------------------
+
+//   const size_t symbol_idx_ul = cfg_->Frame().GetULSymbolIdx(symbol_id);
+//   const size_t data_symbol_idx_ul =
+//       symbol_idx_ul - cfg_->Frame().ClientUlPilotSymbols();
+//   const size_t total_data_symbol_idx_ul =
+//       cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
+//   const complex_float* data_buf = data_buffer_[total_data_symbol_idx_ul];
+
+//   const size_t frame_slot = frame_id % kFrameWnd;
+
+//   size_t max_sc_ite =
+//       std::min(cfg_->DemulBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
+//   assert(max_sc_ite % kSCsPerCacheline == 0);
+
+//   // ---------------------------------------------------------------------------
+//   // Armadillo elementwise multiplication
+
+//   arma::cx_float* equal_ptr = 
+//         (arma::cx_float*)(&equal_buffer_arma_[total_data_symbol_idx_ul]
+//                                         [base_sc_id * cfg_->UeAntNum()]);
+//   arma::cx_fvec vec_equaled(equal_ptr, max_sc_ite, false);
+
+//   arma::cx_float* data_ptr = (arma::cx_float*)(&data_buf[base_sc_id]);
+//   // not consider multi-antenna case (antena offset is omitted)
+//   // assuming cfg->BsAntNum() == 1, reducing a dimension
+//   arma::cx_fvec vec_data(data_ptr, max_sc_ite, false);
+
+//   arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
+//       ul_beam_matrices_[frame_slot][0]); // pick the first element
+//   arma::cx_fvec vec_ul_beam(max_sc_ite); // init empty vec
+//   for (size_t i = 0; i < max_sc_ite; ++i) {
+//     vec_ul_beam(i) = ul_beam_ptr[cfg_->GetBeamScId(base_sc_id + i)];
+//   }
+
+//   vec_equaled = vec_ul_beam % vec_data;
+
+//   // ---------------------------------------------------------------------------
+//   // MKL elementwise multiplication
+
+//   arma::cx_float* equal_ptr_mkl = 
+//         (arma::cx_float*)(&equal_buffer_mkl_[total_data_symbol_idx_ul]
+//                                         [base_sc_id * cfg_->UeAntNum()]);
+
+//   vcMul(max_sc_ite, (MKL_Complex8*)ul_beam_ptr,
+//         (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr_mkl);
+
+//   // ---------------------------------------------------------------------------
+//   // Test equalness
+//   EXPECT_TRUE(equal_buffer_arma_ == equal_buffer_mkl_);
+//   EXPECT_FALSE(equal_buffer_ == equal_buffer_arma_);
+//   EXPECT_FALSE(equal_buffer_ == equal_buffer_mkl_);
+// }
 
 int main(int argc, char** argv) {
   printf("Running main() from %s\n", __FILE__);
