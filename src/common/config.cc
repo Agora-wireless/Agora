@@ -839,7 +839,7 @@ Config::Config(std::string jsonfilename)
       "Basestation Network Traffic Avg  (Mbps): %.3f\n"
       "UE Network Traffic Peak (Mbps): %.3f\n"
       "UE Network Traffic Avg  (Mbps): %.3f\n"
-      "All UEs Network Traffic Avg (Mbps): %.3f\n"
+      "All UEs Network Traffic Peak (Mbps): %.3f\n"
       "All UEs Network Traffic Avg (Mbps): %.3f\n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, ul_modulation_.c_str(),
@@ -1690,8 +1690,8 @@ void Config::GenData() {
     FreeBuffer1d(&pilot_pre_ifft_);
   }
 
-  delete[](ul_temp_parity_buffer);
-  delete[](dl_temp_parity_buffer);
+  delete[] (ul_temp_parity_buffer);
+  delete[] (dl_temp_parity_buffer);
   ul_iq_ifft.Free();
   dl_iq_ifft.Free();
   dl_encoded_bits.Free();
