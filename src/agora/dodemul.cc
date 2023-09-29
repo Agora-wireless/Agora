@@ -198,182 +198,182 @@ EventData DoDemul::Launch(size_t tag) {
     }
   } else {
 
-  // Iterate through cache lines
-  for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
-    // size_t start_equal_tsc0 = GetTime::WorkerRdtsc();
+    // Iterate through cache lines
+    for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
+      // size_t start_equal_tsc0 = GetTime::WorkerRdtsc();
 
-    // Step 1: Populate data_gather_buffer as a row-major matrix with
-    // kSCsPerCacheline rows and BsAntNum() columns
+      // Step 1: Populate data_gather_buffer as a row-major matrix with
+      // kSCsPerCacheline rows and BsAntNum() columns
 
-    // Since kSCsPerCacheline divides demul_block_size and
-    // kTransposeBlockSize, all subcarriers (base_sc_id + i) lie in the
-    // same partial transpose block.
-    const size_t partial_transpose_block_base =
-        ((base_sc_id + i) / kTransposeBlockSize) *
-        (kTransposeBlockSize * cfg_->BsAntNum());
+      // Since kSCsPerCacheline divides demul_block_size and
+      // kTransposeBlockSize, all subcarriers (base_sc_id + i) lie in the
+      // same partial transpose block.
+      const size_t partial_transpose_block_base =
+          ((base_sc_id + i) / kTransposeBlockSize) *
+          (kTransposeBlockSize * cfg_->BsAntNum());
 
 #ifdef __AVX512F__
-    static constexpr size_t kAntNumPerSimd = 8;
+      static constexpr size_t kAntNumPerSimd = 8;
 #else
-    static constexpr size_t kAntNumPerSimd = 4;
+      static constexpr size_t kAntNumPerSimd = 4;
 #endif
 
-    size_t ant_start = 0;
-    if (kUseSIMDGather && kUsePartialTrans &&
-        (cfg_->BsAntNum() % kAntNumPerSimd) == 0) {
-      // Gather data for all antennas and 8 subcarriers in the same cache
-      // line, 1 subcarrier and 4 (AVX2) or 8 (AVX512) ants per iteration
-      size_t cur_sc_offset =
-          partial_transpose_block_base + (base_sc_id + i) % kTransposeBlockSize;
-      const float* src =
-          reinterpret_cast<const float*>(&data_buf[cur_sc_offset]);
-      float* dst = reinterpret_cast<float*>(data_gather_buffer_);
+      size_t ant_start = 0;
+      if (kUseSIMDGather && kUsePartialTrans &&
+          (cfg_->BsAntNum() % kAntNumPerSimd) == 0) {
+        // Gather data for all antennas and 8 subcarriers in the same cache
+        // line, 1 subcarrier and 4 (AVX2) or 8 (AVX512) ants per iteration
+        size_t cur_sc_offset =
+            partial_transpose_block_base + (base_sc_id + i) % kTransposeBlockSize;
+        const float* src =
+            reinterpret_cast<const float*>(&data_buf[cur_sc_offset]);
+        float* dst = reinterpret_cast<float*>(data_gather_buffer_);
 #ifdef __AVX512F__
-      __m512i index = _mm512_setr_epi32(
-          0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
-          kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
-          kTransposeBlockSize * 6, kTransposeBlockSize * 6 + 1,
-          kTransposeBlockSize * 8, kTransposeBlockSize * 8 + 1,
-          kTransposeBlockSize * 10, kTransposeBlockSize * 10 + 1,
-          kTransposeBlockSize * 12, kTransposeBlockSize * 12 + 1,
-          kTransposeBlockSize * 14, kTransposeBlockSize * 14 + 1);
-      for (size_t ant_i = 0; ant_i < cfg_->BsAntNum();
-           ant_i += kAntNumPerSimd) {
-        for (size_t j = 0; j < kSCsPerCacheline; j++) {
-          __m512 data_rx = kTransposeBlockSize == 1
-                               ? _mm512_load_ps(&src[j * cfg_->BsAntNum() * 2])
-                               : _mm512_i32gather_ps(index, &src[j * 2], 4);
+        __m512i index = _mm512_setr_epi32(
+            0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
+            kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
+            kTransposeBlockSize * 6, kTransposeBlockSize * 6 + 1,
+            kTransposeBlockSize * 8, kTransposeBlockSize * 8 + 1,
+            kTransposeBlockSize * 10, kTransposeBlockSize * 10 + 1,
+            kTransposeBlockSize * 12, kTransposeBlockSize * 12 + 1,
+            kTransposeBlockSize * 14, kTransposeBlockSize * 14 + 1);
+        for (size_t ant_i = 0; ant_i < cfg_->BsAntNum();
+            ant_i += kAntNumPerSimd) {
+          for (size_t j = 0; j < kSCsPerCacheline; j++) {
+            __m512 data_rx = kTransposeBlockSize == 1
+                                ? _mm512_load_ps(&src[j * cfg_->BsAntNum() * 2])
+                                : _mm512_i32gather_ps(index, &src[j * 2], 4);
 
-          assert((reinterpret_cast<intptr_t>(&dst[j * cfg_->BsAntNum() * 2]) %
-                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
-          assert((reinterpret_cast<intptr_t>(&src[j * cfg_->BsAntNum() * 2]) %
-                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
-          _mm512_store_ps(&dst[j * cfg_->BsAntNum() * 2], data_rx);
+            assert((reinterpret_cast<intptr_t>(&dst[j * cfg_->BsAntNum() * 2]) %
+                    (kAntNumPerSimd * sizeof(float) * 2)) == 0);
+            assert((reinterpret_cast<intptr_t>(&src[j * cfg_->BsAntNum() * 2]) %
+                    (kAntNumPerSimd * sizeof(float) * 2)) == 0);
+            _mm512_store_ps(&dst[j * cfg_->BsAntNum() * 2], data_rx);
+          }
+          src += kAntNumPerSimd * kTransposeBlockSize * 2;
+          dst += kAntNumPerSimd * 2;
         }
-        src += kAntNumPerSimd * kTransposeBlockSize * 2;
-        dst += kAntNumPerSimd * 2;
-      }
 #else
-      __m256i index = _mm256_setr_epi32(
-          0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
-          kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
-          kTransposeBlockSize * 6, kTransposeBlockSize * 6 + 1);
-      for (size_t ant_i = 0; ant_i < cfg_->BsAntNum();
-           ant_i += kAntNumPerSimd) {
-        for (size_t j = 0; j < kSCsPerCacheline; j++) {
-          assert((reinterpret_cast<intptr_t>(&dst[j * cfg_->BsAntNum() * 2]) %
-                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
-          __m256 data_rx = _mm256_i32gather_ps(&src[j * 2], index, 4);
-          _mm256_store_ps(&dst[j * cfg_->BsAntNum() * 2], data_rx);
+        __m256i index = _mm256_setr_epi32(
+            0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
+            kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
+            kTransposeBlockSize * 6, kTransposeBlockSize * 6 + 1);
+        for (size_t ant_i = 0; ant_i < cfg_->BsAntNum();
+            ant_i += kAntNumPerSimd) {
+          for (size_t j = 0; j < kSCsPerCacheline; j++) {
+            assert((reinterpret_cast<intptr_t>(&dst[j * cfg_->BsAntNum() * 2]) %
+                    (kAntNumPerSimd * sizeof(float) * 2)) == 0);
+            __m256 data_rx = _mm256_i32gather_ps(&src[j * 2], index, 4);
+            _mm256_store_ps(&dst[j * cfg_->BsAntNum() * 2], data_rx);
+          }
+          src += kAntNumPerSimd * kTransposeBlockSize * 2;
+          dst += kAntNumPerSimd * 2;
         }
-        src += kAntNumPerSimd * kTransposeBlockSize * 2;
-        dst += kAntNumPerSimd * 2;
-      }
 #endif
-      // Set the remaining number of antennas for non-SIMD gather
-      ant_start = cfg_->BsAntNum() - (cfg_->BsAntNum() % kAntNumPerSimd);
-    }
-    if (ant_start < cfg_->BsAntNum()) {
-      complex_float* dst = data_gather_buffer_ + ant_start;
+        // Set the remaining number of antennas for non-SIMD gather
+        ant_start = cfg_->BsAntNum() - (cfg_->BsAntNum() % kAntNumPerSimd);
+      }
+      if (ant_start < cfg_->BsAntNum()) {
+        complex_float* dst = data_gather_buffer_ + ant_start;
+        for (size_t j = 0; j < kSCsPerCacheline; j++) {
+          for (size_t ant_i = ant_start; ant_i < cfg_->BsAntNum(); ant_i++) {
+            *dst++ =
+                kUsePartialTrans
+                    ? data_buf[partial_transpose_block_base +
+                              (ant_i * kTransposeBlockSize) +
+                              ((base_sc_id + i + j) % kTransposeBlockSize)]
+                    : data_buf[ant_i * cfg_->OfdmDataNum() + base_sc_id + i + j];
+          }
+        }
+      }
+
+      // Step 2: For each subcarrier, perform equalization by multiplying the
+      // subcarrier's data from each antenna with the subcarrier's precoder
       for (size_t j = 0; j < kSCsPerCacheline; j++) {
-        for (size_t ant_i = ant_start; ant_i < cfg_->BsAntNum(); ant_i++) {
-          *dst++ =
-              kUsePartialTrans
-                  ? data_buf[partial_transpose_block_base +
-                             (ant_i * kTransposeBlockSize) +
-                             ((base_sc_id + i + j) % kTransposeBlockSize)]
-                  : data_buf[ant_i * cfg_->OfdmDataNum() + base_sc_id + i + j];
+        const size_t cur_sc_id = base_sc_id + i + j;
+
+        arma::cx_float* equal_ptr = nullptr;
+        if (kExportConstellation) {
+          equal_ptr =
+              (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
+                                              [cur_sc_id *
+                                              cfg_->SpatialStreamsNum()]);
+        } else {
+          equal_ptr =
+              (arma::cx_float*)(&equaled_buffer_temp_[(cur_sc_id - base_sc_id) *
+                                                      cfg_->SpatialStreamsNum()]);
         }
-      }
-    }
+        arma::cx_fmat mat_equaled(equal_ptr, cfg_->SpatialStreamsNum(), 1, false);
 
-    // Step 2: For each subcarrier, perform equalization by multiplying the
-    // subcarrier's data from each antenna with the subcarrier's precoder
-    for (size_t j = 0; j < kSCsPerCacheline; j++) {
-      const size_t cur_sc_id = base_sc_id + i + j;
-
-      arma::cx_float* equal_ptr = nullptr;
-      if (kExportConstellation) {
-        equal_ptr =
-            (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                            [cur_sc_id *
-                                             cfg_->SpatialStreamsNum()]);
-      } else {
-        equal_ptr =
-            (arma::cx_float*)(&equaled_buffer_temp_[(cur_sc_id - base_sc_id) *
-                                                    cfg_->SpatialStreamsNum()]);
-      }
-      arma::cx_fmat mat_equaled(equal_ptr, cfg_->SpatialStreamsNum(), 1, false);
-
-      arma::cx_float* data_ptr = reinterpret_cast<arma::cx_float*>(
-          &data_gather_buffer_[j * cfg_->BsAntNum()]);
-      arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
-          ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
+        arma::cx_float* data_ptr = reinterpret_cast<arma::cx_float*>(
+            &data_gather_buffer_[j * cfg_->BsAntNum()]);
+        arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
+            ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
 
 #if defined(USE_MKL_JIT)
-      mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_beam_ptr,
-                     (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
+        mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_beam_ptr,
+                      (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
 #else
-      arma::cx_fmat mat_data(data_ptr, cfg_->BsAntNum(), 1, false);
+        arma::cx_fmat mat_data(data_ptr, cfg_->BsAntNum(), 1, false);
 
-      arma::cx_fmat mat_ul_beam(ul_beam_ptr, cfg_->SpatialStreamsNum(),
-                                cfg_->BsAntNum(), false);
-      mat_equaled = mat_ul_beam * mat_data;
+        arma::cx_fmat mat_ul_beam(ul_beam_ptr, cfg_->SpatialStreamsNum(),
+                                  cfg_->BsAntNum(), false);
+        mat_equaled = mat_ul_beam * mat_data;
 #endif
 
-      // Enable phase shift calibration
-      if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
-        // Calc new phase shift
-        if (symbol_idx_ul < cfg_->Frame().ClientUlPilotSymbols()) {  
-          if (symbol_idx_ul == 0 && cur_sc_id == 0) {
-            // Reset previous frame
+        // Enable phase shift calibration
+        if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
+          // Calc new phase shift
+          if (symbol_idx_ul < cfg_->Frame().ClientUlPilotSymbols()) {  
+            if (symbol_idx_ul == 0 && cur_sc_id == 0) {
+              // Reset previous frame
+              arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
+                  ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
+              arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(),
+                                            cfg_->Frame().ClientUlPilotSymbols(),
+                                            false);
+              mat_phase_shift.fill(0);
+            }
             arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
-                ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
-            arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(),
-                                          cfg_->Frame().ClientUlPilotSymbols(),
+                &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
+                                      [symbol_idx_ul * cfg_->UeAntNum()]);
+            arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(), 1,
                                           false);
-            mat_phase_shift.fill(0);
+            arma::cx_fmat shift_sc =
+                sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
+            mat_phase_shift += shift_sc;
           }
-          arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
-              &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
-                                    [symbol_idx_ul * cfg_->UeAntNum()]);
-          arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(), 1,
+          if (symbol_idx_ul == cfg_->Frame().ClientUlPilotSymbols() && cur_sc_id == 0) { 
+            arma::cx_float* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
+                ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
+            arma::cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeAntNum(),
+                                        cfg_->Frame().ClientUlPilotSymbols(),
                                         false);
-          arma::cx_fmat shift_sc =
-              sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
-          mat_phase_shift += shift_sc;
-        }
-        if (symbol_idx_ul == cfg_->Frame().ClientUlPilotSymbols() && cur_sc_id == 0) { 
-          arma::cx_float* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
-              ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
-          arma::cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeAntNum(),
-                                      cfg_->Frame().ClientUlPilotSymbols(),
-                                      false);
-          theta_mat = arg(pilot_corr_mat);
-          theta_inc = theta_mat.col(cfg_->Frame().ClientUlPilotSymbols()-1) - theta_mat.col(0);
-          theta_inc /= (float)std::max(
-              1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
-        }
+            theta_mat = arg(pilot_corr_mat);
+            theta_inc = theta_mat.col(cfg_->Frame().ClientUlPilotSymbols()-1) - theta_mat.col(0);
+            theta_inc /= (float)std::max(
+                1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
+          }
 
-        // apply previously calc'ed phase shift to data
-        if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
-          arma::fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
-          arma::cx_fmat mat_phase_correct = arma::cx_fmat(cos(-cur_theta), sin(-cur_theta));
-          // arma::cx_fmat mat_phase_correct = arma::cx_fmat(cos_lut_func(-cur_theta), sin_lut_func(-cur_theta));
-          mat_equaled %= mat_phase_correct;
+          // apply previously calc'ed phase shift to data
+          if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
+            arma::fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
+            arma::cx_fmat mat_phase_correct = arma::cx_fmat(cos(-cur_theta), sin(-cur_theta));
+            // arma::cx_fmat mat_phase_correct = arma::cx_fmat(cos_lut_func(-cur_theta), sin_lut_func(-cur_theta));
+            mat_equaled %= mat_phase_correct;
 
 #if !defined(TIME_EXCLUSIVE)
-          auto ue_list = mac_sched_->ScheduledUeList(frame_id, cur_sc_id);
-          const size_t data_symbol_idx_ul =
-              symbol_idx_ul - this->cfg_->Frame().ClientUlPilotSymbols();
-          // Measure EVM from ground truth
-          phy_stats_->UpdateEvm(frame_id, data_symbol_idx_ul, cur_sc_id,
-                                mat_equaled.col(0), ue_list);
+            auto ue_list = mac_sched_->ScheduledUeList(frame_id, cur_sc_id);
+            const size_t data_symbol_idx_ul =
+                symbol_idx_ul - this->cfg_->Frame().ClientUlPilotSymbols();
+            // Measure EVM from ground truth
+            phy_stats_->UpdateEvm(frame_id, data_symbol_idx_ul, cur_sc_id,
+                                  mat_equaled.col(0), ue_list);
 #endif
+          }
         }
+        duration_stat_equal_->task_count_++;
       }
-      duration_stat_equal_->task_count_++;
-    }
     }
   }
 
