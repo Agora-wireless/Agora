@@ -114,7 +114,7 @@ void Agora::SendSnrReport(EventType event_type, size_t frame_id,
   for (size_t i = 0; i < config_->UeAntNum(); i++) {
     EventData snr_report(EventType::kSNRReport, base_tag.tag_);
     snr_report.num_tags_ = 2;
-    float snr = this->phy_stats_->GetEvmSnr(frame_id, i);
+    const float snr = this->phy_stats_->GetEvmSnr(frame_id, i);
     std::memcpy(&snr_report.tags_[1], &snr, sizeof(float));
     TryEnqueueFallback(&mac_request_queue_, snr_report);
     base_tag.ue_id_++;
@@ -851,7 +851,9 @@ finish:
   }
 
   // Calculate and print per-user BER
-  if ((kEnableMac == false) && (kPrintPhyStats == true)) {
+  if constexpr (kEnableMac) {
+    this->mac_thread_->PrintUplinkMacErrors();
+  } else if (kPrintPhyStats == true) {
     this->phy_stats_->PrintPhyStats();
   }
   this->Stop();

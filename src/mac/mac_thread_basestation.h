@@ -51,6 +51,7 @@ class MacThreadBaseStation {
   // The main MAC thread event loop. It receives uplink data bits from the
   // master thread and sends them to remote applications.
   void RunEventLoop();
+  void PrintUplinkMacErrors();
 
  private:
   // Receive events from Agora PHY master thread. Forwards
@@ -145,6 +146,10 @@ class MacThreadBaseStation {
 
   // CRC
   std::unique_ptr<DoCRC> crc_obj_;
+
+  //MAC decoding stats
+  std::array<size_t, kMaxUEs> valid_mac_packets_;
+  std::array<size_t, kMaxUEs> error_mac_packets_;
 };
 
 #endif  // MAC_THREAD_H_
