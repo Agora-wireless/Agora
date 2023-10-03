@@ -6,10 +6,10 @@
   "channel": "A",
   "frequency": 3.6e9,
   "single_gain": true,
-  "rx_gain_a": 65,
-  "tx_gain_a": 81,
-  "rx_gain_b": 65,
-  "tx_gain_b": 81,
+  "rx_gain_a": 85,
+  "tx_gain_a": 100,
+  "rx_gain_b": 85,
+  "tx_gain_b": 100,
   "sample_rate": 7.68e6,
   "cp_size": 32,
   "fft_size": 1024,
@@ -34,8 +34,8 @@
   "freq_orthogonal_pilot": false,
   "client_ul_pilot_syms": 2,
   "beamsweep": false,
-  /* why? 0, 1, 5, 6bad? (2,3.4*/
-  "beacon_antenna": 4,
+  /* 2 working the best right now */
+  "beacon_antenna": 2,
   /* UE configuration */
   "ue_resync_period": 200,
   "ue_channel": "A",
@@ -43,13 +43,13 @@
     85
   ],
   "ue_tx_gain_a": [
-    95
+    100
   ],
   "ue_rx_gain_b": [
     85
   ],
   "ue_tx_gain_b": [
-    95
+    100
   ],
   "tx_advance": [
     140
@@ -64,7 +64,7 @@
   "ue_core_offset": 10,
   "ue_worker_thread_num": 2,
   "ue_socket_thread_num": 1,
-  /* Merlin radios -- 8 (tested)*/
+  /* Merlin radios -- 6 (tested)*/
   "core_offset": 1,
   "worker_thread_num": 6,
   "socket_thread_num": 1,
