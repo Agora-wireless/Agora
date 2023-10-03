@@ -167,7 +167,7 @@ void PhyStats::PrintPhyStats() {
 
 void PhyStats::PrintEvmStats(size_t frame_id, const arma::uvec& ue_list) {
   //Disable the EVM if the mac is enabled
-  if constexpr (kEnableMac) {
+  if constexpr (kEnableMac == false) {
     arma::fmat evm_buf(evm_buffer_[frame_id % kFrameWnd], config_->UeAntNum(),
                        1, false);
     arma::fmat evm_mat =
