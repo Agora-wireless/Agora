@@ -204,7 +204,7 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
           pkt->PayloadLength();
 
     } else {
-      if (pkt->Ue() <= kMaxUEs) {
+      if (pkt->Ue() < kMaxUEs) {
         error_mac_packets_.at(pkt->Ue())++;
       }
       ss << "  *****Failed Data integrity check - invalid parameters"
