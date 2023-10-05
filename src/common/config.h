@@ -621,6 +621,97 @@ class Config {
   inline const std::vector<std::string>& UlTxFreqDataFiles() const {
     return ul_tx_f_data_files_;
   }
+  inline void LogEnqueueTimeStamp(EventType event_type,
+                                  size_t frame_id,
+                                  size_t symbol_id,
+                                  size_t tsc_enqueue_start,
+                                  size_t tsc_enqueue_end) {
+    enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_start_ =
+      tsc_enqueue_start;
+    enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_end_ =
+      tsc_enqueue_end;
+    enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].event_type_ =
+      event_type;
+    enqueue_stats_id_.at(symbol_id)++;
+  }
+
+  inline void LogDequeueTimeStamp(EventType event_type,
+                                  size_t frame_id,
+                                  size_t tsc_dequeue_start,
+                                  size_t tsc_dequeue_end) {
+    // std::printf("DEBUG: I AM HERE: dequeue_stats_id_: %zu, event_type: %s, frame id: %zu, tsc start: %zu, tsc end: %zu\n",
+    //             dequeue_stats_id_, eventTypeToString.at(static_cast<size_t>(event_type)).c_str(), frame_id, tsc_dequeue_start, tsc_dequeue_end);
+    dequeue_stats_[dequeue_stats_id_].tsc_start_ = tsc_dequeue_start;
+    dequeue_stats_[dequeue_stats_id_].tsc_end_ = tsc_dequeue_end;
+    dequeue_stats_[dequeue_stats_id_].event_type_ = event_type;
+    dequeue_stats_id_++;
+  }
+
+  void IncrementTotalWorkerDequeueTSC(int tid, size_t frame_id, size_t tsc) {
+    total_worker_dequeue_tsc_[tid][frame_id] += tsc;
+  }
+
+  void IncrementTotalWorkerEnqueueTSC(int tid, size_t frame_id, size_t tsc) {
+    total_worker_enqueue_tsc_[tid][frame_id] += tsc;
+  }
+
+  void IncrementTotalWorkerValidDequeueTSC(int tid, size_t frame_id, size_t tsc) {
+    total_worker_valid_dequeue_tsc_[tid][frame_id] += tsc;
+  }
+
+  void IncrementWorkerNumValidEnqueue(int tid, size_t frame_id) {
+    worker_num_valid_enqueue_[tid][frame_id]++;
+  }
+
+  inline void SaveWorkerEnqueueStats(int tid, size_t symbol_id, size_t start_tsc,
+                                     size_t end_tsc, EventType event_type) {
+    size_t id = worker_enqueue_stats_id_[tid][symbol_id];
+    worker_enqueue_stats_[tid][symbol_id][id].tsc_start_ = start_tsc;
+    worker_enqueue_stats_[tid][symbol_id][id].tsc_end_ = end_tsc;
+    worker_enqueue_stats_[tid][symbol_id][id].event_type_ = event_type;
+    worker_enqueue_stats_id_[tid][symbol_id]++;
+  }
+
+  inline void SaveWorkerDequeueStats(int tid, size_t symbol_id, size_t start_tsc,
+                                     size_t end_tsc, EventType event_type) {
+    size_t id = worker_dequeue_stats_id_[tid][symbol_id];
+    worker_dequeue_stats_[tid][symbol_id][id].tsc_start_ = start_tsc;
+    worker_dequeue_stats_[tid][symbol_id][id].tsc_end_ = end_tsc;
+    worker_dequeue_stats_[tid][symbol_id][id].event_type_ = event_type;
+    worker_dequeue_stats_id_[tid][symbol_id]++;
+  }
+
+  // Task enqueue/dequeue start and end timestamps and task type
+  struct QueueTsStat {
+    EventType event_type_;
+    size_t tsc_start_ = 0;  // Unit = TSC cycles
+    size_t tsc_end_ = 0;    // Unit = TSC cycles
+  };
+
+  std::array<std::array<QueueTsStat, 100000>, kMaxSymbols> enqueue_stats_;
+  std::array<QueueTsStat, 100000> dequeue_stats_;
+  std::array<size_t, kMaxSymbols> enqueue_stats_id_ = {};
+  size_t dequeue_stats_id_ = 0;
+
+  std::array<std::array<size_t, kNumStatsFrames>, kMaxThreads>
+      total_worker_dequeue_tsc_ = {};
+  std::array<std::array<size_t, kNumStatsFrames>, kMaxThreads>
+      total_worker_enqueue_tsc_ = {};
+  std::array<std::array<size_t, kNumStatsFrames>, kMaxThreads>
+      total_worker_valid_dequeue_tsc_ = {};
+  std::array<std::array<size_t, kNumStatsFrames>, kMaxThreads>
+      worker_num_valid_enqueue_ = {};
+
+  std::array<std::array<std::array<QueueTsStat, 1024>, kMaxSymbols>,
+             kMaxThreads>
+      worker_enqueue_stats_;
+  std::array<std::array<std::array<QueueTsStat, 1024>, kMaxSymbols>,
+             kMaxThreads>
+      worker_dequeue_stats_;
+  std::array<std::array<size_t, kMaxSymbols>, kMaxThreads>
+      worker_enqueue_stats_id_ = {};
+  std::array<std::array<size_t, kMaxSymbols>, kMaxThreads>
+      worker_dequeue_stats_id_ = {};
 
  private:
   void Print() const;
@@ -629,12 +720,12 @@ class Config {
   void DumpMcsInfo();
 
   /* Class constants */
-  inline static const size_t kDefaultSymbolNumPerFrame = 70;
+  inline static const size_t kDefaultSymbolNumPerFrame = 30;
   inline static const size_t kDefaultFreqOrthPilotSymbolNum = 1;
-  inline static const size_t kDefaultULSymPerFrame = 30;
+  inline static const size_t kDefaultULSymPerFrame = 10;
   inline static const size_t kDefaultULSymStart = 9;
-  inline static const size_t kDefaultDLSymPerFrame = 30;
-  inline static const size_t kDefaultDLSymStart = 40;
+  inline static const size_t kDefaultDLSymPerFrame = 10;
+  inline static const size_t kDefaultDLSymStart = 20;
 
   // Number of code blocks per OFDM symbol
   // Temporarily set to 1
