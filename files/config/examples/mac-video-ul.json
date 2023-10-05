@@ -1,15 +1,15 @@
 {
-  "serial_file": "files/experiment/topology-merlin-ul.json",
+  "serial_file": "files/topology/topology-vulture-ul.json",
   "cells": 1,
   "calibrate_digital": false,
   "calibrate_analog": false,
   "channel": "A",
-  "frequency": 3.6e9,
+  "frequency": 3.56e9,
   "single_gain": true,
-  "rx_gain_a": 85,
-  "tx_gain_a": 100,
-  "rx_gain_b": 85,
-  "tx_gain_b": 100,
+  "rx_gain_a": 60,
+  "tx_gain_a": 75,
+  "rx_gain_b": 60,
+  "tx_gain_b": 75,
   "sample_rate": 7.68e6,
   "cp_size": 32,
   "fft_size": 1024,
@@ -29,33 +29,34 @@
   "ofdm_rx_zero_prefix_cal_dl": 324,
   "ofdm_rx_zero_prefix_cal_ul": 136,
   "frame_schedule": [
-    "BGPGUUUUUG"
+    "BGPPGUUUUUG"
   ],
   "freq_orthogonal_pilot": false,
   "client_ul_pilot_syms": 2,
   "beamsweep": false,
-  /* 2 working the best right now */
-  "beacon_antenna": 2,
+  "beacon_antenna": 1,
   /* UE configuration */
   "ue_resync_period": 200,
   "ue_channel": "A",
   "ue_rx_gain_a": [
-    85
+    65,
+    65
   ],
   "ue_tx_gain_a": [
-    100
+    75,
+    75
   ],
   "ue_rx_gain_b": [
-    85
+    65,
+    65
   ],
   "ue_tx_gain_b": [
-    100
+    75,
+    75
   ],
   "tx_advance": [
+    140,
     140
-  ],
-  "corr_scale": [
-    1
   ],
   "ue_hw_framer": false,
   "hw_framer": true,
@@ -63,8 +64,8 @@
   "exclude_cores": [],
   "ue_core_offset": 10,
   "ue_worker_thread_num": 2,
-  "ue_socket_thread_num": 1,
-  /* Merlin radios -- 6 (tested)*/
+  "ue_socket_thread_num": 2,
+  /* Vulture radios -- 32x2 (tested)*/
   "core_offset": 1,
   "worker_thread_num": 6,
   "socket_thread_num": 1,
