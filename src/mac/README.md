@@ -4,6 +4,7 @@
 ## Over the Air  32x2 uplink video streaming
 ![Image of Video Demo Interactions](https://user-images.githubusercontent.com/10745791/272974286-1a32ed49-08b6-468b-b671-97a6f57bdc13.png)
   * For Faros RRU and Iris UEs, pass `-DRADIO_TYPE=SOAPY_IRIS -DENABLE_MAC=True` to cmake
+  * For video streaming, you must ensure USE_UDP_DATA_SOURCE is defined.  Otherwise it will assume file transfers
   * Configure the gains, and verify the topology file (outdoor may need up to 85/100 rx/tx gains)
   * Terminal 1:
     <pre>
@@ -41,4 +42,4 @@
       vlc udp://@127.0.0.1:1360
     </pre>
     Increment the port number by 1 for each UE (1351 / 1361, etc)
-  * To date, vlc will pack UDP traffic in packets that have a data size in multiples of 188.  
+  * To date, vlc will pack UDP traffic in packets that have a data size in multiples of 188
