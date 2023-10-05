@@ -43,19 +43,19 @@ enum class TsType : size_t {
   kPilotAllRX,         // All pilot packets received
   kRCAllRX,            // All Reciprocity Calibration Symbols received
   kFFTPilotsDone,      // Completed FFT for all pilots in this frame
-  kBeamDone,           // Completed zeroforcing for this frame
+  kBeamDone,           // Completed zero forcing for this frame
   kDemulDone,          // Completed demodulation for this frame
   kRXDone,             // All packets of a frame received
-  kRCDone,             // Recirocity Calibration Computation done
-  kEncodeDone,
-  kDecodeDone,  // Completed all LDPC decoding for this frame
-  kPrecodeDone,
-  kIFFTDone,
-  kBroadcastDone,
-  kTXProcessedFirst,
-  kTXDone,
-  kModulDone,
-  kFFTDone,
+  kRCDone,             // Reciprocity Calibration Computation done
+  kEncodeDone,         // Completed all LDPC encoding for this frame
+  kDecodeDone,         // Completed all LDPC decoding for this frame
+  kPrecodeDone,        // Completed precoding for this frame
+  kIFFTDone,           // Completed IFFT of data symbols for this frame
+  kBroadcastDone,      // Completed broadcast for this frame
+  kTXProcessedFirst,   // First symbol in packet transmitted
+  kTXDone,             // All packets of a frame transmitted
+  kModulDone,          // Completed modulation for this frame
+  kFFTDone,            // Completed FFT of data symbols for this frame
   kTsTypeEnd
 };
 static constexpr size_t kNumTimestampTypes =

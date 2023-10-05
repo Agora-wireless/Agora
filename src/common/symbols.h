@@ -16,6 +16,7 @@
 // Number of frames received that we allocate space for in worker threads. This
 // is the frame window that we track in Agora.
 static constexpr size_t kFrameWnd = 40;
+static const size_t kFrameForProfiling = 6;
 
 #define TX_FRAME_DELTA (4)
 #define SETTLE_TIME_MS (1)
@@ -64,6 +65,29 @@ enum class EventType : int {
 
 static constexpr size_t kNumEventTypes =
     static_cast<size_t>(EventType::kThreadTermination) + 1;
+
+// Define a mapping from EventType to string
+static const std::array<std::string, kNumEventTypes> eventTypeToString = {
+  "PacketRX",
+  "FFT",
+  "Beam",
+  "Demul",
+  "IFFT",
+  "Precode",
+  "PacketTX",
+  "PacketPilotTX",
+  "Decode",
+  "Encode",
+  "Modul",
+  "PacketFromMac",
+  "PacketToMac",
+  "FFTPilot",
+  "SNRReport",
+  "RANUpdate",
+  "RBIndicator",
+  "Broadcast",
+  "ThreadTermination"
+};
 
 // Types of Agora Doers
 enum class DoerType : size_t {
@@ -313,6 +337,9 @@ static constexpr size_t kNumStatsFrames = 10000;
 
 // If true, enable timing measurements in workers
 static constexpr bool kIsWorkerTimingEnabled = true;
+
+// If true, enable timing measurements in master
+static constexpr bool kIsMasterTimingEnabled = true;
 
 // Maximum breakdown of a statistic (e.g., timing)
 static constexpr size_t kMaxStatsBreakdown = 4;
