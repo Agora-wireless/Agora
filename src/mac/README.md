@@ -2,7 +2,7 @@
   Agora currently only builds and runs on Linux, and has been tested on Ubuntu 16.04, 18.04, 20.04 (Recommended), and 22.04 LTS. 
   Agora requires CMake 2.8+ and works with both GNU and Intel compilers with C++17 support. 
 ## Over the Air  32x2 uplink video streaming
-  * ![Image of Video Demo Interactions](/assets/10745791/272974286-1a32ed49-08b6-468b-b671-97a6f57bdc13.png)
+  * ![Image of Video Demo Interactions](https://user-images.githubusercontent.com/10745791/272974286-1a32ed49-08b6-468b-b671-97a6f57bdc13.png)
   * For Faros RRU and Iris UEs, pass `-DRADIO_TYPE=SOAPY_IRIS -DENABLE_MAC=True` to cmake
   * Configure the gains, and verify the topology file (outdoor may need up to 85/100 rx/tx gains)
   * Terminal 1:
