@@ -29,7 +29,7 @@
 class ResourceProvisionerThread {
  public:
   // Default log file for RP layer outputs
-  static constexpr char kDefaultLogFilename[] = "files/config/examples/rp_log_server.txt";
+  static constexpr char kDefaultLogFilename[] = "files/experiment/rp_log_server.txt";
   static constexpr size_t kUdpRxBufferPadding = 2048u;
 
   ResourceProvisionerThread(
@@ -62,8 +62,6 @@ class ResourceProvisionerThread {
   std::string log_filename_;
 
   // UDP endpoint used for sending & receiving messages
-  // std::unique_ptr<UDPClient> udp_client_;
-  // std::unique_ptr<UDPServer> udp_server_;
   std::unique_ptr<UDPComm> udp_comm_;
 
   // A preallocated buffer to store UDP packets received via recv()

@@ -275,6 +275,10 @@ Config::Config(std::string jsonfilename)
   beamforming_algo_ = kBeamformingStr.at(beamforming_str_);
   num_spatial_streams_ = tdd_conf.value("spatial_streams", ue_ant_num_);
 
+  rp_remote_host_name_ = tdd_conf.value("rp_remote_host_name", "127.0.0.1");
+  rp_tx_port_ = tdd_conf.value("rp_tx_port", 3000);
+  rp_rx_port_ = tdd_conf.value("rp_rx_port", 4000);
+
   bs_server_addr_ = tdd_conf.value("bs_server_addr", "127.0.0.1");
   bs_rru_addr_ = tdd_conf.value("bs_rru_addr", "127.0.0.1");
   ue_server_addr_ = tdd_conf.value("ue_server_addr", "127.0.0.1");
@@ -293,10 +297,6 @@ Config::Config(std::string jsonfilename)
   ue_mac_rx_port_ = tdd_conf.value("ue_mac_rx_port", kMacUserLocalPort);
   bs_mac_tx_port_ = tdd_conf.value("bs_mac_tx_port", kMacBaseRemotePort);
   bs_mac_rx_port_ = tdd_conf.value("bs_mac_rx_port", kMacBaseLocalPort);
-
-  rp_remote_host_name_ = tdd_conf.value("rp_remote_host_name", "127.0.0.1");
-  rp_rx_port_ = tdd_conf.value("rp_rx_port", 7777);
-  rp_tx_port_ = tdd_conf.value("rp_tx_port", 7070);
 
   log_listener_addr_ = tdd_conf.value("log_listener_addr", "");
   log_listener_port_ = tdd_conf.value("log_listener_port", 33300);
@@ -645,7 +645,6 @@ Config::Config(std::string jsonfilename)
   } else {
     worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
   }
-  worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
   socket_thread_num_ = tdd_conf.value("socket_thread_num", 4);
   ue_core_offset_ = tdd_conf.value("ue_core_offset", 0);
   ue_worker_thread_num_ = tdd_conf.value("ue_worker_thread_num", 25);
