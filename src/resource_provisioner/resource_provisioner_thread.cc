@@ -35,14 +35,9 @@ ResourceProvisionerThread::ResourceProvisionerThread(
   udp_pkt_buf_.resize(udp_pkt_len + kUdpRxBufferPadding);
 
   size_t udp_server_port = cfg_->RpRxPort();
-  // size_t udp_client_port = cfg_->RpTxPort();
   AGORA_LOG_INFO(
       "ResourceProvisionerThread: Setting up UDP server for RP data at port %zu\n",
       udp_server_port);
-  // udp_server_ = std::make_unique<UDPServer>(
-  //     cfg_->UeServerAddr(), udp_server_port, udp_pkt_len);
-  // udp_client_ = std::make_unique<UDPClient>(
-  //     cfg_->UeServerAddr(), udp_client_port);
   udp_comm_ =
       std::make_unique<UDPComm>(cfg_->UeServerAddr(), udp_server_port,
                                 udp_pkt_len * kMaxUEs, 0);
@@ -130,7 +125,6 @@ void ResourceProvisionerThread::RunEventLoop() {
 
   while (cfg_->Running() == true) {
     if ((GetTime::Rdtsc() - last_frame_tx_tsc) > tsc_delta_) {
-      // RequestEventFromAgora();
       ReceiveEventFromAgora();
       ReceiveUdpPacketsFromRp();
       last_frame_tx_tsc = GetTime::Rdtsc();

@@ -25,11 +25,11 @@ while True:
     s.sendto(send_data, (ip, tx_port))
     print("\n\n Server sent data\n\n")
 
-    # # Receive data
-    # print("####### Server is listening #######")
-    # data, address = s.recvfrom(4096)
-    # decoded_data = struct.unpack('NN', data) # 2 size_t type
-    # print("\n\n Server received: ", decoded_data, "\n\n")
+    # Receive data
+    print("####### Server is listening #######")
+    data, address = s.recvfrom(4096)
+    decoded_data = struct.unpack('NN', data) # 2 size_t type
+    print("\n\n Server received: ", decoded_data, "\n\n")
 
     # timer delay for 1 sec
     time.sleep(1)
