@@ -7,6 +7,7 @@
 #define DOER_H_
 
 #include <cstddef>
+#include <queue>
 
 #include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"
@@ -19,11 +20,18 @@ class Doer {
   virtual bool TryLaunch(
       moodycamel::ConcurrentQueue<EventData>& task_queue,
       moodycamel::ConcurrentQueue<EventData>& complete_task_queue,
-      moodycamel::ProducerToken* worker_ptok) {
+      moodycamel::ProducerToken* worker_ptok,
+      std::queue<EventData>& task_q,
+      std::queue<EventData>& complete_task_q) {
     EventData req_event;
+    EventData req_event_test;
 
     ///Each event is handled by 1 Doer(Thread) and each tag is processed sequentually
     if (task_queue.try_dequeue(req_event)) {
+      req_event_test = task_q.front();
+      task_q.pop();
+      RtAssert(req_event.num_tags_ == req_event_test.num_tags_, "Q: Doer TryLaunch Dequeue");
+      RtAssert(req_event.event_type_ == req_event_test.event_type_, "Q: Doer TryLaunch Dequeue");
       // We will enqueue one response event containing results for all
       // request tags in the request event
       EventData resp_event;
@@ -38,6 +46,7 @@ class Doer {
                  "Invalid event type in resp");
       }
       TryEnqueueFallback(&complete_task_queue, worker_ptok, resp_event);
+      complete_task_q.push(resp_event);
       return true;
     }
     return false;

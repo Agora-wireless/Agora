@@ -172,6 +172,15 @@ struct EventData {
 };
 static_assert(sizeof(EventData) == 64);
 
+inline bool operator==(const EventData& lhs, const EventData& rhs) {
+  if (lhs.event_type_ != rhs.event_type_) { return false;}
+  if (lhs.num_tags_ != rhs.num_tags_) { return false;}
+  for (uint32_t i = 0; i < lhs.num_tags_; ++i) {
+    if (lhs.tags_.at(i) != rhs.tags_.at(i)) { return false; }
+  }
+  return true;
+}
+
 struct Packet {
   // The packet's data starts at kOffsetOfData bytes from the start
   static constexpr size_t kOffsetOfData = 64;

@@ -8,6 +8,7 @@
 
 #include <array>
 #include <cstddef>
+#include <queue>
 
 #include "common_typedef_sdk.h"
 #include "concurrentqueue.h"
@@ -100,6 +101,7 @@ class AgoraBuffer {
 struct SchedInfo {
   moodycamel::ConcurrentQueue<EventData> concurrent_q_;
   moodycamel::ProducerToken* ptok_;
+  std::queue<EventData> q_;
 };
 
 // Used to communicate between the manager and the worker class
@@ -119,9 +121,15 @@ class MessageInfo {
                 .at(static_cast<size_t>(event_type))
                 .concurrent_q_;
   }
+  inline std::queue<EventData>* GetQ(EventType event_type, size_t qid) {
+    return &sched_info_arr_.at(qid).at(static_cast<size_t>(event_type)).q_;
+  }
 
   inline moodycamel::ConcurrentQueue<EventData>& GetCompQueue(size_t qid) {
     return complete_task_queue_.at(qid);
+  }
+  inline std::queue<EventData>& GetCompQ(size_t qid) {
+    return complete_task_q_.at(qid);
   }
 
   inline moodycamel::ProducerToken* GetWorkerPtok(size_t qid,
@@ -174,6 +182,8 @@ class MessageInfo {
       worker_ptoks_ptr_;
   std::array<std::array<SchedInfo, kNumEventTypes>, kScheduleQueues>
       sched_info_arr_;
+
+  std::array<std::queue<EventData>, kScheduleQueues> complete_task_q_;
 };
 
 struct FrameInfo {

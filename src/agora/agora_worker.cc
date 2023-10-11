@@ -134,7 +134,9 @@ void AgoraWorker::RunWorker() {
       if (computers_vec.at(i)->TryLaunch(
               *message_->GetConq(events_vec.at(i), cur_qid),
               message_->GetCompQueue(cur_qid),
-              message_->GetWorkerPtok(cur_qid, tid))) {
+              message_->GetWorkerPtok(cur_qid, tid),
+              *message_->GetQ(events_vec.at(i), cur_qid),
+              message_->GetCompQ(cur_qid))) {
         empty_queue = false;
         break;
       }
