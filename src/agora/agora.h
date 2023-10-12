@@ -124,7 +124,7 @@ class Agora {
   std::unique_ptr<MacScheduler> mac_sched_;
   std::unique_ptr<Stats> stats_;
   std::unique_ptr<PhyStats> phy_stats_;
-  std::unique_ptr<AgoraWorker> worker_set_;
+  std::unique_ptr<AgoraWorker> worker_;
 
   //Agora Buffer containment
   std::unique_ptr<AgoraBuffer> agora_memory_;
@@ -169,17 +169,11 @@ class Agora {
   // TX/RX buffers.
   std::array<std::queue<fft_req_tag_t>, kFrameWnd> fft_queue_arr_;
 
-  // Master thread's message queue for receiving packets
-  moodycamel::ConcurrentQueue<EventData> message_queue_;
-
   // Master-to-worker queue for MAC
   moodycamel::ConcurrentQueue<EventData> mac_request_queue_;
 
   // Worker-to-master queue for MAC
   moodycamel::ConcurrentQueue<EventData> mac_response_queue_;
-
-  moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
-  moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
 
   uint8_t schedule_process_flags_;
   std::queue<size_t> encode_deferral_;

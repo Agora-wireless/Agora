@@ -66,9 +66,20 @@ Agora::Agora(Config* const cfg)
   frame_tracking_.cur_sche_frame_id_ = 0;
   frame_tracking_.cur_proc_frame_id_ = 0;
 
-  InitializeQueues();
+  // Create concurrent queues for streamers & STL queue for doers
+  message_ = std::make_unique<MessageInfo>(
+    kDefaultWorkerQueueSize * config_->Frame().NumDataSyms(),
+    kDefaultMessageQueueSize * config_->Frame().NumDataSyms(),
+    config_->SocketThreadNum());
+
   InitializeCounters();
   InitializeThreads();
+
+  // Create workers
+  ///\todo convert unique ptr to shared
+  worker_ = std::make_unique<AgoraWorker>(
+      config_, mac_sched_.get(), stats_.get(), phy_stats_.get(), message_.get(),
+      agora_memory_.get(), &frame_tracking_);
 
   if (kRecordUplinkFrame) {
     recorder_ = std::make_unique<Agora_recorder::RecorderThread>(
@@ -88,7 +99,7 @@ Agora::~Agora() {
     mac_std_thread_.join();
   }
 
-  worker_set_.reset();
+  worker_.reset();
   if (recorder_ != nullptr) {
     AGORA_LOG_INFO("Waiting for Recording to complete\n");
     recorder_->Stop();
@@ -96,7 +107,7 @@ Agora::~Agora() {
   recorder_.reset();
   stats_.reset();
   phy_stats_.reset();
-  FreeQueues();
+  message_.reset(); // remove tokens for each doer
 }
 
 void Agora::Stop() {
@@ -203,8 +214,8 @@ void Agora::ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
           "event(s) to worker %zu transmit queue\n",
           frame_id, symbol_id, worker.size(), enqueue_worker_id);
 
-      TryEnqueueBulkFallback(message_->GetPacketTXConq(),
-                             tx_ptoks_ptr_[enqueue_worker_id], worker.data(),
+      TryEnqueueBulkFallback(message_->GetTxConQ(),
+                             message_->GetTxPTokPtr(enqueue_worker_id), worker.data(),
                              worker.size());
     }
     enqueue_worker_id++;
@@ -292,22 +303,20 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
                          bool is_turn_to_dequeue_from_io) {
   size_t total_events = 0;
   size_t remaining_events = events_list.size();
-  // size_t total_events_test = 0;
-  // std::vector<EventData> events_list_test(events_list.size());
   if (is_turn_to_dequeue_from_io) {
     for (size_t i = 0; i < config_->SocketThreadNum(); i++) {
       if (remaining_events > 0) {
         //Restrict the amount from each socket
         const size_t request_events =
             std::min(kDequeueBulkSizeTXRX, remaining_events);
-        const size_t new_events = message_queue_.try_dequeue_bulk_from_producer(
-            *(rx_ptoks_ptr_[i]), &events_list.at(total_events), request_events);
+        const size_t new_events = message_->GetRxConQ()->try_dequeue_bulk_from_producer(
+            *(message_->GetRxPTokPtr(i)), &events_list.at(total_events), request_events);
         remaining_events = remaining_events - new_events;
         total_events = total_events + new_events;
       } else {
         AGORA_LOG_WARN(
             "remaining_events = %zu:%zu, queue %zu num elements %zu\n",
-            remaining_events, total_events, i, message_queue_.size_approx());
+            remaining_events, total_events, i, message_->GetRxConQ()->size_approx());
       }
     }
 
@@ -333,6 +342,7 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
     if (total_events == remaining_events) {
       printf("Note: use up max space of complete queue\n");
     }
+    // printf("[debug] Fetched event length = %ld\n", total_events);
   }
   return total_events;
 }
@@ -794,7 +804,7 @@ void Agora::Start() {
                   "length %zu\n",
                   samples_num_per_ue, cfg->SpatialStreamsNum(), diff,
                   samples_num_per_ue * std::log2(16.0f) / diff,
-                  message_->GetPacketTXConq()->size_approx());
+                  message_->GetTxConQ()->size_approx());
               unused(diff);
               unused(samples_num_per_ue);
               tx_begin = GetTime::GetTimeUs();
@@ -843,7 +853,7 @@ void Agora::Start() {
         }
       }
 
-      worker_set_->RunWorker();
+      worker_->RunWorker();
     } /* End of for */
   }   /* End of while */
 
@@ -1016,36 +1026,6 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
   }
 }
 
-/// \todo move this to the MessageInfo class..
-void Agora::InitializeQueues() {
-  const int data_symbol_num_perframe = config_->Frame().NumDataSyms();
-  message_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kDefaultMessageQueueSize * data_symbol_num_perframe);
-
-  // Create concurrent queues for each Doer
-  message_ = std::make_unique<MessageInfo>(kDefaultWorkerQueueSize *
-                                           data_symbol_num_perframe);
-
-  for (size_t i = 0; i < config_->SocketThreadNum(); i++) {
-    rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(message_queue_);
-    tx_ptoks_ptr_[i] = new moodycamel::ProducerToken(
-        *(message_->GetPacketTXConq()));
-  }
-}
-
-/// \todo move this to the MessageInfo class..
-void Agora::FreeQueues() {
-  // remove tokens for each doer
-  message_.reset();
-
-  for (size_t i = 0; i < config_->SocketThreadNum(); i++) {
-    delete rx_ptoks_ptr_[i];
-    delete tx_ptoks_ptr_[i];
-    rx_ptoks_ptr_[i] = nullptr;
-    tx_ptoks_ptr_[i] = nullptr;
-  }
-}
-
 void Agora::InitializeCounters() {
   const auto& cfg = config_;
 
@@ -1117,26 +1097,26 @@ void Agora::InitializeThreads() {
   /* Initialize TXRX threads */
   if (kUseArgos || kUseUHD || kUsePureUHD) {
     packet_tx_rx_ = std::make_unique<PacketTxRxRadio>(
-        config_, config_->CoreOffset() + 1, &message_queue_,
-        message_->GetPacketTXConq(), rx_ptoks_ptr_,
-        tx_ptoks_ptr_, agora_memory_->GetUlSocket(),
+        config_, config_->CoreOffset() + 1, message_->GetRxConQ(),
+        message_->GetTxConQ(), message_->GetRxPTokPtr(),
+        message_->GetTxPTokPtr(), agora_memory_->GetUlSocket(),
         agora_memory_->GetUlSocketSize() / config_->PacketLength(),
         this->stats_->FrameStart(), agora_memory_->GetDlSocket());
 #if defined(USE_DPDK)
   } else if (kUseDPDK) {
     packet_tx_rx_ = std::make_unique<PacketTxRxDpdk>(
-        config_, config_->CoreOffset() + 1, &message_queue_,
-        message_->GetPacketTXConq(), rx_ptoks_ptr_,
-        tx_ptoks_ptr_, agora_memory_->GetUlSocket(),
+        config_, config_->CoreOffset() + 1, message_->GetRxConQ(),
+        message_->GetTxConQ(), message_->GetRxPTokPtr(),
+        message_->GetTxPTokPtr(), agora_memory_->GetUlSocket(),
         agora_memory_->GetUlSocketSize() / config_->PacketLength(),
         this->stats_->FrameStart(), agora_memory_->GetDlSocket());
 #endif
   } else {
     /* Default to the simulator */
     packet_tx_rx_ = std::make_unique<PacketTxRxSim>(
-        config_, config_->CoreOffset() + 1, &message_queue_,
-        message_->GetPacketTXConq(), rx_ptoks_ptr_,
-        tx_ptoks_ptr_, agora_memory_->GetUlSocket(),
+        config_, config_->CoreOffset() + 1, message_->GetRxConQ(),
+        message_->GetTxConQ(), message_->GetRxPTokPtr(),
+        message_->GetTxPTokPtr(), agora_memory_->GetUlSocket(),
         agora_memory_->GetUlSocketSize() / config_->PacketLength(),
         this->stats_->FrameStart(), agora_memory_->GetDlSocket());
   }
@@ -1153,12 +1133,6 @@ void Agora::InitializeThreads() {
     mac_std_thread_ =
         std::thread(&MacThreadBaseStation::RunEventLoop, mac_thread_.get());
   }
-
-  // Create workers
-  ///\todo convert unique ptr to shared
-  worker_set_ = std::make_unique<AgoraWorker>(
-      config_, mac_sched_.get(), stats_.get(), phy_stats_.get(), message_.get(),
-      agora_memory_.get(), &frame_tracking_);
 
   AGORA_LOG_INFO(
       "Master/worker thread core %zu, TX/RX thread cores %zu--%zu\n",
