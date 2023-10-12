@@ -132,11 +132,11 @@ void AgoraWorker::RunWorker() {
   if (config_->Running() == true) {
     for (size_t i = 0; i < computers_vec.size(); i++) {
       if (computers_vec.at(i)->TryLaunch(
-              *message_->GetConq(events_vec.at(i), cur_qid),
-              message_->GetCompQueue(cur_qid),
-              message_->GetWorkerPtok(cur_qid, tid),
-              *message_->GetQ(events_vec.at(i), cur_qid),
-              message_->GetCompQ(cur_qid))) {
+              // *message_->GetConq(events_vec.at(i), cur_qid),
+              // message_->GetCompQueue(cur_qid),
+              // message_->GetWorkerPtok(cur_qid, tid),
+              *message_->GetTaskQueue(events_vec.at(i), cur_qid),
+              message_->GetCompQueue(cur_qid))) {
         empty_queue = false;
         break;
       }

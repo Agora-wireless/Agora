@@ -169,9 +169,9 @@ void Agora::ScheduleAntennas(EventType event_type, size_t frame_id,
       event.tags_[j] = base_tag.tag_;
       base_tag.ant_id_++;
     }
-    TryEnqueueFallback(message_->GetConq(event_type, qid),
-                       message_->GetPtok(event_type, qid), event);
-    message_->GetQ(event_type, qid)->push(event);
+    // TryEnqueueFallback(message_->GetConq(event_type, qid),
+    //                    message_->GetPtok(event_type, qid), event);
+    message_->GetTaskQueue(event_type, qid)->push(event);
   }
 }
 
@@ -240,10 +240,10 @@ void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
 
   const size_t qid = (frame_id & 0x1);
   for (size_t i = 0; i < num_events; i++) {
-    TryEnqueueFallback(message_->GetConq(event_type, qid),
-                       message_->GetPtok(event_type, qid),
-                       EventData(event_type, base_tag.tag_));
-    message_->GetQ(event_type, qid)->push(EventData(event_type, base_tag.tag_));
+    // TryEnqueueFallback(message_->GetConq(event_type, qid),
+    //                    message_->GetPtok(event_type, qid),
+    //                    EventData(event_type, base_tag.tag_));
+    message_->GetTaskQueue(event_type, qid)->push(EventData(event_type, base_tag.tag_));
     base_tag.sc_id_ += block_size;
   }
 }
@@ -270,9 +270,9 @@ void Agora::ScheduleCodeblocks(EventType event_type, Direction dir,
       event.tags_[j] = base_tag.tag_;
       base_tag.cb_id_++;
     }
-    TryEnqueueFallback(message_->GetConq(event_type, qid),
-                       message_->GetPtok(event_type, qid), event);
-    message_->GetQ(event_type, qid)->push(event);
+    // TryEnqueueFallback(message_->GetConq(event_type, qid),
+    //                    message_->GetPtok(event_type, qid), event);
+    message_->GetTaskQueue(event_type, qid)->push(event);
   }
 }
 
@@ -292,18 +292,18 @@ void Agora::ScheduleUsers(EventType event_type, size_t frame_id,
 void Agora::ScheduleBroadCastSymbols(EventType event_type, size_t frame_id) {
   auto base_tag = gen_tag_t::FrmSym(frame_id, 0u);
   const size_t qid = (frame_id & 0x1);
-  TryEnqueueFallback(message_->GetConq(event_type, qid),
-                     message_->GetPtok(event_type, qid),
-                     EventData(event_type, base_tag.tag_));
-  message_->GetQ(event_type, qid)->push(EventData(event_type, base_tag.tag_));
+  // TryEnqueueFallback(message_->GetConq(event_type, qid),
+  //                    message_->GetPtok(event_type, qid),
+  //                    EventData(event_type, base_tag.tag_));
+  message_->GetTaskQueue(event_type, qid)->push(EventData(event_type, base_tag.tag_));
 }
 
 size_t Agora::FetchEvent(std::vector<EventData>& events_list,
                          bool is_turn_to_dequeue_from_io) {
   size_t total_events = 0;
   size_t remaining_events = events_list.size();
-  size_t total_events_test = 0;
-  std::vector<EventData> events_list_test(events_list.size());
+  // size_t total_events_test = 0;
+  // std::vector<EventData> events_list_test(events_list.size());
   if (is_turn_to_dequeue_from_io) {
     for (size_t i = 0; i < config_->SocketThreadNum(); i++) {
       if (remaining_events > 0) {
@@ -334,22 +334,22 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
       }
     }
   } else {
-    total_events =
-        message_->GetCompQueue(frame_tracking_.cur_proc_frame_id_ & 0x1)
-            .try_dequeue_bulk(&events_list.at(total_events), remaining_events);
-    std::queue<EventData> *comp_q = &message_->GetCompQ(frame_tracking_.cur_proc_frame_id_ & 0x1);
-    while (!comp_q->empty() && total_events_test < remaining_events) {
-      events_list_test.at(total_events_test) = comp_q->front();
+    // total_events =
+    //     message_->GetCompQueue(frame_tracking_.cur_proc_frame_id_ & 0x1)
+    //         .try_dequeue_bulk(&events_list.at(total_events), remaining_events);
+    std::queue<EventData> *comp_q = &message_->GetCompQueue(frame_tracking_.cur_proc_frame_id_ & 0x1);
+    while (!comp_q->empty() && total_events < remaining_events) {
+      events_list.at(total_events) = comp_q->front();
       comp_q->pop();
-      ++total_events_test;
+      ++total_events;
     }
     if (total_events == remaining_events) {
       printf("Note: use up max space of complete queue\n");
     }
-    RtAssert(total_events == total_events_test, "Test fetching event dequeue num");
-    for (size_t i = 0; i < total_events; ++i) {
-      RtAssert(events_list.at(i) == events_list_test.at(i), "Test fetching event dequeue");
-    }
+    // RtAssert(total_events == total_events_test, "Test fetching event dequeue num");
+    // for (size_t i = 0; i < total_events; ++i) {
+    //   RtAssert(events_list.at(i) == events_list_test.at(i), "Test fetching event dequeue");
+    // }
   }
   return total_events;
 }
@@ -811,7 +811,8 @@ void Agora::Start() {
                   "length %zu\n",
                   samples_num_per_ue, cfg->SpatialStreamsNum(), diff,
                   samples_num_per_ue * std::log2(16.0f) / diff,
-                  message_->GetConq(EventType::kPacketTX, 0)->size_approx());
+                  // message_->GetConq(EventType::kPacketTX, 0)->size_approx()
+                  message_->GetTaskQueue(EventType::kPacketTX, 0)->size());
               unused(diff);
               unused(samples_num_per_ue);
               tx_begin = GetTime::GetTimeUs();
@@ -856,10 +857,10 @@ void Agora::Start() {
               }
             }
           }
-          TryEnqueueFallback(message_->GetConq(EventType::kFFT, qid),
-                             message_->GetPtok(EventType::kFFT, qid),
-                             do_fft_task);
-          message_->GetQ(EventType::kFFT, qid)->push(do_fft_task);
+          // TryEnqueueFallback(message_->GetConq(EventType::kFFT, qid),
+          //                    message_->GetPtok(EventType::kFFT, qid),
+          //                    do_fft_task);
+          message_->GetTaskQueue(EventType::kFFT, qid)->push(do_fft_task);
         }
       }
 

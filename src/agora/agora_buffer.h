@@ -98,92 +98,103 @@ class AgoraBuffer {
   Table<complex_float> calib_dl_buffer_;
 };
 
-struct SchedInfo {
-  moodycamel::ConcurrentQueue<EventData> concurrent_q_;
-  moodycamel::ProducerToken* ptok_;
-  std::queue<EventData> q_;
-};
+// struct SchedInfo {
+//   // moodycamel::ConcurrentQueue<EventData> concurrent_q_;
+//   // moodycamel::ProducerToken* ptok_;
+//   std::queue<EventData> q_;
+// };
 
 // Used to communicate between the manager and the worker class
 //Needs to manage its own memory
 class MessageInfo {
  public:
   explicit MessageInfo(size_t queue_size) { Alloc(queue_size); }
-  ~MessageInfo() { Free(); }
+  ~MessageInfo() { /*Free();*/ }
 
-  inline moodycamel::ProducerToken* GetPtok(EventType event_type, size_t qid) {
-    return sched_info_arr_.at(qid).at(static_cast<size_t>(event_type)).ptok_;
-  }
+  // inline moodycamel::ProducerToken* GetPtok(EventType event_type, size_t qid) {
+  //   return sched_info_arr_.at(qid).at(static_cast<size_t>(event_type)).ptok_;
+  // }
 
   inline moodycamel::ConcurrentQueue<EventData>* GetConq(EventType event_type,
                                                          size_t qid) {
-    return &sched_info_arr_.at(qid)
-                .at(static_cast<size_t>(event_type))
-                .concurrent_q_;
+    RtAssert(event_type == EventType::kPacketTX && qid == 0,
+             "GetConq() is reduced to GetConq(EventType::kPacketRx, 0) in single-core-sim.");
+    return &packet_tx_concurrent_queue;
+    // return &sched_info_arr_.at(qid)
+    //             .at(static_cast<size_t>(event_type))
+    //             .concurrent_q_;
   }
-  inline std::queue<EventData>* GetQ(EventType event_type, size_t qid) {
-    return &sched_info_arr_.at(qid).at(static_cast<size_t>(event_type)).q_;
+  inline std::queue<EventData>* GetTaskQueue(EventType event_type, size_t qid) {
+    RtAssert(event_type != EventType::kPacketTX || qid != 0,
+             "GetConq(EventType::kPacketRx, 0) is the correct usage.");
+    // return &sched_info_arr_.at(qid).at(static_cast<size_t>(event_type)).q_;
+    return &task_queues.at(qid).at(static_cast<size_t>(event_type));
   }
 
-  inline moodycamel::ConcurrentQueue<EventData>& GetCompQueue(size_t qid) {
-    return complete_task_queue_.at(qid);
-  }
-  inline std::queue<EventData>& GetCompQ(size_t qid) {
-    return complete_task_q_.at(qid);
+  // inline moodycamel::ConcurrentQueue<EventData>& GetCompQueue(size_t qid) {
+  //   return complete_task_queue_.at(qid);
+  // }
+  inline std::queue<EventData>& GetCompQueue(size_t qid) {
+    return complete_task_queues_.at(qid);
   }
 
-  inline moodycamel::ProducerToken* GetWorkerPtok(size_t qid,
-                                                  size_t worker_id) {
-    return worker_ptoks_ptr_.at(qid).at(worker_id);
-  }
+  // inline moodycamel::ProducerToken* GetWorkerPtok(size_t qid,
+  //                                                 size_t worker_id) {
+  //   return worker_ptoks_ptr_.at(qid).at(worker_id);
+  // }
 
  private:
   inline void Alloc(size_t queue_size) {
-    for (auto& queue : complete_task_queue_) {
-      queue = moodycamel::ConcurrentQueue<EventData>(queue_size);
-    }
-    for (auto& queue : sched_info_arr_) {
-      for (auto& event : queue) {
-        event.concurrent_q_ =
-            moodycamel::ConcurrentQueue<EventData>(queue_size);
-        event.ptok_ = new moodycamel::ProducerToken(event.concurrent_q_);
-      }
-    }
+    packet_tx_concurrent_queue = moodycamel::ConcurrentQueue<EventData>(queue_size);
+    // for (auto& queue : complete_task_queue_) {
+    //   queue = moodycamel::ConcurrentQueue<EventData>(queue_size);
+    // }
+    // for (auto& queue : sched_info_arr_) {
+    //   for (auto& event : queue) {
+    //     event.concurrent_q_ =
+    //         moodycamel::ConcurrentQueue<EventData>(queue_size);
+    //     event.ptok_ = new moodycamel::ProducerToken(event.concurrent_q_);
+    //   }
+    // }
 
-    size_t queue_count = 0;
-    for (auto& queue : worker_ptoks_ptr_) {
-      for (auto& worker : queue) {
-        worker =
-            new moodycamel::ProducerToken(complete_task_queue_.at(queue_count));
-      }
-      queue_count++;
-    }
+    // size_t queue_count = 0;
+    // for (auto& queue : worker_ptoks_ptr_) {
+    //   for (auto& worker : queue) {
+    //     worker =
+    //         new moodycamel::ProducerToken(complete_task_queue_.at(queue_count));
+    //   }
+    //   queue_count++;
+    // }
   }
 
-  inline void Free() {
-    for (auto& queue : sched_info_arr_) {
-      for (auto& event : queue) {
-        delete event.ptok_;
-        event.ptok_ = nullptr;
-      }
-    }
-    for (auto& queue : worker_ptoks_ptr_) {
-      for (auto& worker : queue) {
-        delete worker;
-        worker = nullptr;
-      }
-    }
-  }
+  // inline void Free() {
+  //   for (auto& queue : sched_info_arr_) {
+  //     for (auto& event : queue) {
+  //       delete event.ptok_;
+  //       event.ptok_ = nullptr;
+  //     }
+  //   }
+  //   for (auto& queue : worker_ptoks_ptr_) {
+  //     for (auto& worker : queue) {
+  //       delete worker;
+  //       worker = nullptr;
+  //     }
+  //   }
+  // }
 
-  std::array<moodycamel::ConcurrentQueue<EventData>, kScheduleQueues>
-      complete_task_queue_;
-  std::array<std::array<moodycamel::ProducerToken*, kMaxThreads>,
-             kScheduleQueues>
-      worker_ptoks_ptr_;
-  std::array<std::array<SchedInfo, kNumEventTypes>, kScheduleQueues>
-      sched_info_arr_;
+  // std::array<moodycamel::ConcurrentQueue<EventData>, kScheduleQueues>
+  //     complete_task_queue_;
+  // std::array<std::array<moodycamel::ProducerToken*, kMaxThreads>,
+  //            kScheduleQueues>
+  //     worker_ptoks_ptr_;
+  // std::array<std::array<SchedInfo, kNumEventTypes>, kScheduleQueues>
+  //     sched_info_arr_;
+  std::array<std::array<std::queue<EventData>, kNumEventTypes>, kScheduleQueues>
+    task_queues;
 
-  std::array<std::queue<EventData>, kScheduleQueues> complete_task_q_;
+  // keep the concurrent queue to communicate to streamer thread
+  moodycamel::ConcurrentQueue<EventData> packet_tx_concurrent_queue;
+  std::array<std::queue<EventData>, kScheduleQueues> complete_task_queues_;
 };
 
 struct FrameInfo {
