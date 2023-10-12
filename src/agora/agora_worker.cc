@@ -30,23 +30,7 @@ AgoraWorker::AgoraWorker(Config* cfg, MacScheduler* mac_sched, Stats* stats,
   InitializeWorker();
 }
 
-AgoraWorker::~AgoraWorker() {
-  // No worker threads anymore
-  // for (auto& worker_thread : workers_) {
-  //   AGORA_LOG_SYMBOL("Agora: Joining worker thread\n");
-  //   if (worker_thread.joinable()) {
-  //     worker_thread.join();
-  //   }
-  // }
-}
-
-// void AgoraWorker::CreateThreads() {
-//   AGORA_LOG_SYMBOL("Worker: creating %zu workers\n",
-//                    config_->WorkerThreadNum());
-//   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
-//     workers_.emplace_back(&AgoraWorker::WorkerThread, this, i);
-//   }
-// }
+AgoraWorker::~AgoraWorker() {}
 
 void AgoraWorker::InitializeWorker() {
   /* Limit the number of thread to be 1 */
@@ -58,9 +42,6 @@ void AgoraWorker::InitializeWorker() {
   tid = 0; // starts with 0 but has only one thread (master)
 
   AGORA_LOG_INFO("Worker: Initialize worker (function)\n");
-
-  // PinToCoreWithOffset(ThreadType::kWorker, base_worker_core_offset_, tid);
-  // AGORA_LOG_INFO("Worker: Core binding succeeded\n");
 
   /* Initialize operators */
   // debug: use make_shared intead of make_unique to escape the scope
@@ -132,9 +113,6 @@ void AgoraWorker::RunWorker() {
   if (config_->Running() == true) {
     for (size_t i = 0; i < computers_vec.size(); i++) {
       if (computers_vec.at(i)->TryLaunch(
-              // *message_->GetConq(events_vec.at(i), cur_qid),
-              // message_->GetCompQueue(cur_qid),
-              // message_->GetWorkerPtok(cur_qid, tid),
               *message_->GetTaskQueue(events_vec.at(i), cur_qid),
               message_->GetCompQueue(cur_qid))) {
         empty_queue = false;
@@ -157,5 +135,4 @@ void AgoraWorker::RunWorker() {
       empty_queue = true;
     }
   }
-  // AGORA_LOG_SYMBOL("Agora worker %d exit\n", tid);
 }
