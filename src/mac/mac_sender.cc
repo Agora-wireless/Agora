@@ -19,7 +19,7 @@
 static const std::string kMacSendFromAddress = "127.0.0.1";
 static constexpr uint16_t kMacSendFromPort = 0;
 
-//#define USE_UDP_DATA_SOURCE
+#define USE_UDP_DATA_SOURCE
 static constexpr bool kDebugPrintSender = false;
 static constexpr size_t kFrameLoadAdvance = 10;
 static constexpr size_t kBufferInit = 10;
@@ -181,8 +181,8 @@ void MacSender::StartTx() {
   // Run the master thread (from current thread)
   MasterThread(kMasterThreadId);
 
-  delete[](this->frame_start_);
-  delete[](this->frame_end_);
+  delete[] (this->frame_start_);
+  delete[] (this->frame_end_);
 }
 
 void MacSender::StartTxfromMain(double* in_frame_start, double* in_frame_end) {
@@ -456,9 +456,13 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
 
   // Split the Ue data up between threads and sources
   size_t ue_per_thread = (cfg_->UeAntNum() / update_thread_num_);
-  if (cfg_->UeAntNum() / update_thread_num_ > 0) {
+  if ((cfg_->UeAntNum() % update_thread_num_) > 0) {
     ue_per_thread++;
   }
+
+  AGORA_LOG_INFO(
+      "MacSender[%zu]: Number UE Ants %zu, total update threads %zu\n", tid,
+      cfg_->UeAntNum(), update_thread_num_);
 
   const size_t ue_ant_low = tid * ue_per_thread;
   const size_t ue_ant_high =
@@ -466,9 +470,10 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
 
   // Sender gets better performance when this thread is not pinned to core
   AGORA_LOG_INFO(
-      "MacSender: Data update thread %zu running on core %d servicing ue "
-      "%zu:%zu data\n",
-      tid, sched_getcpu(), ue_ant_low, ue_ant_high);
+      "MacSender: Data update thread [%zu:%zu] running on core %d servicing ue "
+      "%zu:%zu data num %zu\n",
+      tid, update_thread_num_ - 1, sched_getcpu(), ue_ant_low, ue_ant_high,
+      ue_per_thread);
 
 #if defined(USE_UDP_DATA_SOURCE)
   std::vector<std::unique_ptr<VideoReceiver>> sources;
@@ -495,7 +500,7 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
       for (size_t i = ue_ant_low; i <= ue_ant_high; i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
-        size_t ant_source = i % num_data_sources;
+        const size_t ant_source = i % num_data_sources;
         UpdateTxBuffer(sources.at(ant_source).get(), tag_for_ue);
       }
       buffer_updates++;
@@ -512,7 +517,7 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
       for (size_t i = ue_ant_low; i <= ue_ant_high; i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
-        size_t ant_source = i % num_data_sources;
+        const size_t ant_source = i % num_data_sources;
         UpdateTxBuffer(sources.at(ant_source).get(), tag_for_ue);
       }
     }
@@ -523,11 +528,12 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
 void MacSender::UpdateTxBuffer(MacDataReceiver* data_source, gen_tag_t tag) {
   // Load a frames worth of data
   uint8_t* mac_packet_location = tx_buffers_[TagToTxBuffersIndex(tag)];
+  size_t loaded_bytes_in_frame = 0;
 
   for (size_t i = 0; i < packets_per_frame_; i++) {
     auto* pkt = reinterpret_cast<MacPacketPacked*>(mac_packet_location);
     // Read a MacPayload into the data section
-    size_t loaded_bytes =
+    const size_t loaded_bytes =
         data_source->Load(pkt->DataPtr(), mac_payload_max_length_);
 
     pkt->Set(tag.frame_id_, get_data_symbol_id_(i), tag.ue_id_, loaded_bytes);
@@ -538,17 +544,20 @@ void MacSender::UpdateTxBuffer(MacDataReceiver* data_source, gen_tag_t tag) {
           "source\n",
           tag.frame_id_, tag.ant_id_);
     } else if (loaded_bytes < mac_payload_max_length_) {
-      AGORA_LOG_INFO(
-          "MacSender [frame %d, ue %d]: Not enough mac data available sending "
-          "%zu bytes of padding\n",
-          tag.frame_id_, tag.ant_id_, mac_payload_max_length_ - loaded_bytes);
+      AGORA_LOG_FRAME(
+          "MacSender [frame %d, ue %d, pkt %d]: Not enough mac data available "
+          "sending %zu bytes of padding\n",
+          tag.frame_id_, tag.ant_id_, i,
+          mac_payload_max_length_ - loaded_bytes);
     }
+    loaded_bytes_in_frame += loaded_bytes;
     // MacPacketLength should be the size of the mac packet but is not.
     mac_packet_location += tx_buffer_pkt_offset_;
   }
-  AGORA_LOG_INFO("MacSender [frame %d, ue %d]: Loaded packet for bytes %zu\n",
-                 tag.frame_id_, tag.ant_id_,
-                 mac_payload_max_length_ * packets_per_frame_);
+  AGORA_LOG_INFO(
+      "MacSender [frame %d, ue %d]: Loaded frame with data bytes %zu:%zu\n",
+      tag.frame_id_, tag.ant_id_, loaded_bytes_in_frame,
+      (mac_payload_max_length_ * packets_per_frame_));
 }
 
 void MacSender::WriteStatsToFile(size_t tx_frame_count) const {
