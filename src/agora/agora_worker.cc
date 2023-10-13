@@ -27,6 +27,12 @@ AgoraWorker::AgoraWorker(Config* cfg, MacScheduler* mac_sched, Stats* stats,
       message_(message),
       buffer_(buffer),
       frame_(frame) {
+  
+  tid = 0; // starts with 0 but has only one thread (master)
+  cur_qid = 0;
+  empty_queue_itrs = 0;
+  empty_queue = true;
+
   InitializeWorker();
 }
 
@@ -38,8 +44,6 @@ void AgoraWorker::InitializeWorker() {
     AGORA_LOG_ERROR("Worker: Single-core mode allows only 1 worker thread!\n");
     exit(EXIT_FAILURE);
   }
-
-  tid = 0; // starts with 0 but has only one thread (master)
 
   AGORA_LOG_INFO("Worker: Initialize worker (function)\n");
 
@@ -103,14 +107,10 @@ void AgoraWorker::InitializeWorker() {
   }
 
   AGORA_LOG_INFO("Worker: Initialization finished\n");
-
-  cur_qid = 0;
-  empty_queue_itrs = 0;
-  empty_queue = true;
 }
 
 void AgoraWorker::RunWorker() {
-  if (config_->Running() == true) {
+  // if (config_->Running() == true) {
     for (size_t i = 0; i < computers_vec.size(); i++) {
       if (computers_vec.at(i)->TryLaunch(
               *message_->GetTaskQueue(events_vec.at(i), cur_qid),
@@ -134,5 +134,5 @@ void AgoraWorker::RunWorker() {
     } else {
       empty_queue = true;
     }
-  }
+  // }
 }

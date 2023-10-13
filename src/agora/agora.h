@@ -71,14 +71,14 @@ class Agora {
   size_t FetchEvent(std::vector<EventData>& events_list,
                     bool is_turn_to_dequeue_from_io);
 
-  void InitializeQueues();
   void InitializeCounters();
   void InitializeThreads();
-  void FreeQueues();
 
   void SaveDecodeDataToFile(int frame_id);
   void SaveTxDataToFile(int frame_id);
 
+  void HandleEvents(EventData& event, size_t& tx_count, double tx_begin,
+                    bool& finish);
   void HandleEventFft(size_t tag);
   void UpdateRxCounters(size_t frame_id, size_t symbol_id);
 
@@ -179,6 +179,8 @@ class Agora {
   std::queue<size_t> encode_deferral_;
 
   std::unique_ptr<Agora_recorder::RecorderThread> recorder_;
+
+  DurationStat* duration_stat_;
 };
 
 #endif  // AGORA_H_
