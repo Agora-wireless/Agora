@@ -37,9 +37,15 @@ class Doer {
       resp_event.event_type_ = req_event.event_type_;
 
       for (size_t i = 0; i < req_event.num_tags_; i++) {
-        // CAUTION: symbol_id_ below is subject to the type of req_event
-        frame_id_ = gen_tag_t(req_event.tags_.at(i)).frame_id_;
-        symbol_id_ = gen_tag_t(req_event.tags_.at(i)).symbol_id_;
+        if (req_event.event_type_ == EventType::kFFT) {
+          Packet* pkt = fft_req_tag_t(req_event.tags_.at(i)).rx_packet_->RawPacket();
+          frame_id_ = pkt->frame_id_;
+          symbol_id_ = pkt->symbol_id_;
+        } else {
+          // CAUTION: Proper value in symbol_id_ below is subject to the type of req_event
+          frame_id_ = gen_tag_t(req_event.tags_.at(i)).frame_id_;
+          symbol_id_ = gen_tag_t(req_event.tags_.at(i)).symbol_id_;
+        }
         EventData doer_comp = Launch(req_event.tags_.at(i));
         RtAssert(doer_comp.num_tags_ == 1, "Invalid num_tags in resp");
         resp_event.tags_.at(i) = doer_comp.tags_.at(0);
@@ -73,15 +79,15 @@ class Doer {
     return EventData();
   }
 
-  size_t dequeue_tsc_ = 0;
-  size_t valid_dequeue_tsc_ = 0;
-  size_t enqueue_tsc_ = 0;
+  size_t frame_id_ = 0;
+  size_t symbol_id_ = 0;
   size_t dequeue_start_tsc_ = 0;
   size_t dequeue_end_tsc_ = 0;
   size_t enqueue_start_tsc_ = 0;
   size_t enqueue_end_tsc_ = 0;
-  size_t frame_id_ = 0;
-  size_t symbol_id_ = 0;
+  size_t dequeue_tsc_ = 0;
+  size_t valid_dequeue_tsc_ = 0;
+  size_t enqueue_tsc_ = 0;
 
  protected:
   Doer(Config* in_config, int in_tid) : cfg_(in_config), tid_(in_tid) {}

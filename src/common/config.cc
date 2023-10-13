@@ -634,6 +634,8 @@ Config::Config(std::string jsonfilename)
 
   // Agora configurations
   frames_to_test_ = tdd_conf.value("max_frame", 9600);
+  frame_to_profile_ = tdd_conf.value("profiling_frame", 250);
+  enable_profiling_ = tdd_conf.value("enable_profiling", false);
   core_offset_ = tdd_conf.value("core_offset", 0);
   worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
   socket_thread_num_ = tdd_conf.value("socket_thread_num", 4);

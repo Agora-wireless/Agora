@@ -130,34 +130,35 @@ void AgoraWorker::WorkerThread(int tid) {
             message_->GetWorkerPtok(cur_qid, tid))) {
         empty_queue = false;
 
-        if (((computers_vec.at(i)->frame_id_ == kFrameForProfiling) and
+        config_->UpdateTotalWorkerDequeueTsc(
+          tid, computers_vec.at(i)->frame_id_,
+          computers_vec.at(i)->dequeue_tsc_);
+
+        config_->UpdateTotalWorkerEnqueueTsc(
+          tid, computers_vec.at(i)->frame_id_,
+          computers_vec.at(i)->enqueue_tsc_);
+
+        config_->UpdateTotalWorkerValidDequeueTsc(
+          tid, computers_vec.at(i)->frame_id_,
+          computers_vec.at(i)->valid_dequeue_tsc_);
+
+        config_->UpdateWorkerNumValidEnqueue(
+          tid, computers_vec.at(i)->frame_id_);
+
+        if (((computers_vec.at(i)->frame_id_ == config_->FrameToProfile()) and
              (cur_qid == (computers_vec.at(i)->frame_id_ & 0x1)))) {
-          config_->IncrementTotalWorkerDequeueTSC(
-            tid, computers_vec.at(i)->frame_id_,
-            computers_vec.at(i)->dequeue_tsc_);
-
-          config_->IncrementTotalWorkerEnqueueTSC(
-            tid, computers_vec.at(i)->frame_id_,
-            computers_vec.at(i)->enqueue_tsc_);
-
-          config_->IncrementTotalWorkerValidDequeueTSC(
-            tid, computers_vec.at(i)->frame_id_,
-            computers_vec.at(i)->valid_dequeue_tsc_);
-
-          config_->IncrementWorkerNumValidEnqueue(
-            tid, computers_vec.at(i)->frame_id_);
 
           size_t symbol_id = computers_vec.at(i)->symbol_id_;
           if (symbol_id > config_->Frame().NumTotalSyms())
           {
-            symbol_id = 0; // Event type for beam does not have a valid symbol_id
+            symbol_id = 0; // Event type of kBeam does not have a valid symbol_id
           }
 
-          config_->SaveWorkerEnqueueStats(
+          config_->LogWorkerEnqueueStats(
             tid, symbol_id, computers_vec.at(i)->enqueue_start_tsc_,
             computers_vec.at(i)->enqueue_end_tsc_, events_vec.at(i));
 
-          config_->SaveWorkerDequeueStats(
+          config_->LogWorkerDequeueStats(
             tid, symbol_id, computers_vec.at(i)->dequeue_start_tsc_,
             computers_vec.at(i)->dequeue_end_tsc_, events_vec.at(i));
         }
