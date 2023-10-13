@@ -16,7 +16,6 @@
 // Number of frames received that we allocate space for in worker threads. This
 // is the frame window that we track in Agora.
 static constexpr size_t kFrameWnd = 40;
-static const size_t kFrameForProfiling = 6;
 
 #define TX_FRAME_DELTA (4)
 #define SETTLE_TIME_MS (1)
@@ -308,6 +307,12 @@ static const std::map<char, SymbolType> kSymbolMap = {
 
 enum class SubcarrierType { kNull, kDMRS, kPTRS, kData };
 
+// Maximum number of events allowed for all threads per symbol in a logging frame
+static constexpr size_t kMaxLoggingEventsMaster = 100000;
+
+// Maximum number of events allowed per thread per symbol in a logging frame
+static constexpr size_t kMaxLoggingEventsWorker = 1024;
+
 // Maximum number of symbols per frame allowed by Agora
 static constexpr size_t kMaxSymbols = 140;
 
@@ -337,9 +342,6 @@ static constexpr size_t kNumStatsFrames = 10000;
 
 // If true, enable timing measurements in workers
 static constexpr bool kIsWorkerTimingEnabled = true;
-
-// If true, enable timing measurements in master
-static constexpr bool kIsMasterTimingEnabled = true;
 
 // Maximum breakdown of a statistic (e.g., timing)
 static constexpr size_t kMaxStatsBreakdown = 4;

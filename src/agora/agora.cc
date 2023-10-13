@@ -167,8 +167,17 @@ void Agora::ScheduleAntennas(EventType event_type, size_t frame_id,
       event.tags_[j] = base_tag.tag_;
       base_tag.ant_id_++;
     }
+    size_t enqueue_start_tsc_ = GetTime::WorkerRdtsc();
     TryEnqueueFallback(message_->GetConq(event_type, qid),
                        message_->GetPtok(event_type, qid), event);
+    size_t enqueue_end_tsc_ = GetTime::WorkerRdtsc();
+    if (frame_id == this->config_->FrameToProfile()) {
+      config_->LogMasterEnqueueStats(event_type,
+                                     frame_id,
+                                     symbol_id,
+                                     enqueue_start_tsc_,
+                                     enqueue_end_tsc_);
+    }
   }
 }
 
@@ -193,7 +202,7 @@ void Agora::ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
         frame_id, symbol_id, antenna, enqueue_worker_id, worker_events.size());
   }
 
-  //Enqueue all events for all workers
+  // Enqueue all events for all workers
   size_t enqueue_worker_id = 0;
   for (const auto& worker : worker_events) {
     if (!worker.empty()) {
@@ -237,17 +246,17 @@ void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
 
   const size_t qid = (frame_id & 0x1);
   for (size_t i = 0; i < num_events; i++) {
-    size_t tsc_enqueue_start = GetTime::WorkerRdtsc();
+    size_t enqueue_start_tsc_ = GetTime::WorkerRdtsc();
     TryEnqueueFallback(message_->GetConq(event_type, qid),
                        message_->GetPtok(event_type, qid),
                        EventData(event_type, base_tag.tag_));
-    size_t tsc_enqueue_end = GetTime::WorkerRdtsc();
-    if (frame_id == kFrameForProfiling) {
-      config_->LogEnqueueTimeStamp(event_type,
-                                   frame_id,
-                                   symbol_id,
-                                   tsc_enqueue_start,
-                                   tsc_enqueue_end);
+    size_t enqueue_end_tsc_ = GetTime::WorkerRdtsc();
+    if (frame_id == this->config_->FrameToProfile()) {
+      config_->LogMasterEnqueueStats(event_type,
+                                     frame_id,
+                                     symbol_id,
+                                     enqueue_start_tsc_,
+                                     enqueue_end_tsc_);
     }
     base_tag.sc_id_ += block_size;
   }
@@ -275,16 +284,16 @@ void Agora::ScheduleCodeblocks(EventType event_type, Direction dir,
       event.tags_[j] = base_tag.tag_;
       base_tag.cb_id_++;
     }
-    size_t tsc_enqueue_start = GetTime::WorkerRdtsc();
+    size_t enqueue_start_tsc_ = GetTime::WorkerRdtsc();
     TryEnqueueFallback(message_->GetConq(event_type, qid),
                        message_->GetPtok(event_type, qid), event);
-    size_t tsc_enqueue_end = GetTime::WorkerRdtsc();
-    if (frame_id == kFrameForProfiling) {
-      config_->LogEnqueueTimeStamp(event_type,
-                                   frame_id,
-                                   symbol_idx,
-                                   tsc_enqueue_start,
-                                   tsc_enqueue_end);
+    size_t enqueue_end_tsc_ = GetTime::WorkerRdtsc();
+    if (frame_id == this->config_->FrameToProfile()) {
+      config_->LogMasterEnqueueStats(event_type,
+                                     frame_id,
+                                     symbol_idx,
+                                     enqueue_start_tsc_,
+                                     enqueue_end_tsc_);
     }
   }
 }
@@ -375,29 +384,21 @@ void Agora::Start() {
   while ((config_->Running() == true) &&
          (SignalHandler::GotExitSignal() == false)) {
     // Get a batch of events
-    size_t tsc_dequeue_start = GetTime::WorkerRdtsc();
+    size_t dequeue_start_tsc_ = GetTime::WorkerRdtsc();
     const size_t num_events =
         FetchEvent(events_list, is_turn_to_dequeue_from_io);
+    size_t dequeue_end_tsc_ = GetTime::WorkerRdtsc();
     is_turn_to_dequeue_from_io = !is_turn_to_dequeue_from_io;
-    size_t tsc_dequeue_end = GetTime::WorkerRdtsc();
 
     // Handle each event
     for (size_t ev_i = 0; ev_i < num_events; ev_i++) {
       EventData& event = events_list.at(ev_i);
       size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-      // size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-      if (frame_id == kFrameForProfiling) {
-        config_->LogDequeueTimeStamp(event.event_type_,
-                                     frame_id,
-                                     tsc_dequeue_start,
-                                     tsc_dequeue_end);
-        #if 0
-        if (event.event_type_ == EventType::kFFT) {
-            config_->SaveWorkerDequeueStats(
-              tid, symbol_id, tsc_dequeue_start,
-              tsc_dequeue_end, EventType::kFFT);
-        }
-        #endif
+      if (frame_id == this->config_->FrameToProfile()) {
+        config_->LogMasterDequeueStats(event.event_type_,
+                                       frame_id,
+                                       dequeue_start_tsc_,
+                                       dequeue_end_tsc_);
       }
 
       // FFT processing is scheduled after falling through the switch
@@ -867,30 +868,17 @@ void Agora::Start() {
               }
             }
           }
-          size_t tsc_enqueue_start = GetTime::WorkerRdtsc();
-          // size_t enqueue_start_tsc_ = GetTime::WorkerRdtsc();
+          size_t enqueue_start_tsc_ = GetTime::WorkerRdtsc();
           TryEnqueueFallback(message_->GetConq(EventType::kFFT, qid),
                              message_->GetPtok(EventType::kFFT, qid),
                              do_fft_task);
-          size_t tsc_enqueue_end = GetTime::WorkerRdtsc();
-          // size_t enqueue_end_tsc_ = GetTime::WorkerRdtsc();
-          // size_t enqueue_tsc_ = enqueue_end_tsc_ - enqueue_start_tsc_;
-          // size_t valid_dequeue_tsc_ = dequeue_diff_tsc;
-          #if 0
-          if (((frame_tracking_.cur_sche_frame_id_ == kFrameForProfiling) and
-               (qid == (frame_tracking_.cur_sche_frame_id_ & 0x1)))) {
-
-            config_->SaveWorkerEnqueueStats(
-              tid, symbol_id, enqueue_start_tsc_,
-              enqueue_end_tsc_, EventType::kFFT);
-          }
-          #endif
-          if (frame_tracking_.cur_sche_frame_id_ == kFrameForProfiling) {
-            config_->LogEnqueueTimeStamp(EventType::kFFT,
-                                         frame_tracking_.cur_sche_frame_id_,
-                                         symbol_id,
-                                         tsc_enqueue_start,
-                                         tsc_enqueue_end);
+          size_t enqueue_end_tsc_ = GetTime::WorkerRdtsc();
+          if (frame_tracking_.cur_sche_frame_id_ == this->config_->FrameToProfile()) {
+            config_->LogMasterEnqueueStats(EventType::kFFT,
+                                           frame_tracking_.cur_sche_frame_id_,
+                                           symbol_id,
+                                           enqueue_start_tsc_,
+                                           enqueue_end_tsc_);
           }
         }
       }

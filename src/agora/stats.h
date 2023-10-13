@@ -43,7 +43,7 @@ enum class TsType : size_t {
   kPilotAllRX,         // All pilot packets received
   kRCAllRX,            // All Reciprocity Calibration Symbols received
   kFFTPilotsDone,      // Completed FFT for all pilots in this frame
-  kBeamDone,           // Completed zero forcing for this frame
+  kBeamDone,           // Completed zeroforcing for this frame
   kDemulDone,          // Completed demodulation for this frame
   kRXDone,             // All packets of a frame received
   kRCDone,             // Reciprocity Calibration Computation done

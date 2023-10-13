@@ -12,16 +12,16 @@
 static const std::string kProjectDir = TOSTRING(PROJECT_DIRECTORY);
 static const std::string kStatsOutputFilePath =
     kProjectDir + "/files/experiment/";
-static const std::string kAgoraConfigFilename =
-    kStatsOutputFilePath + "agora_config.txt";
 static const std::string kStatsDataFilename =
     kStatsOutputFilePath + "timeresult.txt";
 static const std::string kStatsDetailedDataFilename =
     kStatsOutputFilePath + "timeresult_detail.txt";
+static const std::string kAgoraConfigFilename =
+    kStatsOutputFilePath + "agora_config.txt";
 static const std::string kMasterFilename =
-    kStatsOutputFilePath + "master.txt";
+    kStatsOutputFilePath + "timestamps_master.txt";
 static const std::string kWorkerFilename =
-    kStatsOutputFilePath + "worker.txt";
+    kStatsOutputFilePath + "timestamps_workers.txt";
 
 Stats::Stats(const Config* const cfg)
     : config_(cfg),
@@ -52,14 +52,6 @@ void Stats::PopulateSummary(FrameSummary* frame_summary, size_t thread_id,
     frame_summary->us_avg_threads_.at(j) +=
         frame_summary->us_this_thread_.at(j);
   }
-
-  // std::printf("DEBUG: doer_type: %zu, thread_id: %zu, ds->task_count_: %zu, ds->task_duration_.at(0): %zu, "
-  //             "ds_old->task_duration_.at(0): %zu, us_this_thread_.at(0): %lf, "
-  //             "us_avg_threads_.at(0): %lf \n",
-  //             static_cast<size_t>(doer_type), thread_id, ds->task_count_, ds->task_duration_.at(0), 
-  //             ds_old->task_duration_.at(0), frame_summary->us_this_thread_.at(0),
-  //             frame_summary->us_avg_threads_.at(0));
-
   *ds_old = *ds;
 }
 
@@ -69,8 +61,6 @@ void Stats::ComputeAvgOverThreads(FrameSummary* frame_summary,
     frame_summary->us_avg_threads_.at(j) =
         frame_summary->us_avg_threads_.at(j) / thread_num;
   }
-  // std::printf("DEBUG: thread_num: %zu, us_avg_threads_.at(0): %lf \n",
-  //             thread_num, frame_summary->us_avg_threads_.at(0));
 }
 
 void Stats::PrintPerThreadPerTask(std::string const& doer_string,
@@ -269,10 +259,10 @@ void Stats::SaveToFile() {
     RtAssert(false,
              std::string("No uplink or downlink symbols in the frame\n"));
   }
-
   std::fclose(fp_debug);
 
-  if (kIsWorkerTimingEnabled == true) {
+  if (config_->EnableProfiling() == true) {
+
     AGORA_LOG_INFO("Stats: Printing Agora configurations to %s\n",
                    kAgoraConfigFilename.c_str());
 
@@ -282,18 +272,21 @@ void Stats::SaveToFile() {
     RtAssert(fp_agora_config != nullptr,
              std::string("Open file failed ") + std::to_string(errno));
 
-    // Print configurations
+    // Print Agora configuration parameters
     std::fprintf(fp_agora_config,
-                 "fft_size, ofdm_data_num, demul_block_size, bs_radio_num, "
-                 "ue_radio_num, worker_thread_num, ul_symbol_num_perframe, "
-                 "dl_symbol_num_perframe, pilot_symbol_num_perframe, max_frame\n");
+                 "freq_ghz, rate, fft_size, ofdm_data_num, samps_per_symbol, "
+                 "demul_block_size, bs_radio_num, ue_radio_num, worker_thread_num, "
+                 "pilot_symbol_num_perframe, ul_symbol_num_perframe, "
+                 "dl_symbol_num_perframe, total_symbol_num_perframe, max_frame, profiling_frame\n");
 
     std::fprintf(fp_agora_config,
-                 "%zu %zu %zu %zu %zu %zu %zu %zu %zu %zu\n",
-                 config_->OfdmCaNum(), config_->OfdmDataNum(), config_->DemulBlockSize(), 
-                 config_->NumRadios(), config_->UeNum(), config_->WorkerThreadNum(), 
-                 config_->Frame().NumULSyms(), config_->Frame().NumDLSyms(), 
-                 config_->Frame().NumPilotSyms(), config_->FramesToTest());
+                 "%f %.0f %zu %zu %zu %zu %zu %zu %zu %zu %zu %zu %zu %zu %zu\n",
+                 config_->FreqGhz(), config_->Rate(), config_->OfdmCaNum(),
+                 config_->OfdmDataNum(), config_->SampsPerSymbol(), config_->DemulBlockSize(),
+                 config_->NumRadios(), config_->UeNum(), config_->WorkerThreadNum(),
+                 config_->Frame().NumPilotSyms(), config_->Frame().NumULSyms(),
+                 config_->Frame().NumDLSyms(), config_->Frame().NumTotalSyms(),
+                 config_->FramesToTest(), config_->FrameToProfile());
 
     std::fclose(fp_agora_config);
 
@@ -414,7 +407,8 @@ void Stats::SaveToFile() {
     std::fclose(fp_debug_detailed);
   }
 
-  if (kIsMasterTimingEnabled) {
+  if (config_->EnableProfiling() == true) {
+
     FILE* fp_master = std::fopen(kMasterFilename.c_str(), "w");
 
     RtAssert(fp_master != nullptr,
@@ -424,19 +418,15 @@ void Stats::SaveToFile() {
   
     std::fprintf(
       fp_master, "Master frame %zu: dequeue %zu tasks, start: %zu\n",
-      kFrameForProfiling, config_->dequeue_stats_id_,
-      MasterGetTsc(TsType::kFirstSymbolRX, kFrameForProfiling));
+      config_->FrameToProfile(), config_->dequeue_stats_id_,
+      MasterGetTsc(TsType::kFirstSymbolRX, config_->FrameToProfile()));
 
-    // AGORA_LOG_INFO("Master: NumTotalSyms: %zu, enqueue_stats_id_: %zu, dequeue_stats_id_: %zu\n",
-    //                config_->Frame().NumTotalSyms(),
-    //                config_->enqueue_stats_id_.at(0),
-    //                config_->dequeue_stats_id_);
     for (size_t i = 0; i < config_->Frame().NumTotalSyms(); i++) {
       for (size_t j = 0; j < config_->enqueue_stats_id_.at(i); j++) {
         std::fprintf(fp_master,
                      "Master frame %zu symbol %zu: enqueue task %s tsc "
                      "[%zu-%zu] = %.3f\n",
-                     kFrameForProfiling, i,
+                     config_->FrameToProfile(), i,
                      eventTypeToString.at(static_cast<size_t>(config_->enqueue_stats_[i][j].event_type_)).c_str(),
                      config_->enqueue_stats_[i][j].tsc_end_,
                      config_->enqueue_stats_[i][j].tsc_start_,
@@ -449,7 +439,7 @@ void Stats::SaveToFile() {
     for (size_t i = 0; i < config_->dequeue_stats_id_; i++) {
       std::fprintf(fp_master,
                    "Master frame %zu: dequeue task %s tsc [%zu-%zu] = %.3f\n",
-                   kFrameForProfiling,
+                   config_->FrameToProfile(),
                    eventTypeToString.at(static_cast<size_t>(config_->dequeue_stats_[i].event_type_)).c_str(),
                    config_->dequeue_stats_[i].tsc_end_, config_->dequeue_stats_[i].tsc_start_,
                    GetTime::CyclesToUs(config_->dequeue_stats_[i].tsc_end_ - 
@@ -459,7 +449,8 @@ void Stats::SaveToFile() {
     std::fclose(fp_master);
   }
 
-  if (kIsWorkerTimingEnabled) {
+  if (config_->EnableProfiling() == true) {
+
     FILE* fp_worker = std::fopen(kWorkerFilename.c_str(), "w");
 
     RtAssert(fp_worker != nullptr,
@@ -469,7 +460,7 @@ void Stats::SaveToFile() {
                 kWorkerFilename.c_str());
 
     for (size_t tid = 0; tid < task_thread_num_; tid++) {
-      for (size_t i = kFrameForProfiling; i <= this->last_frame_id_; i += 2000) {
+      for (size_t i = config_->FrameToProfile(); i <= this->last_frame_id_; i += 2000) {
         std::fprintf(
           fp_worker,
           "Worker %zu frame %zu: %zu enqueue takes %.2f us, dequeue takes %.2f us"
@@ -488,7 +479,7 @@ void Stats::SaveToFile() {
           std::fprintf(
             fp_worker,
             "Worker %zu frame %zu symbol %zu: enqueue task %s tsc [%zu-%zu] = %.3f\n",
-            tid, kFrameForProfiling, i,
+            tid, config_->FrameToProfile(), i,
             eventTypeToString.at(static_cast<size_t>(config_->worker_enqueue_stats_[tid][i][j].event_type_)).c_str(),
             config_->worker_enqueue_stats_[tid][i][j].tsc_end_,
             config_->worker_enqueue_stats_[tid][i][j].tsc_start_,
@@ -503,7 +494,7 @@ void Stats::SaveToFile() {
             fp_worker,
             "Worker %zu frame %zu symbol %zu: dequeue task %s tsc [%zu-%zu] = "
             "%.3f\n",
-            tid, kFrameForProfiling, i,
+            tid, config_->FrameToProfile(), i,
             eventTypeToString.at(static_cast<size_t>(config_->worker_dequeue_stats_[tid][i][j].event_type_)).c_str(),
             config_->worker_dequeue_stats_[tid][i][j].tsc_end_,
             config_->worker_dequeue_stats_[tid][i][j].tsc_start_,
@@ -512,7 +503,8 @@ void Stats::SaveToFile() {
                                 config_->FreqGhz()));
         }
       }
-    }    
+    }
+    std::fclose(fp_worker);
   }
 }
 
