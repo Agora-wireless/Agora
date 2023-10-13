@@ -257,7 +257,7 @@ std::string FiveGConfig::FormFrame(std::string frame_schedule, size_t user_num,
   RtAssert(subframe_idx == 9,
            "Entered frame_schedule has less than 10 subframes.");
   // Create the frame based on the format nums in the subframe array.
-  frame += FormBeaconSubframe(subframes[0], user_num_);
+  frame += FormBeaconSubframe(subframes[0], user_num);
   for (size_t i = 1; i < kSubframesPerFrame; i++) {
     if (subframes[i] == kFlexibleSlotFormatIdx) {
       frame += flex_formats.at(flex_format_idx);
