@@ -327,9 +327,7 @@ class Config {
   inline uint16_t DpdkNumPorts() const { return this->dpdk_num_ports_; }
   inline uint16_t DpdkPortOffset() const { return this->dpdk_port_offset_; }
 
-  inline std::string SchedulerType() const {
-    return this->scheduler_type_;
-  }
+  inline std::string SchedulerType() const { return this->scheduler_type_; }
 
   inline const std::string& DpdkMacAddrs() const {
     return this->dpdk_mac_addrs_;

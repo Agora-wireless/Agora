@@ -28,37 +28,24 @@ class ProportionalFairness : public SchedulerModel {
   arma::uvec ScheduledUeMap(size_t frame_id, size_t sc_id) final;
 
  protected:
-  arma::vec last_SE_;
-
-  //Vector of size 1 x UEs that records the sum of UEs max capacity
-  arma::vec pf_UEs_history_;
-
-  //Matrix of size Frames x UEs, records the UEs max capacity at specific frame
-  std::vector<arma::vec> pf_UEs_history_frames_;
-
-  size_t current_frame = 0;
+  arma::vec last_se_;
+  size_t current_frame_ = 0;
 
   std::vector<bool> ues_flags_;
-  std::vector<float> pf_ues_history;
+  std::vector<float> pf_ues_history_;
 
   //Vector of possible scheduling options
-  std::vector<std::vector<size_t> > groups_vector;
-  std::vector<size_t> ues_vector;
-  std::vector<size_t> combination;
-
-  std::vector<float> snr_per_ue_;
-  arma::cx_fmat csi_;
+  std::vector<std::vector<size_t>> groups_vector_;
+  std::vector<size_t> ues_vector_;
+  std::vector<size_t> combination_;
 
   std::vector<float> capacities_per_ue_;
   arma::cx_fcube channel_covariance_matrices_;
-
-  //Returns the maximum capacity per ue
   std::vector<float> UEsCapacity(arma::cx_fmat csi,
                                  std::vector<float> snr_per_ue);
 
   void Schedule(size_t frame, std::vector<float> ues_capacity);
   void UpdatePF(size_t frame, std::vector<float> ues_capacity);
-
   void Combination(int k, int offset);
 };
 
