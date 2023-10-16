@@ -14,7 +14,7 @@
 
 class RoundRobbin : public SchedulerModel {
  public:
-  RoundRobbin(Config* const cfg);
+  explicit RoundRobbin(Config* const cfg);
   ~RoundRobbin() = default;
 
   bool IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id) final;

@@ -15,7 +15,7 @@
 
 class SchedulerModel {
  public:
-  SchedulerModel(Config* const cfg);
+  explicit SchedulerModel(Config* const cfg);
   virtual ~SchedulerModel();
 
   virtual void Update(size_t frame_id, arma::cx_fmat csi_,
