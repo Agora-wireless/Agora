@@ -52,7 +52,7 @@ EventData DoIFFT::Launch(size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ant_id = gen_tag_t(tag).ant_id_;
-  const bool bypass_iFFT = cfg_->FreqDomainChannel();
+  const bool bypass_ifft = cfg_->FreqDomainChannel();
 
   if (kDebugPrintInTask) {
     std::printf("In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n",
@@ -79,7 +79,7 @@ EventData DoIFFT::Launch(size_t tag) {
   std::memset(ifft_in_ptr + (cfg_->OfdmDataStop()) * 2, 0,
               sizeof(float) * cfg_->OfdmDataStart() * 2);
 
-  if (bypass_iFFT && kMemcpyBeforeIFFT) {
+  if (bypass_ifft && kMemcpyBeforeIFFT) {
     std::memcpy(ifft_out_ptr, ifft_in_ptr,
                 sizeof(float) * cfg_->OfdmCaNum() * 2);
   } else {

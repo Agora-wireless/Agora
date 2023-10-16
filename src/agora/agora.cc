@@ -50,7 +50,7 @@ static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
 // add 1 if dedicating core for RP
 Agora::Agora(Config* const cfg)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum() +
-                               cfg->DynamicCoreAlloc()),
+                               (cfg->DynamicCoreAlloc() ? 1 : 0)),
       config_(cfg),
       mac_sched_(std::make_unique<MacScheduler>(cfg)),
       stats_(std::make_unique<Stats>(cfg)),

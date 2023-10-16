@@ -34,8 +34,8 @@ class SchedulerModel {
   static std::unique_ptr<SchedulerModel> CreateSchedulerModel(
       Config* const cfg);
 
-  inline const size_t SelectedGroup() const { return selected_group_; }
-  inline const size_t NumGroups() const { return num_groups_; }
+  inline size_t SelectedGroup() const { return selected_group_; }
+  inline size_t NumGroups() const { return num_groups_; }
 
  protected:
   Config* const cfg_;

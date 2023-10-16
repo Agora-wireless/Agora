@@ -41,8 +41,7 @@ ChannelModel::ChannelModel(size_t bs_ant_num, size_t ue_ant_num,
     : bss_num_(bs_ant_num),
       ues_num_(ue_ant_num),
       n_samps_(samples_per_sym),
-      h_flat_(),
-      h_selective_(),
+      
       fading_type_(fading_type) {}
 
 /*

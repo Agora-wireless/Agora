@@ -59,7 +59,7 @@ EventData DoIFFTClient::Launch(size_t tag) {
 
   const size_t symbol_idx_ul = cfg_->Frame().GetULSymbolIdx(symbol_id);
 
-  const bool bypass_iFFT = cfg_->FreqDomainChannel();
+  const bool bypass_ifft = cfg_->FreqDomainChannel();
 
   if (kDebugPrintInTask) {
     AGORA_LOG_INFO(
@@ -82,7 +82,7 @@ EventData DoIFFTClient::Launch(size_t tag) {
   std::memset(ifft_in_ptr + (cfg_->OfdmDataStop()) * 2, 0,
               sizeof(float) * cfg_->OfdmDataStart() * 2);
 
-  if (bypass_iFFT && kMemcpyBeforeIFFT) {
+  if (bypass_ifft && kMemcpyBeforeIFFT) {
     std::memcpy(ifft_out_ptr, ifft_in_ptr,
                 sizeof(float) * cfg_->OfdmCaNum() * 2);
   } else {

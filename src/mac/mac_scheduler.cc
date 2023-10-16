@@ -6,7 +6,7 @@
 
 #include "logger.h"
 
-static constexpr size_t kCSI_SubcarrierIdx = 0;
+static constexpr size_t kCsiSubcarrierIdx = 0;
 
 MacScheduler::MacScheduler(Config* const cfg) : cfg_(cfg) {
   scheduler_model_ = std::move(SchedulerModel::CreateSchedulerModel(cfg_));
@@ -56,7 +56,7 @@ void MacScheduler::UpdateSNR(std::vector<float> snr_per_ue) {
 }
 
 void MacScheduler::UpdateCSI(size_t cur_sc_id, const arma::cx_fmat& csi_in) {
-  if (cur_sc_id == kCSI_SubcarrierIdx) {
+  if (cur_sc_id == kCsiSubcarrierIdx) {
     csi_ = csi_in;
   }
 }

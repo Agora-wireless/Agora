@@ -642,9 +642,9 @@ Config::Config(std::string jsonfilename)
   core_offset_ = tdd_conf.value("core_offset", 0);
   // use all available cores
   if (dynamic_core_allocation_) {
-    worker_thread_num_ =
-        sysconf(_SC_NPROCESSORS_ONLN) -
-        (core_offset_ + socket_thread_num_ + dynamic_core_allocation_ + 1);
+    worker_thread_num_ = sysconf(_SC_NPROCESSORS_ONLN) -
+                         (core_offset_ + socket_thread_num_ +
+                          (dynamic_core_allocation_ ? 1 : 0) + 1);
   } else {
     worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
   }
@@ -1197,12 +1197,12 @@ void Config::GenPilots() {
   AllocBuffer1d(&pilot_pre_ifft_, this->ofdm_ca_num_,
                 Agora_memory::Alignment_t::kAlign64, 1);
 
-  complex_float* ifft_ptr_ = pilot_ifft_;
-  std::memcpy(ifft_ptr_ + ofdm_data_start_, this->pilots_,
+  complex_float* ifft_ptr = pilot_ifft_;
+  std::memcpy(ifft_ptr + ofdm_data_start_, this->pilots_,
               ofdm_data_num_ * sizeof(complex_float));
 
   if (this->freq_domain_channel_ == false) {
-    CommsLib::FFTShift(ifft_ptr_, ofdm_ca_num_);
+    CommsLib::FFTShift(ifft_ptr, ofdm_ca_num_);
     CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
   }
 
@@ -1456,13 +1456,13 @@ void Config::GenData() {
         }
       }
 
-      complex_float* ifft_ptr_ = &ul_iq_ifft[i][u * ofdm_ca_num_];
-      std::memcpy(ifft_ptr_ + ofdm_data_start_, ul_iq_f_[i] + q,
+      complex_float* ifft_ptr = &ul_iq_ifft[i][u * ofdm_ca_num_];
+      std::memcpy(ifft_ptr + ofdm_data_start_, ul_iq_f_[i] + q,
                   ofdm_data_num_ * sizeof(complex_float));
 
       if (this->freq_domain_channel_ == false) {
-        CommsLib::FFTShift(ifft_ptr_, ofdm_ca_num_);
-        CommsLib::IFFT(ifft_ptr_, ofdm_ca_num_, false);
+        CommsLib::FFTShift(ifft_ptr, ofdm_ca_num_);
+        CommsLib::IFFT(ifft_ptr, ofdm_ca_num_, false);
       }
     }
   }
@@ -1548,13 +1548,13 @@ void Config::GenData() {
         }
       }
 
-      complex_float* ifft_ptr_ = &dl_iq_ifft[i][u * ofdm_ca_num_];
-      std::memcpy(ifft_ptr_ + ofdm_data_start_, dl_iq_f_[i] + q,
+      complex_float* ifft_ptr = &dl_iq_ifft[i][u * ofdm_ca_num_];
+      std::memcpy(ifft_ptr + ofdm_data_start_, dl_iq_f_[i] + q,
                   ofdm_data_num_ * sizeof(complex_float));
 
       if (this->freq_domain_channel_ == false) {
-        CommsLib::FFTShift(ifft_ptr_, ofdm_ca_num_);
-        CommsLib::IFFT(ifft_ptr_, ofdm_ca_num_, false);
+        CommsLib::FFTShift(ifft_ptr, ofdm_ca_num_);
+        CommsLib::IFFT(ifft_ptr, ofdm_ca_num_, false);
       }
     }
   }
@@ -1606,10 +1606,10 @@ void Config::GenData() {
 
   // Generate time domain ue-specific pilot symbols
   for (size_t i = 0; i < this->ue_ant_num_; i++) {
-    complex_float* ue_pilot_ = (this->freq_domain_channel_)
-                                   ? ue_pilot_pre_ifft_[i]
-                                   : ue_pilot_ifft_[i];
-    CommsLib::Ifft2tx(ue_pilot_, this->ue_specific_pilot_t_[i],
+    complex_float* ue_pilot = (this->freq_domain_channel_)
+                                  ? ue_pilot_pre_ifft_[i]
+                                  : ue_pilot_ifft_[i];
+    CommsLib::Ifft2tx(ue_pilot, this->ue_specific_pilot_t_[i],
                       this->ofdm_ca_num_, this->ofdm_tx_zero_prefix_,
                       this->cp_len_, kDebugDownlink ? 1 : this->scale_);
   }
@@ -1703,8 +1703,8 @@ void Config::GenData() {
     FreeBuffer1d(&pilot_pre_ifft_);
   }
 
-  delete[](ul_temp_parity_buffer);
-  delete[](dl_temp_parity_buffer);
+  delete[] (ul_temp_parity_buffer);
+  delete[] (dl_temp_parity_buffer);
   ul_iq_ifft.Free();
   dl_iq_ifft.Free();
   dl_encoded_bits.Free();
@@ -2003,7 +2003,7 @@ void Config::Print() const {
 }
 
 extern "C" {
-__attribute__((visibility("default"))) Config* ConfigNew(char* filename) {
+__attribute__((visibility("default"))) Config* ConfigNew(const char* filename) {
   auto* cfg = new Config(filename);
   cfg->GenData();
   return cfg;
