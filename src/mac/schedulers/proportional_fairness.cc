@@ -78,7 +78,7 @@ ProportionalFairness::ProportionalFairness(Config* const cfg)
   AGORA_LOG_INFO(ss.str());
 }
 
-void ProportionalFairness::Combination(int k, int offset = 0) {
+void ProportionalFairness::Combination(int k, int offset) {
   if (k == 0) {
     groups_vector_.push_back(combination_);
     return;
