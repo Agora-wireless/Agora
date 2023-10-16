@@ -4,6 +4,8 @@
  */
 #include "mac_scheduler.h"
 
+#include <utility>
+
 #include "logger.h"
 
 static constexpr size_t kCsiSubcarrierIdx = 0;
@@ -52,7 +54,7 @@ void MacScheduler::UpdateScheduler(size_t frame_id) {
 }
 
 void MacScheduler::UpdateSNR(std::vector<float> snr_per_ue) {
-  snr_per_ue_ = snr_per_ue;
+  snr_per_ue_ = std::move(snr_per_ue);
 }
 
 void MacScheduler::UpdateCSI(size_t cur_sc_id, const arma::cx_fmat& csi_in) {

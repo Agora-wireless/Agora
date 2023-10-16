@@ -18,8 +18,8 @@ class SchedulerModel {
   explicit SchedulerModel(Config* const cfg);
   virtual ~SchedulerModel();
 
-  virtual void Update(size_t frame_id, arma::cx_fmat csi_,
-                      std::vector<float> snr_per_ue_) {}
+  virtual void Update(size_t frame_id, const arma::cx_fmat& csi,
+                      const std::vector<float>& snr_per_ue) {}
 
   virtual bool IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id) {
     return false;

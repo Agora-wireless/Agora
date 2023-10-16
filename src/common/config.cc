@@ -541,7 +541,7 @@ Config::Config(std::string jsonfilename)
     convert a subframe formated frame into the symbol formated frame that Agora
     is designed to handle.
     */
-    if (frame.find(",") != std::string::npos) {
+    if (frame.find(',') != std::string::npos) {
       std::vector<std::string> flex_formats =
           tdd_conf.value("flex_formats", json::array());
       FiveGConfig fivegconfig = FiveGConfig(tdd_conf);

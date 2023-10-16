@@ -90,8 +90,8 @@ void ProportionalFairness::Combination(int k, int offset) {
   }
 }
 
-void ProportionalFairness::Update(size_t frame_id, arma::cx_fmat csi,
-                                  std::vector<float> snr_per_ue) {
+void ProportionalFairness::Update(size_t frame_id, const arma::cx_fmat& csi,
+                                  const std::vector<float>& snr_per_ue) {
   std::vector<float> ues_capacity = UEsCapacity(csi, snr_per_ue);
 
   if (frame_id < kCalibFrames) {
@@ -121,7 +121,7 @@ void ProportionalFairness::Update(size_t frame_id, arma::cx_fmat csi,
 }
 
 std::vector<float> ProportionalFairness::UEsCapacity(
-    arma::cx_fmat csi, std::vector<float> snr_per_ue) {
+    const arma::cx_fmat& csi, const std::vector<float>& snr_per_ue) {
   // Calculate the channel covariance matrices for each UE
   std::vector<size_t> selected_ues = groups_vector_[selected_group_];
   for (size_t ue = 0; ue < cfg_->SpatialStreamsNum(); ue++) {
@@ -140,7 +140,7 @@ std::vector<float> ProportionalFairness::UEsCapacity(
 }
 
 void ProportionalFairness::Schedule(size_t frame,
-                                    std::vector<float> ues_capacity) {
+                                    const std::vector<float>& ues_capacity) {
   arma::vec pf(num_groups_, arma::fill::zeros);
   float max_pf = 0;
   for (size_t action = 0; action < num_groups_; action++) {
@@ -165,7 +165,7 @@ void ProportionalFairness::Schedule(size_t frame,
 }
 
 void ProportionalFairness::UpdatePF(size_t frame,
-                                    std::vector<float> ues_capacity) {
+                                    const std::vector<float>& ues_capacity) {
   for (const auto& idx : groups_vector_[selected_group_]) {
     pf_ues_history_[idx] += ues_capacity[idx];
   }
