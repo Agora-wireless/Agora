@@ -77,6 +77,36 @@ MacThreadClient::MacThreadClient(
       std::make_unique<UDPServer>(cfg_->UeServerAddr(), kMacBaseClientPort,
                                   udp_control_len * kMaxUEs * kMaxPktsPerUE);
   crc_obj_ = std::make_unique<DoCRC>();
+
+  //Init the UL Bits Buffer
+  const size_t num_ul_mac_packets_per_frame =
+      cfg_->MacPacketsPerframe(Direction::kUplink);
+  const size_t num_ul_pilot_symbols = cfg_->Frame().ClientUlPilotSymbols();
+  for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
+    for (size_t radio_buffer_id = 0; radio_buffer_id < kFrameWnd;
+         radio_buffer_id++) {
+      for (size_t ul_sym_idx = num_ul_pilot_symbols;
+           ul_sym_idx < cfg_->Frame().NumULSyms(); ul_sym_idx++) {
+        AGORA_LOG_TRACE("Init Ul Buffer %zu symbol [%zu:%zu]\n",
+                        radio_buffer_id, ul_sym_idx,
+                        cfg_->Frame().GetULSymbol(ul_sym_idx));
+        const size_t dest_pkt_offset =
+            ((radio_buffer_id * num_ul_mac_packets_per_frame) +
+             (ul_sym_idx - num_ul_pilot_symbols)) *
+            cfg_->MacPacketLength(Direction::kUplink);
+
+        auto* pkt = reinterpret_cast<MacPacketPacked*>(
+            &(*client_.ul_bits_buffer_)[ue_id][dest_pkt_offset]);
+
+        //Frame 0, Data Size 0
+        pkt->Set(0, cfg_->Frame().GetULSymbol(ul_sym_idx), ue_id, 0);
+        // Insert CRC
+        pkt->Crc(static_cast<uint16_t>(
+            (crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) &
+             0xFFFF)));
+      }
+    }
+  }
 }
 
 MacThreadClient::~MacThreadClient() {
@@ -425,13 +455,17 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
 
   // We've received bits for the uplink.
   size_t& radio_buf_id = client_.ul_bits_buffer_id_[next_radio_id_];
-
   if ((*client_.ul_bits_buffer_status_)[next_radio_id_][radio_buf_id] == 1) {
-    std::fprintf(
-        stderr,
+    AGORA_LOG_WARN(
         "MacThreadClient: UDP RX buffer full, buffer ID: %zu. Dropping "
         "rx frame data\n",
         radio_buf_id);
+
+    //Move on to the next radio
+    next_radio_id_ = (next_radio_id_ + 1) % cfg_->UeAntNum();
+    if (next_radio_id_ == 0) {
+      next_tx_frame_id_++;
+    }
     return;
   }
 

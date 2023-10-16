@@ -166,16 +166,19 @@ void PhyStats::PrintPhyStats() {
 }
 
 void PhyStats::PrintEvmStats(size_t frame_id, const arma::uvec& ue_list) {
-  arma::fmat evm_buf(evm_buffer_[frame_id % kFrameWnd], config_->UeAntNum(), 1,
-                     false);
-  arma::fmat evm_mat =
-      evm_buf.st() / (config_->OfdmDataNum() * num_rxdata_symbols_);
+  //Disable the EVM if the mac is enabled
+  if constexpr (kEnableMac == false) {
+    arma::fmat evm_buf(evm_buffer_[frame_id % kFrameWnd], config_->UeAntNum(),
+                       1, false);
+    arma::fmat evm_mat =
+        evm_buf.st() / (config_->OfdmDataNum() * num_rxdata_symbols_);
 
-  [[maybe_unused]] std::stringstream ss;
-  ss << "Frame " << frame_id << ", Scheduled User(s): \n  " << ue_list.st()
-     << "  EVM " << (100.0f * arma::sqrt(evm_mat(ue_list).st())) << "  SNR "
-     << (-10.0f * arma::log10(evm_mat(ue_list).st()));
-  AGORA_LOG_INFO("%s\n", ss.str().c_str());
+    [[maybe_unused]] std::stringstream ss;
+    ss << "Frame " << frame_id << ", Scheduled User(s): \n  " << ue_list.st()
+       << "  EVM " << (100.0f * arma::sqrt(evm_mat(ue_list).st())) << "  SNR "
+       << (-10.0f * arma::log10(evm_mat(ue_list).st()));
+    AGORA_LOG_INFO("%s\n", ss.str().c_str());
+  }
 }
 
 float PhyStats::GetEvmSnr(size_t frame_id, size_t ue_id) {
@@ -338,9 +341,10 @@ void PhyStats::RecordEvm(size_t frame_id, size_t num_rec_sc,
     ss_evm_sc << frame_id;
     const size_t num_frame_data = config_->OfdmDataNum() * num_rxdata_symbols_;
     for (size_t ue_id = 0; ue_id < config_->UeAntNum(); ue_id++) {
-      float evm_pcnt = ((std::sqrt(evm_buffer_[frame_id % kFrameWnd][ue_id] /
-                                   num_frame_data)) *
-                        100.0f);
+      const float evm_pcnt =
+          ((std::sqrt(evm_buffer_[frame_id % kFrameWnd][ue_id] /
+                      num_frame_data)) *
+           100.0f);
       ss_evm << ","
              << ((ue_map.at(ue_id) != 0) ? std::to_string(evm_pcnt) : "ns");
     }
