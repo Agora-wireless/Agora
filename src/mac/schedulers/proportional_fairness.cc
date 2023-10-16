@@ -146,9 +146,8 @@ void ProportionalFairness::Schedule(size_t frame,
   for (size_t action = 0; action < num_groups_; action++) {
     std::vector<size_t> selected_ues = groups_vector_[action];
     if (frame > 0) {
-      for (size_t i = 0; i < selected_ues.size(); i++) {
+      for (const auto& ue_idx : selected_ues) {
         float tp_history = 0;
-        size_t ue_idx = selected_ues[i];
         if (ues_flags_[ue_idx]) {
           tp_history = kLamda * pf_ues_history_[ue_idx] / frame +
                        (1 - kLamda) * last_se_[ue_idx];
@@ -167,8 +166,7 @@ void ProportionalFairness::Schedule(size_t frame,
 
 void ProportionalFairness::UpdatePF(size_t frame,
                                     std::vector<float> ues_capacity) {
-  for (size_t i = 0; i < groups_vector_[selected_group_].size(); i++) {
-    size_t idx = groups_vector_[selected_group_][i];
+  for (const auto& idx : groups_vector_[selected_group_]) {
     pf_ues_history_[idx] += ues_capacity[idx];
   }
   for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {

@@ -356,5 +356,5 @@ EventData DoDemul::Launch(size_t tag) {
 
   duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
   duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
-  return EventData(EventType::kDemul, tag);
+  return {EventType::kDemul, tag};
 }

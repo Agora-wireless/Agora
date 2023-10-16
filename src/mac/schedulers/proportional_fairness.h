@@ -16,7 +16,7 @@
 class ProportionalFairness : public SchedulerModel {
  public:
   explicit ProportionalFairness(Config* const cfg);
-  ~ProportionalFairness() = default;
+  ~ProportionalFairness() override = default;
 
   size_t UpdateScheduler(size_t frame_id, std::vector<float> ues_capacity);
 

@@ -88,7 +88,7 @@ DoBeamWeights::~DoBeamWeights() {
 
 EventData DoBeamWeights::Launch(size_t tag) {
   ComputeBeams(tag);
-  return EventData(EventType::kBeam, tag);
+  return {EventType::kBeam, tag};
 }
 
 void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,

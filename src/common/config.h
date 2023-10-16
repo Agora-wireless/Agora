@@ -754,10 +754,10 @@ class Config {
 
   std::vector<uint32_t> pilot_;
   std::vector<uint32_t> beacon_;
-  complex_float* pilots_;
-  complex_float* pilots_sgn_;
-  complex_float* pilot_pre_ifft_;
-  complex_float* pilot_ifft_;
+  complex_float* pilots_{nullptr};
+  complex_float* pilots_sgn_{nullptr};
+  complex_float* pilot_pre_ifft_{nullptr};
+  complex_float* pilot_ifft_{nullptr};
   Table<complex_float> ue_specific_pilot_;
   Table<complex_float> ue_pilot_pre_ifft_;
   Table<complex_float> ue_pilot_ifft_;

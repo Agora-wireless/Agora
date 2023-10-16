@@ -13,7 +13,7 @@
 static constexpr size_t kMaxReadAttempts = 2u;
 
 FileReceiver::FileReceiver(std::string &file_name)
-    : file_name_(file_name), data_available_(0), data_start_offset_(0) {
+    : file_name_(file_name) {
   ///\todo Make sure that the file size is > FileReceiver::kFileStreamRxSize
   data_stream_.open(file_name_, (std::ifstream::in | std::ifstream::binary));
   assert(data_stream_.is_open() == true);

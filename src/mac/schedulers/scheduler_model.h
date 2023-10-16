@@ -25,10 +25,10 @@ class SchedulerModel {
     return false;
   }
   virtual arma::uvec ScheduledUeList(size_t frame_id, size_t sc_id) {
-    return arma::uvec();
+    return {};
   }
   virtual arma::uvec ScheduledUeMap(size_t frame_id, size_t sc_id) {
-    return arma::uvec();
+    return {};
   }
 
   static std::unique_ptr<SchedulerModel> CreateSchedulerModel(
@@ -43,7 +43,7 @@ class SchedulerModel {
   Table<size_t> schedule_buffer_index_;
   Table<int> schedule_buffer_;
 
-  size_t selected_group_;
+  size_t selected_group_{0};
   size_t num_groups_;
 };
 

@@ -15,7 +15,7 @@
 class RoundRobbin : public SchedulerModel {
  public:
   explicit RoundRobbin(Config* const cfg);
-  ~RoundRobbin() = default;
+  ~RoundRobbin() override = default;
 
   bool IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id) final;
   arma::uvec ScheduledUeList(size_t frame_id, size_t sc_id) final;
