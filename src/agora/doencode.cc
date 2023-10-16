@@ -180,5 +180,5 @@ EventData DoEncode::Launch(size_t tag) {
     std::printf("Thread %d Encode takes %.2f\n", tid_,
                 GetTime::CyclesToUs(duration, cfg_->FreqGhz()));
   }
-  return EventData(EventType::kEncode, tag);
+  return {EventType::kEncode, tag};
 }

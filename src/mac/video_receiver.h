@@ -37,8 +37,8 @@ class VideoReceiver : public MacDataReceiver {
   std::array<std::byte, VideoReceiver::kVideoStreamLocalRxBufSize>
       local_rx_buffer_;
 
-  size_t data_available_;
-  size_t data_start_offset_;
+  size_t data_available_{0};
+  size_t data_start_offset_{0};
 };
 
 #endif  // VIDEO_RECEIVER_H_

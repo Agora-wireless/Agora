@@ -21,7 +21,7 @@ AgoraWorker::AgoraWorker(Config* cfg, MacScheduler* mac_sched, Stats* stats,
                          PhyStats* phy_stats, MessageInfo* message,
                          AgoraBuffer* buffer, FrameInfo* frame)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum() +
-                               cfg->DynamicCoreAlloc()),
+                               (cfg->DynamicCoreAlloc() ? 1 : 0)),
       config_(cfg),
       mac_sched_(mac_sched),
       stats_(stats),
@@ -64,23 +64,23 @@ void AgoraWorker::UpdateCores(RPControlMsg rcm) {
       sysconf(_SC_NPROCESSORS_ONLN) - base_worker_core_offset_);
 
   // Target core numbers
-  size_t start_core_id_ = workers_.size();
-  size_t updated_core_num_ = workers_.size() + rcm.add_core_ - rcm.remove_core_;
+  const size_t start_core_id = workers_.size();
+  size_t updated_core_num = workers_.size() + rcm.add_core_ - rcm.remove_core_;
   // TODO: (size_t)sysconf(_SC_NPROCESSORS_ONLN) gives all available core # in the machine
-  size_t max_core_num_ =
+  const size_t max_core_num =
       sysconf(_SC_NPROCESSORS_ONLN) - base_worker_core_offset_;
 
   AGORA_LOG_INFO(
       "[ALERTTTTTT]: CPU Layout Update!!! start_core_: %zu, updated_core_num_: "
       "%zu \n",
-      start_core_id_, updated_core_num_);
+      start_core_id, updated_core_num);
 
   // Update workers
-  if (workers_.size() < updated_core_num_) {
+  if (workers_.size() < updated_core_num) {
     // Add workers
-    updated_core_num_ = std::min(updated_core_num_, max_core_num_);
+    updated_core_num = std::min(updated_core_num, max_core_num);
 
-    for (size_t core_i = start_core_id_; core_i < updated_core_num_; core_i++) {
+    for (size_t core_i = start_core_id; core_i < updated_core_num; core_i++) {
       // Update info
       active_core_[core_i] = true;
       workers_.emplace_back(&AgoraWorker::WorkerThread, this, core_i);
@@ -89,15 +89,15 @@ void AgoraWorker::UpdateCores(RPControlMsg rcm) {
   } else {
     // Remove workers
     // minimum core number?
-    updated_core_num_ = std::max(updated_core_num_, (size_t)2);
-    for (size_t core_i = start_core_id_; core_i > updated_core_num_; core_i--) {
+    updated_core_num = std::max(updated_core_num, (size_t)2);
+    for (size_t core_i = start_core_id; core_i > updated_core_num; core_i--) {
       // Update info
       active_core_[core_i - 1] = false;
       RemoveCoreFromList(core_i - 1, base_worker_core_offset_);
       workers_.at(core_i - 1).join();
       AGORA_LOG_INFO("Agora: removed core # %ld\n", core_i);
     }
-    workers_.resize(updated_core_num_);
+    workers_.resize(updated_core_num);
   }
 
   AGORA_LOG_INFO(

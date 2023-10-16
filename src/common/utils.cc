@@ -215,8 +215,8 @@ size_t GetAvailableCores() {
   std::string s;
   std::getline(file, s);
 
-  size_t start_core = (size_t)stoi(s.substr(0, s.find("-")));
-  size_t end_core = (size_t)stoi(s.substr(s.find("-") + 1));
+  size_t start_core = (size_t)stoi(s.substr(0, s.find('-')));
+  size_t end_core = (size_t)stoi(s.substr(s.find('-') + 1));
   // remove master core, tx/rx core
   return end_core - start_core;
 }
