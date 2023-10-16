@@ -4,7 +4,9 @@
  */
 #include "resource_provisioner_thread.h"
 
+#include "gettime.h"
 #include "logger.h"
+#include "rp_config.h"
 
 // ticks every ~1s
 ResourceProvisionerThread::ResourceProvisionerThread(
