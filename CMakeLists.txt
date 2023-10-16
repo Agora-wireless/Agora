@@ -396,6 +396,7 @@ include_directories(
   src/common/loggers
   src/recorder
   src/mac/
+  src/resource_provisioner
   src/radio
   src/radio/radio_set
   src/agora/
@@ -478,7 +479,8 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/dodecode.cc
   src/mac/mac_thread_basestation.cc
   src/agora/txrx/packet_txrx_sim.cc
-  src/agora/txrx/workers/txrx_worker_sim.cc)
+  src/agora/txrx/workers/txrx_worker_sim.cc
+  src/resource_provisioner/resource_provisioner_thread.cc)
 
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
