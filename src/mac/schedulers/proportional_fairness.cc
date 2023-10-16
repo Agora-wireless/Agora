@@ -164,7 +164,7 @@ void ProportionalFairness::Schedule(size_t frame,
   }
 }
 
-void ProportionalFairness::UpdatePF(size_t frame,
+void ProportionalFairness::UpdatePF(size_t /*frame*/,
                                     const std::vector<float>& ues_capacity) {
   for (const auto& idx : groups_vector_[selected_group_]) {
     pf_ues_history_[idx] += ues_capacity[idx];

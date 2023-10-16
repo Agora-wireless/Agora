@@ -63,12 +63,12 @@ void MacScheduler::UpdateCSI(size_t cur_sc_id, const arma::cx_fmat& csi_in) {
   }
 }
 
-size_t MacScheduler::ScheduledUeUlMcs(size_t frame_id, size_t ue_id) const {
+size_t MacScheduler::ScheduledUeUlMcs(size_t /*frame_id*/, size_t ue_id) const {
   const size_t gp = scheduler_model_->SelectedGroup();
   return ul_mcs_buffer_.At(gp)[ue_id];
 }
 
-size_t MacScheduler::ScheduledUeDlMcs(size_t frame_id, size_t ue_id) const {
+size_t MacScheduler::ScheduledUeDlMcs(size_t /*frame_id*/, size_t ue_id) const {
   const size_t gp = scheduler_model_->SelectedGroup();
   return dl_mcs_buffer_.At(gp)[ue_id];
 }

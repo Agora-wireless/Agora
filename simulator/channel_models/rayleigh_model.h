@@ -15,7 +15,7 @@ class RayleighModel : public ChannelModel {
       : ChannelModel(bs_ant_num, ue_ant_num, samples_per_sym,
                      ChannelModel::kFlat) {}
 
-  void UpdateModel(const float mean_channel_gain) final {
+  void UpdateModel(const float /*mean_channel_gain*/) final {
     arma::fmat rmat(ues_num_, bss_num_, arma::fill::randn);
     arma::fmat imat(ues_num_, bss_num_, arma::fill::randn);
 
