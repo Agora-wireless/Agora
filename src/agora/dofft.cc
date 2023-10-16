@@ -286,7 +286,7 @@ EventData DoFFT::Launch(size_t tag) {
   duration_stat->task_count_++;
   duration_stat->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
   return {EventType::kFFT,
-                   gen_tag_t::FrmSym(pkt->frame_id_, pkt->symbol_id_).tag_};
+          gen_tag_t::FrmSym(pkt->frame_id_, pkt->symbol_id_).tag_};
 }
 
 void DoFFT::PartialTranspose(complex_float* out_buf, size_t ant_id,

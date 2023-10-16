@@ -16,8 +16,7 @@ static const std::string kRxAddress = "";
 
 VideoReceiver::VideoReceiver(uint16_t port)
     : udp_video_receiver_(kRxAddress, port,
-                          VideoReceiver::kVideoStreamSocketRxBufSize)
-      {}
+                          VideoReceiver::kVideoStreamSocketRxBufSize) {}
 
 size_t VideoReceiver::Load(unsigned char *destination, size_t requested_bytes) {
   size_t rx_attempts = 0u;

@@ -29,7 +29,7 @@ static constexpr size_t kSockBufSize = (1024 * 1024 * 64 * 8) - 1;
 /* Helper classes */
 class SocketRxBuffer {
  public:
-  explicit SocketRxBuffer(size_t num_bytes) :  data_(num_bytes) {}
+  explicit SocketRxBuffer(size_t num_bytes) : data_(num_bytes) {}
   ~SocketRxBuffer() = default;
 
   inline size_t DataSize() const { return data_size_; }

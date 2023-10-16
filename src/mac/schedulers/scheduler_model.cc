@@ -24,8 +24,7 @@ std::unique_ptr<SchedulerModel> SchedulerModel::CreateSchedulerModel(
   }
 }
 
-SchedulerModel::SchedulerModel(Config* const cfg)
-    : cfg_(cfg) {}
+SchedulerModel::SchedulerModel(Config* const cfg) : cfg_(cfg) {}
 
 SchedulerModel::~SchedulerModel() {
   schedule_buffer_index_.Free();
