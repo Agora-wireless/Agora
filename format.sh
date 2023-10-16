@@ -37,6 +37,9 @@ clang-format-11 -i src/encoder/*.h
 clang-format-11 -i src/mac/*.cc
 clang-format-11 -i src/mac/*.h
 
+clang-format-11 -i src/mac/schedulers/*.cc
+clang-format-11 -i src/mac/schedulers/*.h
+
 clang-format-11 -i src/resource_provisioner/*.cc
 clang-format-11 -i src/resource_provisioner/*.h
 

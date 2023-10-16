@@ -97,10 +97,10 @@ class DataGenerator {
 
   void GetNoisySymbol(const std::vector<complex_float>& modulated_symbol,
                       std::vector<complex_float>& noisy_symbol,
-                      float noise_level);
+                      float noise_level) const;
   void GetNoisySymbol(const complex_float* modulated_symbol,
                       complex_float* noisy_symbol, size_t length,
-                      float noise_level);
+                      float noise_level) const;
 
   static void GetNoisySymbol(complex_float* modulated_symbol, size_t length,
                              float noise_level, unsigned seed = 0);

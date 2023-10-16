@@ -327,6 +327,8 @@ class Config {
   inline uint16_t DpdkNumPorts() const { return this->dpdk_num_ports_; }
   inline uint16_t DpdkPortOffset() const { return this->dpdk_port_offset_; }
 
+  inline std::string SchedulerType() const { return this->scheduler_type_; }
+
   inline const std::string& DpdkMacAddrs() const {
     return this->dpdk_mac_addrs_;
   }
@@ -752,10 +754,10 @@ class Config {
 
   std::vector<uint32_t> pilot_;
   std::vector<uint32_t> beacon_;
-  complex_float* pilots_;
-  complex_float* pilots_sgn_;
-  complex_float* pilot_pre_ifft_;
-  complex_float* pilot_ifft_;
+  complex_float* pilots_{nullptr};
+  complex_float* pilots_sgn_{nullptr};
+  complex_float* pilot_pre_ifft_{nullptr};
+  complex_float* pilot_ifft_{nullptr};
   Table<complex_float> ue_specific_pilot_;
   Table<complex_float> ue_pilot_pre_ifft_;
   Table<complex_float> ue_pilot_ifft_;
@@ -1016,5 +1018,7 @@ class Config {
 
   // If true, channel matrix H will be applied in the frequency domain
   bool freq_domain_channel_;
+
+  std::string scheduler_type_;
 };
 #endif /* CONFIG_HPP_ */
