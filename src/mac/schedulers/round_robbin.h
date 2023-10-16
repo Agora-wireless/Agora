@@ -7,8 +7,6 @@
 #define ROUND_ROBBIN_H_
 
 #include <cstddef>
-#include <memory>
-#include <vector>
 
 #include "armadillo"
 #include "config.h"

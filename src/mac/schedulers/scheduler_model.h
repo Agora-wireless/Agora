@@ -11,6 +11,7 @@
 
 #include "armadillo"
 #include "config.h"
+#include "memory_manage.h"
 
 class SchedulerModel {
  public:

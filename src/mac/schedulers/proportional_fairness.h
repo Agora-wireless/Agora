@@ -7,7 +7,6 @@
 #define PROPORTIONAL_FAIRNESS_H_
 
 #include <cstddef>
-#include <memory>
 #include <vector>
 
 #include "armadillo"

@@ -24,19 +24,19 @@ RoundRobbin::RoundRobbin(Config* const cfg) : SchedulerModel(cfg) {
 }
 
 bool RoundRobbin::IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id) {
-  size_t gp = frame_id % num_groups_;
+  const size_t gp = frame_id % num_groups_;
   return (schedule_buffer_[gp][ue_id + cfg_->UeAntNum() * sc_id] != 0);
 }
 
 arma::uvec RoundRobbin::ScheduledUeMap(size_t frame_id, size_t sc_id) {
-  size_t gp = frame_id % num_groups_;
+  const size_t gp = frame_id % num_groups_;
   return arma::uvec(reinterpret_cast<unsigned long long*>(
                         &schedule_buffer_[gp][cfg_->UeAntNum() * sc_id]),
                     cfg_->UeAntNum(), false);
 }
 
 arma::uvec RoundRobbin::ScheduledUeList(size_t frame_id, size_t sc_id) {
-  size_t gp = frame_id % num_groups_;
+  const size_t gp = frame_id % num_groups_;
   return sort(arma::uvec(
       reinterpret_cast<unsigned long long*>(
           &schedule_buffer_index_[gp][cfg_->SpatialStreamsNum() * sc_id]),

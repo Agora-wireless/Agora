@@ -10,7 +10,7 @@ static constexpr size_t kCSI_SubcarrierIdx = 0;
 
 MacScheduler::MacScheduler(Config* const cfg) : cfg_(cfg) {
   scheduler_model_ = std::move(SchedulerModel::CreateSchedulerModel(cfg_));
-  size_t num_groups = scheduler_model_->NumGroups();
+  const size_t num_groups = scheduler_model_->NumGroups();
 
   ul_mcs_buffer_.Calloc(num_groups, cfg_->UeAntNum(),
                         Agora_memory::Alignment_t::kAlign64);
@@ -61,12 +61,12 @@ void MacScheduler::UpdateCSI(size_t cur_sc_id, const arma::cx_fmat& csi_in) {
   }
 }
 
-size_t MacScheduler::ScheduledUeUlMcs(size_t frame_id, size_t ue_id) {
-  size_t gp = scheduler_model_->SelectedGroup();
-  return ul_mcs_buffer_[gp][ue_id];
+size_t MacScheduler::ScheduledUeUlMcs(size_t frame_id, size_t ue_id) const {
+  const size_t gp = scheduler_model_->SelectedGroup();
+  return ul_mcs_buffer_.At(gp)[ue_id];
 }
 
-size_t MacScheduler::ScheduledUeDlMcs(size_t frame_id, size_t ue_id) {
-  size_t gp = scheduler_model_->SelectedGroup();
-  return dl_mcs_buffer_[gp][ue_id];
+size_t MacScheduler::ScheduledUeDlMcs(size_t frame_id, size_t ue_id) const {
+  const size_t gp = scheduler_model_->SelectedGroup();
+  return dl_mcs_buffer_.At(gp)[ue_id];
 }

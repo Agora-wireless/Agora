@@ -5,7 +5,13 @@
 #ifndef MAC_SCHEDULER_H_
 #define MAC_SCHEDULER_H_
 
+#include <cstddef>
+#include <memory>
+#include <vector>
+
+#include "armadillo"
 #include "config.h"
+#include "memory_manage.h"
 #include "scheduler_model.h"
 
 class MacScheduler {
@@ -17,8 +23,8 @@ class MacScheduler {
   size_t ScheduledUeIndex(size_t frame_id, size_t sc_id, size_t sched_ue_id);
   arma::uvec ScheduledUeList(size_t frame_id, size_t sc_id);
   arma::uvec ScheduledUeMap(size_t frame_id, size_t sc_id);
-  size_t ScheduledUeUlMcs(size_t frame_id, size_t ue_id);
-  size_t ScheduledUeDlMcs(size_t frame_id, size_t ue_id);
+  size_t ScheduledUeUlMcs(size_t frame_id, size_t ue_id) const;
+  size_t ScheduledUeDlMcs(size_t frame_id, size_t ue_id) const;
 
   //Used for Proportional Fairness Algorithm
   void UpdateCSI(size_t cur_sc_id, const arma::cx_fmat& csi_in);
