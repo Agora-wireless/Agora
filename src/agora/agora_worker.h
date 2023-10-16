@@ -16,9 +16,8 @@
 #include "mac_scheduler.h"
 #include "mat_logger.h"
 #include "phy_stats.h"
-#include "stats.h"
 #include "rp_config.h"
-#include "utils.h"
+#include "stats.h"
 
 class AgoraWorker {
  public:

@@ -155,8 +155,10 @@ double Stats::MeasureLastFrameLatency() {
   for (size_t j = 0; j < config_->SocketThreadNum(); j++) {
     ref_tsc = std::min(ref_tsc, this->frame_start_[j][frame_id]);
   }
-  double processing_started = MasterGetUsFromRef(TsType::kProcessingStarted, frame_id, ref_tsc);
-  double decoding_done = MasterGetUsFromRef(TsType::kDecodeDone, frame_id, ref_tsc);
+  double processing_started =
+      MasterGetUsFromRef(TsType::kProcessingStarted, frame_id, ref_tsc);
+  double decoding_done =
+      MasterGetUsFromRef(TsType::kDecodeDone, frame_id, ref_tsc);
 
   return decoding_done - processing_started;
 }

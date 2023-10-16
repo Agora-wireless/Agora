@@ -640,8 +640,11 @@ Config::Config(std::string jsonfilename)
   // Agora configurations
   frames_to_test_ = tdd_conf.value("max_frame", 9600);
   core_offset_ = tdd_conf.value("core_offset", 0);
+  // use all available cores
   if (dynamic_core_allocation_) {
-    worker_thread_num_ = sysconf(_SC_NPROCESSORS_ONLN) - (core_offset_ + socket_thread_num_ + dynamic_core_allocation_ + 1); // use all available cores
+    worker_thread_num_ =
+        sysconf(_SC_NPROCESSORS_ONLN) -
+        (core_offset_ + socket_thread_num_ + dynamic_core_allocation_ + 1);
   } else {
     worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
   }
@@ -1699,8 +1702,8 @@ void Config::GenData() {
     FreeBuffer1d(&pilot_pre_ifft_);
   }
 
-  delete[] (ul_temp_parity_buffer);
-  delete[] (dl_temp_parity_buffer);
+  delete[](ul_temp_parity_buffer);
+  delete[](dl_temp_parity_buffer);
   ul_iq_ifft.Free();
   dl_iq_ifft.Free();
   dl_encoded_bits.Free();

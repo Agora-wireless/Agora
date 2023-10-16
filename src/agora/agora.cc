@@ -11,13 +11,13 @@
 #if defined(USE_DPDK)
 #include "packet_txrx_dpdk.h"
 #endif
+#include "agora_worker.h"
 #include "concurrent_queue_wrapper.h"
 #include "logger.h"
 #include "modulation.h"
 #include "packet_txrx_radio.h"
 #include "packet_txrx_sim.h"
 #include "signal_handler.h"
-#include "agora_worker.h"
 
 static const bool kDebugPrintPacketsFromMac = false;
 static const bool kDebugDeferral = true;
@@ -47,8 +47,10 @@ static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
                        kRecorderWorkerMultiFile};
 #endif
 
+// add 1 if dedicating core for RP
 Agora::Agora(Config* const cfg)
-    : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum() + cfg->DynamicCoreAlloc()), // add 1 if dedicating core for RP
+    : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum() +
+                               cfg->DynamicCoreAlloc()),
       config_(cfg),
       mac_sched_(std::make_unique<MacScheduler>(cfg)),
       stats_(std::make_unique<Stats>(cfg)),
@@ -96,7 +98,6 @@ Agora::~Agora() {
   }
   // Dynamic core allocation
   if (config_->DynamicCoreAlloc()) {
-    // dynamic_core_thread_.join();
     rp_std_thread_.join();
   }
   recorder_.reset();
@@ -552,8 +553,10 @@ void Agora::Start() {
           RPControlMsg rcm;
           rcm.add_core_ = event.tags_[0];
           rcm.remove_core_ = event.tags_[1];
-          AGORA_LOG_INFO("Agora: Received cores update data from RP of add_cores %zu,"
-          "remove_cores %zu\n", rcm.add_core_, rcm.remove_core_);
+          AGORA_LOG_INFO(
+              "Agora: Received cores update data from RP of add_cores %zu,"
+              "remove_cores %zu\n",
+              rcm.add_core_, rcm.remove_core_);
           worker_set_->UpdateCores(rcm);
         } break;
 
@@ -562,10 +565,12 @@ void Agora::Start() {
           RPStatusMsg rsm;
           rsm.latency_ = this->stats_->MeasureLastFrameLatency();
           rsm.core_num_ = worker_set_->GetCoresInfo();
-          AGORA_LOG_INFO("Agora: Sending status to RP of latency %zu, core_num %zu\n",
-                  rsm.latency_, rsm.core_num_);
-          TryEnqueueFallback(&rp_request_queue_,
-                          EventData(EventType::kPacketToRp, rsm.latency_, rsm.core_num_));
+          AGORA_LOG_INFO(
+              "Agora: Sending status to RP of latency %zu, core_num %zu\n",
+              rsm.latency_, rsm.core_num_);
+          TryEnqueueFallback(
+              &rp_request_queue_,
+              EventData(EventType::kPacketToRp, rsm.latency_, rsm.core_num_));
         } break;
 
         case EventType::kRANUpdate: {
@@ -1185,10 +1190,13 @@ void Agora::InitializeThreads() {
 
   // Enable dynamic core allocation
   if (config_->DynamicCoreAlloc()) {
-    const size_t rp_cpu_core = config_->CoreOffset() + config_->SocketThreadNum() + 1; // TODO: dedicate a core to RP?
+    // TODO : dedicate a core to RP?
+    const size_t rp_cpu_core =
+        config_->CoreOffset() + config_->SocketThreadNum() + 1;
     rp_thread_ = std::make_unique<ResourceProvisionerThread>(
         config_, rp_cpu_core, &rp_request_queue_, &rp_response_queue_);
-    rp_std_thread_ = std::thread(&ResourceProvisionerThread::RunEventLoop, rp_thread_.get());
+    rp_std_thread_ =
+        std::thread(&ResourceProvisionerThread::RunEventLoop, rp_thread_.get());
   }
 
   // Create workers
@@ -1199,21 +1207,21 @@ void Agora::InitializeThreads() {
 
   if (config_->DynamicCoreAlloc() == false) {
     AGORA_LOG_INFO(
-      "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
-      "cores %zu--%zu\n",
-      config_->CoreOffset(), config_->CoreOffset() + 1,
-      config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1,
-      base_worker_core_offset_,
-      base_worker_core_offset_ + config_->WorkerThreadNum() - 1);
+        "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
+        "cores %zu--%zu\n",
+        config_->CoreOffset(), config_->CoreOffset() + 1,
+        config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1,
+        base_worker_core_offset_,
+        base_worker_core_offset_ + config_->WorkerThreadNum() - 1);
   } else {
     AGORA_LOG_INFO(
-      "Master thread core %zu, TX/RX thread cores %zu--%zu, RP thread core %zu, "
-      "worker thread cores %zu--%zu\n",
-      config_->CoreOffset(), config_->CoreOffset() + 1,
-      config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1,
-      config_->CoreOffset() + config_->SocketThreadNum() + 1,
-      base_worker_core_offset_,
-      base_worker_core_offset_ + config_->WorkerThreadNum() - 1);
+        "Master thread core %zu, TX/RX thread cores %zu--%zu, RP thread core "
+        "%zu, worker thread cores %zu--%zu\n",
+        config_->CoreOffset(), config_->CoreOffset() + 1,
+        config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1,
+        config_->CoreOffset() + config_->SocketThreadNum() + 1,
+        base_worker_core_offset_,
+        base_worker_core_offset_ + config_->WorkerThreadNum() - 1);
   }
 }
 

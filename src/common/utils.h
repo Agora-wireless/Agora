@@ -31,8 +31,6 @@ void SetCpuLayoutOnNumaNodes(
     bool verbose = false,
     const std::vector<size_t>& cores_to_exclude = std::vector<size_t>(1, 0));
 
-void UpdateCpuLayout(const std::vector<size_t>& cores_to_exclude);
-
 size_t GetPhysicalCoreId(size_t core_id);
 
 /* Pin this thread to core with global index = core_id */
