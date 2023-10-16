@@ -17,7 +17,7 @@ class DatasetModel : public ChannelModel {
   void UpdateModel(const float mean_channel_gain) final;
 
  private:
-  arma::cx_fmat GetMatricesByFrame(hsize_t frame);
+  arma::cx_fmat GetMatricesByFrame(size_t frame);
   void InstantiateDataset(const std::string& dataset_path);
   /*
   * Vector of complex H Matrices x NumFrames
@@ -25,7 +25,7 @@ class DatasetModel : public ChannelModel {
   * h_matrices_frames_[ FrameIndex ][ SubcarrierIndex ]
   */
   std::vector<std::vector<arma::cx_fmat>> h_matrices_frames_;
-  hsize_t current_frame_num_;
+  size_t current_frame_num_;
 };
 
 #endif  //DATASET_MODEL_H_

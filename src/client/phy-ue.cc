@@ -117,7 +117,7 @@ PhyUe::PhyUe(Config* config)
   }
 
   size_t core_offset_worker = config_->UeCoreOffset() + 1 + rx_thread_num_;
-  if (kEnableMac == true) {
+  if constexpr (kEnableMac) {
     mac_thread_ = std::make_unique<MacThreadClient>(
         config_, core_offset_worker, decoded_buffer_, &ul_bits_buffer_,
         &ul_bits_buffer_status_, &to_mac_queue_, &complete_queue_);
@@ -202,7 +202,7 @@ PhyUe::~PhyUe() {
   }
   recorders_.clear();
 
-  if (kEnableMac == true) {
+  if constexpr (kEnableMac) {
     mac_std_thread_.join();
   }
 
@@ -568,7 +568,7 @@ void PhyUe::Start() {
           const bool symbol_complete =
               decode_counters_.CompleteTask(frame_id, symbol_id);
           if (symbol_complete == true) {
-            if (kEnableMac) {
+            if constexpr (kEnableMac) {
               auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
 
               for (size_t i = 0; i < config_->UeAntNum(); i++) {
