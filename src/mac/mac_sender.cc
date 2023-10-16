@@ -181,8 +181,8 @@ void MacSender::StartTx() {
   // Run the master thread (from current thread)
   MasterThread(kMasterThreadId);
 
-  delete[] (this->frame_start_);
-  delete[] (this->frame_end_);
+  delete[](this->frame_start_);
+  delete[](this->frame_end_);
 }
 
 void MacSender::StartTxfromMain(double* in_frame_start, double* in_frame_end) {
