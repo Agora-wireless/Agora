@@ -103,7 +103,9 @@ class Config {
   inline size_t BeaconAnt() const { return this->beacon_ant_; }
   inline size_t BeaconLen() const { return this->beacon_len_; }
 
-  inline bool DynamicCoreAlloc() const { return this->dynamic_core_allocation_; }
+  inline bool DynamicCoreAlloc() const {
+    return this->dynamic_core_allocation_;
+  }
   inline bool SmoothCalib() const { return this->smooth_calib_; }
   inline bool Beamsweep() const { return this->beamsweep_; }
   inline bool SampleCalEn() const { return this->sample_cal_en_; }
@@ -335,7 +337,9 @@ class Config {
   inline size_t UeMacRxPort() const { return this->ue_mac_rx_port_; }
   inline size_t UeMacTxPort() const { return this->ue_mac_tx_port_; }
 
-  inline std::string RpRemoteHostName() const { return this->rp_remote_host_name_; }
+  inline std::string RpRemoteHostName() const {
+    return this->rp_remote_host_name_;
+  }
   inline size_t RpRxPort() const { return this->rp_rx_port_; }
   inline size_t RpTxPort() const { return this->rp_tx_port_; }
 

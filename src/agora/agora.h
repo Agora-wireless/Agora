@@ -6,7 +6,6 @@
 #ifndef AGORA_H_
 #define AGORA_H_
 
-#include <numa.h>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -20,12 +19,12 @@
 #include "concurrentqueue.h"
 #include "mac_scheduler.h"
 #include "mac_thread_basestation.h"
-#include "resource_provisioner_thread.h"
 #include "message.h"
 #include "packet_txrx.h"
 #include "phy_stats.h"
 #include "ran_config.h"
 #include "recorder_thread.h"
+#include "resource_provisioner_thread.h"
 #include "stats.h"
 #include "symbols.h"
 
@@ -129,8 +128,6 @@ class Agora {
   // The thread running RP thread functions
   std::unique_ptr<ResourceProvisionerThread> rp_thread_;
   std::thread rp_std_thread_;
-
-  // std::thread dynamic_core_thread_;
 
   std::unique_ptr<MacScheduler> mac_sched_;
   std::unique_ptr<Stats> stats_;

@@ -1,8 +1,6 @@
 use tokio::net::UdpSocket;
 use tokio::time::{delay_for, Duration};
 use std::io;
-// use std::cmp;
-// use std::process::Command;
 
 // Communication parameters
 static TX_ADDR: &str  = "127.0.0.1:4000";

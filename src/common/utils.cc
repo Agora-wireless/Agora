@@ -125,11 +125,6 @@ void SetCpuLayoutOnNumaNodes(bool verbose,
   }
 }
 
-void UpdateCpuLayout(const std::vector<size_t>& cores_to_exclude) {
-  cpu_layout.clear();
-  SetCpuLayoutOnNumaNodes(false, cores_to_exclude);
-}
-
 size_t GetPhysicalCoreId(size_t core_id) {
   size_t core;
   if (cpu_layout_initialized) {
@@ -220,9 +215,10 @@ size_t GetAvailableCores() {
   std::string s;
   std::getline(file, s);
 
-  size_t start_core = (size_t) stoi(s.substr(0, s.find("-")));
-  size_t end_core = (size_t) stoi(s.substr(s.find("-") + 1));
-  return end_core - start_core; // remove master core, tx/rx core
+  size_t start_core = (size_t)stoi(s.substr(0, s.find("-")));
+  size_t end_core = (size_t)stoi(s.substr(s.find("-") + 1));
+  // remove master core, tx/rx core
+  return end_core - start_core;
 }
 
 std::vector<size_t> Utils::StrToChannels(const std::string& channel) {

@@ -3,8 +3,10 @@
  * @brief Implementation file for the ResourceProvisionerThread class.
  */
 #include "resource_provisioner_thread.h"
+
 #include "logger.h"
 
+// ticks every ~1s
 ResourceProvisionerThread::ResourceProvisionerThread(
     Config* cfg, size_t core_offset,
     moodycamel::ConcurrentQueue<EventData>* rx_queue,
@@ -12,11 +14,10 @@ ResourceProvisionerThread::ResourceProvisionerThread(
     const std::string& log_filename)
     : cfg_(cfg),
       freq_ghz_(GetTime::MeasureRdtscFreq()),
-      tsc_delta_((cfg_->GetFrameDurationSec() * 1e9) / freq_ghz_ * 1000), // ticks every ~1s
+      tsc_delta_((cfg_->GetFrameDurationSec() * 1e9) / freq_ghz_ * 1000),
       core_offset_(core_offset),
       rx_queue_(rx_queue),
       tx_queue_(tx_queue) {
-
   // Set up log file
   if (log_filename.empty() == false) {
     log_filename_ = log_filename;  // Use a non-default log filename
@@ -31,16 +32,17 @@ ResourceProvisionerThread::ResourceProvisionerThread(
       cfg_->GetFrameDurationSec() * 1000, tsc_delta_);
 
   // RP sends control message of size defined by RPControlMsg
-  const size_t udp_pkt_len = 32; //sizeof(RPControlMsg);
+  //sizeof(RPControlMsg);
+  const size_t udp_pkt_len = 32;
   udp_pkt_buf_.resize(udp_pkt_len + kUdpRxBufferPadding);
 
   size_t udp_server_port = cfg_->RpRxPort();
   AGORA_LOG_INFO(
-      "ResourceProvisionerThread: Setting up UDP server for RP data at port %zu\n",
+      "ResourceProvisionerThread: Setting up UDP server for RP data at port "
+      "%zu\n",
       udp_server_port);
-  udp_comm_ =
-      std::make_unique<UDPComm>(cfg_->UeServerAddr(), udp_server_port,
-                                udp_pkt_len * kMaxUEs, 0);
+  udp_comm_ = std::make_unique<UDPComm>(cfg_->UeServerAddr(), udp_server_port,
+                                        udp_pkt_len * kMaxUEs, 0);
 }
 
 ResourceProvisionerThread::~ResourceProvisionerThread() {
@@ -51,7 +53,8 @@ ResourceProvisionerThread::~ResourceProvisionerThread() {
 void ResourceProvisionerThread::RequestEventFromAgora() {
   // create event from pkt
   EventData msg(EventType::kPacketToRp, 0);
-  RtAssert(tx_queue_->enqueue(msg), "ResourceProvisionerThread: Failed to enqueue control packet");
+  RtAssert(tx_queue_->enqueue(msg),
+           "ResourceProvisionerThread: Failed to enqueue control packet");
 }
 
 /*
@@ -67,10 +70,12 @@ void ResourceProvisionerThread::SendEventToAgora(const char* payload) {
   } else {
     // create event from pkt
     EventData msg(EventType::kPacketFromRp, pkt->add_core_, pkt->remove_core_);
-    AGORA_LOG_INFO("ResourceProvisionerThread: Sending core update data to Agora of add_cores %zu, remove_cores %zu\n",
-                    pkt->add_core_, pkt->remove_core_);
+    AGORA_LOG_INFO(
+        "ResourceProvisionerThread: Sending core update data to Agora of "
+        "add_cores %zu, remove_cores %zu\n",
+        pkt->add_core_, pkt->remove_core_);
     RtAssert(tx_queue_->enqueue(msg),
-            "ResourceProvisionerThread: Failed to enqueue control packet");
+             "ResourceProvisionerThread: Failed to enqueue control packet");
   }
 }
 
@@ -99,7 +104,10 @@ void ResourceProvisionerThread::ReceiveEventFromAgora() {
   }
 
   if (event.event_type_ == EventType::kPacketToRp) {
-    AGORA_LOG_INFO("ResourceProvisionerThread: Received status from Agora of latency %zu, core_num %zu\n", event.tags_[0], event.tags_[1]);
+    AGORA_LOG_INFO(
+        "ResourceProvisionerThread: Received status from Agora of latency %zu, "
+        "core_num %zu\n",
+        event.tags_[0], event.tags_[1]);
     SendUdpPacketsToRp(event);
   }
 }
@@ -109,19 +117,20 @@ void ResourceProvisionerThread::SendUdpPacketsToRp(EventData event) {
   RPStatusMsg msg;
   msg.latency_ = event.tags_[0];
   msg.core_num_ = event.tags_[1];
-  udp_comm_->Send(cfg_->RpRemoteHostName(), cfg_->RpTxPort(), (std::byte*)&msg, sizeof(RPStatusMsg));
+  udp_comm_->Send(cfg_->RpRemoteHostName(), cfg_->RpTxPort(), (std::byte*)&msg,
+                  sizeof(RPStatusMsg));
 }
 
 void ResourceProvisionerThread::RunEventLoop() {
   AGORA_LOG_INFO(
-    "ResourceProvisionerThread: Running thread event loop, logging to file "
-    "%s\n",
-    log_filename_.c_str()
-  );
+      "ResourceProvisionerThread: Running thread event loop, logging to file "
+      "%s\n",
+      log_filename_.c_str());
 
   PinToCoreWithOffset(ThreadType::kWorkerRpTXRX, core_offset_,
                       0 /* thread ID */);
-  size_t last_frame_tx_tsc = 0; // keep the frequency of function call
+  // keep the frequency of function call
+  size_t last_frame_tx_tsc = 0;
 
   while (cfg_->Running() == true) {
     if ((GetTime::Rdtsc() - last_frame_tx_tsc) > tsc_delta_) {

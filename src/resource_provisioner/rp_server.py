@@ -18,7 +18,6 @@ def listen_data():
     return decoded_data
 
 def send_data(x, y):
-    # num = input("# cores?: ").split(',')
     send_data = struct.pack('NN', int(x), int(y))
     s.sendto(send_data, (ip, tx_port))
     print("\n\n Server sent data: {}, {}\n\n".format(x, y))

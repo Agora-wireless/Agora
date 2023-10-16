@@ -5,18 +5,16 @@
 #ifndef RP_THREAD_H_
 #define RP_THREAD_H_
 
-#include <queue>
+#include <cstddef>
+#include <cstdio>
+#include <memory>
+#include <string>
+#include <vector>
 
-#include "agora_buffer.h"
 #include "concurrentqueue.h"
 #include "config.h"
-#include "crc.h"
-#include "gettime.h"
-#include "ran_config.h"
-#include "symbols.h"
-#include "udp_client.h"
-#include "udp_server.h"
-#include "rp_config.h"
+#include "message.h"
+#include "udp_comm.h"
 
 /**
  * @brief The RP thread that runs alongside the PHY processing at the Agora
@@ -29,14 +27,14 @@
 class ResourceProvisionerThread {
  public:
   // Default log file for RP layer outputs
-  static constexpr char kDefaultLogFilename[] = "files/experiment/rp_log_server.txt";
+  static constexpr char kDefaultLogFilename[] =
+      "files/experiment/rp_log_server.txt";
   static constexpr size_t kUdpRxBufferPadding = 2048u;
 
-  ResourceProvisionerThread(
-      Config* const cfg, size_t core_offset,
-      moodycamel::ConcurrentQueue<EventData>* rx_queue,
-      moodycamel::ConcurrentQueue<EventData>* tx_queue,
-      const std::string& log_filename = "");
+  ResourceProvisionerThread(Config* const cfg, size_t core_offset,
+                            moodycamel::ConcurrentQueue<EventData>* rx_queue,
+                            moodycamel::ConcurrentQueue<EventData>* tx_queue,
+                            const std::string& log_filename = "");
 
   ~ResourceProvisionerThread();
 
@@ -54,11 +52,15 @@ class ResourceProvisionerThread {
 
   Config* const cfg_;
 
-  const double freq_ghz_;  // RDTSC frequency in GHz
-  const size_t tsc_delta_; // Clock ticks, we check for new packets from applications every [tsc_delta_]
-  const size_t core_offset_;  // The CPU core on which this thread runs
+  // RDTSC frequency in GHz
+  const double freq_ghz_;
+  // Clock ticks, we check for new packets from applications every [tsc_delta_]
+  const size_t tsc_delta_;
+  // The CPU core on which this thread runs
+  const size_t core_offset_;
 
-  FILE* log_file_;  // Log file used to store MAC layer outputs
+  // Log file used to store RP layer outputs
+  FILE* log_file_;
   std::string log_filename_;
 
   // UDP endpoint used for sending & receiving messages
