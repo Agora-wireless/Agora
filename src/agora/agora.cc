@@ -85,7 +85,7 @@ Agora::Agora(Config* const cfg)
 }
 
 Agora::~Agora() {
-  if (kEnableMac == true) {
+  if constexpr (kEnableMac) {
     mac_std_thread_.join();
   }
 
@@ -120,7 +120,7 @@ void Agora::SendSnrReport(EventType event_type, size_t frame_id,
   for (size_t i = 0; i < config_->UeAntNum(); i++) {
     EventData snr_report(EventType::kSNRReport, base_tag.tag_);
     snr_report.num_tags_ = 2;
-    float snr = this->phy_stats_->GetEvmSnr(frame_id, i);
+    const float snr = this->phy_stats_->GetEvmSnr(frame_id, i);
     std::memcpy(&snr_report.tags_[1], &snr, sizeof(float));
     TryEnqueueFallback(&mac_request_queue_, snr_report);
     base_tag.ue_id_++;
@@ -319,7 +319,7 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
       }
     }
 
-    if (kEnableMac) {
+    if constexpr (kEnableMac) {
       if (remaining_events > 0) {
         const size_t new_events = mac_response_queue_.try_dequeue_bulk(
             &events_list.at(total_events), remaining_events);
@@ -522,7 +522,7 @@ void Agora::Start() {
           const bool last_decode_task =
               this->decode_counters_.CompleteTask(frame_id, symbol_id);
           if (last_decode_task == true) {
-            if (kEnableMac == true) {
+            if constexpr (kEnableMac) {
               ScheduleUsers(EventType::kPacketToMac, frame_id, symbol_id);
             }
             stats_->PrintPerSymbolDone(
@@ -536,7 +536,7 @@ void Agora::Start() {
               auto ue_map = mac_sched_->ScheduledUeMap(frame_id, 0u);
               this->phy_stats_->RecordBer(frame_id, ue_map);
               this->phy_stats_->RecordSer(frame_id, ue_map);
-              if (kEnableMac == false) {
+              if constexpr (kEnableMac == false) {
                 assert(frame_tracking_.cur_proc_frame_id_ == frame_id);
                 const bool work_finished = this->CheckFrameComplete(frame_id);
                 if (work_finished == true) {
@@ -890,7 +890,9 @@ finish:
   }
 
   // Calculate and print per-user BER
-  if ((kEnableMac == false) && (kPrintPhyStats == true)) {
+  if constexpr (kEnableMac) {
+    this->mac_thread_->PrintUplinkMacErrors();
+  } else if (kPrintPhyStats == true) {
     this->phy_stats_->PrintPhyStats();
   }
   this->Stop();
@@ -923,7 +925,7 @@ void Agora::HandleEventFft(size_t tag) {
             this->phy_stats_->PrintUlSnrStats(frame_id);
           }
           this->phy_stats_->RecordPilotSnr(frame_id);
-          if (kEnableMac == true) {
+          if constexpr (kEnableMac) {
             SendSnrReport(EventType::kSNRReport, frame_id, symbol_id);
           }
           ScheduleSubcarriers(EventType::kBeam, frame_id, 0);
@@ -1006,7 +1008,7 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
   }
   // Receive first packet in a frame
   if (rx_counters_.num_pkts_.at(frame_slot) == 0) {
-    if (kEnableMac == false) {
+    if constexpr (kEnableMac == false) {
       // schedule this frame's encoding
       // Defer the schedule.  If frames are already deferred or the current
       // received frame is too far off
@@ -1168,7 +1170,7 @@ void Agora::InitializeThreads() {
         this->stats_->FrameStart(), agora_memory_->GetDlSocket());
   }
 
-  if (kEnableMac == true) {
+  if constexpr (kEnableMac) {
     const size_t mac_cpu_core = config_->CoreOffset() +
                                 config_->SocketThreadNum() +
                                 config_->WorkerThreadNum() + 1;

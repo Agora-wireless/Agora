@@ -45,10 +45,9 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
 
     case ChannelModel::kSelective: {
       const size_t n_rows = (cfg_->FreqDomainChannel())
-                                 ? cfg_->OfdmCaNum()
-                                 : cfg_->SampsPerSymbol();
-      const size_t n_cols =
-          (is_downlink) ? cfg_->UeAntNum() : cfg_->BsAntNum();
+                                ? cfg_->OfdmCaNum()
+                                : cfg_->SampsPerSymbol();
+      const size_t n_cols = (is_downlink) ? cfg_->UeAntNum() : cfg_->BsAntNum();
 
       fmat_h.zeros(n_rows, n_cols);
       for (size_t h_index = 0; h_index < n_rows; h_index++) {
