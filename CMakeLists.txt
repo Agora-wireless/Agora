@@ -603,7 +603,7 @@ endforeach()
 set(UNIT_TESTS test_armadillo test_datatype_conversion test_udp_client_server
   test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
   test_ptr_grid test_avx512_complex_mul test_scrambler
-  test_256qam_demod test_ctrl_channel test_equal)
+  test_256qam_demod test_ctrl_channel test_equal test_equal_time)
 
 foreach(test_name IN LISTS UNIT_TESTS)
   add_executable(${test_name}

@@ -25,6 +25,7 @@ bool operator!=(const complex_float lhs, const complex_float& rhs)
   // return (lhs.re != rhs.re) || (lhs.im != rhs.im);
 
   // approx_eq, enable this if you would like to compare between armadillo & MKL
+  // the precision here will impact the rate of failure
   float threshold = 0.0001;
   return (fabs(lhs.re - rhs.re) > threshold) ||
          (fabs(lhs.im - rhs.im) > threshold);
@@ -579,9 +580,7 @@ void equal_vec(Config* cfg_,
 
   // Intermediate buffers for equalized data
   complex_float* equaled_buffer_temp_;
-  complex_float* equaled_buffer_temp_transposed_;
   arma::cx_fmat ue_pilot_data_;
-  int ue_num_simd256_;
 
   // For efficient phase shift calibration
   static arma::fvec theta_vec;
@@ -592,10 +591,6 @@ void equal_vec(Config* cfg_,
   // ---------------------------------------------------------------------------
 
   equaled_buffer_temp_ =
-      static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::kAlign64,
-          cfg_->DemulBlockSize() * kMaxUEs * sizeof(complex_float)));
-  equaled_buffer_temp_transposed_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::kAlign64,
           cfg_->DemulBlockSize() * kMaxUEs * sizeof(complex_float)));
@@ -701,11 +696,9 @@ void equal_vec(Config* cfg_,
   }
 }
 
-TEST(TestPhaseShiftCalib, OrgSingle) {
+TEST(TestEqual, OrgSingle) {
   auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
   cfg_->GenData();
-
-  static constexpr size_t kFrameWnd = 3;
 
   // ---------------------------------------------------------------------------
   // Prepare buffers
@@ -741,11 +734,9 @@ TEST(TestPhaseShiftCalib, OrgSingle) {
             ue_spec_pilot_buffer_, ul_beam_matrices_, 0, 1, 0);
 }
 
-TEST(TestPhaseShiftCalib, OrgLoop) {
+TEST(TestEqual, OrgLoop) {
   auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
   cfg_->GenData();
-
-  static constexpr size_t kFrameWnd = 3;
 
   // ---------------------------------------------------------------------------
   // Prepare buffers
@@ -777,8 +768,8 @@ TEST(TestPhaseShiftCalib, OrgLoop) {
   // Run
   // ---------------------------------------------------------------------------
 
-  for (size_t frame_id = 0; frame_id <= 3; ++frame_id) {
-    for (size_t symbol_id = 1; symbol_id < 17; ++symbol_id) {
+  for (size_t frame_id = 0; frame_id <= kFrameWnd; ++frame_id) {
+    for (size_t symbol_id = 1; symbol_id < cfg_->Frame().NumULSyms(); ++symbol_id) {
       for (size_t base_sc_id = 0; base_sc_id < cfg_->OfdmDataNum(); base_sc_id += cfg_->DemulBlockSize()) {
         equal_org(cfg_.get(), data_buffer_, equal_buffer_,
                   ue_spec_pilot_buffer_, ul_beam_matrices_,
@@ -788,11 +779,9 @@ TEST(TestPhaseShiftCalib, OrgLoop) {
   }
 }
 
-TEST(TestPhaseShiftCalib, IfcondSingle) {
+TEST(TestEqual, IfcondSingle) {
   auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
   cfg_->GenData();
-
-  static constexpr size_t kFrameWnd = 3;
 
   // ---------------------------------------------------------------------------
   // Prepare buffers
@@ -828,11 +817,9 @@ TEST(TestPhaseShiftCalib, IfcondSingle) {
             ue_spec_pilot_buffer_, ul_beam_matrices_, 0, 1, 0);
 }
 
-TEST(TestPhaseShiftCalib, IfcondLoop) {
+TEST(TestEqual, IfcondLoop) {
   auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
   cfg_->GenData();
-
-  static constexpr size_t kFrameWnd = 3;
 
   // ---------------------------------------------------------------------------
   // Prepare buffers
@@ -864,8 +851,8 @@ TEST(TestPhaseShiftCalib, IfcondLoop) {
   // Run
   // ---------------------------------------------------------------------------
 
-  for (size_t frame_id = 0; frame_id <= 3; ++frame_id) {
-    for (size_t symbol_id = 1; symbol_id < 17; ++symbol_id) {
+  for (size_t frame_id = 0; frame_id <= kFrameWnd; ++frame_id) {
+    for (size_t symbol_id = 1; symbol_id < cfg_->Frame().NumULSyms(); ++symbol_id) {
       for (size_t base_sc_id = 0; base_sc_id < cfg_->OfdmDataNum(); base_sc_id += cfg_->DemulBlockSize()) {
         equal_ifcond(cfg_.get(), data_buffer_, equal_buffer_,
                   ue_spec_pilot_buffer_, ul_beam_matrices_,
@@ -875,11 +862,9 @@ TEST(TestPhaseShiftCalib, IfcondLoop) {
   }
 }
 
-TEST(TestPhaseShiftCalib, VecSingle) {
+TEST(TestEqual, VecSingle) {
   auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
   cfg_->GenData();
-
-  static constexpr size_t kFrameWnd = 3;
 
   // ---------------------------------------------------------------------------
   // Prepare buffers
@@ -915,11 +900,9 @@ TEST(TestPhaseShiftCalib, VecSingle) {
             ue_spec_pilot_buffer_, ul_beam_matrices_, 0, 1, 0);
 }
 
-TEST(TestPhaseShiftCalib, VecLoop) {
+TEST(TestEqual, VecLoop) {
   auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
   cfg_->GenData();
-
-  static constexpr size_t kFrameWnd = 3;
 
   // ---------------------------------------------------------------------------
   // Prepare buffers
@@ -951,8 +934,8 @@ TEST(TestPhaseShiftCalib, VecLoop) {
   // Run
   // ---------------------------------------------------------------------------
 
-  for (size_t frame_id = 0; frame_id <= 3; ++frame_id) {
-    for (size_t symbol_id = 1; symbol_id < 17; ++symbol_id) {
+  for (size_t frame_id = 0; frame_id <= kFrameWnd; ++frame_id) {
+    for (size_t symbol_id = 1; symbol_id < cfg_->Frame().NumULSyms(); ++symbol_id) {
       for (size_t base_sc_id = 0; base_sc_id < cfg_->OfdmDataNum(); base_sc_id += cfg_->DemulBlockSize()) {
         equal_vec(cfg_.get(), data_buffer_, equal_buffer_,
                   ue_spec_pilot_buffer_, ul_beam_matrices_,
@@ -962,11 +945,9 @@ TEST(TestPhaseShiftCalib, VecLoop) {
   }
 }
 
-TEST(TestPhaseShiftCalib, CorrectnessSingle) {
+TEST(TestEqual, CorrectnessSingle) {
   auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
   cfg_->GenData();
-
-  static constexpr size_t kFrameWnd = 3;
 
   // ---------------------------------------------------------------------------
   // Prepare buffers
@@ -1059,11 +1040,9 @@ TEST(TestPhaseShiftCalib, CorrectnessSingle) {
   EXPECT_TRUE(equal_buffer_ == equal_buffer_test2_);
 }
 
-TEST(TestPhaseShiftCalib, CorrectnessLoop) {
+TEST(TestEqual, CorrectnessLoop) {
   auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
   cfg_->GenData();
-
-  static constexpr size_t kFrameWnd = 3;
 
   // ---------------------------------------------------------------------------
   // Prepare buffers
@@ -1110,8 +1089,8 @@ TEST(TestPhaseShiftCalib, CorrectnessLoop) {
   // Run & test
   // ---------------------------------------------------------------------------
 
-  for (size_t frame_id = 0; frame_id <= 3; ++frame_id) {
-    for (size_t symbol_id = 1; symbol_id < 17; ++symbol_id) {
+  for (size_t frame_id = 0; frame_id <= kFrameWnd; ++frame_id) {
+    for (size_t symbol_id = 1; symbol_id < cfg_->Frame().NumULSyms(); ++symbol_id) {
       for (size_t base_sc_id = 0; base_sc_id < cfg_->OfdmDataNum(); base_sc_id += cfg_->DemulBlockSize()) {
         // printf("--------------------------------------------------\n");
         equal_org(cfg_.get(), data_buffer_, equal_buffer_,
@@ -1144,7 +1123,7 @@ TEST(TestPhaseShiftCalib, CorrectnessLoop) {
   }
 }
 
-// TEST(TestPhaseShiftCalib, MKLvsArma) {
+// TEST(TestEqual, MKLvsArma) {
 
 //   auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
 //   cfg_->GenData();
