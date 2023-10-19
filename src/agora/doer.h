@@ -83,10 +83,10 @@ class Doer {
   size_t symbol_id_ = 0;
   size_t dequeue_start_tsc_ = 0;
   size_t dequeue_end_tsc_ = 0;
-  size_t enqueue_start_tsc_ = 0;
-  size_t enqueue_end_tsc_ = 0;
   size_t dequeue_tsc_ = 0;
   size_t valid_dequeue_tsc_ = 0;
+  size_t enqueue_start_tsc_ = 0;
+  size_t enqueue_end_tsc_ = 0;
   size_t enqueue_tsc_ = 0;
 
  protected:

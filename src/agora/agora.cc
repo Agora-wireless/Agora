@@ -116,7 +116,10 @@ void Agora::SendSnrReport(EventType event_type, size_t frame_id,
     snr_report.num_tags_ = 2;
     float snr = this->phy_stats_->GetEvmSnr(frame_id, i);
     std::memcpy(&snr_report.tags_[1], &snr, sizeof(float));
-    TryEnqueueFallback(&mac_request_queue_, snr_report);
+    config_->TryEnqueueLogStatsMaster(&mac_request_queue_,
+                                      snr_report,
+                                      frame_id,
+                                      symbol_id);
     base_tag.ue_id_++;
   }
 }
@@ -167,17 +170,11 @@ void Agora::ScheduleAntennas(EventType event_type, size_t frame_id,
       event.tags_[j] = base_tag.tag_;
       base_tag.ant_id_++;
     }
-    size_t enqueue_start_tsc_ = GetTime::WorkerRdtsc();
-    TryEnqueueFallback(message_->GetConq(event_type, qid),
-                       message_->GetPtok(event_type, qid), event);
-    size_t enqueue_end_tsc_ = GetTime::WorkerRdtsc();
-    if (frame_id == this->config_->FrameToProfile()) {
-      config_->LogMasterEnqueueStats(event_type,
-                                     frame_id,
-                                     symbol_id,
-                                     enqueue_start_tsc_,
-                                     enqueue_end_tsc_);
-    }
+    config_->TryEnqueueLogStatsMaster(message_->GetConq(event_type, qid),
+                                      message_->GetPtok(event_type, qid),
+                                      event,
+                                      frame_id,
+                                      symbol_id);
   }
 }
 
@@ -246,18 +243,11 @@ void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
 
   const size_t qid = (frame_id & 0x1);
   for (size_t i = 0; i < num_events; i++) {
-    size_t enqueue_start_tsc_ = GetTime::WorkerRdtsc();
-    TryEnqueueFallback(message_->GetConq(event_type, qid),
-                       message_->GetPtok(event_type, qid),
-                       EventData(event_type, base_tag.tag_));
-    size_t enqueue_end_tsc_ = GetTime::WorkerRdtsc();
-    if (frame_id == this->config_->FrameToProfile()) {
-      config_->LogMasterEnqueueStats(event_type,
-                                     frame_id,
-                                     symbol_id,
-                                     enqueue_start_tsc_,
-                                     enqueue_end_tsc_);
-    }
+    config_->TryEnqueueLogStatsMaster(message_->GetConq(event_type, qid),
+                                      message_->GetPtok(event_type, qid),
+                                      EventData(event_type, base_tag.tag_),
+                                      frame_id,
+                                      symbol_id);
     base_tag.sc_id_ += block_size;
   }
 }
@@ -284,29 +274,24 @@ void Agora::ScheduleCodeblocks(EventType event_type, Direction dir,
       event.tags_[j] = base_tag.tag_;
       base_tag.cb_id_++;
     }
-    size_t enqueue_start_tsc_ = GetTime::WorkerRdtsc();
-    TryEnqueueFallback(message_->GetConq(event_type, qid),
-                       message_->GetPtok(event_type, qid), event);
-    size_t enqueue_end_tsc_ = GetTime::WorkerRdtsc();
-    if (frame_id == this->config_->FrameToProfile()) {
-      config_->LogMasterEnqueueStats(event_type,
-                                     frame_id,
-                                     symbol_idx,
-                                     enqueue_start_tsc_,
-                                     enqueue_end_tsc_);
-    }
+    config_->TryEnqueueLogStatsMaster(message_->GetConq(event_type, qid),
+                                      message_->GetPtok(event_type, qid),
+                                      event,
+                                      frame_id,
+                                      symbol_idx);
   }
 }
 
 void Agora::ScheduleUsers(EventType event_type, size_t frame_id,
                           size_t symbol_id) {
   assert(event_type == EventType::kPacketToMac);
-  unused(event_type);
   auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
 
   for (size_t i = 0; i < config_->SpatialStreamsNum(); i++) {
-    TryEnqueueFallback(&mac_request_queue_,
-                       EventData(EventType::kPacketToMac, base_tag.tag_));
+    config_->TryEnqueueLogStatsMaster(&mac_request_queue_,
+                                      EventData(EventType::kPacketToMac, base_tag.tag_),
+                                      frame_id,
+                                      symbol_id);
     base_tag.ue_id_++;
   }
 }
@@ -314,9 +299,12 @@ void Agora::ScheduleUsers(EventType event_type, size_t frame_id,
 void Agora::ScheduleBroadCastSymbols(EventType event_type, size_t frame_id) {
   auto base_tag = gen_tag_t::FrmSym(frame_id, 0u);
   const size_t qid = (frame_id & 0x1);
-  TryEnqueueFallback(message_->GetConq(event_type, qid),
-                     message_->GetPtok(event_type, qid),
-                     EventData(event_type, base_tag.tag_));
+  size_t symbol_id = 0; // kBroadcast event does not have a valid symbol_id
+  config_->TryEnqueueLogStatsMaster(message_->GetConq(event_type, qid),
+                                    message_->GetPtok(event_type, qid),
+                                    EventData(event_type, base_tag.tag_),
+                                    frame_id,
+                                    symbol_id);
 }
 
 size_t Agora::FetchEvent(std::vector<EventData>& events_list,
@@ -395,7 +383,7 @@ void Agora::Start() {
       EventData& event = events_list.at(ev_i);
       size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
       if (frame_id == this->config_->FrameToProfile()) {
-        config_->LogMasterDequeueStats(event.event_type_,
+        config_->LogDequeueStatsMaster(event.event_type_,
                                        frame_id,
                                        dequeue_start_tsc_,
                                        dequeue_end_tsc_);
@@ -841,7 +829,6 @@ void Agora::Start() {
         fft_queue_arr_.at(frame_tracking_.cur_sche_frame_id_ % kFrameWnd);
       const size_t qid = frame_tracking_.cur_sche_frame_id_ & 0x1;
       if (cur_fftq.size() >= config_->FftBlockSize()) {
-        size_t symbol_id = 0;
         const size_t num_fft_blocks = cur_fftq.size() / config_->FftBlockSize();
         for (size_t i = 0; i < num_fft_blocks; i++) {
           EventData do_fft_task;
@@ -868,18 +855,12 @@ void Agora::Start() {
               }
             }
           }
-          size_t enqueue_start_tsc_ = GetTime::WorkerRdtsc();
-          TryEnqueueFallback(message_->GetConq(EventType::kFFT, qid),
-                             message_->GetPtok(EventType::kFFT, qid),
-                             do_fft_task);
-          size_t enqueue_end_tsc_ = GetTime::WorkerRdtsc();
-          if (frame_tracking_.cur_sche_frame_id_ == this->config_->FrameToProfile()) {
-            config_->LogMasterEnqueueStats(EventType::kFFT,
-                                           frame_tracking_.cur_sche_frame_id_,
-                                           symbol_id,
-                                           enqueue_start_tsc_,
-                                           enqueue_end_tsc_);
-          }
+          size_t symbol_id = 0; // kFFT event does not have a valid symbol_id
+          config_->TryEnqueueLogStatsMaster(message_->GetConq(EventType::kFFT, qid),
+                                            message_->GetPtok(EventType::kFFT, qid),
+                                            do_fft_task,
+                                            frame_tracking_.cur_sche_frame_id_,
+                                            symbol_id);
         }
       }
     } /* End of for */
