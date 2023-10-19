@@ -28,7 +28,8 @@
     "ofdm_tx_zero_postfix": 160,
     "ofdm_rx_zero_prefix_bs": 160,
     "frame_schedule": [
-        "BGGGGPUUUGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+        /* "BGGGGPGGUGGUGGUGGUGGUGGGGGGGGGGGGGGGGGGGGGGGGGG" */
+        "BGGGPUUUUUUUUUUUUUUUUGGGGGGGGGGGGGGGGGGGGGGGGGG"
     ],
     "client_ul_pilot_syms": 2,
     "beacon_antenna" : 0,
@@ -37,13 +38,13 @@
     "ue_resync_period": 500,
     "ue_channel": "A",
     "ue_rx_gain_a": [
-        15
+        20
     ],
     "ue_tx_gain_a": [
         15 
     ],
     "ue_rx_gain_b": [
-        15  
+        20  
     ],
     "ue_tx_gain_b": [
         15
@@ -66,6 +67,6 @@
     "worker_thread_num": 1,
     "socket_thread_num": 1,
     "max_frame": 200000,
-    "corr_scale": [100]
+    "corr_scale": [1000]
  }
  
