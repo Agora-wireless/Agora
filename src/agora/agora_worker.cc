@@ -130,37 +130,38 @@ void AgoraWorker::WorkerThread(int tid) {
             message_->GetWorkerPtok(cur_qid, tid))) {
         empty_queue = false;
 
-        config_->UpdateTotalWorkerDequeueTsc(
-          tid, computers_vec.at(i)->frame_id_,
-          computers_vec.at(i)->dequeue_tsc_);
-
-        config_->UpdateTotalWorkerEnqueueTsc(
-          tid, computers_vec.at(i)->frame_id_,
-          computers_vec.at(i)->enqueue_tsc_);
-
-        config_->UpdateTotalWorkerValidDequeueTsc(
-          tid, computers_vec.at(i)->frame_id_,
-          computers_vec.at(i)->valid_dequeue_tsc_);
-
-        config_->UpdateWorkerNumValidEnqueue(
-          tid, computers_vec.at(i)->frame_id_);
-
         if (((computers_vec.at(i)->frame_id_ == config_->FrameToProfile()) and
              (cur_qid == (computers_vec.at(i)->frame_id_ & 0x1)))) {
-
           size_t symbol_id = computers_vec.at(i)->symbol_id_;
           if (symbol_id > config_->Frame().NumTotalSyms())
           {
-            symbol_id = 0; // Event type of kBeam does not have a valid symbol_id
+            symbol_id = 0; // kBeam event does not have a valid symbol_id
           }
 
-          config_->LogWorkerEnqueueStats(
-            tid, symbol_id, computers_vec.at(i)->enqueue_start_tsc_,
-            computers_vec.at(i)->enqueue_end_tsc_, events_vec.at(i));
+          config_->UpdateDequeueTscWorker(
+            tid,
+            computers_vec.at(i)->frame_id_,
+            computers_vec.at(i)->dequeue_tsc_,
+            computers_vec.at(i)->valid_dequeue_tsc_);
 
-          config_->LogWorkerDequeueStats(
-            tid, symbol_id, computers_vec.at(i)->dequeue_start_tsc_,
-            computers_vec.at(i)->dequeue_end_tsc_, events_vec.at(i));
+          config_->LogDequeueStatsWorker(
+            tid,
+            symbol_id,
+            computers_vec.at(i)->dequeue_start_tsc_,
+            computers_vec.at(i)->dequeue_end_tsc_,
+            events_vec.at(i));
+
+          config_->UpdateEnqueueTscWorker(
+            tid,
+            computers_vec.at(i)->frame_id_,
+            computers_vec.at(i)->enqueue_tsc_);
+
+          config_->LogEnqueueStatsWorker(
+            tid,
+            symbol_id,
+            computers_vec.at(i)->enqueue_start_tsc_,
+            computers_vec.at(i)->enqueue_end_tsc_,
+            events_vec.at(i));
         }
         break;
       }

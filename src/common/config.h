@@ -23,6 +23,8 @@
 #include "nlohmann/json.hpp"
 #include "symbols.h"
 #include "utils.h"
+#include "gettime.h"
+#include "concurrent_queue_wrapper.h"
 
 class Config {
  public:
@@ -624,21 +626,55 @@ class Config {
     return ul_tx_f_data_files_;
   }
 
-  inline void LogMasterEnqueueStats(EventType event_type,
-                                    size_t frame_id,
-                                    size_t symbol_id,
-                                    size_t tsc_enqueue_start,
-                                    size_t tsc_enqueue_end) {
-    enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_start_ =
-      tsc_enqueue_start;
-    enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_end_ =
-      tsc_enqueue_end;
-    enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].event_type_ =
-      event_type;
-    enqueue_stats_id_.at(symbol_id)++;
+  inline void TryEnqueueLogStatsMaster(moodycamel::ConcurrentQueue<EventData>* mc_queue,
+                                       moodycamel::ProducerToken* producer_token, 
+                                       const EventData& event,
+                                       size_t frame_id,
+                                       size_t symbol_id) {
+    size_t enqueue_start_tsc_ = 0;
+    size_t enqueue_end_tsc_ = 0;
+    if (frame_id == this->frame_to_profile_) {
+      enqueue_start_tsc_ = GetTime::WorkerRdtsc();
+    }
+    TryEnqueueFallback(mc_queue,
+                       producer_token,
+                       event);
+    if (frame_id == this->frame_to_profile_) {
+      enqueue_end_tsc_ = GetTime::WorkerRdtsc();
+      enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_start_ =
+        enqueue_start_tsc_;
+      enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_end_ =
+        enqueue_end_tsc_;
+      enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].event_type_ =
+        event.event_type_;
+      enqueue_stats_id_.at(symbol_id)++;
+    }
   }
 
-  inline void LogMasterDequeueStats(EventType event_type,
+  inline void TryEnqueueLogStatsMaster(moodycamel::ConcurrentQueue<EventData>* mc_queue,
+                                       const EventData& event,
+                                       size_t frame_id,
+                                       size_t symbol_id) {
+    size_t enqueue_start_tsc_ = 0;
+    size_t enqueue_end_tsc_ = 0;
+    if (frame_id == this->frame_to_profile_) {
+      enqueue_start_tsc_ = GetTime::WorkerRdtsc();
+    }
+    TryEnqueueFallback(mc_queue,
+                       event);
+    if (frame_id == this->frame_to_profile_) {
+      enqueue_end_tsc_ = GetTime::WorkerRdtsc();
+      enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_start_ =
+        enqueue_start_tsc_;
+      enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_end_ =
+        enqueue_end_tsc_;
+      enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].event_type_ =
+        event.event_type_;
+      enqueue_stats_id_.at(symbol_id)++;
+    }
+  }
+
+  inline void LogDequeueStatsMaster(EventType event_type,
                                     size_t frame_id,
                                     size_t tsc_dequeue_start,
                                     size_t tsc_dequeue_end) {
@@ -648,24 +684,26 @@ class Config {
     dequeue_stats_id_++;
   }
 
-  void UpdateTotalWorkerDequeueTsc(int tid, size_t frame_id, size_t tsc) {
-    total_worker_dequeue_tsc_[tid][frame_id] += tsc;
+  inline void UpdateDequeueTscWorker(int tid,
+                                     size_t frame_id,
+                                     size_t dequeue_tsc,
+                                     size_t valid_dequeue_tsc) {
+    total_worker_dequeue_tsc_[tid][frame_id] += dequeue_tsc;
+    total_worker_valid_dequeue_tsc_[tid][frame_id] += valid_dequeue_tsc;
   }
 
-  void UpdateTotalWorkerValidDequeueTsc(int tid, size_t frame_id, size_t tsc) {
-    total_worker_valid_dequeue_tsc_[tid][frame_id] += tsc;
-  }
-
-  void UpdateTotalWorkerEnqueueTsc(int tid, size_t frame_id, size_t tsc) {
-    total_worker_enqueue_tsc_[tid][frame_id] += tsc;
-  }
-
-  void UpdateWorkerNumValidEnqueue(int tid, size_t frame_id) {
+  inline void UpdateEnqueueTscWorker(int tid,
+                                     size_t frame_id,
+                                     size_t enqueue_tsc) {
+    total_worker_enqueue_tsc_[tid][frame_id] += enqueue_tsc;
     worker_num_valid_enqueue_[tid][frame_id]++;
   }
 
-  inline void LogWorkerEnqueueStats(int tid, size_t symbol_id, size_t start_tsc,
-                                    size_t end_tsc, EventType event_type) {
+  inline void LogEnqueueStatsWorker(int tid,
+                                    size_t symbol_id,
+                                    size_t start_tsc,
+                                    size_t end_tsc,
+                                    EventType event_type) {
     size_t id = worker_enqueue_stats_id_[tid][symbol_id];
     worker_enqueue_stats_[tid][symbol_id][id].tsc_start_ = start_tsc;
     worker_enqueue_stats_[tid][symbol_id][id].tsc_end_ = end_tsc;
@@ -673,8 +711,11 @@ class Config {
     worker_enqueue_stats_id_[tid][symbol_id]++;
   }
 
-  inline void LogWorkerDequeueStats(int tid, size_t symbol_id, size_t start_tsc,
-                                    size_t end_tsc, EventType event_type) {
+  inline void LogDequeueStatsWorker(int tid,
+                                    size_t symbol_id,
+                                    size_t start_tsc,
+                                    size_t end_tsc,
+                                    EventType event_type) {
     size_t id = worker_dequeue_stats_id_[tid][symbol_id];
     worker_dequeue_stats_[tid][symbol_id][id].tsc_start_ = start_tsc;
     worker_dequeue_stats_[tid][symbol_id][id].tsc_end_ = end_tsc;

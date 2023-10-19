@@ -32,8 +32,8 @@ y_axis_start = 0;
 y_axis_end = worker_thread_num + 5;
 
 %%
-keySet = {'FFT', 'PacketRX', 'PacketTX', 'Beam', 'Demul', 'Decode', 'Encode', 'Precode', 'IFFT'};
-valueSet = [1 2 3 4 5 6 7 8 9];
+keySet = {'PacketRX', 'FFT', 'Beam', 'Demul', 'IFFT', 'Precode', 'PacketTX', 'Decode', 'Encode', 'PacketToMac', 'SNRReport', 'Broadcast'};
+valueSet = [1 2 3 4 5 6 7 8 9 10 11 12];
 M = containers.Map(keySet,valueSet);
 num_worker_types = length(valueSet);
 
@@ -202,7 +202,7 @@ if PLOT_PROFILING
         0.3010                0.7450              0.9330;
         0.6350                0.0780              0.1840;
         0.2136                0.8934              0.4327;
-        0.9873                0.6091              0.1263];
+        0.9873                0.3091              0.7263];
     offset = 0.15;
     colors_2 = [0                   0.4470              0.7410 - offset;
         0.8500              0.3250              0.0980 - offset;
@@ -261,13 +261,13 @@ if PLOT_PROFILING
     % xlim([x_axis_start x_axis_end]);
     ylim([y_axis_start y_axis_end]);
     if dl_symbol_num_perframe == 0 % UL only frame configuration
-        l = legend([h_all(1), h_all(4), h_all(5), h_all(6), h_master],...
+        l = legend([h_all(2), h_all(3), h_all(4), h_all(8), h_master],...
             'FFT', 'Beam', 'Demul', 'Decode', 'Master', 'Location', 'NorthOutside', 'Orientation', 'horizontal', 'NumColumns', 4);
     elseif ul_symbol_num_perframe == 0 % DL only frame confguration
-        l = legend([h_all(1), h_all(4), h_all(7), h_all(8), h_all(9), h_master],...
+        l = legend([h_all(2), h_all(3), h_all(9), h_all(6), h_all(5), h_master],...
             'FFT', 'Beam', 'Encode', 'Precode', 'IFFT', 'Master', 'Location', 'NorthOutside', 'Orientation', 'horizontal', 'NumColumns', 4);
     else % Both UL and DL frame configuration
-        l = legend([h_all(1), h_all(4), h_all(5), h_all(6), h_all(7), h_all(8), h_all(9), h_master],...
-            'FFT', 'Beam', 'Demul', 'Decode', 'Encode', 'Precode', 'IFFT', 'Master', 'Location', 'NorthOutside', 'Orientation', 'horizontal', 'NumColumns', 4);
+        l = legend([h_all(2), h_all(3), h_all(4), h_all(5), h_all(6), h_all(8), h_all(9), h_master],...
+            'FFT', 'Beam', 'Demul', 'IFFT', 'Precode', 'Decode', 'Encode', 'Master', 'Location', 'NorthOutside', 'Orientation', 'horizontal', 'NumColumns', 4);
     end
 end
