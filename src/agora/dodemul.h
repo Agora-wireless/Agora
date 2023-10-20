@@ -60,7 +60,8 @@ class DoDemul : public Doer {
   Table<complex_float>& ue_spec_pilot_buffer_;
   Table<complex_float>& equal_buffer_;
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_;
-  DurationStat* duration_stat_;
+  DurationStat* duration_stat_demul_;
+  DurationStat* duration_stat_equal_;
   PhyStats* phy_stats_;
 
   /// Intermediate buffer to gather raw data. Size = subcarriers per cacheline

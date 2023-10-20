@@ -70,14 +70,14 @@ class Agora {
   size_t FetchEvent(std::vector<EventData>& events_list,
                     bool is_turn_to_dequeue_from_io);
 
-  void InitializeQueues();
   void InitializeCounters();
   void InitializeThreads();
-  void FreeQueues();
 
   void SaveDecodeDataToFile(int frame_id);
   void SaveTxDataToFile(int frame_id);
 
+  void HandleEvents(EventData& event, size_t& tx_count, double tx_begin,
+                    bool& finish);
   void HandleEventFft(size_t tag);
   void UpdateRxCounters(size_t frame_id, size_t symbol_id);
 
@@ -121,7 +121,7 @@ class Agora {
 
   std::unique_ptr<Stats> stats_;
   std::unique_ptr<PhyStats> phy_stats_;
-  std::unique_ptr<AgoraWorker> worker_set_;
+  std::unique_ptr<AgoraWorker> worker_;
 
   //Agora Buffer containment
   std::unique_ptr<AgoraBuffer> agora_memory_;
@@ -166,22 +166,18 @@ class Agora {
   // TX/RX buffers.
   std::array<std::queue<fft_req_tag_t>, kFrameWnd> fft_queue_arr_;
 
-  // Master thread's message queue for receiving packets
-  moodycamel::ConcurrentQueue<EventData> message_queue_;
-
   // Master-to-worker queue for MAC
   moodycamel::ConcurrentQueue<EventData> mac_request_queue_;
 
   // Worker-to-master queue for MAC
   moodycamel::ConcurrentQueue<EventData> mac_response_queue_;
 
-  moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
-  moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
-
   uint8_t schedule_process_flags_;
   std::queue<size_t> encode_deferral_;
 
   std::unique_ptr<Agora_recorder::RecorderThread> recorder_;
+
+  DurationStat* duration_stat_;
 };
 
 #endif  // AGORA_H_

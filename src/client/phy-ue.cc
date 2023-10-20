@@ -469,12 +469,14 @@ void PhyUe::Start() {
             const bool pilot_fft_complete =
                 fft_dlpilot_counters_.CompleteSymbol(frame_id);
             if (pilot_fft_complete) {
+#if !defined(TIME_EXCLUSIVE)
               if (kPrintPhyStats) {
                 this->phy_stats_->PrintDlSnrStats(frame_id);
               }
               this->phy_stats_->RecordDlCsi(frame_id, config_->LogScNum(),
                                             csi_buffer_);
               this->phy_stats_->RecordDlPilotSnr(frame_id);
+#endif
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
               PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
               ScheduleDefferedDownlinkSymbols(frame_id);

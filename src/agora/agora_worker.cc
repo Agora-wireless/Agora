@@ -26,40 +26,25 @@ AgoraWorker::AgoraWorker(Config* cfg, Stats* stats, PhyStats* phy_stats,
       message_(message),
       buffer_(buffer),
       frame_(frame) {
+  
+  tid = 0; // starts with 0 but has only one thread (master)
+  cur_qid = 0;
+  empty_queue_itrs = 0;
+  empty_queue = true;
+
   InitializeWorker();
 }
 
-AgoraWorker::~AgoraWorker() {
-  // No worker threads anymore
-  // for (auto& worker_thread : workers_) {
-  //   AGORA_LOG_SYMBOL("Agora: Joining worker thread\n");
-  //   if (worker_thread.joinable()) {
-  //     worker_thread.join();
-  //   }
-  // }
-}
-
-// void AgoraWorker::CreateThreads() {
-//   AGORA_LOG_SYMBOL("Worker: creating %zu workers\n",
-//                    config_->WorkerThreadNum());
-//   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
-//     workers_.emplace_back(&AgoraWorker::WorkerThread, this, i);
-//   }
-// }
+AgoraWorker::~AgoraWorker() {}
 
 void AgoraWorker::InitializeWorker() {
   /* Limit the number of thread to be 1 */
   if (config_->WorkerThreadNum() != 1) {
-    AGORA_LOG_ERROR("Worker: Single-core mode allows only 1 thread!\n");
+    AGORA_LOG_ERROR("Worker: Single-core mode allows only 1 worker thread!\n");
     exit(EXIT_FAILURE);
   }
 
-  tid = 0; // starts with 0 but has only one thread (master)
-
   AGORA_LOG_INFO("Worker: Initialize worker (function)\n");
-
-  // PinToCoreWithOffset(ThreadType::kWorker, base_worker_core_offset_, tid);
-  // AGORA_LOG_INFO("Worker: Core binding succeeded\n");
 
   /* Initialize operators */
   // debug: use make_shared intead of make_unique to escape the scope
@@ -120,19 +105,14 @@ void AgoraWorker::InitializeWorker() {
   }
 
   AGORA_LOG_INFO("Worker: Initialization finished\n");
-
-  cur_qid = 0;
-  empty_queue_itrs = 0;
-  empty_queue = true;
 }
 
 void AgoraWorker::RunWorker() {
-  if (config_->Running() == true) {
+  // if (config_->Running() == true) {
     for (size_t i = 0; i < computers_vec.size(); i++) {
       if (computers_vec.at(i)->TryLaunch(
-              *message_->GetConq(events_vec.at(i), cur_qid),
-              message_->GetCompQueue(cur_qid),
-              message_->GetWorkerPtok(cur_qid, tid))) {
+              *message_->GetTaskQueue(events_vec.at(i), cur_qid),
+              message_->GetCompQueue(cur_qid))) {
         empty_queue = false;
         break;
       }
@@ -152,6 +132,5 @@ void AgoraWorker::RunWorker() {
     } else {
       empty_queue = true;
     }
-  }
-  // AGORA_LOG_SYMBOL("Agora worker %d exit\n", tid);
+  // }
 }

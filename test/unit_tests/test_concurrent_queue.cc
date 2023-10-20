@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <thread>
+#include <queue>
 
 #include "concurrentqueue.h"
 
@@ -129,6 +130,31 @@ TEST(TestConcurrentQueue, WorkerToMasterWithoutTokens) {
   master.join();
   for (auto& w : workers) {
     w.join();
+  }
+}
+
+TEST(TestDefaultQueue, WorkerToMasterNoMultiThread) {
+  std::queue<ItemT> queue;
+
+  // enqueue
+  for (size_t i = 0; i < kNumWorkers; i++) {
+    size_t next_expected = i;
+    while (next_expected < kMaxTestNum) {
+      ItemT item(next_expected);
+      queue.push(item);
+      next_expected += kNumWorkers;
+    }
+  }
+
+  // dequeue
+  ItemT item;
+  size_t sum = 0;
+  while (sum < kMaxTestNum) {
+    if (!queue.empty()) {
+      item = queue.front();
+      queue.pop();
+      sum++;
+    }
   }
 }
 

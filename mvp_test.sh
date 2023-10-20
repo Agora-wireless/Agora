@@ -2,7 +2,7 @@
 
 # This script runs the Agora in RRU mode with USRP.
 #
-# Copyright 2023 Chung-Hsuan Tung
+# Copyright 2023 @cstandy
 #
 # This script is used to test if the code can run.
 # Thus, it does not look into if the processing is correct, nor is it meaningful
@@ -78,6 +78,10 @@ function exe_bs {
 function exe_user {
     echo "Running the user..."
     $user --conf_file $config
+    # $user --conf_file $config   \
+    #       --num_threads=2       \
+    #       --core_offset=10      \
+    #       --enable_slow_start=0
     # script -q -c "$user --conf_file $config" $logfile
 }
 

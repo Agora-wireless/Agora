@@ -69,30 +69,35 @@ enum class DoerType : size_t {
   kFFT,
   kCSI,
   kBeam,
+  kEqual,
   kDemul,
   kDecode,
   kEncode,
   kIFFT,
   kPrecode,
-  kRC
+  kRC,
+  kSched // used for DurationStat in master function
 };
 
-static constexpr std::array<DoerType, (static_cast<size_t>(DoerType::kRC) + 1)>
-    kAllDoerTypes = {DoerType::kFFT,   DoerType::kCSI,     DoerType::kBeam,
-                     DoerType::kDemul, DoerType::kDecode,  DoerType::kEncode,
-                     DoerType::kIFFT,  DoerType::kPrecode, DoerType::kRC};
+static constexpr std::array<DoerType, (static_cast<size_t>(DoerType::kSched) + 1)>
+    kAllDoerTypes = {DoerType::kFFT,    DoerType::kCSI,     DoerType::kBeam,
+                     DoerType::kEqual,  DoerType::kDemul,   DoerType::kDecode,
+                     DoerType::kEncode, DoerType::kIFFT,    DoerType::kPrecode,
+                     DoerType::kRC,     DoerType::kSched};
 static constexpr size_t kNumDoerTypes = kAllDoerTypes.size();
 
 static const std::map<DoerType, std::string> kDoerNames = {
     {DoerType::kFFT, std::string("FFT")},
     {DoerType::kCSI, std::string("CSI")},
     {DoerType::kBeam, std::string("Beamweights")},
+    {DoerType::kEqual, std::string("Equal")},
     {DoerType::kDemul, std::string("Demul")},
     {DoerType::kDecode, std::string("Decode")},
     {DoerType::kEncode, std::string("Encode")},
     {DoerType::kIFFT, std::string("iFFT")},
     {DoerType::kPrecode, std::string("Precode")},
-    {DoerType::kRC, std::string("RC")}};
+    {DoerType::kRC, std::string("RC")},
+    {DoerType::kSched, std::string("Schedule")}};
 
 enum class PrintType : int {
   kPacketRXPilots,
@@ -175,7 +180,7 @@ static constexpr bool kEnableCsvLog = true;
 static constexpr bool kEnableCsvLog = false;
 #endif
 
-#if defined(ENABLE_MAT_LOG)
+#if defined(ENABLE_MAT_LOG) && !defined(TIME_EXCLUSIVE)
 static constexpr bool kEnableMatLog = true;
 #else
 static constexpr bool kEnableMatLog = false;
@@ -196,8 +201,13 @@ static constexpr bool kUplinkHardDemod = false;
 
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = true;
+#if !defined(TIME_EXCLUSIVE)
+static constexpr bool kCollectPhyStats = true;
+static constexpr bool kPrintBeamStats = true;
+#else
 static constexpr bool kCollectPhyStats = false;
 static constexpr bool kPrintBeamStats = false;
+#endif
 
 static constexpr bool kStatsPrintFrameSummary = true;
 static constexpr bool kDebugPrintPerFrameDone = true;

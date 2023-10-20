@@ -118,6 +118,8 @@ set(ENABLE_DPDK False CACHE BOOL "ENABLE_DPDK set to true to enable dpdk support
 message(STATUS "ENABLE_DPDK:      ${ENABLE_DPDK}")
 set(ENABLE_HDF5 False CACHE BOOL "ENABLE_HDF5 defaulting to 'False'")
 message(STATUS "ENABLE_HDF5:      ${ENABLE_HDF5}")
+set(TIME_EXCLUSIVE False CACHE BOOL "TIME_EXCLUSIVE defaulting to 'False'")
+message(STATUS "TIME_EXCLUSIVE:   ${TIME_EXCLUSIVE}")
 message(STATUS "--------------------------------\n--")
 
 if(RADIO_TYPE STREQUAL SOAPY_IRIS)
@@ -187,6 +189,12 @@ if (${ENABLE_HDF5})
   endif()
   message(VERBOSE "  HDF5 Includes: ${HDF5_INCLUDE_DIRS} Libraries: ${HDF5_LIBRARIES}")
   include_directories(${HDF5_INCLUDE_DIRS})
+endif()
+
+#Time-exclusive Report, disable all phy stat except BER and BLER for verification
+if (${TIME_EXCLUSIVE})
+  add_definitions(-DTIME_EXCLUSIVE)
+  message("-- Time-exlusive: Report only timing but not other characteristics")
 endif()
 
 #Python
@@ -582,7 +590,7 @@ endforeach()
 set(UNIT_TESTS test_armadillo test_datatype_conversion test_udp_client_server
   test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
   test_ptr_grid test_avx512_complex_mul test_scrambler
-  test_256qam_demod)
+  test_256qam_demod test_equal test_equal_time)
 
 foreach(test_name IN LISTS UNIT_TESTS)
   add_executable(${test_name}

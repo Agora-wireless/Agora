@@ -6,10 +6,11 @@
 #  * test_agora.sh 5: Run the test five times
 #  * test_agora.sh 5 out_file: Run the test five times and redirect test
 #    outputs to out_file. Only print pass/fail summary statistics to screen.
-input_filepath="files/config/ci"
+input_filepath="../../files/config/ci"
+build_dir="../../build/"
 
 # Check that all required executables are present
-exe_list="build/test_agora build/data_generator build/sender"
+exe_list="${build_dir}/test_agora ${build_dir}/data_generator ${build_dir}/sender"
 for exe in ${exe_list}; do
   if [ ! -f ${exe} ]; then
       echo "${exe} not found. Exiting."
@@ -62,42 +63,42 @@ for i in `seq 1 $num_iters`; do
     echo "==========================================="
     echo "Generating data for uplink correctness test $i......"
     echo -e "===========================================\n"
-    ./build/data_generator --conf_file ${input_filepath}/tddconfig-correctness-test-ul.json
+    ${build_dir}/data_generator --conf_file ${input_filepath}/tddconfig-correctness-test-ul.json
     
     echo -e "-------------------------------------------------------\n\n\n"
     echo "==========================================="
     echo "Running uplink correctness test $i......"
     echo -e "===========================================\n"
     # We sleep before starting the sender to allow the Agora server to start
-    ./build/test_agora --conf_file ${input_filepath}/tddconfig-correctness-test-ul.json &
-    sleep 1; ./build/sender --num_threads 1 --core_offset 10 --conf_file ${input_filepath}/tddconfig-correctness-test-ul.json
+    ${build_dir}/test_agora --conf_file ${input_filepath}/tddconfig-correctness-test-ul.json &
+    sleep 1; ${build_dir}/sender --num_threads 1 --core_offset 10 --conf_file ${input_filepath}/tddconfig-correctness-test-ul.json
     wait
 
     echo "==========================================="
     echo "Generating data for downlink correctness test $i......"
     echo -e "===========================================\n"
-    ./build/data_generator --conf_file ${input_filepath}/tddconfig-correctness-test-dl.json
+    ${build_dir}/data_generator --conf_file ${input_filepath}/tddconfig-correctness-test-dl.json
 
     echo -e "-------------------------------------------------------\n\n\n"
     echo "==========================================="
     echo "Running downlink correctness test $i......"
     echo -e "===========================================\n"
-    ./build/test_agora --conf_file ${input_filepath}/tddconfig-correctness-test-dl.json &
-    sleep 1; ./build/sender --num_threads 1 --core_offset 10 --conf_file ${input_filepath}/tddconfig-correctness-test-dl.json
+    ${build_dir}/test_agora --conf_file ${input_filepath}/tddconfig-correctness-test-dl.json &
+    sleep 1; ${build_dir}/sender --num_threads 1 --core_offset 10 --conf_file ${input_filepath}/tddconfig-correctness-test-dl.json
     echo -e "-------------------------------------------------------\n\n\n"
     wait
 
     echo "==========================================="
     echo "Generating data for uplink downlink combined correctness test $i......"
     echo -e "===========================================\n"
-    ./build/data_generator --conf_file ${input_filepath}/tddconfig-correctness-test-both.json
+    ${build_dir}/data_generator --conf_file ${input_filepath}/tddconfig-correctness-test-both.json
 
     echo -e "-------------------------------------------------------\n\n\n"
     echo "==========================================="
     echo "Running combined correctness test $i......"
     echo -e "===========================================\n"
-    ./build/test_agora --conf_file ${input_filepath}/tddconfig-correctness-test-both.json &
-    sleep 1; ./build/sender --num_threads 1 --core_offset 10 --conf_file ${input_filepath}/tddconfig-correctness-test-both.json
+    ${build_dir}/test_agora --conf_file ${input_filepath}/tddconfig-correctness-test-both.json &
+    sleep 1; ${build_dir}/sender --num_threads 1 --core_offset 10 --conf_file ${input_filepath}/tddconfig-correctness-test-both.json
     echo -e "-------------------------------------------------------\n\n\n"
     wait
   } >> $out_file
