@@ -20,7 +20,8 @@
 AgoraWorker::AgoraWorker(Config* cfg, MacScheduler* mac_sched, Stats* stats,
                          PhyStats* phy_stats, MessageInfo* message,
                          AgoraBuffer* buffer, FrameInfo* frame)
-    : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
+    : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum() +
+                               (cfg->DynamicCoreAlloc() ? 1 : 0)),
       config_(cfg),
       mac_sched_(mac_sched),
       stats_(stats),
@@ -41,12 +42,73 @@ AgoraWorker::~AgoraWorker() {
 }
 
 void AgoraWorker::CreateThreads() {
-  AGORA_LOG_SYMBOL("Worker: creating %zu workers\n",
+  AGORA_LOG_SYMBOL("Worker: Creating %zu workers\n",
                    config_->WorkerThreadNum());
+  active_core_.resize(sysconf(_SC_NPROCESSORS_ONLN));
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
+    active_core_[i] = true;
     workers_.emplace_back(&AgoraWorker::WorkerThread, this, i);
   }
+  for (size_t i = config_->WorkerThreadNum();
+       i < (size_t)sysconf(_SC_NPROCESSORS_ONLN); i++) {
+    active_core_[i] = false;
+  }
 }
+
+void AgoraWorker::UpdateCores(RPControlMsg rcm) {
+  AGORA_LOG_INFO("=================================\n");
+  AGORA_LOG_INFO(
+      "Agora: Updating compute resources for workers thread - currently used: "
+      "%ld,total: %ld\n",
+      workers_.size(),
+      sysconf(_SC_NPROCESSORS_ONLN) - base_worker_core_offset_);
+
+  // Target core numbers
+  const size_t start_core_id = workers_.size();
+  size_t updated_core_num = workers_.size() + rcm.add_core_ - rcm.remove_core_;
+  // TODO: (size_t)sysconf(_SC_NPROCESSORS_ONLN) gives all available core # in the machine
+  const size_t max_core_num =
+      sysconf(_SC_NPROCESSORS_ONLN) - base_worker_core_offset_;
+
+  AGORA_LOG_INFO(
+      "[ALERTTTTTT]: CPU Layout Update!!! start_core_: %zu, updated_core_num_: "
+      "%zu \n",
+      start_core_id, updated_core_num);
+
+  // Update workers
+  if (workers_.size() < updated_core_num) {
+    // Add workers
+    updated_core_num = std::min(updated_core_num, max_core_num);
+
+    for (size_t core_i = start_core_id; core_i < updated_core_num; core_i++) {
+      // Update info
+      active_core_[core_i] = true;
+      workers_.emplace_back(&AgoraWorker::WorkerThread, this, core_i);
+      AGORA_LOG_INFO("Agora: added core # %ld\n", core_i);
+    }
+  } else {
+    // Remove workers
+    // minimum core number?
+    updated_core_num = std::max(updated_core_num, (size_t)2);
+    for (size_t core_i = start_core_id; core_i > updated_core_num; core_i--) {
+      // Update info
+      active_core_[core_i - 1] = false;
+      RemoveCoreFromList(core_i - 1, base_worker_core_offset_);
+      workers_.at(core_i - 1).join();
+      AGORA_LOG_INFO("Agora: removed core # %ld\n", core_i);
+    }
+    workers_.resize(updated_core_num);
+  }
+
+  AGORA_LOG_INFO(
+      "Agora: Compute resource update is complete - currently used: %ld, "
+      "total: %ld\n",
+      workers_.size(),
+      sysconf(_SC_NPROCESSORS_ONLN) - base_worker_core_offset_);
+  AGORA_LOG_INFO("=================================\n");
+}
+
+size_t AgoraWorker::GetCoresInfo() { return workers_.size(); }
 
 void AgoraWorker::WorkerThread(int tid) {
   PinToCoreWithOffset(ThreadType::kWorker, base_worker_core_offset_, tid);

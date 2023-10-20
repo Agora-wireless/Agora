@@ -11,6 +11,7 @@
 #if defined(USE_DPDK)
 #include "packet_txrx_dpdk.h"
 #endif
+#include "agora_worker.h"
 #include "concurrent_queue_wrapper.h"
 #include "logger.h"
 #include "modulation.h"
@@ -46,8 +47,10 @@ static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
                        kRecorderWorkerMultiFile};
 #endif
 
+// add 1 if dedicating core for RP
 Agora::Agora(Config* const cfg)
-    : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
+    : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum() +
+                               (cfg->DynamicCoreAlloc() ? 1 : 0)),
       config_(cfg),
       mac_sched_(std::make_unique<MacScheduler>(cfg)),
       stats_(std::make_unique<Stats>(cfg)),
@@ -84,7 +87,7 @@ Agora::Agora(Config* const cfg)
 }
 
 Agora::~Agora() {
-  if (kEnableMac == true) {
+  if constexpr (kEnableMac) {
     mac_std_thread_.join();
   }
 
@@ -92,6 +95,10 @@ Agora::~Agora() {
   if (recorder_ != nullptr) {
     AGORA_LOG_INFO("Waiting for Recording to complete\n");
     recorder_->Stop();
+  }
+  // Dynamic core allocation
+  if (config_->DynamicCoreAlloc()) {
+    rp_std_thread_.join();
   }
   recorder_.reset();
   stats_.reset();
@@ -114,7 +121,7 @@ void Agora::SendSnrReport(EventType event_type, size_t frame_id,
   for (size_t i = 0; i < config_->UeAntNum(); i++) {
     EventData snr_report(EventType::kSNRReport, base_tag.tag_);
     snr_report.num_tags_ = 2;
-    float snr = this->phy_stats_->GetEvmSnr(frame_id, i);
+    const float snr = this->phy_stats_->GetEvmSnr(frame_id, i);
     std::memcpy(&snr_report.tags_[1], &snr, sizeof(float));
     config_->TryEnqueueLogStatsMaster(&mac_request_queue_,
                                       snr_report,
@@ -328,7 +335,7 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
       }
     }
 
-    if (kEnableMac) {
+    if constexpr (kEnableMac) {
       if (remaining_events > 0) {
         const size_t new_events = mac_response_queue_.try_dequeue_bulk(
             &events_list.at(total_events), remaining_events);
@@ -338,6 +345,18 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
         AGORA_LOG_WARN(
             "remaining_events = %zu:%zu, mac queue num elements %zu\n",
             remaining_events, total_events, mac_response_queue_.size_approx());
+      }
+    }
+    if (config_->DynamicCoreAlloc()) {
+      if (remaining_events > 0) {
+        const size_t new_events = rp_response_queue_.try_dequeue_bulk(
+            &events_list.at(total_events), remaining_events);
+        remaining_events = remaining_events - new_events;
+        total_events = total_events + new_events;
+      } else {
+        AGORA_LOG_WARN(
+            "remaining_events = %zu:%zu, rp queue num elements %zu\n",
+            remaining_events, total_events, rp_response_queue_.size_approx());
       }
     }
   } else {
@@ -497,7 +516,10 @@ void Agora::Start() {
                 this->phy_stats_->RecordBer(frame_id, ue_map);
                 this->phy_stats_->RecordSer(frame_id, ue_map);
               }
+
               this->phy_stats_->ClearEvmBuffer(frame_id);
+
+              this->mac_sched_->UpdateScheduler(frame_id);
 
               // skip Decode when hard demod is enabled
               if (kUplinkHardDemod) {
@@ -528,7 +550,7 @@ void Agora::Start() {
           const bool last_decode_task =
               this->decode_counters_.CompleteTask(frame_id, symbol_id);
           if (last_decode_task == true) {
-            if (kEnableMac == true) {
+            if constexpr (kEnableMac) {
               ScheduleUsers(EventType::kPacketToMac, frame_id, symbol_id);
             }
             stats_->PrintPerSymbolDone(
@@ -542,7 +564,7 @@ void Agora::Start() {
               auto ue_map = mac_sched_->ScheduledUeMap(frame_id, 0u);
               this->phy_stats_->RecordBer(frame_id, ue_map);
               this->phy_stats_->RecordSer(frame_id, ue_map);
-              if (kEnableMac == false) {
+              if constexpr (kEnableMac == false) {
                 assert(frame_tracking_.cur_proc_frame_id_ == frame_id);
                 const bool work_finished = this->CheckFrameComplete(frame_id);
                 if (work_finished == true) {
@@ -551,6 +573,31 @@ void Agora::Start() {
               }
             }
           }
+        } break;
+
+        case EventType::kPacketFromRp: {
+          // Control message from RP
+          RPControlMsg rcm;
+          rcm.add_core_ = event.tags_[0];
+          rcm.remove_core_ = event.tags_[1];
+          AGORA_LOG_INFO(
+              "Agora: Received cores update data from RP of add_cores %zu,"
+              "remove_cores %zu\n",
+              rcm.add_core_, rcm.remove_core_);
+          worker_set_->UpdateCores(rcm);
+        } break;
+
+        case EventType::kPacketToRp: {
+          // Status info to RP
+          RPStatusMsg rsm;
+          rsm.latency_ = this->stats_->MeasureLastFrameLatency();
+          rsm.core_num_ = worker_set_->GetCoresInfo();
+          AGORA_LOG_INFO(
+              "Agora: Sending status to RP of latency %zu, core_num %zu\n",
+              rsm.latency_, rsm.core_num_);
+          TryEnqueueFallback(
+              &rp_request_queue_,
+              EventData(EventType::kPacketToRp, rsm.latency_, rsm.core_num_));
         } break;
 
         case EventType::kRANUpdate: {
@@ -878,7 +925,9 @@ finish:
   }
 
   // Calculate and print per-user BER
-  if ((kEnableMac == false) && (kPrintPhyStats == true)) {
+  if constexpr (kEnableMac) {
+    this->mac_thread_->PrintUplinkMacErrors();
+  } else if (kPrintPhyStats == true) {
     this->phy_stats_->PrintPhyStats();
   }
   this->Stop();
@@ -910,8 +959,13 @@ void Agora::HandleEventFft(size_t tag) {
           if (kPrintPhyStats == true) {
             this->phy_stats_->PrintUlSnrStats(frame_id);
           }
+
+          std::vector<float> max_snr_per_ue =
+              this->phy_stats_->GetMaxSnrPerUes(frame_id);
+          this->mac_sched_->UpdateSNR(max_snr_per_ue);
+
           this->phy_stats_->RecordPilotSnr(frame_id);
-          if (kEnableMac == true) {
+          if constexpr (kEnableMac) {
             SendSnrReport(EventType::kSNRReport, frame_id, symbol_id);
           }
           ScheduleSubcarriers(EventType::kBeam, frame_id, 0);
@@ -994,7 +1048,7 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
   }
   // Receive first packet in a frame
   if (rx_counters_.num_pkts_.at(frame_slot) == 0) {
-    if (kEnableMac == false) {
+    if constexpr (kEnableMac == false) {
       // schedule this frame's encoding
       // Defer the schedule.  If frames are already deferred or the current
       // received frame is too far off
@@ -1156,7 +1210,7 @@ void Agora::InitializeThreads() {
         this->stats_->FrameStart(), agora_memory_->GetDlSocket());
   }
 
-  if (kEnableMac == true) {
+  if constexpr (kEnableMac) {
     const size_t mac_cpu_core = config_->CoreOffset() +
                                 config_->SocketThreadNum() +
                                 config_->WorkerThreadNum() + 1;
@@ -1169,19 +1223,41 @@ void Agora::InitializeThreads() {
         std::thread(&MacThreadBaseStation::RunEventLoop, mac_thread_.get());
   }
 
+  // Enable dynamic core allocation
+  if (config_->DynamicCoreAlloc()) {
+    // TODO : dedicate a core to RP?
+    const size_t rp_cpu_core =
+        config_->CoreOffset() + config_->SocketThreadNum() + 1;
+    rp_thread_ = std::make_unique<ResourceProvisionerThread>(
+        config_, rp_cpu_core, &rp_request_queue_, &rp_response_queue_);
+    rp_std_thread_ =
+        std::thread(&ResourceProvisionerThread::RunEventLoop, rp_thread_.get());
+  }
+
   // Create workers
   ///\todo convert unique ptr to shared
   worker_set_ = std::make_unique<AgoraWorker>(
       config_, mac_sched_.get(), stats_.get(), phy_stats_.get(), message_.get(),
       agora_memory_.get(), &frame_tracking_);
 
-  AGORA_LOG_INFO(
-      "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
-      "cores %zu--%zu\n",
-      config_->CoreOffset(), config_->CoreOffset() + 1,
-      config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1,
-      base_worker_core_offset_,
-      base_worker_core_offset_ + config_->WorkerThreadNum() - 1);
+  if (config_->DynamicCoreAlloc() == false) {
+    AGORA_LOG_INFO(
+        "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
+        "cores %zu--%zu\n",
+        config_->CoreOffset(), config_->CoreOffset() + 1,
+        config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1,
+        base_worker_core_offset_,
+        base_worker_core_offset_ + config_->WorkerThreadNum() - 1);
+  } else {
+    AGORA_LOG_INFO(
+        "Master thread core %zu, TX/RX thread cores %zu--%zu, RP thread core "
+        "%zu, worker thread cores %zu--%zu\n",
+        config_->CoreOffset(), config_->CoreOffset() + 1,
+        config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1,
+        config_->CoreOffset() + config_->SocketThreadNum() + 1,
+        base_worker_core_offset_,
+        base_worker_core_offset_ + config_->WorkerThreadNum() - 1);
+  }
 }
 
 void Agora::SaveDecodeDataToFile(int frame_id) {

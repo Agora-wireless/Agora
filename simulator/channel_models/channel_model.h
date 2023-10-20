@@ -21,7 +21,7 @@ class ChannelModel {
   virtual ~ChannelModel() = default;
 
   //Function called every frame
-  virtual void UpdateModel() = 0;
+  virtual void UpdateModel(const float mean_channel_gain) = 0;
 
   /*
   * Returns H Matrix, if selective fading apply h_slice_index for each subcarrier
@@ -43,6 +43,8 @@ class ChannelModel {
   const size_t bss_num_;
   const size_t ues_num_;
   const size_t n_samps_;
+
+  size_t max_frame_num_;
 
   //H Matrix, MUST be of size UEs x BSs
   arma::cx_fmat h_flat_;

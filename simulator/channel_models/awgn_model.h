@@ -14,7 +14,7 @@ class AwgnModel : public ChannelModel {
       : ChannelModel(bs_ant_num, ue_ant_num, samples_per_sym,
                      ChannelModel::kFlat) {}
 
-  void UpdateModel() final {
+  void UpdateModel(const float /*mean_channel_gain*/) final {
     arma::fmat rmat(ues_num_, bss_num_, arma::fill::ones);
     arma::fmat imat(ues_num_, bss_num_, arma::fill::ones);
 
