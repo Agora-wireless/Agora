@@ -70,6 +70,8 @@ class Agora {
 
   size_t FetchEvent(std::vector<EventData>& events_list,
                     bool is_turn_to_dequeue_from_io);
+  size_t FetchStreamerEvent(std::vector<EventData>& events_list);
+  size_t FetchDoerEvent(std::vector<EventData>& events_list);
 
   void InitializeCounters();
   void InitializeThreads();
@@ -79,6 +81,7 @@ class Agora {
 
   void HandleEvents(EventData& event, size_t& tx_count, double tx_begin,
                     bool& finish);
+  void HandleStreamerEvents(EventData& event);
   void HandleEventFft(size_t tag);
   void UpdateRxCounters(size_t frame_id, size_t symbol_id);
 
@@ -91,6 +94,7 @@ class Agora {
                         size_t symbol_id);
   void ScheduleAntennasTX(size_t frame_id, size_t symbol_id);
   void ScheduleDownlinkProcessing(size_t frame_id);
+  void TryScheduleFft();
 
   /**
    * @brief Schedule LDPC decoding or encoding over code blocks
