@@ -166,16 +166,19 @@ void PhyStats::PrintPhyStats() {
 }
 
 void PhyStats::PrintEvmStats(size_t frame_id, const arma::uvec& ue_list) {
-  arma::fmat evm_buf(evm_buffer_[frame_id % kFrameWnd], config_->UeAntNum(), 1,
-                     false);
-  arma::fmat evm_mat =
-      evm_buf.st() / (config_->OfdmDataNum() * num_rxdata_symbols_);
+  //Disable the EVM if the mac is enabled
+  if constexpr (kEnableMac == false) {
+    arma::fmat evm_buf(evm_buffer_[frame_id % kFrameWnd], config_->UeAntNum(),
+                       1, false);
+    arma::fmat evm_mat =
+        evm_buf.st() / (config_->OfdmDataNum() * num_rxdata_symbols_);
 
-  [[maybe_unused]] std::stringstream ss;
-  ss << "Frame " << frame_id << ", Scheduled User(s): \n  " << ue_list.st()
-     << "  EVM " << (100.0f * arma::sqrt(evm_mat(ue_list).st())) << "  SNR "
-     << (-10.0f * arma::log10(evm_mat(ue_list).st()));
-  AGORA_LOG_INFO("%s\n", ss.str().c_str());
+    [[maybe_unused]] std::stringstream ss;
+    ss << "Frame " << frame_id << ", Scheduled User(s): \n  " << ue_list.st()
+       << "  EVM " << (100.0f * arma::sqrt(evm_mat(ue_list).st())) << "  SNR "
+       << (-10.0f * arma::log10(evm_mat(ue_list).st()));
+    AGORA_LOG_INFO("%s\n", ss.str().c_str());
+  }
 }
 
 float PhyStats::GetEvmSnr(size_t frame_id, size_t ue_id) {
@@ -338,9 +341,10 @@ void PhyStats::RecordEvm(size_t frame_id, size_t num_rec_sc,
     ss_evm_sc << frame_id;
     const size_t num_frame_data = config_->OfdmDataNum() * num_rxdata_symbols_;
     for (size_t ue_id = 0; ue_id < config_->UeAntNum(); ue_id++) {
-      float evm_pcnt = ((std::sqrt(evm_buffer_[frame_id % kFrameWnd][ue_id] /
-                                   num_frame_data)) *
-                        100.0f);
+      const float evm_pcnt =
+          ((std::sqrt(evm_buffer_[frame_id % kFrameWnd][ue_id] /
+                      num_frame_data)) *
+           100.0f);
       ss_evm << ","
              << ((ue_map.at(ue_id) != 0) ? std::to_string(evm_pcnt) : "ns");
     }
@@ -665,4 +669,29 @@ float PhyStats::GetNoise(size_t frame_id, const arma::uvec& ue_list) {
                        config_->BsAntNum() * config_->UeAntNum(), false);
 
   return arma::as_scalar(arma::mean(noise_vec(ue_list)));
+}
+
+std::vector<float> PhyStats::GetMaxSnrPerUes(size_t frame_id) {
+  std::vector<float> max_snr_per_ues(config_->UeAntNum());
+  for (size_t i = 0; i < config_->UeAntNum(); i++) {
+    float max_snr = FLT_MIN;
+    const float* frame_snr =
+        &pilot_snr_[frame_id % kFrameWnd][i * config_->BsAntNum()];
+    for (size_t j = 0; j < config_->BsAntNum(); j++) {
+      const size_t radio_id = j / config_->NumChannels();
+      const size_t cell_id = config_->CellId().at(radio_id);
+      if (config_->ExternalRefNode(cell_id) == true &&
+          radio_id == config_->RefRadio(cell_id)) {
+        continue;
+      }
+      if (frame_snr[j] > max_snr) {
+        max_snr = frame_snr[j];
+      }
+    }
+    if (max_snr == FLT_MIN) {
+      max_snr = -100;
+    }
+    max_snr_per_ues.at(i) = max_snr;
+  }
+  return max_snr_per_ues;
 }

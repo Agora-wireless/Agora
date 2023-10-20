@@ -67,7 +67,7 @@ class Doer {
   virtual EventData Launch(size_t tag) {
     unused(tag);
     RtAssert(false, "Doer: Launch(tag) not implemented");
-    return EventData();
+    return {};
   }
 
   /// The main event handling function that performs Doer-specific work.
@@ -76,7 +76,7 @@ class Doer {
     unused(tag);
     unused(event_type);
     RtAssert(false, "Doer: Launch(tag, event_type) not implemented");
-    return EventData();
+    return {};
   }
 
   size_t frame_id_ = 0;
