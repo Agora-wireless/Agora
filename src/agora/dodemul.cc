@@ -167,8 +167,8 @@ EventData DoDemul::Launch(size_t tag) {
                                   false);
         arma::cx_fvec vec_ue_pilot_data_ = vec_pilot_data.subvec(base_sc_id, base_sc_id+max_sc_ite-1);
 
-        // mat_phase_shift += sum(vec_equaled % conj(vec_ue_pilot_data_));
-        mat_phase_shift += sum(sign(vec_equaled % conj(vec_ue_pilot_data_)));
+        mat_phase_shift += sum(vec_equaled % conj(vec_ue_pilot_data_));
+        // mat_phase_shift += sum(sign(vec_equaled % conj(vec_ue_pilot_data_)));
         // sign should be able to optimize out but the result will be different
       }
 
