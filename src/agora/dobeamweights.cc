@@ -97,9 +97,11 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
                                     const float noise,
                                     complex_float* ul_beam_mem,
                                     complex_float* dl_beam_mem) {
+#if !defined(TIME_EXCLUSIVE)
   if (kEnableMatLog) {
     phy_stats_->UpdateUlCsi(frame_id, cur_sc_id, mat_csi);
   }
+#endif
   arma::cx_fmat mat_ul_beam(reinterpret_cast<arma::cx_float*>(ul_beam_mem),
                             cfg_->SpatialStreamsNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_beam_tmp;
@@ -107,8 +109,29 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     case CommsLib::BeamformingAlgorithm::kZF:
       if (kUseInverseForZF) {
         try {
-          mat_ul_beam_tmp =
+          if (cfg_->BsAntNum() == 1 && cfg_->UeAntNum() == 1) {
+            arma::cx_fmat mat_ul_beam_tmp_1x1 = arma::cx_fmat(
+              1/(arma::square(arma::real(mat_csi)) + 
+                 arma::square(arma::imag(mat_csi))),
+              arma::zeros<arma::fmat>(1, 1)
+            ) * arma::conj(mat_csi);
+            mat_ul_beam_tmp = mat_ul_beam_tmp_1x1;
+          } else {
+            mat_ul_beam_tmp =
               arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
+          }
+          // mat_ul_beam_tmp =
+          //     arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
+          // mat_ul_beam_tmp.print("mat_ul_beam_tmp");
+          // mat_ul_beam_tmp_1x1.print("mat_ul_beam_tmp_1x1");
+          // RtAssert(arma::approx_equal(mat_ul_beam_tmp, mat_ul_beam_tmp_1x1, "both", 0.01, 0.01));
+          // mat_csi.print("mat_csi"); // TODO: reduce to scalar operation.
+          // mat_csi.t().print("mat_csi.t()");
+          // (mat_csi.t() * mat_csi).print("mat_csi.t() * mat_csi");
+          // (pow(abs(mat_csi), 2)).print("pow(abs(mat_csi), 2)");
+          // arma::inv_sympd(mat_csi.t() * mat_csi).print("arma::inv_sympd(mat_csi.t() * mat_csi)");
+          // (1/(arma::square(arma::real(mat_csi))+arma::square(arma::imag(mat_csi)))).print("1/pow(abs(mat_csi), 2)");
+          // RtAssert(false);
         } catch (std::runtime_error&) {
           AGORA_LOG_WARN(
               "Failed to invert channel matrix, falling back to pinv()\n");
@@ -211,6 +234,8 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     }
   }
   mat_ul_beam = mat_ul_beam_tmp;
+
+#if !defined(TIME_EXCLUSIVE)
   if (kEnableMatLog) {
     phy_stats_->UpdateUlBeam(frame_id, cur_sc_id, mat_ul_beam.st());
   }
@@ -218,6 +243,7 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     const float rcond = arma::rcond(mat_csi.t() * mat_csi);
     phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
   }
+#endif
 }
 
 // Called for each frame_id / sc_id
