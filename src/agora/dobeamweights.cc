@@ -436,58 +436,43 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
       cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kZF &&
       cfg_->Frame().NumDLSyms() == 0 &&
       num_ext_ref_ == 0) {
-    // if (base_sc_id == 0) {
-    //   // TODO: set flag to switch whether to group SCs
-    //   const size_t sc_vec_len = cfg_->OfdmDataNum() / cfg_->PilotScGroupSize();
-    //   arma::cx_fvec csi_vec(sc_vec_len);
-    //   arma::cx_fvec ul_beam_vec(sc_vec_len);
-    //   size_t ue_idx = 0;
+    if (base_sc_id == 0) {
+      const size_t start_tsc1 = GetTime::WorkerRdtsc();
 
-    //   // Gather CSI
-    //   complex_float* cx_src = &csi_buffers_[frame_slot][ue_idx][base_sc_id];
-    //   for (size_t i = 0; i < sc_vec_len; ++i) {
-    //     csi_vec(i) = *(arma::cx_float*)(cx_src + i*cfg_->PilotScGroupSize());
-    //   }
+      // TODO: set flag to switch whether to group SCs
+      const size_t sc_vec_len = cfg_->OfdmDataNum() / cfg_->PilotScGroupSize();
+      arma::cx_fvec csi_vec(sc_vec_len);
+      arma::cx_fvec ul_beam_vec(sc_vec_len);
+      size_t ue_idx = 0;
 
-    //   // Compute beam weights
-    //   ul_beam_vec = (1/(arma::square(arma::real(csi_vec)) + 
-    //       arma::square(arma::imag(csi_vec))),
-    //       arma::zeros<arma::fvec>(sc_vec_len)
-    //     ) % arma::conj(csi_vec);
+      // Gather CSI
+      complex_float* cx_src = &csi_buffers_[frame_slot][ue_idx][base_sc_id];
+      for (size_t i = 0; i < sc_vec_len; ++i) {
+        csi_vec(i) = *(arma::cx_float*)(cx_src + i*cfg_->PilotScGroupSize());
+      }
 
-    //   // Distribute beam weights
-    //   complex_float* ul_beam_mem = ul_beam_matrices_[frame_slot][base_sc_id];
-    //   for (size_t i = 0; i < sc_vec_len; ++i) {
-    //   *(arma::cx_float*)(ul_beam_mem + i*cfg_->PilotScGroupSize()) = ul_beam_vec(i);
-    //   }
-    // } else { return; }
-    const size_t start_tsc1 = GetTime::WorkerRdtsc();
-    // Handle each subcarrier in the block (base_sc_id : last_sc_id -1)
+      const size_t start_tsc2 = GetTime::WorkerRdtsc();
+      duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
 
-    // Gather CSI matrices of each pilot from partially-transposed CSIs.
-    size_t ue_idx = 0; // Single UE antenna indicates single UE
+      // Compute beam weights
+      ul_beam_vec = (1/(arma::square(arma::real(csi_vec)) + 
+                        arma::square(arma::imag(csi_vec))))
+                    % arma::conj(csi_vec);
 
-    complex_float* cx_src = &csi_buffers_[frame_slot][ue_idx][base_sc_id];
-    // AGORA_LOG_WARN("base_sc_id = %ld in frame %ld\n", base_sc_id, frame_id);
+      const double start_tsc3 = GetTime::WorkerRdtsc();
+      duration_stat_->task_duration_[2u] += start_tsc3 - start_tsc2;
 
-    const size_t start_tsc2 = GetTime::WorkerRdtsc();
-    duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
+      // Distribute beam weights
+      complex_float* ul_beam_mem = ul_beam_matrices_[frame_slot][base_sc_id];
+      for (size_t i = 0; i < sc_vec_len; ++i) {
+        *(arma::cx_float*)(ul_beam_mem + i*cfg_->PilotScGroupSize()) =
+          ul_beam_vec(i);
+      }
 
-    arma::cx_fmat mat_csi((arma::cx_float*)(cx_src), cfg_->BsAntNum(),
-                          cfg_->SpatialStreamsNum(), false);
-
-    const double start_tsc3 = GetTime::WorkerRdtsc();
-    duration_stat_->task_duration_[2u] += start_tsc3 - start_tsc2;
-
-    complex_float* ul_beam_mem = ul_beam_matrices_[frame_slot][base_sc_id];
-    arma::cx_fmat mat_ul_beam(reinterpret_cast<arma::cx_float*>(ul_beam_mem),
-                            cfg_->SpatialStreamsNum(), cfg_->BsAntNum(), false);
-    mat_ul_beam = (1/(arma::square(arma::real(mat_csi)) + 
-                      arma::square(arma::imag(mat_csi)))) * arma::conj(mat_csi);
-
-    duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
-    duration_stat_->task_count_++;
-    duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;
+      duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
+      duration_stat_->task_count_++;
+      duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;
+    }
     return;
   }
 
