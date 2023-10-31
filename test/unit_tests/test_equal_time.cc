@@ -262,10 +262,10 @@ void equal_op_profile() {
   printf(" . ms_acc = %.2f ms\n", ms_acc);
   printf(" . ms_unit = %.2f ms\n", ms_unit);
   printf(" . ms_apply = %.2f ms\n", ms_apply);
-  printf(" . ms_apply_0 = %.2f ms (cal theta)\n", ms_apply_0);
-  printf(" . ms_apply_1 = %.2f ms (sin/cos)\n", ms_apply_1);
-  printf(" . ms_apply_2 = %.2f ms (form cx_float)\n", ms_apply_2);
-  printf(" . ms_apply_3 = %.2f ms (mult)\n", ms_apply_3);
+  printf("     . ms_apply_0 = %.2f ms (cal theta)\n", ms_apply_0);
+  printf("     . ms_apply_1 = %.2f ms (sin/cos)\n", ms_apply_1);
+  printf("     . ms_apply_2 = %.2f ms (form cx_float)\n", ms_apply_2);
+  printf("     . ms_apply_3 = %.2f ms (mult)\n", ms_apply_3);
 }
 
 TEST(TestEqual, VecFunc) {
