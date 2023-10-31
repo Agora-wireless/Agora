@@ -109,29 +109,8 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     case CommsLib::BeamformingAlgorithm::kZF:
       if (kUseInverseForZF) {
         try {
-          if (cfg_->BsAntNum() == 1 && cfg_->UeAntNum() == 1) {
-            arma::cx_fmat mat_ul_beam_tmp_1x1 = arma::cx_fmat(
-              1/(arma::square(arma::real(mat_csi)) + 
-                 arma::square(arma::imag(mat_csi))),
-              arma::zeros<arma::fmat>(1, 1)
-            ) * arma::conj(mat_csi);
-            mat_ul_beam_tmp = mat_ul_beam_tmp_1x1;
-          } else {
-            mat_ul_beam_tmp =
+          mat_ul_beam_tmp =
               arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
-          }
-          // mat_ul_beam_tmp =
-          //     arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
-          // mat_ul_beam_tmp.print("mat_ul_beam_tmp");
-          // mat_ul_beam_tmp_1x1.print("mat_ul_beam_tmp_1x1");
-          // RtAssert(arma::approx_equal(mat_ul_beam_tmp, mat_ul_beam_tmp_1x1, "both", 0.01, 0.01));
-          // mat_csi.print("mat_csi"); // TODO: reduce to scalar operation.
-          // mat_csi.t().print("mat_csi.t()");
-          // (mat_csi.t() * mat_csi).print("mat_csi.t() * mat_csi");
-          // (pow(abs(mat_csi), 2)).print("pow(abs(mat_csi), 2)");
-          // arma::inv_sympd(mat_csi.t() * mat_csi).print("arma::inv_sympd(mat_csi.t() * mat_csi)");
-          // (1/(arma::square(arma::real(mat_csi))+arma::square(arma::imag(mat_csi)))).print("1/pow(abs(mat_csi), 2)");
-          // RtAssert(false);
         } catch (std::runtime_error&) {
           AGORA_LOG_WARN(
               "Failed to invert channel matrix, falling back to pinv()\n");
@@ -448,6 +427,68 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
       //Start at the next multiple of PilotScGroupSize
       start_sc += (cfg_->PilotScGroupSize() - rem);
     }
+  }
+
+  // Reduce to scalar, vectorized operation in special case (1x1 ant config),
+  // uplink, zeroforcing
+  if (cfg_->BsAntNum() == 1 && cfg_->UeAntNum() == 1 &&
+      cfg_->SpatialStreamsNum() == 1 &&
+      cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kZF &&
+      cfg_->Frame().NumDLSyms() == 0 &&
+      num_ext_ref_ == 0) {
+    // if (base_sc_id == 0) {
+    //   // TODO: set flag to switch whether to group SCs
+    //   const size_t sc_vec_len = cfg_->OfdmDataNum() / cfg_->PilotScGroupSize();
+    //   arma::cx_fvec csi_vec(sc_vec_len);
+    //   arma::cx_fvec ul_beam_vec(sc_vec_len);
+    //   size_t ue_idx = 0;
+
+    //   // Gather CSI
+    //   complex_float* cx_src = &csi_buffers_[frame_slot][ue_idx][base_sc_id];
+    //   for (size_t i = 0; i < sc_vec_len; ++i) {
+    //     csi_vec(i) = *(arma::cx_float*)(cx_src + i*cfg_->PilotScGroupSize());
+    //   }
+
+    //   // Compute beam weights
+    //   ul_beam_vec = (1/(arma::square(arma::real(csi_vec)) + 
+    //       arma::square(arma::imag(csi_vec))),
+    //       arma::zeros<arma::fvec>(sc_vec_len)
+    //     ) % arma::conj(csi_vec);
+
+    //   // Distribute beam weights
+    //   complex_float* ul_beam_mem = ul_beam_matrices_[frame_slot][base_sc_id];
+    //   for (size_t i = 0; i < sc_vec_len; ++i) {
+    //   *(arma::cx_float*)(ul_beam_mem + i*cfg_->PilotScGroupSize()) = ul_beam_vec(i);
+    //   }
+    // } else { return; }
+    const size_t start_tsc1 = GetTime::WorkerRdtsc();
+    // Handle each subcarrier in the block (base_sc_id : last_sc_id -1)
+
+    // Gather CSI matrices of each pilot from partially-transposed CSIs.
+    size_t ue_idx = 0; // Single UE antenna indicates single UE
+
+    complex_float* cx_src = &csi_buffers_[frame_slot][ue_idx][base_sc_id];
+    // AGORA_LOG_WARN("base_sc_id = %ld in frame %ld\n", base_sc_id, frame_id);
+
+    const size_t start_tsc2 = GetTime::WorkerRdtsc();
+    duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
+
+    arma::cx_fmat mat_csi((arma::cx_float*)(cx_src), cfg_->BsAntNum(),
+                          cfg_->SpatialStreamsNum(), false);
+
+    const double start_tsc3 = GetTime::WorkerRdtsc();
+    duration_stat_->task_duration_[2u] += start_tsc3 - start_tsc2;
+
+    complex_float* ul_beam_mem = ul_beam_matrices_[frame_slot][base_sc_id];
+    arma::cx_fmat mat_ul_beam(reinterpret_cast<arma::cx_float*>(ul_beam_mem),
+                            cfg_->SpatialStreamsNum(), cfg_->BsAntNum(), false);
+    mat_ul_beam = (1/(arma::square(arma::real(mat_csi)) + 
+                      arma::square(arma::imag(mat_csi)))) * arma::conj(mat_csi);
+
+    duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
+    duration_stat_->task_count_++;
+    duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;
+    return;
   }
 
   // Handle each subcarrier in the block (base_sc_id : last_sc_id -1)
