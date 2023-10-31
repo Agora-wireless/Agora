@@ -188,8 +188,9 @@ void equal_op_profile() {
   size_t tsc_reset_0, tsc_reset_1;
   size_t tsc_acc_0, tsc_acc_1;
   size_t tsc_unit_0, tsc_unit_1;
-  size_t tsc_apply_0, tsc_apply_1;
+  size_t tsc_apply_0, tsc_apply_1, tsc_apply_2, tsc_apply_3, tsc_apply_4;
   double ms_equal = 0, ms_reset = 0, ms_acc = 0, ms_unit = 0, ms_apply = 0;
+  double ms_apply_0 = 0, ms_apply_1 = 0, ms_apply_2 = 0, ms_apply_3 = 0;
 
   for (size_t i = 0; i < num_iter; ++i) {
     symbol_idx_ul = i % num_ul_per_frame;
@@ -238,9 +239,20 @@ void equal_op_profile() {
     if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
       tsc_apply_0 = GetTime::Rdtsc();
       float cur_theta_f = theta_vec(0) + (symbol_idx_ul * theta_inc);
-      vec_equaled *= arma::cx_float(cos(-cur_theta_f), sin(-cur_theta_f));
+      // vec_equaled *= arma::cx_float(cos(-cur_theta_f), sin(-cur_theta_f));
       tsc_apply_1 = GetTime::Rdtsc();
-      ms_apply += GetTime::CyclesToMs(tsc_apply_1 - tsc_apply_0, cfg_->FreqGhz());
+      float cos_f = cos(-cur_theta_f);
+      float sin_f = sin(-cur_theta_f);
+      tsc_apply_2 = GetTime::Rdtsc();
+      arma::cx_float cx_shift = arma::cx_float(cos_f, sin_f);
+      tsc_apply_3 = GetTime::Rdtsc();
+      vec_equaled *= cx_shift;
+      tsc_apply_4 = GetTime::Rdtsc();
+      ms_apply_0 += GetTime::CyclesToMs(tsc_apply_1 - tsc_apply_0, cfg_->FreqGhz());
+      ms_apply_1 += GetTime::CyclesToMs(tsc_apply_2 - tsc_apply_1, cfg_->FreqGhz());
+      ms_apply_2 += GetTime::CyclesToMs(tsc_apply_3 - tsc_apply_2, cfg_->FreqGhz());
+      ms_apply_3 += GetTime::CyclesToMs(tsc_apply_4 - tsc_apply_3, cfg_->FreqGhz());
+      ms_apply += GetTime::CyclesToMs(tsc_apply_4 - tsc_apply_0, cfg_->FreqGhz());
     }
   }
 
@@ -250,6 +262,10 @@ void equal_op_profile() {
   printf(" . ms_acc = %.2f ms\n", ms_acc);
   printf(" . ms_unit = %.2f ms\n", ms_unit);
   printf(" . ms_apply = %.2f ms\n", ms_apply);
+  printf(" . ms_apply_0 = %.2f ms (cal theta)\n", ms_apply_0);
+  printf(" . ms_apply_1 = %.2f ms (sin/cos)\n", ms_apply_1);
+  printf(" . ms_apply_2 = %.2f ms (form cx_float)\n", ms_apply_2);
+  printf(" . ms_apply_3 = %.2f ms (mult)\n", ms_apply_3);
 }
 
 TEST(TestEqual, VecFunc) {
