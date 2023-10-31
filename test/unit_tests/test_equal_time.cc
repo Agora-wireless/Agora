@@ -177,6 +177,14 @@ void equal_op_profile() {
   arma::cx_fvec vec_data(max_sc_ite, arma::fill::randu);
   arma::cx_fvec vec_ul_beam(max_sc_ite, arma::fill::randu);
   arma::cx_fmat mat_phase_shift(1, 1);
+  // arma::fvec vec_equaled_real;
+  // arma::fvec vec_equaled_imag;
+  // arma::fvec vec_data_real = arma::real(vec_data);
+  // arma::fvec vec_data_imag = arma::imag(vec_data);
+  // arma::fvec vec_ul_data_real = arma::real(vec_ul_beam);
+  // arma::fvec vec_ul_data_imag = arma::imag(vec_ul_beam);
+  // arma::fmat mat_phase_shift_real = arma::real(mat_phase_shift);
+  // arma::fmat mat_phase_shift_imag = arma::imag(mat_phase_shift);
   static arma::fvec theta_vec;
   static float theta_inc;
   size_t symbol_idx_ul;
@@ -188,9 +196,9 @@ void equal_op_profile() {
   size_t tsc_reset_0, tsc_reset_1;
   size_t tsc_acc_0, tsc_acc_1;
   size_t tsc_unit_0, tsc_unit_1;
-  size_t tsc_apply_0, tsc_apply_1, tsc_apply_2, tsc_apply_3, tsc_apply_4;
+  size_t tsc_apply_0, tsc_apply_1, tsc_apply_2, tsc_apply_3, tsc_apply_4, tsc_apply_5;
   double ms_equal = 0, ms_reset = 0, ms_acc = 0, ms_unit = 0, ms_apply = 0;
-  double ms_apply_0 = 0, ms_apply_1 = 0, ms_apply_2 = 0, ms_apply_3 = 0;
+  double ms_apply_0 = 0, ms_apply_1 = 0, ms_apply_2 = 0, ms_apply_3 = 0, ms_apply_4;
 
   for (size_t i = 0; i < num_iter; ++i) {
     symbol_idx_ul = i % num_ul_per_frame;
@@ -198,6 +206,10 @@ void equal_op_profile() {
     tsc_equal_0 = GetTime::Rdtsc();
     vec_equaled = vec_ul_beam % vec_data;
     tsc_equal_1 = GetTime::Rdtsc();
+    // vec_equaled_real =
+    //   vec_ul_data_real % vec_data_real - vec_ul_data_imag % vec_data_imag;
+    // vec_equaled_imag =
+    //   vec_ul_data_real % vec_data_imag + vec_ul_data_imag % vec_data_real;
     ms_equal += GetTime::CyclesToMs(tsc_equal_1 - tsc_equal_0, cfg_->FreqGhz());
 
     if (symbol_idx_ul == 0) {
@@ -213,11 +225,21 @@ void equal_op_profile() {
     // Calc new phase shift
     if (symbol_idx_ul < cfg_->Frame().ClientUlPilotSymbols()) {
       arma::cx_fvec vec_ue_pilot_data_(max_sc_ite, arma::fill::randu);
+      // arma::fvec vec_ue_pilot_data_real_ = arma::real(vec_ue_pilot_data_);
+      // arma::fvec vec_ue_pilot_data_imag_ = arma::imag(vec_ue_pilot_data_);
 
       tsc_acc_0 = GetTime::Rdtsc();
       // mat_phase_shift += sum(sign(vec_equaled % conj(vec_ue_pilot_data_)));
       mat_phase_shift += sum(vec_equaled % conj(vec_ue_pilot_data_));
       tsc_acc_1 = GetTime::Rdtsc();
+      // mat_phase_shift_real += sum(
+      //   vec_equaled_real % vec_ue_pilot_data_real_ + 
+      //   vec_equaled_imag % vec_ue_pilot_data_imag_
+      // );
+      // mat_phase_shift_imag += sum(
+      //   vec_equaled_imag % vec_ue_pilot_data_real_ - 
+      //   vec_equaled_real % vec_ue_pilot_data_imag_
+      // );
       ms_acc += GetTime::CyclesToMs(tsc_acc_1 - tsc_acc_0, cfg_->FreqGhz());
     }
 
@@ -225,7 +247,10 @@ void equal_op_profile() {
     // Check the special case condition to avoid reading wrong memory location
     if (symbol_idx_ul == cfg_->Frame().ClientUlPilotSymbols()) { 
       arma::cx_fvec pilot_corr_vec(cfg_->Frame().ClientUlPilotSymbols(), arma::fill::randu);
+      // arma::fvec pilot_corr_vec_real = arma::real(pilot_corr_vec);
+      // arma::fvec pilot_corr_vec_imag = arma::imag(pilot_corr_vec);
       
+      // theta_vec = arma::atan(pilot_corr_vec_imag/pilot_corr_vec_real);
       tsc_unit_0 = GetTime::Rdtsc();
       theta_vec = arg(pilot_corr_vec);
       theta_inc = theta_vec(cfg_->Frame().ClientUlPilotSymbols()-1) - theta_vec(0);
@@ -237,6 +262,7 @@ void equal_op_profile() {
 
     // Apply previously calc'ed phase shift to data
     if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
+
       tsc_apply_0 = GetTime::Rdtsc();
       float cur_theta_f = theta_vec(0) + (symbol_idx_ul * theta_inc);
       // vec_equaled *= arma::cx_float(cos(-cur_theta_f), sin(-cur_theta_f));
@@ -246,13 +272,22 @@ void equal_op_profile() {
       tsc_apply_2 = GetTime::Rdtsc();
       arma::cx_float cx_shift = arma::cx_float(cos_f, sin_f);
       tsc_apply_3 = GetTime::Rdtsc();
-      vec_equaled *= cx_shift;
+      vec_equaled_real = arma::real(vec_equaled);
+      vec_equaled_imag = arma::imag(vec_equaled);
+      // vec_equaled *= cx_shift;
       tsc_apply_4 = GetTime::Rdtsc();
+      // arma::cx_fvec vec_equaled_org = vec_equaled * cx_shift;
+      vec_equaled = arma::cx_fvec(vec_equaled_real * cos_f - vec_equaled_imag * sin_f, vec_equaled_real * sin_f + vec_equaled_imag * cos_f);
+      // vec_equaled_real = vec_equaled_real * cos_f - vec_equaled_imag * sin_f;
+      // vec_equaled_imag = vec_equaled_real * sin_f + vec_equaled_imag * cos_f;
+      tsc_apply_5 = GetTime::Rdtsc();
+      // RtAssert(arma::approx_equal(vec_equaled, vec_equaled_org, "both", 0.01, 0.01), "Correctness check.");
       ms_apply_0 += GetTime::CyclesToMs(tsc_apply_1 - tsc_apply_0, cfg_->FreqGhz());
       ms_apply_1 += GetTime::CyclesToMs(tsc_apply_2 - tsc_apply_1, cfg_->FreqGhz());
       ms_apply_2 += GetTime::CyclesToMs(tsc_apply_3 - tsc_apply_2, cfg_->FreqGhz());
       ms_apply_3 += GetTime::CyclesToMs(tsc_apply_4 - tsc_apply_3, cfg_->FreqGhz());
-      ms_apply += GetTime::CyclesToMs(tsc_apply_4 - tsc_apply_0, cfg_->FreqGhz());
+      ms_apply_4 += GetTime::CyclesToMs(tsc_apply_5 - tsc_apply_4, cfg_->FreqGhz());
+      ms_apply += GetTime::CyclesToMs(tsc_apply_5 - tsc_apply_0, cfg_->FreqGhz());
     }
   }
 
@@ -265,7 +300,8 @@ void equal_op_profile() {
   printf("     . ms_apply_0 = %.2f ms (cal theta)\n", ms_apply_0);
   printf("     . ms_apply_1 = %.2f ms (sin/cos)\n", ms_apply_1);
   printf("     . ms_apply_2 = %.2f ms (form cx_float)\n", ms_apply_2);
-  printf("     . ms_apply_3 = %.2f ms (mult)\n", ms_apply_3);
+  printf("     . ms_apply_3 = %.2f ms (read real/imag)\n", ms_apply_3);
+  printf("     . ms_apply_4 = %.2f ms (real mult)\n", ms_apply_4);
 }
 
 TEST(TestEqual, VecFunc) {
