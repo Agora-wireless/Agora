@@ -301,9 +301,11 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     for (size_t i = 0; i < this->cfg_->UeAntNum(); i++) {
       std::vector<complex_float> pilots_f_ue(
           this->cfg_->OfdmCaNum());  // Zeroed
+      size_t step_size = this->cfg_->GroupPilotSc() ?
+                         this->cfg_->PilotScGroupSize() : 1;
       for (size_t j = this->cfg_->OfdmDataStart();
            j < this->cfg_->OfdmDataStop();
-           j += this->cfg_->PilotScGroupSize()) {
+           j += step_size) {
         pilots_f_ue.at(i + j) = pilot_fd.at(i + j);
       }
       // Load pilots

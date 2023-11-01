@@ -31,7 +31,8 @@
     "sample_rate": 122.88e6,
     "max_frame": 2000,
 
-    "freq_orthogonal_pilot": true,
+    "freq_orthogonal_pilot": false,
+    "group_pilot_sc": true,
     "client_ul_pilot_syms": 2,
     /* Compute configuration */
     "core_offset": 28,

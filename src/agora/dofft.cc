@@ -199,6 +199,7 @@ EventData DoFFT::Launch(size_t tag) {
 
   if (sym_type == SymbolType::kPilot) {
     const size_t pilot_symbol_id = cfg_->Frame().GetPilotSymbolIdx(symbol_id);
+#if !defined(TIME_EXCLUSIVE)
     if (kCollectPhyStats) {
       if (cfg_->FreqOrthogonalPilot()) {
         for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
@@ -209,6 +210,7 @@ EventData DoFFT::Launch(size_t tag) {
                                    fft_inout_);
       }
     }
+#endif
     PartialTranspose(csi_buffers_[frame_slot][pilot_symbol_id], ant_id,
                      SymbolType::kPilot);
 
@@ -216,21 +218,23 @@ EventData DoFFT::Launch(size_t tag) {
     // TODO 1. allow pilot sc group size different than kTransposeBlockSize
     // TODO 2. potential use of multiple pilot symbols
     // TODO 3. interpolation of CSI in gap subcarriers
-    if (cfg_->FreqOrthogonalPilot() && cfg_->GroupPilotSc() &&
+    if (cfg_->FreqOrthogonalPilot() &&
         pilot_symbol_id == cfg_->Frame().NumPilotSyms() - 1) {
-      const size_t num_blocks = cfg_->OfdmDataNum() / kTransposeBlockSize;
+      const size_t block_size = cfg_->GroupPilotSc() ? kTransposeBlockSize : 1;
+      const size_t num_blocks = cfg_->OfdmDataNum() / block_size;
       for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
         const size_t block_base_offset =
-            block_idx * (kTransposeBlockSize * cfg_->BsAntNum());
+            block_idx * (block_size * cfg_->BsAntNum());
         const size_t block_offset =
             kUsePartialTrans
-                ? block_base_offset + (ant_id * kTransposeBlockSize)
+                ? block_base_offset + (ant_id * block_size)
                 : (cfg_->OfdmDataNum() * ant_id) +
-                      (block_idx * kTransposeBlockSize);
+                      (block_idx * block_size);
         complex_float* src = &csi_buffers_[frame_slot][0][block_offset];
         for (ssize_t ue_id = cfg_->UeAntNum() - 1; ue_id >= 0; ue_id--) {
           complex_float* dst = &csi_buffers_[frame_slot][ue_id][block_offset];
-          for (size_t sc_idx = 0; sc_idx < kTransposeBlockSize; sc_idx++) {
+          for (size_t sc_idx = 0; sc_idx < block_size; sc_idx++) {
+            // suspicious but need to test in MIMO setting
             dst[sc_idx] = src[ue_id];
           }
         }

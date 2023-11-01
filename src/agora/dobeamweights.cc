@@ -436,37 +436,36 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
       cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kZF &&
       cfg_->Frame().NumDLSyms() == 0 &&
       num_ext_ref_ == 0) {
-    if (base_sc_id == 0) {
+    if (start_sc == 0) {
       const size_t start_tsc1 = GetTime::WorkerRdtsc();
 
       // TODO: set flag to switch whether to group SCs
-      const size_t sc_vec_len = cfg_->OfdmDataNum() / cfg_->PilotScGroupSize();
+      const size_t sc_vec_len = cfg_->OfdmDataNum() / sc_inc;
       arma::cx_fvec csi_vec(sc_vec_len);
       arma::cx_fvec ul_beam_vec(sc_vec_len);
-      size_t ue_idx = 0;
+      size_t ue_idx = 0; // If UeAntNum() == 1, only one UE exists.
 
       // Gather CSI
-      complex_float* cx_src = &csi_buffers_[frame_slot][ue_idx][base_sc_id];
+      complex_float* cx_src = &csi_buffers_[frame_slot][ue_idx][start_sc];
       for (size_t i = 0; i < sc_vec_len; ++i) {
-        csi_vec(i) = *(arma::cx_float*)(cx_src + i*cfg_->PilotScGroupSize());
+        csi_vec(i) = *(arma::cx_float*)(cx_src + i*sc_inc);
       }
 
       const size_t start_tsc2 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
 
-      // Compute beam weights
+      // Compute beam weights (zero-forcing)
       ul_beam_vec = (1/(arma::square(arma::real(csi_vec)) + 
                         arma::square(arma::imag(csi_vec))))
                     % arma::conj(csi_vec);
 
-      const double start_tsc3 = GetTime::WorkerRdtsc();
-      duration_stat_->task_duration_[2u] += start_tsc3 - start_tsc2;
+      const size_t start_tsc3 = GetTime::WorkerRdtsc();
+      duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
 
       // Distribute beam weights
-      complex_float* ul_beam_mem = ul_beam_matrices_[frame_slot][base_sc_id];
+      complex_float* ul_beam_mem = ul_beam_matrices_[frame_slot][start_sc];
       for (size_t i = 0; i < sc_vec_len; ++i) {
-        *(arma::cx_float*)(ul_beam_mem + i*cfg_->PilotScGroupSize()) =
-          ul_beam_vec(i);
+        *(arma::cx_float*)(ul_beam_mem + i*sc_inc) = ul_beam_vec(i);
       }
 
       duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
@@ -515,8 +514,8 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
       mat_csi.shed_rows(ext_ref_id_);
     }
 
-    const double start_tsc3 = GetTime::WorkerRdtsc();
-    duration_stat_->task_duration_[2u] += start_tsc3 - start_tsc2;
+    const size_t start_tsc3 = GetTime::WorkerRdtsc();
+    duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
 
     float noise = 0;
     if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
