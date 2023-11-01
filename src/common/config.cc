@@ -351,9 +351,10 @@ Config::Config(std::string jsonfilename)
 
   bigstation_mode_ = tdd_conf.value("bigstation_mode", false);
   freq_orthogonal_pilot_ = tdd_conf.value("freq_orthogonal_pilot", false);
+  group_pilot_sc_ = tdd_conf.value("pilot_sc_group", freq_orthogonal_pilot_);
   pilot_sc_group_size_ =
       tdd_conf.value("pilot_sc_group_size", kTransposeBlockSize);
-  if (freq_orthogonal_pilot_) {
+  if (group_pilot_sc_) {
     RtAssert(pilot_sc_group_size_ == kTransposeBlockSize,
              "In this version, pilot_sc_group_size must be equal to Transpose "
              "Block Size " +
@@ -637,7 +638,7 @@ Config::Config(std::string jsonfilename)
   demul_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / demul_block_size_;
 
   beam_block_size_ = tdd_conf.value("beam_block_size", 1);
-  if (freq_orthogonal_pilot_) {
+  if (group_pilot_sc_) {
     if (beam_block_size_ == 1) {
       AGORA_LOG_INFO("Setting beam_block_size to pilot_sc_group_size %zu\n",
                      pilot_sc_group_size_);
@@ -1606,7 +1607,7 @@ void Config::GenData() {
           const size_t shifted_sc = (org_sc >= center_sc)
                                         ? (org_sc - center_sc)
                                         : (org_sc + center_sc);
-          if (this->freq_orthogonal_pilot_ == false ||
+          if (this->group_pilot_sc_ == false ||
               sc_id % this->pilot_sc_group_size_ == ue_id) {
             pilot_ifft_[shifted_sc] = this->pilots_[sc_id];
             pilot_sc_list.push_back(org_sc);

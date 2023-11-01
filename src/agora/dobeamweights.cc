@@ -418,9 +418,9 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
   // Default: Handle each subcarrier one by one
   size_t sc_inc = 1;
   size_t start_sc = base_sc_id;
-  // For freqOrthPilot we can skip all sc except sc % PilotScGroupSize == 0
-  if (cfg_->FreqOrthogonalPilot()) {
-    //For FreqOrthogonalPilot only process the first sc in each group
+  // When grouping sc, we can skip all sc except sc % PilotScGroupSize == 0
+  if (cfg_->GroupPilotSc()) {
+    // When grouping sc only process the first sc in each group
     sc_inc = cfg_->PilotScGroupSize();
     const size_t rem = start_sc % cfg_->PilotScGroupSize();
     if (rem != 0) {

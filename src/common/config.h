@@ -210,6 +210,7 @@ class Config {
   inline bool FreqOrthogonalPilot() const {
     return this->freq_orthogonal_pilot_;
   }
+  inline bool GroupPilotSc() const { return this->group_pilot_sc_; }
   inline size_t PilotScGroupSize() const { return this->pilot_sc_group_size_; }
   inline size_t OfdmTxZeroPrefix() const { return this->ofdm_tx_zero_prefix_; }
   inline size_t OfdmTxZeroPostfix() const {
@@ -519,7 +520,7 @@ class Config {
   /// Return the subcarrier ID which we should refer to for the beamweight
   /// matrices of subcarrier [sc_id].
   inline size_t GetBeamScId(size_t sc_id) const {
-    return this->freq_orthogonal_pilot_
+    return this->group_pilot_sc_
                ? sc_id - (sc_id % this->pilot_sc_group_size_)
                : sc_id;
   }
@@ -835,6 +836,9 @@ class Config {
 
   // Whether to enable frequency orthogonal pilot
   bool freq_orthogonal_pilot_;
+
+  // Whether to group subcarriers in pilot symbol
+  bool group_pilot_sc_;
 
   // Frequency orthogonal pilot subcarrier group size
   size_t pilot_sc_group_size_;
