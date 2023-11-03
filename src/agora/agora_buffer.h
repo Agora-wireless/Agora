@@ -65,6 +65,8 @@ class AgoraBuffer {
   inline char* GetDlSocket() { return dl_socket_buffer_; }
   inline Table<complex_float>& GetCalibUl() { return calib_ul_buffer_; }
   inline Table<complex_float>& GetCalibDl() { return calib_dl_buffer_; }
+  inline Table<complex_float>& GetCalibIqUl() { return calib_ul_iq_buffer_; }
+  inline Table<complex_float>& GetCalibIqDl() { return calib_dl_iq_buffer_; }
   inline Table<complex_float>& GetCalib() { return calib_buffer_; }
 
  private:
@@ -95,6 +97,8 @@ class AgoraBuffer {
   char* dl_socket_buffer_;
   Table<complex_float> calib_ul_buffer_;
   Table<complex_float> calib_dl_buffer_;
+  Table<complex_float> calib_ul_iq_buffer_;
+  Table<complex_float> calib_dl_iq_buffer_;
 };
 
 struct SchedInfo {

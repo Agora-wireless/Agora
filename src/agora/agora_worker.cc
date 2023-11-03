@@ -60,7 +60,8 @@ void AgoraWorker::WorkerThread(int tid) {
       phy_stats_, stats_);
 
   auto compute_fft = std::make_unique<DoFFT>(
-      config_, tid, buffer_->GetFft(), buffer_->GetCsi(), buffer_->GetCalibDl(),
+      config_, tid, buffer_->GetFft(), buffer_->GetCsi(),
+      buffer_->GetCalibIqDl(), buffer_->GetCalibIqUl(), buffer_->GetCalibDl(),
       buffer_->GetCalibUl(), phy_stats_, stats_);
 
   // Downlink workers

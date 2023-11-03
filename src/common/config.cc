@@ -541,6 +541,9 @@ Config::Config(std::string jsonfilename)
       ofdm_data_num_ = fivegconfig.OfdmDataNum();
       ofdm_data_start_ = fivegconfig.OfdmDataStart();
       ofdm_data_stop_ = ofdm_data_start_ + ofdm_data_num_;
+      fivegframe_ = true;
+    } else {
+      fivegframe_ = false;
     }
     frame_ = FrameStats(frame);
   }
@@ -1505,6 +1508,17 @@ void Config::LoadTestVectors() {
   this->pilot_ci16_.resize(samps_per_symbol_, 0);
   CommsLib::Ifft2tx(pilot_ifft_, this->pilot_ci16_.data(), ofdm_ca_num_,
                     ofdm_tx_zero_prefix_, cp_len_, scale_);
+
+  // calibration pilots in 5G frames
+  pilot_calib_ci16_.resize(2);
+  pilot_calib_ci16_.at(0).resize(tdd_switching_gap_, 0);
+  pilot_calib_ci16_.at(0).insert(pilot_calib_ci16_.at(0).end(),
+                                 pilot_ci16_.begin(),
+                                 pilot_ci16_.end() - tdd_switching_gap_);
+  pilot_calib_ci16_.at(1).insert(pilot_calib_ci16_.at(1).begin(),
+                                 pilot_ci16_.end() - tdd_switching_gap_,
+                                 pilot_ci16_.end());
+  pilot_calib_ci16_.at(1).resize(samps_per_symbol_, 0);
 
   for (size_t i = 0; i < ofdm_ca_num_; i++) {
     this->pilot_cf32_.emplace_back(pilot_ifft_[i].re / scale_,

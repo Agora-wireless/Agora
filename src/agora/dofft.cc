@@ -15,12 +15,16 @@ static constexpr bool kPrintPilotCorrStats = false;
 
 DoFFT::DoFFT(Config* config, size_t tid, Table<complex_float>& data_buffer,
              PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
+             Table<complex_float>& calib_dl_iq_buffer,
+             Table<complex_float>& calib_ul_iq_buffer,
              Table<complex_float>& calib_dl_buffer,
              Table<complex_float>& calib_ul_buffer, PhyStats* in_phy_stats,
              Stats* stats_manager)
     : Doer(config, tid),
       data_buffer_(data_buffer),
       csi_buffers_(csi_buffers),
+      calib_dl_iq_buffer_(calib_dl_iq_buffer),
+      calib_ul_iq_buffer_(calib_ul_iq_buffer),
       calib_dl_buffer_(calib_dl_buffer),
       calib_ul_buffer_(calib_ul_buffer),
       phy_stats_(in_phy_stats) {
@@ -97,67 +101,48 @@ EventData DoFFT::Launch(size_t tag) {
   const size_t cell_id = pkt->cell_id_;
   const SymbolType sym_type = cfg_->Frame().GetSymbolType(symbol_id);
 
-  if (cfg_->FftInRru() == true) {
-    SimdConvertFloat16ToFloat32(
-        reinterpret_cast<float*>(fft_inout_),
-        reinterpret_cast<float*>(&pkt->data_[2 * cfg_->OfdmRxZeroPrefixBs()]),
-        cfg_->OfdmCaNum() * 2);
-  } else {
-    if (kUse12BitIQ) {
-      SimdConvert12bitIqToFloat(
-          (uint8_t*)pkt->data_ + 3 * cfg_->OfdmRxZeroPrefixBs(),
-          reinterpret_cast<float*>(fft_inout_), temp_16bits_iq_,
-          cfg_->OfdmCaNum() * 3);
-    } else {
-      size_t sample_offset = cfg_->OfdmRxZeroPrefixBs();
-      if (sym_type == SymbolType::kCalDL) {
-        sample_offset = cfg_->OfdmRxZeroPrefixCalDl();
-      } else if (sym_type == SymbolType::kCalUL) {
-        sample_offset = cfg_->OfdmRxZeroPrefixCalUl();
-      }
-      SimdConvertShortToFloat(&pkt->data_[2 * sample_offset],
-                              reinterpret_cast<float*>(fft_inout_),
-                              cfg_->OfdmCaNum() * 2);
-    }
-    if (kDebugPrintInTask) {
-      std::printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n",
-                  tid_, frame_id, symbol_id, ant_id);
-    }
+  const bool calib_5g = cfg_->FiveGFrame() && (sym_type == SymbolType::kCalDL ||
+                                               sym_type == SymbolType::kCalUL);
 
-    if ((kPrintPilotCorrStats == true) &&
-        ((sym_type == SymbolType::kPilot) || (sym_type == SymbolType::kCalUL) ||
-         ((sym_type == SymbolType::kCalDL) &&
-          (ant_id == cfg_->RefAnt(cell_id))))) {
-      SimdConvertShortToFloat(pkt->data_,
-                              reinterpret_cast<float*>(rx_samps_tmp_),
-                              2 * cfg_->SampsPerSymbol());
-      std::vector<std::complex<float>> samples_vec(
-          rx_samps_tmp_, rx_samps_tmp_ + cfg_->SampsPerSymbol());
-      std::vector<std::complex<float>> tx_seq(
-          cfg_->PilotCf32().begin() + cfg_->CpLen(),
-          cfg_->PilotCf32().end() - cfg_->CpLen());
-      std::vector<std::complex<float>> pilot_corr =
-          CommsLib::CorrelateAvx(samples_vec, tx_seq);
-      std::vector<float> pilot_corr_abs = CommsLib::Abs2Avx(pilot_corr);
-      size_t peak_offset =
-          std::max_element(pilot_corr_abs.begin(), pilot_corr_abs.end()) -
-          pilot_corr_abs.begin();
-      float peak = pilot_corr_abs[peak_offset];
-      size_t seq_len = tx_seq.size();
-      size_t sig_offset = peak_offset < seq_len ? 0 : peak_offset - seq_len;
-      printf(
-          "In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu, "
-          "sig_offset %zu, peak %2.4f\n",
-          tid_, frame_id, symbol_id, ant_id, sig_offset, peak);
-    }
-    if (kPrintInputPilot && sym_type == SymbolType::kPilot) {
-      std::stringstream ss;
-      ss << "FFT_input_" << symbol_id << "_" << ant_id << "=[";
-      for (size_t i = 0; i < cfg_->SampsPerSymbol(); i++) {
-        ss << pkt->data_[2 * i] << "+1j*" << pkt->data_[2 * i + 1] << " ";
+  if (calib_5g) {
+    size_t sample_offset = 0;
+    if (sym_type == SymbolType::kCalDL) {
+      size_t sample_num = cfg_->OfdmCaNum() - cfg_->OfdmRxZeroPrefixCalDl();
+      if (symbol_id == cfg_->Frame().GetDLCalSymbol(0u)) {
+        sample_offset = cfg_->OfdmRxZeroPrefixCalDl();
+      } else {
+        sample_num = cfg_->OfdmRxZeroPrefixCalDl() - cfg_->CpLen();
       }
-      ss << "];" << std::endl;
-      std::cout << ss.str();
+      SimdConvertShortToFloat(
+          &pkt->data_[2 * sample_offset],
+          reinterpret_cast<float*>(calib_dl_iq_buffer_[frame_slot]),
+          sample_num * 2);
+      if (symbol_id == cfg_->Frame().GetDLCalSymbol(1u)) {
+        std::memcpy(
+            reinterpret_cast<float*>(fft_inout_),
+            reinterpret_cast<float*>(calib_dl_iq_buffer_[frame_slot] + ant_id),
+            cfg_->OfdmCaNum() * 2 * sizeof(float));
+      }
+    } else if (sym_type == SymbolType::kCalUL) {
+      const size_t cal_index = cfg_->RecipCalUlRxIndex(frame_id, ant_id);
+      if (cal_index != SIZE_MAX) {
+        size_t sample_num = cfg_->OfdmCaNum() - cfg_->OfdmRxZeroPrefixCalUl();
+        if (symbol_id == cfg_->Frame().GetULCalSymbol(0u)) {
+          sample_offset = cfg_->OfdmRxZeroPrefixCalUl();
+        } else {
+          sample_num = cfg_->OfdmRxZeroPrefixCalUl() - cfg_->CpLen();
+        }
+        SimdConvertShortToFloat(
+            &pkt->data_[2 * sample_offset],
+            reinterpret_cast<float*>(calib_ul_iq_buffer_[frame_slot]),
+            sample_num * 2);
+        if (symbol_id == cfg_->Frame().GetULCalSymbol(1u)) {
+          std::memcpy(reinterpret_cast<float*>(fft_inout_),
+                      reinterpret_cast<float*>(calib_ul_iq_buffer_[frame_slot] +
+                                               ant_id),
+                      cfg_->OfdmCaNum() * 2 * sizeof(float));
+        }
+      }
     }
     if (kPrintFFTInput) {
       std::stringstream ss;
@@ -168,6 +153,83 @@ EventData DoFFT::Launch(size_t tag) {
       }
       ss << "];" << std::endl;
       std::cout << ss.str();
+    }
+  }
+
+  if (!calib_5g) {
+    if (cfg_->FftInRru() == true) {
+      SimdConvertFloat16ToFloat32(
+          reinterpret_cast<float*>(fft_inout_),
+          reinterpret_cast<float*>(&pkt->data_[2 * cfg_->OfdmRxZeroPrefixBs()]),
+          cfg_->OfdmCaNum() * 2);
+    } else {
+      if (kUse12BitIQ) {
+        SimdConvert12bitIqToFloat(
+            (uint8_t*)pkt->data_ + 3 * cfg_->OfdmRxZeroPrefixBs(),
+            reinterpret_cast<float*>(fft_inout_), temp_16bits_iq_,
+            cfg_->OfdmCaNum() * 3);
+      } else {
+        size_t sample_offset = cfg_->OfdmRxZeroPrefixBs();
+        if (sym_type == SymbolType::kCalDL) {
+          sample_offset = cfg_->OfdmRxZeroPrefixCalDl();
+        } else if (sym_type == SymbolType::kCalUL) {
+          sample_offset = cfg_->OfdmRxZeroPrefixCalUl();
+        }
+        SimdConvertShortToFloat(&pkt->data_[2 * sample_offset],
+                                reinterpret_cast<float*>(fft_inout_),
+                                cfg_->OfdmCaNum() * 2);
+      }
+      if (kDebugPrintInTask) {
+        std::printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n",
+                    tid_, frame_id, symbol_id, ant_id);
+      }
+
+      if ((kPrintPilotCorrStats == true) &&
+          ((sym_type == SymbolType::kPilot) ||
+           (sym_type == SymbolType::kCalUL) ||
+           ((sym_type == SymbolType::kCalDL) &&
+            (ant_id == cfg_->RefAnt(cell_id))))) {
+        SimdConvertShortToFloat(pkt->data_,
+                                reinterpret_cast<float*>(rx_samps_tmp_),
+                                2 * cfg_->SampsPerSymbol());
+        std::vector<std::complex<float>> samples_vec(
+            rx_samps_tmp_, rx_samps_tmp_ + cfg_->SampsPerSymbol());
+        std::vector<std::complex<float>> tx_seq(
+            cfg_->PilotCf32().begin() + cfg_->CpLen(),
+            cfg_->PilotCf32().end() - cfg_->CpLen());
+        std::vector<std::complex<float>> pilot_corr =
+            CommsLib::CorrelateAvx(samples_vec, tx_seq);
+        std::vector<float> pilot_corr_abs = CommsLib::Abs2Avx(pilot_corr);
+        size_t peak_offset =
+            std::max_element(pilot_corr_abs.begin(), pilot_corr_abs.end()) -
+            pilot_corr_abs.begin();
+        float peak = pilot_corr_abs[peak_offset];
+        size_t seq_len = tx_seq.size();
+        size_t sig_offset = peak_offset < seq_len ? 0 : peak_offset - seq_len;
+        printf(
+            "In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu, "
+            "sig_offset %zu, peak %2.4f\n",
+            tid_, frame_id, symbol_id, ant_id, sig_offset, peak);
+      }
+      if (kPrintInputPilot && sym_type == SymbolType::kPilot) {
+        std::stringstream ss;
+        ss << "FFT_input_" << symbol_id << "_" << ant_id << "=[";
+        for (size_t i = 0; i < cfg_->SampsPerSymbol(); i++) {
+          ss << pkt->data_[2 * i] << "+1j*" << pkt->data_[2 * i + 1] << " ";
+        }
+        ss << "];" << std::endl;
+        std::cout << ss.str();
+      }
+      if (kPrintFFTInput) {
+        std::stringstream ss;
+        ss << "FFT_input_" << symbol_id << "_" << ant_id << "=[";
+        for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
+          ss << std::fixed << std::setw(5) << std::setprecision(3)
+             << fft_inout_[i].re << "+1j*" << fft_inout_[i].im << " ";
+        }
+        ss << "];" << std::endl;
+        std::cout << ss.str();
+      }
     }
   }
 

@@ -230,13 +230,22 @@ std::string FiveGConfig::FormBeaconSubframe(int format_num, size_t user_num,
       }
     }
   }
+
+  /*
+   * The idea for calibration is to use consecutive guard symbols
+   * at the BS side for calibration. Given the specific issue
+   * in RENEW BS where the Ref node has odd offsets, we need to
+   * put in a G between C and L to avoid transmit/receive slots
+   * of different antennas overlapping. Thus we need minimum 5
+   * gaurd symbols.
+  */
   RtAssert(pilot_num == user_num,
            "More users specified than the "
            "chosen slot format can support.");
-  RtAssert(!calib_needed || guard_num > 4,
+  RtAssert(!calib_needed || guard_num >= 6,
            "Too few guard symbols to accomodate calibration symbols!");
   if (calib_needed) {
-    subframe.replace(first_guard_id, 5, "GCGLG");
+    subframe.replace(first_guard_id, 6, "CCGLLG");
   }
   /*
   If the last symbol of the first slot is a D and this D is not overwritten

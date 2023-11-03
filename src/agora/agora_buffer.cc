@@ -76,6 +76,10 @@ void AgoraBuffer::AllocateTables() {
     dl_ifft_buffer_.Calloc(config_->BsAntNum() * task_buffer_symbol_num,
                            config_->OfdmCaNum(),
                            Agora_memory::Alignment_t::kAlign64);
+    calib_dl_iq_buffer_.Malloc(kFrameWnd, config_->OfdmCaNum(),
+                               Agora_memory::Alignment_t::kAlign64);
+    calib_ul_iq_buffer_.Malloc(kFrameWnd, config_->OfdmCaNum(),
+                               Agora_memory::Alignment_t::kAlign64);
     calib_dl_buffer_.Malloc(kFrameWnd,
                             config_->BfAntNum() * config_->OfdmDataNum(),
                             Agora_memory::Alignment_t::kAlign64);

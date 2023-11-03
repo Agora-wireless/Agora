@@ -404,6 +404,9 @@ class Config {
   inline std::vector<std::complex<int16_t>>& BeaconCi16() {
     return this->beacon_ci16_;
   };
+  inline std::vector<std::complex<int16_t>>& PilotCalibCi16(size_t id) {
+    return this->pilot_calib_ci16_.at(id);
+  };
 
   inline Table<int8_t>& DlBits() { return this->dl_bits_; }
   inline Table<int8_t>& UlBits() { return this->ul_bits_; }
@@ -593,6 +596,7 @@ class Config {
   inline const std::vector<std::string>& UlTxFreqDataFiles() const {
     return ul_tx_f_data_files_;
   }
+  inline bool FiveGFrame() const { return fivegframe_; }
 
  private:
   void Print() const;
@@ -677,6 +681,7 @@ class Config {
   // representing the symbol types in the frame (e.g., 'P' for pilot symbols,
   // 'U' for uplink data symbols)
   FrameStats frame_;
+  bool fivegframe_;
 
   std::atomic<bool> running_;
 
@@ -705,6 +710,7 @@ class Config {
   std::vector<std::complex<int16_t>> pilot_ci16_;
 
   std::vector<std::complex<float>> pilot_cf32_;
+  std::vector<std::vector<std::complex<int16_t>>> pilot_calib_ci16_;
 
   /// I/Q samples of pilots per UE antenna per pilot symbol
   std::vector<std::vector<std::vector<std::complex<int16_t>>>> pilot_ue_ci16_;

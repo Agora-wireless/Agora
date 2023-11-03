@@ -406,7 +406,10 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
       const size_t ref_ant = Configuration()->RefAnt(cell_id);
       const size_t ant_idx = ref_ant % Configuration()->NumChannels();
       // We choose to use the reference antenna to tx from the reference radio
-      calultxbuf.at(ant_idx) = Configuration()->PilotCi16().data();
+      calultxbuf.at(ant_idx) =
+          Configuration()->FiveGFrame()
+              ? Configuration()->PilotCalibCi16(ul_cal_sym_idx).data()
+              : Configuration()->PilotCi16().data();
       long long frame_time = 0;
       if (Configuration()->HwFramer() == false) {
         frame_time =
@@ -460,7 +463,10 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
           channel_offset);
 
       if (calib_radio == radio_id) {
-        caldltxbuf.at(channel_offset) = Configuration()->PilotCi16().data();
+        caldltxbuf.at(channel_offset) =
+            Configuration()->FiveGFrame()
+                ? Configuration()->PilotCalibCi16(dl_cal_sym_idx).data()
+                : Configuration()->PilotCi16().data();
 
         AGORA_LOG_SYMBOL(
             "TxRxWorkerHw[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
