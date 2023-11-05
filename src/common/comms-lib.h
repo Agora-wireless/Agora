@@ -23,6 +23,8 @@
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 
+#include <armadillo>
+
 static const std::map<std::string, size_t> kBeamformingStr{
     {"ZF", 0}, {"MMSE", 1}, {"MRC", 2}};
 
@@ -113,6 +115,11 @@ class CommsLib {
       size_t cp_len, bool interleaved_pilot, bool time_domain = true);
   static std::vector<std::complex<float>> SeqCyclicShift(
       const std::vector<std::complex<float>>& in, float alpha);
+  static std::vector<std::complex<float>> SeqBlankOut(
+      const std::vector<std::complex<float>>& in, size_t offset, size_t numUE);
+  static void csirInterp (arma::cx_mat &in, size_t arraySize, size_t numUE);
+  static arma::cx_mat SeqInterpo (const arma::cx_mat& in, size_t numUE);
+
   static float FindMaxAbs(const complex_float* in, size_t len);
   static float FindMaxAbs(const Table<complex_float>& in, size_t dim1,
                           size_t dim2);

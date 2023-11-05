@@ -211,7 +211,7 @@ void UeWorker::DoFftPilot(size_t tag) {
 
   size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
   auto* csi_buffer_ptr =
-      reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset]);
+      reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset]); 
   auto* fft_buffer_ptr =
       reinterpret_cast<arma::cx_float*>(fft_buffer_[fft_buffer_target_id]);
 
@@ -222,15 +222,45 @@ void UeWorker::DoFftPilot(size_t tag) {
   if (dl_symbol_id < config_.Frame().ClientDlPilotSymbols()) {
     for (size_t j = 0; j < config_.OfdmDataNum(); j++) {
       size_t ant = (kDebugDownlink == true) ? 0 : ant_id;
-      complex_float p = config_.UeSpecificPilot()[ant][j];
-      size_t sc_id = non_null_sc_ind_[j];
-      csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / arma::cx_float(p.re, p.im));
+      if (j % config_.UeAntNum() == ant_id) {
+        complex_float p = config_.UeSpecificPilot()[ant][j]; 
+        size_t sc_id = non_null_sc_ind_[j];
+        csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / arma::cx_float(p.re, p.im));
+      } else {
+          csi_buffer_ptr[j] += arma::cx_float(0.0, 0.0);  // those CSIRs are zeroed and to be interpolated
+      }    
     }
+
+    arma::cx_mat csiInterp_tmp (1, config_.OfdmDataNum());
+    for (size_t i=0; i< config_.OfdmDataNum(); i++) {
+      csiInterp_tmp(i) = csi_buffer_ptr[i];
+    }
+    
+    CommsLib::csirInterp (csiInterp_tmp, config_.OfdmDataNum(), config_.UeNum());
+    for (size_t i=0; i< config_.OfdmDataNum(); i++) {
+         csi_buffer_ptr[i]  = csiInterp_tmp(i);
+    }
+
+    // // interpolation (need to refine if there are more than 2 UEs)
+    //   // auto csi_buffer_tmp = csi_buffer_ptr;
+    //   std::vector<std::complex<float>> output;
+    //   for (size_t i=0; i < config_.OfdmDataNum(); i++) {
+    //     if (csi_buffer_ptr[i] != std::complex<float>(0.0, 0.0)) {
+    //           for (size_t j = 0; j < config_.UeNum(); j++) {
+    //             output.push_back(csi_buffer_ptr[i]);
+    //             }
+    //     }
+    //   }
+    //   for (size_t i=0; i< output.size(); i++) {
+    //     csi_buffer_ptr[i]  = output[i];
+    //   }
+
     if (kCollectPhyStats) {
       phy_stats_.UpdateDlPilotSnr(frame_id, dl_symbol_id, ant_id,
                                   fft_buffer_[fft_buffer_target_id]);
     }
   }
+
 
   if (kDebugPrintPerTaskDone || kDebugPrintFft) {
     size_t fft_duration_stat = GetTime::Rdtsc() - start_tsc;

@@ -178,7 +178,9 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     // We should be scaling the beamforming matrix, so the IFFT
     // output can be scaled with OfdmCaNum() across all antennas.
     // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
+
     const float scale = 1 / (abs(mat_dl_beam_tmp).max());
+    // const float scale = 1 / arma::norm(mat_dl_beam_tmp, "inf");   // infinity norm of precoder in DL-ZFBF
     mat_dl_beam_tmp = mat_dl_beam_tmp * scale;
 
     for (size_t i = 0; i < cfg_->NumCells(); i++) {

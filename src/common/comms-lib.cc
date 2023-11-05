@@ -29,6 +29,8 @@
 #include "logger.h"
 #include "utils.h"
 
+#include <armadillo>
+
 size_t CommsLib::FindPilotSeq(const std::vector<std::complex<float>>& iq,
                               const std::vector<std::complex<float>>& pilot,
                               size_t seq_len) {
@@ -730,6 +732,143 @@ std::vector<std::complex<float>> CommsLib::SeqCyclicShift(
   }
   return out;
 }
+
+// zc_seq blanking for different UEs; SINR measurement purposes
+std::vector<std::complex<float>> CommsLib::SeqBlankOut(
+    const std::vector<std::complex<float>>& in, size_t offset, size_t numUE) {
+        std::vector<std::complex<float>> out(in.size(), 0);
+        std::vector<std::complex<float>> ooseq(in.size(), 0); // on-off sequence for this UE
+        for (size_t i = 0; i < in.size(); i++) {
+            if (i % numUE == offset) {
+                ooseq[i] = std::complex<float>(1.0, 0.0);
+            }
+        }
+        for (size_t i = 0; i < in.size(); i++) {
+            out[i] = ooseq[i] * in[i];
+            }
+        return out;
+}
+
+void CommsLib::csirInterp (arma::cx_mat &matCSIR, size_t arraySize, size_t numUE) {
+    if (arraySize % numUE !=0) {
+        // split CSIR matrix in two parts
+        arma::cx_mat tailCSIR = matCSIR.tail_cols(arraySize % numUE);
+        arma::cx_mat headCSIR = matCSIR.head_cols (matCSIR.n_cols 
+                                                - arraySize % numUE);
+        // // Print head matrix
+        // std::cout << "head matrix before interpolation: " << std::endl;
+        // for (size_t i = 0; i < headCSIR.n_rows; i++) {
+        //     for (size_t j = 0; j < headCSIR.n_cols; j++) {
+        //         std::cout << headCSIR(i,j) << " ";
+        //     }
+        // // Add a newline character when an UE is done printing
+        // std::cout << "\n";
+        // }           
+        // // Print tail matrix
+        // std::cout << "tail matrix before interpolation: " << std::endl;
+        // for (size_t i = 0; i < tailCSIR.n_rows; i++) {
+        //     for (size_t j = 0; j < tailCSIR.n_cols; j++) {
+        //         std::cout << tailCSIR(i,j) << " ";
+        //     }
+        // // Add a newline character when an UE is done printing
+        // std::cout << "\n";
+        // }   
+
+        for (size_t i=0; i<tailCSIR.n_rows; i++) {
+            if (all(tailCSIR.row(i) == arma::cx_double(0.0, 0.0))) {
+                arma::cx_mat interpRow (1, tailCSIR.n_cols);
+                interpRow.fill(matCSIR(i, matCSIR.n_cols-numUE));
+                tailCSIR.row(i) = interpRow;
+            } else {
+                tailCSIR.row(i) = CommsLib::SeqInterpo(tailCSIR.row(i), numUE);
+            }
+        }
+        // // Print interpolated tail matrix
+        // std::cout << "tail matrix after interpolation: " << std::endl;
+        // for (size_t i = 0; i < tailCSIR.n_rows; i++) {
+        //     for (size_t j = 0; j < tailCSIR.n_cols; j++) {
+        //         std::cout << tailCSIR(i,j) << " ";
+        //     }
+        // // Add a newline character when an UE is done printing
+        // std::cout << "\n";
+        // }
+
+        // head CSI matrix now interpolated using func at the end
+        for (size_t i=0; i< headCSIR.n_rows; i++) {
+            headCSIR.row(i) = CommsLib::SeqInterpo(headCSIR.row(i), numUE);
+        }
+
+        // // Print interpolated head CSI matrix
+        // std::cout << "head matrix after interpolation: " << std::endl;
+        // for (size_t i = 0; i < headCSIR.n_rows; i++) {
+        //     for (size_t j = 0; j < headCSIR.n_cols; j++) {
+        //         std::cout << headCSIR(i,j) << " ";
+        //     }
+        // // Add a newline character when an UE is done printing
+        // std::cout << "\n";
+        // }         
+
+
+        // Finally replacing last reminder cols to finish interpolation 
+        matCSIR.cols(0, matCSIR.n_cols - arraySize % numUE -1) = 
+                                        headCSIR;
+        matCSIR.cols(matCSIR.n_cols - arraySize % numUE, 
+                                        matCSIR.n_cols - 1) = tailCSIR;
+
+        // // Print interpolated CSIR
+        // std::cout << "CSIR matrix after interpolation: " << std::endl;
+        // for (size_t i = 0; i < matCSIR.n_rows; i++) {
+        //     for (size_t j = 0; j < matCSIR.n_cols; j++) {
+        //         std::cout << matCSIR(i,j) << " ";
+        //     }
+        // // Add a newline character when an UE is done printing
+        // std::cout << "\n";
+        // }
+      } else {
+          for (size_t i=0; i< matCSIR.n_rows; i++) {
+            matCSIR.row(i) = CommsLib::SeqInterpo(matCSIR.row(i), numUE);
+          }
+        // // Print
+        // std::cout << "CSIR matrix after interpolation: " << std::endl;
+        // for (size_t i = 0; i < matCSIR.n_rows; i++) {
+        //     for (size_t j = 0; j < matCSIR.n_cols; j++) {
+        //         std::cout << matCSIR(i,j) << " ";
+        //     }
+        // // Add a newline character when an UE is done printing
+        // std::cout << "\n";        
+        }
+  }
+
+arma::cx_mat CommsLib::SeqInterpo(
+        const arma::cx_mat& in, size_t numUE) {
+        // in is to be each row of matCSIR before the interpolation
+        // BUT with nan being removed ALREADY
+        std::vector<std::complex<double>> output;
+        size_t dupliCount = numUE;    // chunk size equals to numUE
+
+        // for (auto element : in) {
+        //     if (element != std::complex<float>(0.0, 0.0)) {
+        //         for (size_t i = 0; i < dupliCount; i++) {
+        //         output.push_back(element);
+        //         }
+        //     }
+        // }
+
+        for (size_t i=0; i< in.n_cols; i++) {
+            if (in(i) != arma::cx_double(0.0, 0.0)) {
+                for (size_t j = 0; j < dupliCount; j++) {
+                output.push_back(in(i));
+                }                
+            }
+        }
+
+        arma::cx_mat Output (1, in.n_cols); 
+        for (size_t i=0; i< in.n_cols; i++) {
+            Output(i) = output[i];
+        }
+
+        return Output;
+    }
 
 std::vector<std::vector<double>> CommsLib::GetSequence(size_t seq_len,
                                                        int type) {

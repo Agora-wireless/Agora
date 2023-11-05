@@ -492,10 +492,26 @@ void PhyStats::UpdateDlPilotSnr(size_t frame_id, size_t symbol_id,
                               config_->OfdmCaNum(), false);
   arma::fvec fft_abs_vec = arma::abs(fft_vec);
   arma::fvec fft_abs_mag = fft_abs_vec % fft_abs_vec;
-  const float rssi_per_sc = arma::mean(fft_abs_mag);
+
+  arma::fvec fft_IplusN_mag (fft_abs_mag.n_elem, arma::fill::zeros);
+  arma::fvec fft_Signal_mag (fft_abs_mag.n_elem, arma::fill::zeros);
+  for (size_t i=0; i < fft_abs_mag.size(); i++) {
+    if (i % config_->UeAntNum() != ant_id) {  // checked in shedRow_test
+      fft_IplusN_mag[i] = fft_abs_mag[i];
+    } else {
+      fft_Signal_mag[i] = fft_abs_mag[i];
+    }
+  }
+   
+  const float iplusn_per_sc = arma::mean(fft_IplusN_mag); //avg power of (I+N)
+  //const float rssi_per_sc = arma::mean(fft_abs_mag);
+  const float rssi_per_sc = arma::mean(fft_Signal_mag);  // signal strength at un-blanked SCs
   fft_abs_mag.shed_rows(config_->OfdmDataStart(), config_->OfdmDataStop() - 1);
-  const float noise_per_sc = arma::mean(fft_abs_mag);
-  const float snr = (rssi_per_sc - noise_per_sc) / noise_per_sc;
+  const float noise_per_sc = arma::mean(fft_abs_mag); 
+  const float interf_per_sc = iplusn_per_sc - noise_per_sc; // can be printed later
+
+  // const float snr = (rssi_per_sc - noise_per_sc) / noise_per_sc;
+  const float snr = (rssi_per_sc - iplusn_per_sc) / (iplusn_per_sc); // now the S/(I+N)
   const size_t frame_slot = frame_id % kFrameWnd;
   const size_t idx_offset =
       ant_id * config_->Frame().ClientDlPilotSymbols() + symbol_id;

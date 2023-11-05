@@ -1,0 +1,65 @@
+{
+    "BaseStations": {
+        "BS0": {
+            "hub": "FH4B000019",
+            "sdr": [
+                /*chain 6 -- top chain*/
+                "RF3E000208",
+                "RF3E000636",
+                "RF3E000632",
+                "RF3E000568",
+                "RF3E000558",
+                "RF3E000633",
+                "RF3E000566",
+                "RF3E000635",
+
+                /*chain 4 -- second chain*/
+                "RF3E000146",
+                "RF3E000122",
+                "RF3E000150",
+                "RF3E000128",
+                "RF3E000168",
+                "RF3E000136",
+                "RF3E000213",
+                "RF3E000142"
+
+
+                /*chain 5 -- third chain
+                "RF3E000356",
+                "RF3E000546",
+                "RF3E000620",
+                "RF3E000609",
+                "RF3E000604",
+                "RF3E000612",
+                "RF3E000640",
+                "RF3E000551"*//*,
+
+                /*chain 3 -- bottom chain
+                "RF3E000346",
+                "RF3E000543",
+                "RF3E000594",
+                "RF3E000404",
+                "RF3E000616",
+                "RF3E000622",
+                "RF3E000601"*/
+            ],
+            "reference": "RF3E000089"
+            /*"reference": "RF3E000356"*/
+            /*"reference": "RF3E000208"*/
+            /*"reference": "RF3E000543"*/
+            /*"reference": "RF3E000635"*/
+            /*"reference": "RF3E000142"*/
+            /*"reference": "RF3E000146"*/
+        }
+    },
+    "Clients": {
+        "sdr": [
+            "RF3E000392",
+            "RF3E000241"
+            /*"RF3E000392"*/
+            /*"RF3E000046",
+            "RF3E000059",
+            "RF3E000029"*/
+        ]
+    }
+}
