@@ -511,7 +511,8 @@ void PhyStats::UpdateDlPilotSnr(size_t frame_id, size_t symbol_id,
   const float interf_per_sc = iplusn_per_sc - noise_per_sc; // can be printed later
 
   // const float snr = (rssi_per_sc - noise_per_sc) / noise_per_sc;
-  const float snr = (rssi_per_sc - iplusn_per_sc) / (iplusn_per_sc); // now the S/(I+N)
+  // const float snr = (rssi_per_sc - iplusn_per_sc) / (iplusn_per_sc); // now the S/(I+N)
+  const float snr = rssi_per_sc / iplusn_per_sc;
   const size_t frame_slot = frame_id % kFrameWnd;
   const size_t idx_offset =
       ant_id * config_->Frame().ClientDlPilotSymbols() + symbol_id;
