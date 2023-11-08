@@ -241,6 +241,10 @@ void UeWorker::DoFftPilot(size_t tag) {
          csi_buffer_ptr[i]  = csiInterp_tmp(i);
     }
 
+    // for (size_t i=0; i < 9; i++) {
+    //   std::cout << csi_buffer_ptr[i] << std::endl;
+    // }
+
     // // interpolation (need to refine if there are more than 2 UEs)
     //   // auto csi_buffer_tmp = csi_buffer_ptr;
     //   std::vector<std::complex<float>> output;

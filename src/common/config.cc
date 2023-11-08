@@ -1063,6 +1063,13 @@ void Config::GenData() {
     for (size_t j = 0; j < this->ofdm_data_num_; j++) {
       this->ue_specific_pilot_[i][j] = {zc_ue_pilot_i[j].real(),  // a table of ue specific pilots are generated
                                         zc_ue_pilot_i[j].imag()};
+      
+      // std::cout << "====Begin=====" << std::endl;
+      // for (size_t j=0; j< 10; j++) {
+      //   std::cout << zc_ue_pilot_i[j] << std::endl;
+      // }
+      //   std::cout << "====End=====" << std::endl;
+
       // FFT Shift
       const size_t k = j + ofdm_data_start_ >= ofdm_ca_num_ / 2
                            ? j + ofdm_data_start_ - ofdm_ca_num_ / 2
