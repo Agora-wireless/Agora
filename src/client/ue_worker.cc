@@ -219,6 +219,7 @@ void UeWorker::DoFftPilot(size_t tag) {
   // in the downlink for the user to estimate the channel
   // due to relative reciprocity calibration,
   // see Argos paper (Mobicom'12)
+
   if (dl_symbol_id < config_.Frame().ClientDlPilotSymbols()) {
     for (size_t j = 0; j < config_.OfdmDataNum(); j++) {
       size_t ant = (kDebugDownlink == true) ? 0 : ant_id;
@@ -231,33 +232,52 @@ void UeWorker::DoFftPilot(size_t tag) {
       }    
     }
 
+  bool singleUEinterp = false;        // do csir interpolation even for a single UE
+  if (singleUEinterp) {
+    arma::cx_fmat singleUEooseq (1, config_.OfdmDataNum()); // brute-force generating
+                                                            // on-off sequence for single UE interp
+    for (size_t i = 0; i < config_.OfdmDataNum(); ++i) {
+      if (i % 2 == 0) {
+        // will be 101010... the 0th element (begin) is always one
+        singleUEooseq(0, i) = arma::cx_float(1.0, 0.0);
+      } else {
+          singleUEooseq(0, i) = arma::cx_float(0.0, 0.0);
+      }
+    }
+
+    for (size_t i=0; i < config_.OfdmDataNum(); i++) {
+      csi_buffer_ptr[i] = csi_buffer_ptr[i]*singleUEooseq(0,i);
+    }
+
+
+  }
+
+    //   for (size_t i=0; i < 9; i++) { // checked: alternating zero non-zero ele.
+    //   std::cout << csi_buffer_ptr[i] << std::endl;
+    // }
+
+
     arma::cx_mat csiInterp_tmp (1, config_.OfdmDataNum());
     for (size_t i=0; i< config_.OfdmDataNum(); i++) {
       csiInterp_tmp(i) = csi_buffer_ptr[i];
     }
     
-    CommsLib::csirInterp (csiInterp_tmp, config_.OfdmDataNum(), config_.UeNum());
+    if (singleUEinterp) {
+      CommsLib::csirInterp (csiInterp_tmp, config_.OfdmDataNum(), 
+                                                              config_.UeNum()+1);
+    } else {
+        CommsLib::csirInterp (csiInterp_tmp, config_.OfdmDataNum(), 
+                                                              config_.UeNum());
+    }
     for (size_t i=0; i< config_.OfdmDataNum(); i++) {
          csi_buffer_ptr[i]  = csiInterp_tmp(i);
     }
 
-    // for (size_t i=0; i < 9; i++) {
-    //   std::cout << csi_buffer_ptr[i] << std::endl;
-    // }
+    for (size_t i=0; i < 9; i++) { 
+      std::cout << csi_buffer_ptr[i] << std::endl;
+    }
 
-    // // interpolation (need to refine if there are more than 2 UEs)
-    //   // auto csi_buffer_tmp = csi_buffer_ptr;
-    //   std::vector<std::complex<float>> output;
-    //   for (size_t i=0; i < config_.OfdmDataNum(); i++) {
-    //     if (csi_buffer_ptr[i] != std::complex<float>(0.0, 0.0)) {
-    //           for (size_t j = 0; j < config_.UeNum(); j++) {
-    //             output.push_back(csi_buffer_ptr[i]);
-    //             }
-    //     }
-    //   }
-    //   for (size_t i=0; i< output.size(); i++) {
-    //     csi_buffer_ptr[i]  = output[i];
-    //   }
+
 
     if (kCollectPhyStats) {
       phy_stats_.UpdateDlPilotSnr(frame_id, dl_symbol_id, ant_id,
