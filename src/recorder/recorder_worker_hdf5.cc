@@ -25,6 +25,8 @@ static constexpr size_t kBeaconDatasetIndex = 0;
 static constexpr size_t kDownlinkDatasetIndex = 1;
 static constexpr size_t kPilotDatasetIndex = 0;
 static constexpr size_t kUplinkDatasetIndex = 1;
+static constexpr size_t kCalibDatasetIndex = 2;
+static constexpr size_t kMaxDatasetNum = 3;
 
 RecorderWorkerHDF5::RecorderWorkerHDF5(const Config* in_cfg,
                                        size_t antenna_offset,
@@ -315,24 +317,25 @@ void RecorderWorkerHDF5::Init() {
       }
     }  // end cfg_->Frame().NumDLSyms() > 0
   } else {
+    datasets_.resize(kMaxDatasetNum);
     if (cfg_->Frame().NumPilotSyms() > 0) {
-      datasets_.emplace_back(
+      datasets_.at(kPilotDatasetIndex) =
           std::make_pair<std::string, std::array<hsize_t, kDsDimsNum>>(
               std::string("Pilot_Samples"),
               {kFrameInc, cfg_->NumCells(), cfg_->Frame().NumPilotSyms(),
-               num_antennas_, data_chunk_dims_.back()}));
-      auto& current_dataset = datasets_.back();
+               num_antennas_, data_chunk_dims_.back()});
+      auto& current_dataset = datasets_.at(kPilotDatasetIndex);
       hdf5_->CreateDataset(current_dataset.first, data_chunk_dims_,
                            current_dataset.second);
     }
 
     if (cfg_->Frame().NumULSyms() > 0) {
-      datasets_.emplace_back(
+      datasets_.at(kUplinkDatasetIndex) =
           std::make_pair<std::string, std::array<hsize_t, kDsDimsNum>>(
               std::string("UplinkData"),
               {kFrameInc, cfg_->NumCells(), cfg_->Frame().NumULSyms(),
-               num_antennas_, data_chunk_dims_.back()}));
-      auto& current_dataset = datasets_.back();
+               num_antennas_, data_chunk_dims_.back()});
+      auto& current_dataset = datasets_.at(kUplinkDatasetIndex);
       hdf5_->CreateDataset(current_dataset.first, data_chunk_dims_,
                            current_dataset.second);
 
@@ -367,6 +370,16 @@ void RecorderWorkerHDF5::Init() {
         }
         hdf5_->FinalizeDataset(dataset_name);
       }
+    }
+    if (cfg_->Frame().NumDLCalSyms() > 0) {
+      datasets_.at(kCalibDatasetIndex) =
+          std::make_pair<std::string, std::array<hsize_t, kDsDimsNum>>(
+              std::string("Calib_Samples"),
+              {kFrameInc, cfg_->NumCells(), 1, num_antennas_,
+               data_chunk_dims_.back()});
+      auto& current_dataset = datasets_.at(kCalibDatasetIndex);
+      hdf5_->CreateDataset(current_dataset.first, data_chunk_dims_,
+                           current_dataset.second);
     }
   }
 }
@@ -409,9 +422,9 @@ int RecorderWorkerHDF5::Record(const Packet* pkt) {
 
   const size_t frame_id = pkt->frame_id_;
   const size_t symbol_id = pkt->symbol_id_;
+  const size_t ant_id = pkt->ant_id_;
 
   if (kDebugPrint) {
-    const size_t ant_id = pkt->ant_id_;
     std::printf(
         "RecorderWorkerHDF5::record [frame %zu, symbol %zu, cell %d, "
         "ant %zu] samples: %d %d %d %d %d %d %d %d ....\n",
@@ -445,6 +458,20 @@ int RecorderWorkerHDF5::Record(const Packet* pkt) {
         const size_t dl_symbol_id =
             cfg_->Frame().GetDLSymbolIdx(pkt->symbol_id_);
         WriteDatasetValue(pkt, dl_symbol_id, kDownlinkDatasetIndex);
+        break;
+      }
+      case SymbolType::kCalDL: {
+        const size_t cal_id =
+            0u;  //cfg_->Frame().GetDLCalSymbolIdx(pkt->symbol_id_);
+        WriteDatasetValue(pkt, cal_id, kCalibDatasetIndex);
+        break;
+      }
+      case SymbolType::kCalUL: {
+        const size_t cal_index = cfg_->RecipCalUlRxIndex(frame_id, ant_id);
+        if (cal_index != SIZE_MAX) {
+          const size_t cal_id = 0u;
+          WriteDatasetValue(pkt, cal_id, kCalibDatasetIndex);
+        }
         break;
       }
       case SymbolType::kPilot: {
