@@ -511,7 +511,7 @@ bool TxRxWorkerClientHw::IsRxSymbol(size_t symbol_id) {
 
   if ((symbol_type == SymbolType::kBeacon) ||
       (symbol_type == SymbolType::kControl) ||
-      (symbol_type == SymbolType::kDL)) {
+      (symbol_type == SymbolType::kDL) || (symbol_type == SymbolType::kCalDL)) {
     is_rx = true;
   } else {
     is_rx = false;

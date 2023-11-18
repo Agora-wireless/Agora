@@ -110,6 +110,7 @@ class Config {
   inline bool Beamsweep() const { return this->beamsweep_; }
   inline bool SampleCalEn() const { return this->sample_cal_en_; }
   inline bool ImbalanceCalEn() const { return this->imbalance_cal_en_; }
+  inline bool UseExplicitCSI() const { return this->use_explicit_csi_; }
   inline size_t BeamformingAlgo() const { return this->beamforming_algo_; }
   inline std::string Beamforming() const { return this->beamforming_str_; }
   inline size_t SpatialStreamsNum() const { return this->num_spatial_streams_; }
@@ -344,6 +345,9 @@ class Config {
   }
   inline size_t RpRxPort() const { return this->rp_rx_port_; }
   inline size_t RpTxPort() const { return this->rp_tx_port_; }
+
+  inline size_t CwcRxPort() const { return this->cwc_rx_port_; }
+  inline size_t CwcTxPort() const { return this->cwc_tx_port_; }
 
   inline const std::string& LogListenerAddr() const {
     return this->log_listener_addr_;
@@ -813,6 +817,7 @@ class Config {
   bool beamsweep_;
   bool sample_cal_en_;
   bool imbalance_cal_en_;
+  bool use_explicit_csi_;
   size_t beamforming_algo_;
   size_t num_spatial_streams_;
   std::string beamforming_str_;
@@ -984,6 +989,10 @@ class Config {
   std::string rp_remote_host_name_;
   size_t rp_rx_port_;
   size_t rp_tx_port_;
+
+  // Port ID at CWC
+  size_t cwc_rx_port_;
+  size_t cwc_tx_port_;
 
   // Port ID at log listening server
   size_t log_listener_port_;

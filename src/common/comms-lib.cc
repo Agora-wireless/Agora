@@ -322,6 +322,51 @@ float CommsLib::MeasureTone(std::vector<std::complex<float>> const& samps,
                   fft_size, delta);
 }
 
+float CommsLib::EstimateCFO(const std::vector<std::complex<int16_t>>& sync_buff,
+                            int beacon_start, int beacon_length,
+                            int beacon_repeat) {
+  float cfo_phase_est = 0;
+  int beacon_buff_len = beacon_repeat * beacon_length;
+  std::vector<std::complex<float>> beacon_buff(beacon_buff_len, 0.0f);
+  ConvertShortToFloat(reinterpret_cast<const short*>(&sync_buff[beacon_start]),
+                      reinterpret_cast<float*>(beacon_buff.data()),
+                      beacon_buff_len * 2);
+  return CommsLib::EstimateCFO(beacon_buff, 0, beacon_length, beacon_repeat);
+}
+
+float CommsLib::EstimateCFO(const std::vector<std::complex<float>>& sync_buff,
+                            int beacon_start, int beacon_length,
+                            int beacon_repeat) {
+  float cfo_phase_est = 0;
+  const size_t beacon1_start = beacon_start + beacon_length;
+  const size_t beacon1_stop = beacon_start + beacon_repeat * beacon_length;
+  std::vector<std::complex<float>> beacon0(sync_buff.begin() + beacon_start,
+                                           sync_buff.begin() + beacon1_start);
+  std::vector<std::complex<float>> beacon1(sync_buff.begin() + beacon1_start,
+                                           sync_buff.begin() + beacon1_stop);
+  const auto cfo_mult = CommsLib::ComplexMultAvx(beacon1, beacon0, true);
+  float phase = 0.0f;
+  float prev_phase = 0.0f;
+  for (size_t i = 0; i < cfo_mult.size(); i++) {
+    phase = std::arg(cfo_mult.at(i));
+    float unwrapped_phase = 0;
+    if (i == 0) {
+      unwrapped_phase = phase;
+    } else {
+      float diff = phase - prev_phase;
+      if (diff > M_PI)
+        diff = diff - 2 * M_PI;
+      else if (diff < -M_PI)
+        diff = diff + 2 * M_PI;
+      unwrapped_phase = prev_phase + diff;
+    }
+    prev_phase = phase;
+    cfo_phase_est += unwrapped_phase;
+  }
+  cfo_phase_est /= (M_PI * cfo_mult.size() * beacon_length * beacon_repeat);
+  return cfo_phase_est;
+}
+
 std::vector<size_t> CommsLib::GetDataSc(size_t fft_size, size_t data_sc_num,
                                         size_t pilot_sc_offset,
                                         size_t pilot_sc_spacing) {

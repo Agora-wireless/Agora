@@ -139,6 +139,12 @@ class CommsLib {
                            std::vector<float> const& win, double win_gain,
                            double fft_bin, size_t fft_size,
                            const size_t delta = 10);
+  static float EstimateCFO(const std::vector<std::complex<int16_t>>& sync_buff,
+                           int beacon_start, int beacon_length,
+                           int beacon_repeat = 2);
+  static float EstimateCFO(const std::vector<std::complex<float>>& sync_buff,
+                           int beacon_start, int beacon_length,
+                           int beacon_repeat = 2);
   static std::vector<std::complex<float>> ComposePartialPilotSym(
       const std::vector<std::complex<float>>& pilot, size_t offset,
       size_t pilot_sc_num, size_t fft_size, size_t data_size, size_t data_start,

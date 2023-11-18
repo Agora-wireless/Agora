@@ -242,20 +242,27 @@ void PhyUe::ScheduleWork(EventData do_task) {
 
 void PhyUe::ReceiveDownlinkSymbol(Packet* rx_packet, size_t tag) {
   const size_t frame_slot = rx_packet->frame_id_ % kFrameWnd;
-  const size_t dl_symbol_idx =
-      config_->Frame().GetDLSymbolIdx(rx_packet->symbol_id_);
+  auto symbol_type = config_->GetSymbolType(rx_packet->symbol_id_);
 
   // if symbol is a pilot or we are finished with all pilot ffts for the given
   // frame
-  if (dl_symbol_idx < config_->Frame().ClientDlPilotSymbols()) {
-    ScheduleWork(EventData(EventType::kFFTPilot, tag));
-  } else if (fft_dlpilot_counters_.IsLastSymbol(rx_packet->frame_id_)) {
-    ScheduleWork(EventData(EventType::kFFT, tag));
-  } else {
-    std::queue<EventData>* defferal_queue =
-        &rx_downlink_deferral_.at(frame_slot);
+  if (symbol_type == SymbolType::kDL) {
+    const size_t dl_symbol_idx =
+        config_->Frame().GetDLSymbolIdx(rx_packet->symbol_id_);
+    if (dl_symbol_idx < config_->Frame().ClientDlPilotSymbols()) {
+      ScheduleWork(EventData(EventType::kFFTPilot, tag));
+    } else if (fft_dlpilot_counters_.IsLastSymbol(rx_packet->frame_id_)) {
+      ScheduleWork(EventData(EventType::kFFT, tag));
+    } else {
+      std::queue<EventData>* defferal_queue =
+          &rx_downlink_deferral_.at(frame_slot);
 
-    defferal_queue->push(EventData(EventType::kFFT, tag));
+      defferal_queue->push(EventData(EventType::kFFT, tag));
+    }
+  } else if (symbol_type == SymbolType::kBeacon) {
+    ScheduleWork(EventData(EventType::kBeaconProc, tag));
+  } else if (symbol_type == SymbolType::kCalDL) {
+    ScheduleWork(EventData(EventType::kExplicitCSI, tag));
   }
 }
 
@@ -457,6 +464,12 @@ void PhyUe::Start() {
           }
         } break;
 
+        case EventType::kBeaconProc: {
+          const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+          const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+          const size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
+
+        } break;
         case EventType::kFFTPilot: {
           const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;

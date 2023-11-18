@@ -36,6 +36,18 @@ TxRxWorkerHw::TxRxWorkerHw(
       zeros_(config->SampsPerSymbol(), std::complex<int16_t>(0u, 0u)),
       first_symbol_(interface_count, true) {
   InitRxStatus();
+  if (config->UseExplicitCSI()) {
+    const size_t wired_cpu_core = config->CoreOffset() +
+                                  config->SocketThreadNum() +
+                                  config->WorkerThreadNum() + 2;
+    wired_thread_ = new UserWiredChannel(
+        config, wired_cpu_core, &cwc_request_queue_, &cwc_response_queue_);
+    /*cwc_std_thread_ =
+        std::thread(&ClientWiredComm::RunEventLoop, cwc_thread_.get());*/
+    /*if (config_->UseExplicitCSI()) {
+        cwc_std_thread_.join();
+    }*/
+  }
 }
 
 TxRxWorkerHw::~TxRxWorkerHw() = default;
@@ -84,6 +96,14 @@ void TxRxWorkerHw::DoTxRx() {
     const size_t tx_items = DoTx(time0);
     // If no items transmitted, then try to receive
     if (0 == tx_items) {
+      if (tid_ == 0) {  // only listen in on one thread
+        RxPacket* user_pkt(wired_thread_->ReceiveUdpPacketsFromClient());
+        if (user_pkt != NULL) {
+          const EventData rx_message(EventType::kPacketRX,
+                                     rx_tag_t(user_pkt).tag_);
+          NotifyComplete(rx_message);
+        }
+      }
       if (kSymbolTimingEnabled) {
         rx_times.at(receive_attempt.interface_).start_ticks_ = GetTime::Rdtsc();
       }

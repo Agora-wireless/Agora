@@ -174,6 +174,21 @@ EventData DoFFT::Launch(size_t tag) {
   size_t start_tsc1 = GetTime::WorkerRdtsc();
   duration_stat->task_duration_.at(1) += start_tsc1 - start_tsc;
 
+  if (sym_type == SymbolType::kCalDL || cfg_->UseExplicitCSI()) {
+    float cfo = static_cast<float>(pkt->fill_[0]);
+    arma::fvec theta =
+        (-2 * M_PI * cfo / cfg_->Rate()) *
+        arma::linspace<arma::fvec>(
+            1, cfg_->OfdmCaNum(),
+            cfg_->OfdmCaNum());  // we might need to add with a constant
+    arma::cx_fvec cfo_cor_vec(cfg_->OfdmCaNum(), arma::fill::none);
+    cfo_cor_vec.set_real(cos(theta));
+    cfo_cor_vec.set_real(sin(theta));
+    arma::cx_fvec pilot_cfo_cor(reinterpret_cast<arma::cx_float*>(fft_inout_),
+                                cfg_->OfdmCaNum(), false);
+    pilot_cfo_cor %= cfo_cor_vec;
+  }
+
   if (bypass_fft == false) {
     DftiComputeForward(
         mkl_handle_,
@@ -251,7 +266,7 @@ EventData DoFFT::Launch(size_t tag) {
     RtAssert(radio_id != cfg_->RefRadio(cell_id),
              "Received a Cal Ul symbol for an antenna on the reference radio");
   } else if (sym_type == SymbolType::kCalDL) {
-    if (ant_id == cfg_->RefAnt(cell_id)) {
+    if (cfg_->UseExplicitCSI() || ant_id == cfg_->RefAnt(cell_id)) {
       //Find out what antenna transmitted a pilot on this symbol 'C'
       const size_t pilot_tx_ant = cfg_->RecipCalDlAnt(frame_id, symbol_id);
       const size_t cal_index = cfg_->RecipCalUlRxIndex(frame_id, pilot_tx_ant);
@@ -267,9 +282,9 @@ EventData DoFFT::Launch(size_t tag) {
       PartialTranspose(calib_dl_ptr, pilot_tx_ant, sym_type);
       phy_stats_->UpdateCalibPilotSnr(cal_index, 0, pilot_tx_ant, fft_inout_);
     }
-    RtAssert(
+    /*RtAssert(
         radio_id == cfg_->RefRadio(cell_id),
-        "Received a Cal Dl symbol for an antenna not on the reference radio");
+        "Received a Cal Dl symbol for an antenna not on the reference radio");*/
   } else {
     std::string error_message =
         "Unknown or unsupported symbol type " +

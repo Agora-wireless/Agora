@@ -273,6 +273,7 @@ Config::Config(std::string jsonfilename)
   beamforming_str_ = tdd_conf.value("beamforming", "ZF");
   beamforming_algo_ = kBeamformingStr.at(beamforming_str_);
   num_spatial_streams_ = tdd_conf.value("spatial_streams", ue_ant_num_);
+  use_explicit_csi_ = tdd_conf.value("explicit_csi", false);
 
   rp_remote_host_name_ = tdd_conf.value("rp_remote_host_name", "127.0.0.1");
   rp_tx_port_ = tdd_conf.value("rp_tx_port", 3000);

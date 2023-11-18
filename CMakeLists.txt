@@ -484,6 +484,7 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/mac/mac_thread_basestation.cc
   src/agora/txrx/packet_txrx_sim.cc
   src/agora/txrx/workers/txrx_worker_sim.cc
+  src/agora/txrx/client_comm.cc
   src/resource_provisioner/resource_provisioner_thread.cc)
 
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})

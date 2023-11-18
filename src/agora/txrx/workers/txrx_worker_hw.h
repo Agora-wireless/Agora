@@ -10,6 +10,7 @@
 #include <memory>
 #include <vector>
 
+#include "client_comm.h"
 #include "message.h"
 #include "radio_set.h"
 #include "rx_status_tracker.h"
@@ -83,5 +84,10 @@ class TxRxWorkerHw : public TxRxWorker {
   //For each interface.
   std::vector<TxRxWorkerRx::RxStatusTracker> rx_status_;
   std::vector<bool> first_symbol_;
+  // Client Comm queue
+  moodycamel::ConcurrentQueue<EventData> cwc_request_queue_;
+  moodycamel::ConcurrentQueue<EventData> cwc_response_queue_;
+  UserWiredChannel* wired_thread_;
+  /*std::thread cwc_std_thread_;*/
 };
 #endif  // TXRX_WORKER_SIM_H_

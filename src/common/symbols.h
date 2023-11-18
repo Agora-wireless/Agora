@@ -56,6 +56,10 @@ enum class EventType : int {
   kPacketToMac,
   kPacketFromRp,
   kPacketToRp,
+  kPacketFromClient,
+  kPacketToClient,
+  kBeaconProc,
+  kExplicitCSI,
   kFFTPilot,
   kSNRReport,    // Signal new SNR measurement from PHY to MAC
   kRANUpdate,    // Signal new RAN config to Agora
@@ -196,7 +200,7 @@ static constexpr bool kUsePartialTrans = true;
 
 // Enable hard demodulation and disable LDPC decoding
 // Useful for evaluating constellation quality
-static constexpr bool kDownlinkHardDemod = false;
+static constexpr bool kDownlinkHardDemod = true;
 static constexpr bool kUplinkHardDemod = false;
 
 static constexpr bool kExportConstellation = false;
@@ -231,6 +235,7 @@ enum class ThreadType {
   kWorkerTXRX,
   kWorkerMacTXRX,
   kWorkerRpTXRX,
+  kWorkerCWC,
   kMasterRX,
   kMasterTX,
   kRecorderWorker
@@ -260,6 +265,8 @@ static inline std::string ThreadTypeStr(ThreadType thread_type) {
       return "MAC TXRX";
     case ThreadType::kWorkerRpTXRX:
       return "RP TXRX";
+    case ThreadType::kWorkerCWC:
+      return "Client Control TXRX";
     case ThreadType::kMasterRX:
       return "Master (RX)";
     case ThreadType::kMasterTX:

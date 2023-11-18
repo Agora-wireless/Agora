@@ -576,6 +576,15 @@ void Agora::Start() {
               EventData(EventType::kPacketToRp, rsm.latency_, rsm.core_num_));
         } break;
 
+        case EventType::kPacketFromClient: {
+          RxPacket* rx = rx_tag_t(event.tags_[0u]).rx_packet_;
+          Packet* pkt = rx->RawPacket();
+          fft_queue_arr_.at(pkt->frame_id_ % kFrameWnd)
+              .push(fft_req_tag_t(event.tags_[0]));
+          AGORA_LOG_INFO("Agora: Received explicit pilot from client %zu\n",
+                         pkt->ant_id_);
+        } break;
+
         case EventType::kRANUpdate: {
           RanConfig rc;
           rc.n_antennas_ = event.tags_[0];
@@ -1098,7 +1107,9 @@ void Agora::InitializeCounters() {
   //rx_counters_.num_reciprocity_pkts_per_frame_ = cfg->BsAntNum();
   const size_t num_rx_ul_cal_antennas = cfg->BfAntNum();
   // Same as the number of rx reference antennas (ref ant + other channels)
-  const size_t num_rx_dl_cal_antennas = cfg->BsAntNum() - cfg->BfAntNum();
+  const size_t num_rx_dl_cal_antennas = cfg->UseExplicitCSI()
+                                            ? cfg->BfAntNum()
+                                            : cfg->BsAntNum() - cfg->BfAntNum();
 
   rx_counters_.num_reciprocity_pkts_per_frame_ =
       (cfg->Frame().NumULCalSyms() * num_rx_ul_cal_antennas) +
