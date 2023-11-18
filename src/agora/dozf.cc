@@ -17,7 +17,7 @@ static constexpr bool kUseUlZfForDownlink = false; // more accurate matrix pinv 
 
 enum AsmVersion { ASMv1, ASMv2, FASM };
 static constexpr enum AsmVersion kAsmVersion =FASM;
-static constexpr size_t N_OFF = 0;  // num of OFF antennas among all BS antennas
+static constexpr size_t N_OFF = 0;  // num of OFF antennas at Alice's array
 static constexpr bool kPrintEffGain = true;  // wil be in bs.txt
 
 DoZF::DoZF(Config* config, int tid,

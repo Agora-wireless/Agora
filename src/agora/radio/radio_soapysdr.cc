@@ -848,8 +848,12 @@ void RadioSoapySdr::ConfigureTddModeBs(bool is_ref_radio,
     std::vector<unsigned> beacon_weights(
         cfg_->NumRadios() * cfg_->NumChannels(), is_beacon_antenna ? 1 : 0);
     if (cfg_->Beamsweep()) {
-      for (size_t j = 0; j < beacon_weights.size(); j++) {
-        beacon_weights.at(j) = CommsLib::Hadamard2(ndx, j);
+      if (is_ref_radio) {
+        std::fill(beacon_weights.begin(), beacon_weights.end(), 0);
+      } else {
+        for (size_t j = 0; j < beacon_weights.size(); j++) {
+          beacon_weights.at(j) = CommsLib::Hadamard2(ndx, j);
+        }
       }
     }
 
