@@ -6,10 +6,10 @@
     "channel": "A",
     "frequency": 3.6e9,
     "single_gain": true,
-    /*"rx_gain_a": 60,*/
+    /*"rx_gain_a": 65,*/
     "rx_gain_a": 65,
     /*"tx_gain_a": 75, */       /*(SUBF-suitable)*/
-    "tx_gain_a": 80,
+    "tx_gain_a": 81,
     "rx_gain_b": 60,
     "tx_gain_b": 75,
     "sample_rate": 7.68e6,
@@ -42,6 +42,7 @@
     "ue_resync_period": 1,
     "ue_channel": "A",
     "ue_rx_gain_a": [
+        /*65*/
         65
     ],
     "ue_tx_gain_a": [
