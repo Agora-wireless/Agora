@@ -19,6 +19,7 @@ static constexpr bool kUseUlZfForDownlink = true;
 DoBeamWeights::DoBeamWeights(
     Config* config, int tid,
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
+    PtrGrid<kFrameWnd, kMaxUEs, complex_float>& dl_csi_buffers,
     Table<complex_float>& calib_dl_buffer,
     Table<complex_float>& calib_ul_buffer,
     Table<complex_float>& calib_dl_msum_buffer,
@@ -29,6 +30,7 @@ DoBeamWeights::DoBeamWeights(
     MacScheduler* mac_sched, PhyStats* in_phy_stats, Stats* stats_manager)
     : Doer(config, tid),
       csi_buffers_(csi_buffers),
+      dl_csi_buffers_(dl_csi_buffers),
       calib_dl_buffer_(calib_dl_buffer),
       calib_ul_buffer_(calib_ul_buffer),
       calib_dl_msum_buffer_(calib_dl_msum_buffer),
@@ -54,6 +56,10 @@ DoBeamWeights::DoBeamWeights(
   calib_sc_vec_ptr_ = std::make_unique<arma::cx_fvec>(
       reinterpret_cast<arma::cx_float*>(calib_gather_buffer_), cfg_->BfAntNum(),
       false);
+  dl_csi_gather_buffer_ =
+      static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
+          Agora_memory::Alignment_t::kAlign64,
+          kMaxAntennas * kMaxUEs * sizeof(complex_float)));
 
   //Init to identity
   calib_sc_vec_ptr_->fill(arma::cx_float(1.0f, 0.0f));
@@ -91,12 +97,10 @@ EventData DoBeamWeights::Launch(size_t tag) {
   return {EventType::kBeam, tag};
 }
 
-void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
-                                    const arma::cx_fmat& mat_csi,
-                                    const arma::cx_fvec& calib_sc_vec,
-                                    const float noise,
-                                    complex_float* ul_beam_mem,
-                                    complex_float* dl_beam_mem) {
+void DoBeamWeights::ComputePrecoder(
+    size_t frame_id, size_t cur_sc_id, const arma::cx_fmat& mat_csi,
+    const arma::cx_fmat& mat_dl_csi, const arma::cx_fvec& calib_sc_vec,
+    const float noise, complex_float* ul_beam_mem, complex_float* dl_beam_mem) {
   if (kEnableMatLog) {
     phy_stats_->UpdateUlCsi(frame_id, cur_sc_id, mat_csi);
   }
@@ -106,39 +110,41 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
   arma::cx_fmat mat_ul_beam(reinterpret_cast<arma::cx_float*>(ul_beam_mem),
                             cfg_->SpatialStreamsNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_beam_tmp;
-  switch (cfg_->BeamformingAlgo()) {
-    case CommsLib::BeamformingAlgorithm::kZF:
-      if (kUseInverseForZF) {
-        try {
-          mat_ul_beam_tmp =
-              arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
-        } catch (std::runtime_error&) {
-          AGORA_LOG_WARN(
-              "Failed to invert channel matrix, falling back to pinv()\n");
+  if (cfg_->UseExplicitCSI()) {
+    switch (cfg_->BeamformingAlgo()) {
+      case CommsLib::BeamformingAlgorithm::kZF:
+        if (kUseInverseForZF) {
+          try {
+            mat_ul_beam_tmp =
+                arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
+          } catch (std::runtime_error&) {
+            AGORA_LOG_WARN(
+                "Failed to invert channel matrix, falling back to pinv()\n");
+            arma::pinv(mat_ul_beam_tmp, mat_csi, 1e-2, "dc");
+          }
+        } else {
           arma::pinv(mat_ul_beam_tmp, mat_csi, 1e-2, "dc");
         }
-      } else {
-        arma::pinv(mat_ul_beam_tmp, mat_csi, 1e-2, "dc");
-      }
-      break;
-    case CommsLib::BeamformingAlgorithm::kMMSE:
-      mat_ul_beam_tmp =
-          arma::inv_sympd(
-              mat_csi.t() * mat_csi +
-              noise * arma::eye<arma::cx_fmat>(cfg_->SpatialStreamsNum(),
-                                               cfg_->SpatialStreamsNum())) *
-          mat_csi.t();
-      break;
-    case CommsLib::BeamformingAlgorithm::kMRC:
-      mat_ul_beam_tmp = mat_csi.t();
-      break;
-    default:
-      AGORA_LOG_ERROR("Beamforming algorithm is not implemented!");
+        break;
+      case CommsLib::BeamformingAlgorithm::kMMSE:
+        mat_ul_beam_tmp =
+            arma::inv_sympd(
+                mat_csi.t() * mat_csi +
+                noise * arma::eye<arma::cx_fmat>(cfg_->SpatialStreamsNum(),
+                                                 cfg_->SpatialStreamsNum())) *
+            mat_csi.t();
+        break;
+      case CommsLib::BeamformingAlgorithm::kMRC:
+        mat_ul_beam_tmp = mat_csi.t();
+        break;
+      default:
+        AGORA_LOG_ERROR("Beamforming algorithm is not implemented!");
+    }
   }
 
   if (cfg_->Frame().NumDLSyms() > 0) {
     arma::cx_fmat mat_dl_beam_tmp;
-    if (kUseUlZfForDownlink == true) {
+    if (kUseUlZfForDownlink == true && cfg_->UseExplicitCSI() == false) {
       // With orthonormal calib matrix:
       // pinv(calib * csi) = pinv(csi)*inv(calib)
       // This probably causes a performance hit since we are throwing
@@ -147,7 +153,6 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
       arma::cx_fmat inv_calib_mat = arma::diagmat(arma::sign(calib_sc_vec));
       mat_dl_beam_tmp = mat_ul_beam_tmp * inv_calib_mat;
     } else {
-      arma::cx_fmat mat_dl_csi = inv(arma::diagmat(calib_sc_vec)) * mat_csi;
       if (kEnableMatLog) {
         phy_stats_->UpdateDlCsi(frame_id, cur_sc_id, mat_dl_csi);
       }
@@ -437,18 +442,32 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
     for (size_t selected_ue_idx = 0;
          selected_ue_idx < cfg_->SpatialStreamsNum(); selected_ue_idx++) {
       size_t ue_idx = ue_list.at(selected_ue_idx);
-      auto* dst_csi_ptr = reinterpret_cast<float*>(
-          csi_gather_buffer_ + cfg_->BsAntNum() * selected_ue_idx);
-      if (kUsePartialTrans) {
-        PartialTransposeGather(
-            cur_sc_id,
-            reinterpret_cast<float*>(csi_buffers_[frame_slot][ue_idx]),
-            dst_csi_ptr, cfg_->BsAntNum());
-      } else {
-        TransposeGather(
-            cur_sc_id,
-            reinterpret_cast<float*>(csi_buffers_[frame_slot][ue_idx]),
-            dst_csi_ptr, cfg_->BsAntNum(), cfg_->OfdmDataNum());
+      if (cfg_->Frame().NumULSyms() > 0 ||
+          (cfg_->Frame().NumDLSyms() > 0 && cfg_->UseExplicitCSI() == false)) {
+        auto* dst_csi_ptr = reinterpret_cast<float*>(
+            csi_gather_buffer_ + cfg_->BsAntNum() * selected_ue_idx);
+        auto* src_csi_ptr =
+            reinterpret_cast<float*>(csi_buffers_[frame_slot][ue_idx]);
+        if (kUsePartialTrans) {
+          PartialTransposeGather(cur_sc_id, src_csi_ptr, dst_csi_ptr,
+                                 cfg_->BsAntNum());
+        } else {
+          TransposeGather(cur_sc_id, src_csi_ptr, dst_csi_ptr, cfg_->BsAntNum(),
+                          cfg_->OfdmDataNum());
+        }
+      }
+      if (cfg_->Frame().NumDLSyms() > 0 && cfg_->UseExplicitCSI()) {
+        auto* dst_csi_ptr = reinterpret_cast<float*>(
+            dl_csi_gather_buffer_ + cfg_->BsAntNum() * selected_ue_idx);
+        auto* src_csi_ptr =
+            reinterpret_cast<float*>(dl_csi_buffers_[frame_slot][ue_idx]);
+        if (kUsePartialTrans) {
+          PartialTransposeGather(cur_sc_id, src_csi_ptr, dst_csi_ptr,
+                                 cfg_->BsAntNum());
+        } else {
+          TransposeGather(cur_sc_id, src_csi_ptr, dst_csi_ptr, cfg_->BsAntNum(),
+                          cfg_->OfdmDataNum());
+        }
       }
     }
 
@@ -458,11 +477,20 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
     arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer_, cfg_->BsAntNum(),
                           cfg_->SpatialStreamsNum(), false);
 
-    if (cfg_->Frame().NumDLSyms() > 0) {
-      ComputeCalib(frame_id, cur_sc_id, cal_sc_vec);
-    }
+    arma::cx_fmat mat_dl_csi((arma::cx_float*)dl_csi_gather_buffer_,
+                             cfg_->BsAntNum(), cfg_->SpatialStreamsNum(),
+                             false);
+
     if (num_ext_ref_ > 0) {
       mat_csi.shed_rows(ext_ref_id_);
+      mat_dl_csi.shed_rows(ext_ref_id_);
+    }
+
+    if (cfg_->Frame().NumDLSyms() > 0 && cfg_->UseExplicitCSI() == false) {
+      ComputeCalib(frame_id, cur_sc_id, cal_sc_vec);
+      if (kUseUlZfForDownlink == false) {
+        mat_dl_csi = arma::inv(arma::diagmat(cal_sc_vec)) * mat_csi;
+      }
     }
 
     const double start_tsc3 = GetTime::WorkerRdtsc();
@@ -472,7 +500,7 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
     if (cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kMMSE) {
       noise = phy_stats_->GetNoise(frame_id, ue_list);
     }
-    ComputePrecoder(frame_id, cur_sc_id, mat_csi, cal_sc_vec, noise,
+    ComputePrecoder(frame_id, cur_sc_id, mat_csi, mat_dl_csi, cal_sc_vec, noise,
                     ul_beam_matrices_[frame_slot][cur_sc_id],
                     dl_beam_matrices_[frame_slot][cur_sc_id]);
 

@@ -29,6 +29,9 @@ class AgoraBuffer {
   inline PtrGrid<kFrameWnd, kMaxUEs, complex_float>& GetCsi() {
     return csi_buffer_;
   }
+  inline PtrGrid<kFrameWnd, kMaxUEs, complex_float>& GetDlCsi() {
+    return dl_csi_buffer_;
+  }
   inline PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& GetUlBeamMatrix() {
     return ul_beam_matrix_;
   }
@@ -75,6 +78,7 @@ class AgoraBuffer {
   const size_t ul_socket_buf_size_;
 
   PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffer_;
+  PtrGrid<kFrameWnd, kMaxUEs, complex_float> dl_csi_buffer_;
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrix_;
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_beam_matrix_;
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffer_;

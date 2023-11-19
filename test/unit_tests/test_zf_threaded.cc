@@ -55,6 +55,7 @@ void MasterToWorkerDynamicWorker(
     moodycamel::ConcurrentQueue<EventData>& complete_task_queue,
     moodycamel::ProducerToken* ptok,
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
+    PtrGrid<kFrameWnd, kMaxUEs, complex_float>& dl_csi_buffers,
     Table<complex_float>& calib_dl_buffer,
     Table<complex_float>& calib_ul_buffer,
     Table<complex_float>& calib_dl_msum_buffer,
@@ -72,8 +73,8 @@ void MasterToWorkerDynamicWorker(
   }
 
   auto compute_beam = std::make_unique<DoBeamWeights>(
-      cfg, worker_id, csi_buffers, calib_dl_buffer, calib_ul_buffer,
-      calib_dl_msum_buffer, calib_ul_msum_buffer, calib_buffer,
+      cfg, worker_id, csi_buffers, dl_csi_buffers, calib_dl_buffer,
+      calib_ul_buffer, calib_dl_msum_buffer, calib_ul_msum_buffer, calib_buffer,
       ul_beam_matrices, dl_beam_matrices, mac_sched, phy_stats, stats);
 
   size_t start_tsc = GetTime::Rdtsc();
@@ -130,6 +131,9 @@ TEST(TestZF, VaryingConfig) {
   PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers;
   csi_buffers.RandAllocCxFloat(kMaxAntennas * kMaxDataSCs);
 
+  PtrGrid<kFrameWnd, kMaxUEs, complex_float> dl_csi_buffers;
+  dl_csi_buffers.RandAllocCxFloat(kMaxAntennas * kMaxDataSCs);
+
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_beam_matrices(kMaxAntennas *
                                                                   kMaxUEs);
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_beam_matrices(kMaxUEs *
@@ -152,14 +156,14 @@ TEST(TestZF, VaryingConfig) {
                        std::ref(event_queue), std::ref(complete_task_queue));
 
   for (size_t i = 0; i < kNumWorkers; i++) {
-    threads.emplace_back(MasterToWorkerDynamicWorker, cfg.get(), i,
-                         std::ref(event_queue), std::ref(complete_task_queue),
-                         ptoks[i], std::ref(csi_buffers),
-                         std::ref(calib_dl_buffer), std::ref(calib_ul_buffer),
-                         std::ref(calib_dl_msum_buffer),
-                         std::ref(calib_ul_msum_buffer), std::ref(calib_buffer),
-                         std::ref(ul_beam_matrices), std::ref(dl_beam_matrices),
-                         mac_sched.get(), phy_stats.get(), stats.get());
+    threads.emplace_back(
+        MasterToWorkerDynamicWorker, cfg.get(), i, std::ref(event_queue),
+        std::ref(complete_task_queue), ptoks[i], std::ref(csi_buffers),
+        std::ref(dl_csi_buffers), std::ref(calib_dl_buffer),
+        std::ref(calib_ul_buffer), std::ref(calib_dl_msum_buffer),
+        std::ref(calib_ul_msum_buffer), std::ref(calib_buffer),
+        std::ref(ul_beam_matrices), std::ref(dl_beam_matrices), mac_sched.get(),
+        phy_stats.get(), stats.get());
   }
   for (auto& thread : threads) {
     thread.join();

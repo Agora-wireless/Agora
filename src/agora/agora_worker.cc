@@ -115,15 +115,15 @@ void AgoraWorker::WorkerThread(int tid) {
 
   /* Initialize operators */
   auto compute_beam = std::make_unique<DoBeamWeights>(
-      config_, tid, buffer_->GetCsi(), buffer_->GetCalibDl(),
-      buffer_->GetCalibUl(), buffer_->GetCalibDlMsum(),
+      config_, tid, buffer_->GetCsi(), buffer_->GetDlCsi(),
+      buffer_->GetCalibDl(), buffer_->GetCalibUl(), buffer_->GetCalibDlMsum(),
       buffer_->GetCalibUlMsum(), buffer_->GetCalib(),
       buffer_->GetUlBeamMatrix(), buffer_->GetDlBeamMatrix(), mac_sched_,
       phy_stats_, stats_);
 
   auto compute_fft = std::make_unique<DoFFT>(
-      config_, tid, buffer_->GetFft(), buffer_->GetCsi(), buffer_->GetCalibDl(),
-      buffer_->GetCalibUl(), phy_stats_, stats_);
+      config_, tid, buffer_->GetFft(), buffer_->GetCsi(), buffer_->GetDlCsi(),
+      buffer_->GetCalibDl(), buffer_->GetCalibUl(), phy_stats_, stats_);
 
   // Downlink workers
   auto compute_ifft = std::make_unique<DoIFFT>(config_, tid, buffer_->GetIfft(),

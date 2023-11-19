@@ -22,6 +22,7 @@ class DoFFT : public Doer {
  public:
   DoFFT(Config* config, size_t tid, Table<complex_float>& data_buffer,
         PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
+        PtrGrid<kFrameWnd, kMaxUEs, complex_float>& dl_csi_buffers,
         Table<complex_float>& calib_dl_buffer,
         Table<complex_float>& calib_ul_buffer, PhyStats* in_phy_stats,
         Stats* stats_manager);
@@ -97,6 +98,7 @@ class DoFFT : public Doer {
  private:
   Table<complex_float>& data_buffer_;
   PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
+  PtrGrid<kFrameWnd, kMaxUEs, complex_float>& dl_csi_buffers_;
   Table<complex_float>& calib_dl_buffer_;
   Table<complex_float>& calib_ul_buffer_;
   DFTI_DESCRIPTOR_HANDLE mkl_handle_;

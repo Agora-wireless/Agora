@@ -15,12 +15,14 @@ static constexpr bool kPrintPilotCorrStats = false;
 
 DoFFT::DoFFT(Config* config, size_t tid, Table<complex_float>& data_buffer,
              PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
+             PtrGrid<kFrameWnd, kMaxUEs, complex_float>& dl_csi_buffers,
              Table<complex_float>& calib_dl_buffer,
              Table<complex_float>& calib_ul_buffer, PhyStats* in_phy_stats,
              Stats* stats_manager)
     : Doer(config, tid),
       data_buffer_(data_buffer),
       csi_buffers_(csi_buffers),
+      dl_csi_buffers_(dl_csi_buffers),
       calib_dl_buffer_(calib_dl_buffer),
       calib_ul_buffer_(calib_ul_buffer),
       phy_stats_(in_phy_stats) {
@@ -266,7 +268,7 @@ EventData DoFFT::Launch(size_t tag) {
     RtAssert(radio_id != cfg_->RefRadio(cell_id),
              "Received a Cal Ul symbol for an antenna on the reference radio");
   } else if (sym_type == SymbolType::kCalDL) {
-    if (cfg_->UseExplicitCSI() || ant_id == cfg_->RefAnt(cell_id)) {
+    if (!cfg_->UseExplicitCSI() && ant_id == cfg_->RefAnt(cell_id)) {
       //Find out what antenna transmitted a pilot on this symbol 'C'
       const size_t pilot_tx_ant = cfg_->RecipCalDlAnt(frame_id, symbol_id);
       const size_t cal_index = cfg_->RecipCalUlRxIndex(frame_id, pilot_tx_ant);
@@ -281,6 +283,10 @@ EventData DoFFT::Launch(size_t tag) {
           &calib_dl_buffer_[cal_index][pilot_tx_ant * cfg_->OfdmDataNum()];
       PartialTranspose(calib_dl_ptr, pilot_tx_ant, sym_type);
       phy_stats_->UpdateCalibPilotSnr(cal_index, 0, pilot_tx_ant, fft_inout_);
+    } else if (cfg_->UseExplicitCSI()) {
+      const size_t pilot_tx_ant = cfg_->RecipCalDlAnt(frame_id, symbol_id);
+      PartialTranspose(dl_csi_buffers_[frame_slot][ant_id], pilot_tx_ant,
+                       SymbolType::kPilot);
     }
     /*RtAssert(
         radio_id == cfg_->RefRadio(cell_id),

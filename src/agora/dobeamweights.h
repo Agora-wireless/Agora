@@ -23,6 +23,7 @@ class DoBeamWeights : public Doer {
   DoBeamWeights(
       Config* in_config, int tid,
       PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
+      PtrGrid<kFrameWnd, kMaxUEs, complex_float>& dl_csi_buffers,
       Table<complex_float>& calib_dl_buffer,
       Table<complex_float>& calib_ul_buffer,
       Table<complex_float>& calib_dl_msum_buffer,
@@ -55,12 +56,14 @@ class DoBeamWeights : public Doer {
   /// mMIMO precoder using this CSI matrix and calibration buffer
   void ComputePrecoder(size_t frame_id, size_t cur_sc_id,
                        const arma::cx_fmat& mat_csi,
+                       const arma::cx_fmat& mat_dl_csi,
                        const arma::cx_fvec& calib_sc_vec, const float noise,
                        complex_float* ul_beam_mem, complex_float* dl_beam_mem);
   void ComputeCalib(size_t frame_id, size_t sc_id, arma::cx_fvec& calib_sc_vec);
   void ComputeBeams(size_t tag);
 
   PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
+  PtrGrid<kFrameWnd, kMaxUEs, complex_float>& dl_csi_buffers_;
   complex_float* pred_csi_buffer_;
 
   //Should be read only (Set by FFT and read by Zf)
@@ -75,7 +78,8 @@ class DoBeamWeights : public Doer {
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_;
   DurationStat* duration_stat_;
 
-  complex_float* csi_gather_buffer_;  // Intermediate buffer to gather CSI
+  complex_float* csi_gather_buffer_;     // Intermediate buffer to gather UL CSI
+  complex_float* dl_csi_gather_buffer_;  // Intermediate buffer to gather DL CSI
   // Intermediate buffer to gather reciprical calibration data vector
   complex_float* calib_gather_buffer_;
   std::unique_ptr<arma::cx_fvec> calib_sc_vec_ptr_;

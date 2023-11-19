@@ -10,6 +10,8 @@ AgoraBuffer::AgoraBuffer(Config* const cfg)
                           cfg->Frame().NumTotalSyms()),
       csi_buffer_(kFrameWnd, cfg->UeAntNum(),
                   cfg->BsAntNum() * cfg->OfdmDataNum()),
+      dl_csi_buffer_(kFrameWnd, cfg->UeAntNum(),
+                     cfg->BsAntNum() * cfg->OfdmDataNum()),
       ul_beam_matrix_(kFrameWnd, cfg->OfdmDataNum(),
                       cfg->BsAntNum() * cfg->SpatialStreamsNum()),
       dl_beam_matrix_(kFrameWnd, cfg->OfdmDataNum(),
