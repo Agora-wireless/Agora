@@ -296,4 +296,4 @@ The latest hosted output is located at [Agora Doxygen](https://renew-wireless.or
 Other community resources can be found at the [RENEW Wireless Wiki](https://wiki.renew-wireless.org/)
 
 ## Contact
-Jian Ding (jian.ding@yale.edu)
+Zhecun Liu (zl83@rice.edu)
