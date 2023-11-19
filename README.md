@@ -1,14 +1,24 @@
 [![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fdevelop)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/develop/)
 
-Agora is a complete software realization of real-time massive MIMO baseband processing. hwkk
+# M3A
+M3A: Multipath Multicarrier Misinformation to Adversaries.
+M3A is a multi-antenna multicarrier OFDM/OFDMA transmission system that allows the sender (Alice) to deliver data symbols to legitimate users (Bob) while simultaneously sending misinformation to eavesdroppers (Eve). As a result, the decoded sysbols at Eve are positioned randomly across the I-Q plane. Meanwhile, the data symbol integrity at Bob is still successfully retained. To achieve these, M3A adopts a novel digital baseband algorithm and exploits rich multipath characteristics of physical channels within the Sub-6GHz frequeny range.
+Please refer to our [paper at MobiCom 23'](https://dl.acm.org/doi/10.1145/3570361.3613282) for more details.
 
 Some highlights:
+* M3A does not require either the physical location or CSI (exact or statistical) of Eve.
+* M3A can thwart passive eavesdroppers from decoding data symbols effectively, even in wavelength-scale eavesdropping proximity.
+* M3A retains reliability at Bob in practical indoor multipath environment.
+* M3A can be implemented in multi-antenna 5G and beyond base stations and does not require any modification in the UE.
 
-* Agora currently supports 64x16 MU-MIMO (64 RRU antennas and 16 UEs) with 20 MHz bandwidth and 64QAM modulation, on a 36-core server with AVX512 support. 
-* Agora is configurable in terms of numbers of RRU antennas and UEs, bandwidth, modulation orders, LDPC code rates.
-* Agora supports an emulated RRU and UEs with a high-performance packet generator.
-* Agora has been tested with real RRUs with up to 64 antennas and up to 8 UEs. The RRU and UE devices are available from 
-[Skylark Wireless](https://skylarkwireless.com). 
+[M3A Code](https://github.com/Agora-wireless/Agora/tree/subset-modulation_fftshift) is implemented by using Agora, a complete softwarized baseband processing for Massive MIMO.
+
+## Project Dataset
+This dataset was collected by [Zhecun Liu](mailto:zl83@rice.edu) from Rice University, in a typical lab room that consists of multiple objects, namely
+chairs, tables, and numerous other objects which create a natural multipath environment. 
+There is an obstacle near location 20, deteriorating signal strength between Alice and Bob there.
+We use a fixed 16-QAM modulation during the experiments.
+Alice adopts a TDD-based transmission protocol, as illustrated in Figure below.
 
 ## Contents
  * [Building Agora](#building-agora)
