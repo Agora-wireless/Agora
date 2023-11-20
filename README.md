@@ -16,7 +16,7 @@ Some highlights:
 ## Project Dataset
 This dataset was collected by [Zhecun Liu](mailto:zl83@rice.edu) from Rice University, in a typical lab room that consists of multiple objects, namely
 chairs, tables, and numerous other objects which create a natural multipath environment. 
-The original purpose of this dataset is to compare the reliability and security performance of M3A against the conjugate beamforming as the baseline.
+The original purpose of this dataset is to compare the reliability and security performance of the implemented M3A against the conjugate beamforming as the baseline.
 There is an obstacle near location 20, deteriorating signal strength between Alice and Bob there.
 We use a fixed 16-QAM modulation during the experiments.
 Alice adopts a TDD-based transmission protocol, as illustrated in Figure below.
