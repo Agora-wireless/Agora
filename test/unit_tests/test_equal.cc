@@ -1016,14 +1016,18 @@ void equal_vec_2x2_complex(
   arma::cx_fcube cub_data(data_ptr, cfg_->BsAntNum(), 1, max_sc_ite, false);
   // cub_data.print("cub_data");
 
-  arma::cx_fcube cub_ul_beam(cfg_->UeAntNum(), cfg_->BsAntNum(), max_sc_ite);
-  for (size_t i = 0; i < max_sc_ite; ++i) {
-    arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
-      ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(base_sc_id + i)]);
-    arma::cx_fmat mat_ul_beam(ul_beam_ptr,
-                              cfg_->UeAntNum(), cfg_->BsAntNum(), false);
-    cub_ul_beam.slice(i) = mat_ul_beam;
-  }
+  // arma::cx_fcube cub_ul_beam(cfg_->UeAntNum(), cfg_->BsAntNum(), max_sc_ite);
+  // for (size_t i = 0; i < max_sc_ite; ++i) {
+  //   arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
+  //     ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(base_sc_id + i)]);
+  //   arma::cx_fmat mat_ul_beam(ul_beam_ptr,
+  //                             cfg_->UeAntNum(), cfg_->BsAntNum(), false);
+  //   cub_ul_beam.slice(i) = mat_ul_beam;
+  // }
+  arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
+      ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(base_sc_id)]);
+  arma::cx_fcube cub_ul_beam(ul_beam_ptr, cfg_->UeAntNum(), cfg_->BsAntNum(), max_sc_ite, false);
+  // arma::cx_fcube cub_ul_beam(cfg_->UeAntNum(), cfg_->BsAntNum(), max_sc_ite, arma::fill::zeros);
 
   // Step 1: Equalization
   arma::cx_float* equal_ptr = nullptr;
