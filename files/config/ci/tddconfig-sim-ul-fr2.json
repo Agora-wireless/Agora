@@ -1,14 +1,16 @@
 {
     /* Simulating FlexRAN traffic load */
-    "bs_radio_num": 1,
-    "ue_radio_num": 1,
+    "bs_radio_num": 2,
+    "ue_radio_num": 2,
     "cp_size": 64,
     "fft_size": 1024,
     "ofdm_data_num": 768,
     /* num_subcarrier (12) * num_rb_group (4) * num_rb_per_group (16) */
     "demul_block_size": 768,
     "frame_schedule": [
-        "PUUUUUUUUUUUUUUUUGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+        "PPUUUUUUUUUUUUUUUUGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+        /* "PPUUUUUUUUGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG" */
+        /* "PPPPUUUUUUUUUUUUUUUUGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG" */
         /* "PGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGUGGGUUUUUUUUUUUUUUUU" */
         /* 70 symbols to simulate 5 slots in a frame */
         /* "PUUUUUUGGGGGGG" */
@@ -28,7 +30,7 @@
     /* mu0 = 15 kHz, mu1 = 30 kHz, mu2 = 60 kHz, mu3 = 120 kHz */
     /* sample_rate = mu * fft_size */
     /* mu0: 15.36e6, mu1: 30.72e6, mu2: 61.44e6, mu3: 122.88e6 */
-    "sample_rate": 122.88e6,
+    "sample_rate": 15.36e6,
     "max_frame": 2000,
 
     "freq_orthogonal_pilot": false,
