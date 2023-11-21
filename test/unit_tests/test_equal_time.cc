@@ -1,14 +1,9 @@
 #include <gtest/gtest.h>
 // For some reason, gtest include order matters
-#include <thread>
 
-#include "concurrentqueue.h"
 #include "config.h"
 #include "dodemul.h"
 #include "gettime.h"
-#include "modulation.h"
-#include "phy_stats.h"
-#include "utils.h"
 
 // set static constexpr bool kExportConstellation = true; at symbol.h to enable
 // this unit test. otherwise, the correctness check is not reliable.
@@ -139,8 +134,6 @@ void equal_op_profile_1x1_real() {
   auto cfg_ = std::make_shared<Config>("files/config/ci/tddconfig-sim-ul-fr2.json");
   cfg_->GenData();
   arma::arma_rng::set_seed_random();
-
-#define REAL_OP
 
   // operator var
   size_t max_sc_ite = 768;
@@ -283,8 +276,8 @@ void equal_op_profile_1x1_real() {
 }
 
 TEST(TestEqual, VecOpTime) {
-    equal_op_profile_1x1_complex();
-    // equal_op_profile_1x1_real();
+  equal_op_profile_1x1_complex();
+  // equal_op_profile_1x1_real();
 }
 
 int main(int argc, char** argv) {

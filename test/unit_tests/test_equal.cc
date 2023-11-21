@@ -1,14 +1,9 @@
 #include <gtest/gtest.h>
 // For some reason, gtest include order matters
-#include <thread>
 
-#include "concurrentqueue.h"
 #include "config.h"
 #include "dodemul.h"
 #include "gettime.h"
-#include "modulation.h"
-#include "phy_stats.h"
-#include "utils.h"
 
 // set static constexpr bool kExportConstellation = true; at symbol.h to enable
 // this unit test. otherwise, the correctness check is not reliable.

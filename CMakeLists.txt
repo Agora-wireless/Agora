@@ -56,8 +56,8 @@ endif()
 
 if(NOT DEBUG)
   message(STATUS "Debugging is disabled")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -DNDEBUG")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -DNDEBUG")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -Ofast -DNDEBUG")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Ofast -DNDEBUG")
 else()
   message(STATUS "Verbose Makefile")
   set( CMAKE_VERBOSE_MAKEFILE on )
@@ -603,7 +603,8 @@ endforeach()
 set(UNIT_TESTS test_armadillo test_datatype_conversion test_udp_client_server
   test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
   test_ptr_grid test_avx512_complex_mul test_scrambler
-  test_256qam_demod test_ctrl_channel test_equal test_equal_time)
+  test_256qam_demod test_ctrl_channel test_equal test_equal_time
+  test_arma_cube_slice_2x2)
 
 foreach(test_name IN LISTS UNIT_TESTS)
   add_executable(${test_name}
