@@ -1036,9 +1036,15 @@ void equal_vec_2x2_complex(
   arma::cx_fcube cub_equaled(equal_ptr, cfg_->BsAntNum(), 1, max_sc_ite, false);
   // cub_equaled.print("cub_equaled");
 
-  for (size_t i = 0; i < max_sc_ite; ++i) {
-    cub_equaled.slice(i) = cub_ul_beam.slice(i) * cub_data.slice(i);
-  }
+  // for (size_t i = 0; i < max_sc_ite; ++i) {
+  //   cub_equaled.slice(i) = cub_ul_beam.slice(i) * cub_data.slice(i);
+  // }
+  cub_equaled.tube(0, 0) =
+    cub_ul_beam.tube(0, 0) % cub_data.tube(0, 0) +
+    cub_ul_beam.tube(0, 1) % cub_data.tube(1, 0);
+  cub_equaled.tube(1, 0) =
+    cub_ul_beam.tube(1, 0) % cub_data.tube(0, 0) +
+    cub_ul_beam.tube(1, 1) % cub_data.tube(1, 0);
 
   // Step 2: Phase shift calibration
 
@@ -1065,12 +1071,25 @@ void equal_vec_2x2_complex(
       arma::cx_fmat mat_ue_pilot_data_ =
         ue_pilot_data_.cols(base_sc_id, base_sc_id+max_sc_ite-1);
 
-      for (size_t i = 0; i < max_sc_ite; ++i) {
-        arma::cx_fmat shift_sc =
-          cub_equaled.slice(i) % arma::conj(mat_ue_pilot_data_.col(i));
-          // cub_equaled.slice(i) % sign(conj(mat_ue_pilot_data_.col(i)));
-        mat_phase_shift += shift_sc;
-      }
+      // if use fvec or fcolvec, then transpose mat_ue_pilot_data_ by
+      // mat_ue_pilot_data_.row(0).st()
+      arma::cx_frowvec vec_tube_equal_0 =
+        cub_equaled(arma::span(0), arma::span(0), arma::span::all);
+      arma::cx_frowvec vec_tube_equal_1 =
+        cub_equaled(arma::span(1), arma::span(0), arma::span::all);
+
+      mat_phase_shift.col(0).row(0) += sum(
+        vec_tube_equal_0 % arma::conj(mat_ue_pilot_data_.row(0))
+      );
+      mat_phase_shift.col(0).row(1) += sum(
+        vec_tube_equal_1 % arma::conj(mat_ue_pilot_data_.row(1))
+      );
+      // for (size_t i = 0; i < max_sc_ite; ++i) {
+      //   arma::cx_fmat shift_sc =
+      //     cub_equaled.slice(i) % arma::conj(mat_ue_pilot_data_.col(i));
+      //     // cub_equaled.slice(i) % sign(conj(mat_ue_pilot_data_.col(i)));
+      //   mat_phase_shift += shift_sc;
+      // }
       // sign should be able to optimize out but the result will be different
     }
 
