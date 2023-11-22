@@ -183,6 +183,8 @@ The following are steps to set up both Agora and the packet generator:
 Agora supports a 64-antenna Faros base station as RRU and Iris UE devices. Both are commercially available from [Skylark Wireless](https://skylarkwireless.com) and are used in the [POWER-RENEW PAWR testbed](https://powderwireless.net/).\
 Both Faros and Iris have their roots in the [Argos massive MIMO base station](https://www.yecl.org/argos/), especially [ArgosV3](https://www.yecl.org/argos/pubs/Shepard-MobiCom17-Demo.pdf).
 Agora also supports USRP-based RRU and UEs.
+M3A is evaluated using an indoor 64-antenna Faros base station at Rice University, consisting of four linear antenna arrays. We reserved the top array to perform our experiment, and activated a single RF-chain per Iris module.
+The BS and two UEs are configured to be Alice, Bob, and Eve respectively.
 
 We recommend using one server for controlling the RRU and running Agora,
 and another server for controlling the UEs and running the UE code.
