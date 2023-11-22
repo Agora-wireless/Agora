@@ -209,7 +209,7 @@ void DoPrecode::PrecodingPerSc(size_t frame_id, size_t symbol_idx_dl,
   arma::cx_fmat mat_precoded(precoded_ptr, cfg_->BsAntNum(), 1, false);
 
     /*************************************************************************
-    *      Baseline#4: experiment with ASM random bmfm (per-frame-level)
+    *      Baseline#4: experiment with ant swit random bmfm (per-frame-level)
     **************************************************************************/
    // Assuming SU-DM, the mat_dl_zf should be of Nt-by-1; however, Agora also takes REF
     // into account, resulting in an (Nt+1)-by-1 mat_dl_zf;

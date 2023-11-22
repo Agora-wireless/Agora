@@ -15,10 +15,10 @@ static constexpr bool kUseInverseForZF = true;
 // static constexpr bool kUseUlZfForDownlink = true; // mag info thrown off, but yielded better BER...
 static constexpr bool kUseUlZfForDownlink = false; // more accurate matrix pinv [fixed]
 
-enum AsmVersion { ASMv1, ASMv2, FASM };
-static constexpr enum AsmVersion kAsmVersion =FASM;
+enum M3A_Version { M3A_lc, M3A, FASM };
+static constexpr enum M3A_Version kM3A_Version =FASM;
 static constexpr size_t N_OFF = 0;  // num of OFF antennas at Alice's array
-static constexpr bool kPrintEffGain = true;  // wil be in bs.txt
+static constexpr bool kPrintEffGain = true;  // verify effective channel gain at Bob
 
 DoZF::DoZF(Config* config, int tid,
            PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
@@ -179,7 +179,7 @@ float DoZF::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     // output can be scaled with OfdmCaNum() across all antennas.
     // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
 
-    if (kAsmVersion == ASMv1) {
+    if (kM3A_Version == M3A_lc) {
       // ======A LOCAL NORMALIZATION:========================================
       mat_dl_zf_tmp /= arma::conv_to<arma::cx_fmat>::from(
           arma::square(arma::abs(mat_dl_zf_tmp)));
@@ -205,7 +205,7 @@ float DoZF::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
                               cfg_->BsAntNum(), cfg_->UeAntNum(),
                               cfg_->Frame().NumDLSyms(), false);    // deref
 
-    cube_dl_zf.slice(0) = mat_dl_zf_tmp.st(); // <---Baseline#1: DL bmfm   Q: DO WE STILL NEED .st() HERE?
+    cube_dl_zf.slice(0) = mat_dl_zf_tmp.st(); 
     for (size_t i = 1; i < cube_dl_zf.n_slices; i++) {
       cube_dl_zf.slice(i) = cube_dl_zf.slice(0);
     }
@@ -222,7 +222,7 @@ float DoZF::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     }
     const float min_eff_gain = arma::min(vec_eff_gain);
     for (size_t i = 0; i < cube_dl_zf.n_slices; i++) {
-      if (kAsmVersion == ASMv2) {
+      if (kM3A_Version == M3A) {
         cube_dl_zf.slice(i).col(0) *= min_eff_gain / vec_eff_gain(i);
       } else {
         unused(min_eff_gain);
