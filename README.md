@@ -214,78 +214,9 @@ We recommend using one server for controlling the RRU and running Agora, and ano
 
 After this step, the two log files will be generated automatically, which contains physical layer statistics of the configured transmission frame-by-frame.
 
-## Running performance test
-To test the real-time performance of Agora for processing 64x16 MU-MIMO with 20 MHz bandwidth and 64QAM modulation, we recommend using two servers 
-(one for Agora and another for the emulated RRU) and DPDK\
-for networking. 
-In our experiments, we use 2 servers each with 4 Intel Xeon Gold 6130 CPUs. 
-The servers are connected by 40 GbE Intel XL710 dual-port NICs. 
-
-* **NOTE**: We recommend using at least 10 GbE NIC and a server with more than 10 cores for testing real-time performance of 8x8 MU-MIMO. For 8x8 MU-MIMO, our test on a machine with AVX-512 and CPU frequency\
-of 2.3 GHz support shows that at least 7 worker cores are required to achieve real-time performance. Additionally, Agora requires one core for the manager thread and at least 1 core for network threads.\
-
-We change "worker_thread_num" and "socket_thread_num" to change the number cores assigned to of worker threads and network threads in the json files, e.g., data/tddconfig-sim-ul.json.\
-If you do not have a powerful server or high throughput NICs, we recommend increasing the value of `--frame_duration` when you run `./build/sender`, which will increase frame duration and reduce throughput.
-
-To process 64x16 MU-MIMO in real-time, we use both ports of 40 GbE Intel XL710 NIC with DPDK (see [DPDK_README.md](DPDK_README.md))
-to get enough throughput for the traffic of 64 antennas. \
-(**NOTE**: For 100 GbE NIC, we just need to use one port to get enough thoughput.)
-
-To reduce performance variations, we did the following configurations for the server that runs Agora:
-  * **NOTE**: These steps are not strictly required if you just wanted to try out Agora and do not care about performance variations.
-  * Disable Turbo Boost to reduce performance variation by running 
-    <pre>
-    $ echo "0" | sudo tee /sys/devices/system/cpu/cpufreq/boost
-    </pre>
-  * Set CPU scaling to performance by running 
-    <pre>
-    $ sudo cpupower frequency-set -g performance
-    </pre>
-    where cpupower can be installed through
-    <pre>
-    $ sudo apt-get install -y linux-tools-$(uname -r)
-    </pre>
-  * Turn off hyper-threading. We provide an example bash script 
-	 (scripts/tune_hyperthread.sh), where the core indices are machine dependent.
-  * Set IRQ affinity to direct OS interrupts away from Agora's cores. 
-    We direct all the interrupts to core 0 in our experiments.  
-	  We provide an example bash script (scripts/set_smp_affinity.sh), 
-    where the IRQ indices are machine dependent.
-    
-The steps to collect and analyze timestamp traces are as follows:
-  * Enable DPDK in Agora.  Make sure it is compiled / configured for supporting your specific hardware NICs (see [DPDK_README.md](DPDK_README.md)).
-  * We use data/tddconfig-sim-ul.json for uplink experiments and data/tddconfig-sim-dl.json for downlink experiments.\
-    In our [paper](#documentation), we change “antenna_num”,  “ue_num” and “symbol_num_perframe” 
-    to different values to collect different data points in the figures. 
-  * Generate source data files by running
-    <pre>
-    $ ./build/data_generator --conf_file data/tddconfig-sim-ul.json
-    </pre>
-  * Run Agora as a real-time process (to prevent OS from doing context switches) using 
-    <pre>
-    $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} chrt -rr 99 ./build/agora --conf_file data/tddconfig-sim-ul.json
-    </pre>
-
-    (**NOTE**: Using a process priority 99 is dangerous. Before running it, 
-    make sure you have directed OS interrupts away from cores used by Agora. If you have not done so, run
-    <pre>
-    $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/agora --conf_file data/tddconfig-sim-ul.json
-    </pre>
-    instead to run Agora as a normal process.)
-  * Run the emulated RRU using
-    <pre>
-    $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/sender --num_threads=2 --core_offset=0 \
-      --conf_file=data/tddconfig-sim-ul.json --frame_duration=5000 --enable_slow_start=1
-    </pre>
-    For DPDK, add `--server_mac_addr=` and set it to the MAC address of the NIC used by Agora. 
-  * The timestamps will be saved in data/timeresult.txt after Agora finishes processing. We can then use a [MATLAB script](matlab/parsedata_ul.m) to process the timestamp trace. 
-  * We also provide MATLAB scripts for [uplink](matlab/parse_multi_file_ul) and [downlink](matlab/parse_multi_file_dl) that are able to process multiple timestamp files and generate figures reported in our [paper](#documentation).
-
-## Contributing to Agora
-Agora is open-source and open to your contributions. Before contributing, please read [this](CONTRIBUTING.md).
 
 ## Acknowledgment
-Agora was funded in part by NSF Grant #1518916 and by the NSF PAWR project.
+This work was supported by Cisco, Intel, NSF grants CNS-2148132, CNS-2211618, CNS-1955075, and DOD: Army Research Laboratory grant W911NF-19-2-0269.
 
 ## Documentation
 Check out [Agora Wiki](https://github.com/jianding17/Agora/wiki) for 
