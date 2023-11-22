@@ -3,7 +3,7 @@
 # M3A
 M3A: Multipath Multicarrier Misinformation to Adversaries.
 M3A is a multi-antenna multicarrier OFDM/OFDMA transmission system that allows the sender (Alice) to deliver data symbols to legitimate users (Bob) while simultaneously sending misinformation to eavesdroppers (Eve). As a result, the decoded sysbols at Eve are positioned randomly across the I-Q plane. Meanwhile, the data symbol integrity at Bob is still successfully retained. To achieve these, M3A adopts a novel digital baseband algorithm and exploits rich multipath characteristics of physical channels within the Sub-6GHz frequeny range.
-Please refer to our [paper at MobiCom 23'](https://dl.acm.org/doi/10.1145/3570361.3613282) for more details.
+Check our [paper at MobiCom 23'](https://dl.acm.org/doi/10.1145/3570361.3613282) for more details.
 
 Some highlights:
 * M3A does not require either the physical location or CSI (exact or statistical) of Eve.
@@ -26,7 +26,7 @@ Alice adopts a TDD-based transmission protocol, as illustrated in Figure below.
 
 
 ## Contents
- * [Building Agora](#building-agora)
+ * [Building M3A using Agora](#building-agora)
    * [Setting up the build environment](#setting-up-the-build-environment)
    * [Building and running with emulated RRU](#building-and-running-with-emulated-rru)
    * [Building and running with real RRU](#building-and-running-with-real-rru)
