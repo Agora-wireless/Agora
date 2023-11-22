@@ -187,7 +187,7 @@ We recommend using one server for controlling the RRU and running Agora, and ano
 **Note:** Faros RRU and Iris UEs can be discovered using the [pyfaros](https://github.com/skylarkwireless/pyfaros) tool. You can use this tool to find the topology of the hardware connected to the server.
 
  * Rebuild the code on both servers for RRU side the UE side.
-    * For Faros RRU and Iris UEs (M3A uses this option), pass `-DRADIO_TYPE=SOAPY_IRIS` to cmake
+    * For Faros RRU and Iris UEs (M3A uses this option), pass `-DRADIO_TYPE=SOAPY_IRIS` to cmake. M3A uses this option, and passes `-DENABLE_HDF5=true` as well to enable HDF5 files collection.
     * For USRP-based RRU and UEs, pass `-DRADIO_TYPE=SOAPY_UHD` to cmake
     * M3A used uncoded transmission to explore the scrambling of constellations at Eve. To do so, in `symbols.h`, set variable `static constexpr bool kDownlinkHardDemod` to true.
     * Run `make -j` to recompile the code.
