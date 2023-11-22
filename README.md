@@ -26,7 +26,7 @@ Alice adopts a TDD-based transmission protocol, as illustrated in Figure below.
 
 
 ## Contents
- * [Build M3A using Agora](#Build M3A using Agora)
+ * [Build M3A using Agora](#Build-M3A-using-Agora)
    * [Setting up the build environment](#setting-up-the-build-environment)
    * [Building and running with emulated RRU](#building-and-running-with-emulated-rru)
    * [Building and running with real RRU](#building-and-running-with-real-rru)
