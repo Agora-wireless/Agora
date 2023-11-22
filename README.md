@@ -219,4 +219,4 @@ This work was supported by Cisco, Intel, NSF grants CNS-2148132, CNS-2211618, CN
 ## Documentation
 Our dataset has been released and can be found at the [RENEW Wireless Wiki](https://wiki.renew-wireless.org/)
 ## Contact
-Zhecun Liu (zl83@rice.edu)
+Corresponding author: Zhecun Liu (zl83@rice.edu)
