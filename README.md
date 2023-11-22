@@ -205,10 +205,8 @@ We recommend using one server for controlling the RRU and running Agora, and ano
    * Run `./build/user --conf_file data/examples/dl-vulture-listener.json`, in order to configure Eve. 
    * Notice that the only difference in Bob's vs Eve's json is that Eve adopted a different `frame_schedule: BGCLGGGPGDDDG`. Consequnetly, using two separate json files and just different P slot positions Alice does single-user transmission while Eve overhears all the downlink signals.
  * Run Agora on the server connected to the Faros RRU
-   * scp over the generated file `data/LDPC_orig_XX_data_512_ant2.bin` from the client
-     machine to the server's `data` directory.
-   * Rebuild the code
-     * Run `make -j` to compile the code.
+   * scp over the generated file `data/LDPC_orig_dl_data_512_ant1.bin` `data/LDPC_orig_dl_data_512_ant9.bin` `data/LDPC_rx_data_512_ant9.bin` and `data/orig_dl_data_512_ant1.bin`  from the client machine to the server's `data` directory. 
+   * Run `make -j` to compile the code.
    * For Faros RRU, use the pyfaros tool the same as with the UEs to generate a new `data/topology.json`
    * Modify `data/topology.json` by adding/removing serials of your RRU Irises, and the hub.
    * Run `./build/agora --conf_file data/XX-hw.json`
