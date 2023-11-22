@@ -26,7 +26,7 @@ Alice adopts a TDD-based transmission protocol, as illustrated in Figure below.
 
 
 ## Contents
- * [Building M3A using Agora](#building-agora)
+ * [Build M3A using Agora](#Build M3A using Agora)
    * [Setting up the build environment](#setting-up-the-build-environment)
    * [Building and running with emulated RRU](#building-and-running-with-emulated-rru)
    * [Building and running with real RRU](#building-and-running-with-real-rru)
@@ -37,7 +37,7 @@ Alice adopts a TDD-based transmission protocol, as illustrated in Figure below.
  * [Contact](#contact)
  
  
-# Building Agora
+# Build M3A using Agora
   Agora currently only builds and runs on Linux, and has been tested on Ubuntu 16.04, 18.04, and 20.04. 
   Agora requires CMake 2.8+ and works with both GNU and Intel compilers with C++17 support. 
 ## Setting up the build environment
