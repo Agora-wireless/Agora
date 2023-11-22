@@ -12,6 +12,7 @@ Some highlights:
 * M3A can be implemented in multi-antenna 5G and beyond base stations and does not require any modification in the UE.
 
 [M3A Code](https://github.com/Agora-wireless/Agora/tree/subset-modulation_fftshift) is implemented by using Agora, a complete softwarized baseband processing for Massive MIMO.
+More detailed installation and running instructions are detailed below.
 
 ## Project Dataset
 This dataset was collected by [Zhecun Liu](mailto:zl83@rice.edu) from Rice University, in a typical lab room that consists of multiple objects, namely
