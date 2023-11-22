@@ -182,15 +182,14 @@ The following are steps to set up both Agora and the packet generator:
 ## Building and running with real RRU
 M3A is evaluated using an indoor 64-antenna [Argos massive MIMO base station](https://www.yecl.org/argos/), also commercially available from [Skylark Wireless](https://skylarkwireless.com) and are used in the [POWER-RENEW PAWR testbed](https://powderwireless.net/).
 The base-station contains four linear antennna arrays, we reserved the top array to perform our experiment.
-The BS and two Iris UEs are configured to be Alice, Bob, and Eve respectively. [See below](https://github.com/Agora-wireless/Agora/blob/subset-modulation_fftshift/images/bs%2Bue.pdf) for the setup. For downlink, a reference node outside the array (and synchronized) is required for reciprocity calibration.
+The BS and two Iris UEs are configured to be Alice, Bob, and Eve respectively. [See below](https://github.com/Agora-wireless/Agora/blob/subset-modulation_fftshift/images/bs%2Bue.pdf) for our setup. For downlink, a reference node outside the array (and synchronized) is required for reciprocity calibration.
 
 We recommend using one server for controlling the RRU and running Agora, and another server for controlling the UEs and running the UE code.
  
 **Note:** Faros RRU and Iris UEs can be discovered using the [pyfaros](https://github.com/skylarkwireless/pyfaros) tool. You can use this tool to find the topology of the hardware connected to the server.
 
-We describe how to get the uplink and downlink demos working. Below XX can be replaced with either `ul` and `dl`.
  * Rebuild the code on both servers for RRU side the UE side.
-    * For Faros RRU and Iris UEs, pass `-DRADIO_TYPE=SOAPY_IRIS` to cmake
+    * For Faros RRU and Iris UEs, pass `-DRADIO_TYPE=SOAPY_IRIS` to cmake (M3A used this one)
     * For USRP-based RRU and UEs, pass `-DRADIO_TYPE=SOAPY_UHD` to cmake
     * Run `make -j` to recompile the code.
  * Run the UE code on the server connected to the Iris UEs
@@ -211,7 +210,7 @@ We describe how to get the uplink and downlink demos working. Below XX can be re
      * Run `make -j` to compile the code.
    * For Faros RRU, use the pyfaros tool the same as with the UEs to generate a new `data/topology.json`
    * Modify `data/topology.json` by adding/removing serials of your RRU Irises, and the hub.
-   * Run `./build/agora --conf_file data/XX-hw.json`.
+   * Run `./build/agora --conf_file data/XX-hw.json`. After this step, the log files will be generated automatically.
 
 ## Running performance test
 To test the real-time performance of Agora for processing 64x16 MU-MIMO with 20 MHz bandwidth and 64QAM modulation, we recommend using two servers 
