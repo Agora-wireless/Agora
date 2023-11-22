@@ -207,9 +207,8 @@ We recommend using one server for controlling the RRU and running Agora, and ano
  * Run Agora on the server connected to the Faros RRU
    * scp over the generated file `data/LDPC_orig_dl_data_512_ant1.bin` `data/LDPC_orig_dl_data_512_ant9.bin` `data/LDPC_rx_data_512_ant9.bin` and `data/orig_dl_data_512_ant1.bin`  from the client machine to the server's `data` directory. 
    * Run `make -j` to compile the code.
-   * For Faros RRU, use the pyfaros tool the same as with the UEs to generate a new `data/topology.json`
-   * Modify `data/topology.json` by adding/removing serials of your RRU Irises, and the hub.
-   * Run `./build/agora --conf_file data/XX-hw.json`
+   * For Faros RRU, use the pyfaros tool the same as with the UEs to generate a new `data/topology.json`; modify `data/topology.json` by adding/removing serials of your RRU Irises, and the hub. M3A uses `dl-vulture.json`.
+   * Run `./build/agora --conf_file data/examples/dl-vulture.json`
 
 After this step, the two log files will be generated automatically, which contains physical layer statistics of the configured transmission frame-by-frame.
 
