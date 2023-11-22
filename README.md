@@ -189,7 +189,7 @@ We recommend using one server for controlling the RRU and running Agora, and ano
 **Note:** Faros RRU and Iris UEs can be discovered using the [pyfaros](https://github.com/skylarkwireless/pyfaros) tool. You can use this tool to find the topology of the hardware connected to the server.
 
  * Rebuild the code on both servers for RRU side the UE side.
-    * For Faros RRU and Iris UEs, pass `-DRADIO_TYPE=SOAPY_IRIS` to cmake (M3A used this one)
+    * For Faros RRU and Iris UEs, pass `-DRADIO_TYPE=SOAPY_IRIS` to cmake
     * For USRP-based RRU and UEs, pass `-DRADIO_TYPE=SOAPY_UHD` to cmake
     * Run `make -j` to recompile the code.
  * Run the UE code on the server connected to the Iris UEs
@@ -210,7 +210,9 @@ We recommend using one server for controlling the RRU and running Agora, and ano
      * Run `make -j` to compile the code.
    * For Faros RRU, use the pyfaros tool the same as with the UEs to generate a new `data/topology.json`
    * Modify `data/topology.json` by adding/removing serials of your RRU Irises, and the hub.
-   * Run `./build/agora --conf_file data/XX-hw.json`. After this step, the log files will be generated automatically.
+   * Run `./build/agora --conf_file data/XX-hw.json`
+
+After this step, the two log files will be generated automatically, which contains physical layer statistics of the configured transmission frame-by-frame.
 
 ## Running performance test
 To test the real-time performance of Agora for processing 64x16 MU-MIMO with 20 MHz bandwidth and 64QAM modulation, we recommend using two servers 
