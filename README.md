@@ -1,28 +1,41 @@
 [![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fdevelop)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/develop/)
 
-Agora is a complete software realization of real-time massive MIMO baseband processing. 
+# M3A
+M3A: Multipath Multicarrier Misinformation to Adversaries.
+M3A is a multi-antenna multicarrier OFDM/OFDMA transmission system that allows the sender (Alice) to deliver data symbols to legitimate users (Bob) while simultaneously sending misinformation to eavesdroppers (Eve). As a result, the decoded sysbols at Eve are positioned randomly across the I-Q plane. Meanwhile, the data symbol integrity at Bob is still successfully retained. To achieve these, M3A adopts a novel digital baseband algorithm and exploits rich multipath characteristics of physical channels within the Sub-6GHz frequeny range.
+Check our [paper at MobiCom 23'](https://dl.acm.org/doi/10.1145/3570361.3613282) for more details.
 
 Some highlights:
+* M3A does not require either the physical location or CSI (exact or statistical) of Eve.
+* M3A can thwart passive eavesdroppers from decoding data symbols effectively, even in wavelength-scale eavesdropping proximity.
+* M3A retains reliability at Bob in practical indoor multipath environment.
+* M3A can be implemented in multi-antenna 5G and beyond base stations and does not require any modification in the UE.
 
-* Agora currently supports 64x16 MU-MIMO (64 RRU antennas and 16 UEs) with 20 MHz bandwidth and 64QAM modulation, on a 36-core server with AVX512 support. 
-* Agora is configurable in terms of numbers of RRU antennas and UEs, bandwidth, modulation orders, LDPC code rates.
-* Agora supports an emulated RRU and UEs with a high-performance packet generator.
-* Agora has been tested with real RRUs with up to 64 antennas and up to 8 UEs. The RRU and UE devices are available from 
-[Skylark Wireless](https://skylarkwireless.com). 
+[M3A Code](https://github.com/Agora-wireless/Agora/tree/subset-modulation_fftshift) is implemented by using Agora, a complete softwarized baseband processing for Massive MIMO.
+More detailed installation and running instructions are detailed below.
+
+## Project Dataset
+This dataset was collected by [Zhecun Liu](mailto:zl83@rice.edu) from Rice University, in a typical lab room that consists of multiple objects, namely
+chairs, tables, and numerous other objects which create a natural multipath environment. 
+The original purpose of this dataset is to compare the reliability and security performance of the implemented M3A against the conjugate beamforming as the baseline.
+There is an obstacle near location 20, deteriorating signal strength between Alice and Bob there.
+We use a fixed 16-QAM modulation during the experiments.
+Alice adopts a TDD-based transmission protocol, as illustrated in Figure below.
+
+## Dataset Description
+
 
 ## Contents
- * [Building Agora](#building-agora)
+ * [Build M3A using Agora](#Build-M3A-using-Agora)
    * [Setting up the build environment](#setting-up-the-build-environment)
    * [Building and running with emulated RRU](#building-and-running-with-emulated-rru)
    * [Building and running with real RRU](#building-and-running-with-real-rru)
-   * [Running performance test](#running-performance-test)
- * [Contributing to Agora](#contributing-to-agora)
  * [Acknowledgment](#acknowledgment)
  * [Documentation](#documentation)
  * [Contact](#contact)
  
  
-# Building Agora
+# Build M3A using Agora
   Agora currently only builds and runs on Linux, and has been tested on Ubuntu 16.04, 18.04, and 20.04. 
   Agora requires CMake 2.8+ and works with both GNU and Intel compilers with C++17 support. 
 ## Setting up the build environment
@@ -165,20 +178,18 @@ The following are steps to set up both Agora and the packet generator:
    * Note: make sure agora / user / chsim / macuser / macbs are using different set of cores, otherwise there will be performance slow down.
 
 ## Building and running with real RRU
-Agora supports a 64-antenna Faros base station as RRU and Iris UE devices. Both are commercially available from [Skylark Wireless](https://skylarkwireless.com) and are used in the [POWER-RENEW PAWR testbed](https://powderwireless.net/).\
-Both Faros and Iris have their roots in the [Argos massive MIMO base station](https://www.yecl.org/argos/), especially [ArgosV3](https://www.yecl.org/argos/pubs/Shepard-MobiCom17-Demo.pdf).
-Agora also supports USRP-based RRU and UEs.
+M3A is evaluated using an indoor 64-antenna [Argos massive MIMO base station](https://www.yecl.org/argos/), also commercially available from [Skylark Wireless](https://skylarkwireless.com) and are used in the [POWER-RENEW PAWR testbed](https://powderwireless.net/).
+The base-station contains four linear antennna arrays, we reserved the top array to perform our experiment.
+The BS and two Iris UEs are configured to be Alice, Bob, and Eve respectively. [See below](https://github.com/Agora-wireless/Agora/blob/subset-modulation_fftshift/images/bs%2Bue.pdf) for our setup. For downlink, a reference node outside the array (and synchronized) is required for reciprocity calibration.
 
-We recommend using one server for controlling the RRU and running Agora,
-and another server for controlling the UEs and running the UE code.
+We recommend using one server for controlling the RRU and running Agora, and another server for controlling the UEs and running the UE code.
  
-Agora supports both uplink and downlink with real RRU and UEs. For downlink, a reference node outside the array (and synchronized) is required for reciprocity calibration.\
 **Note:** Faros RRU and Iris UEs can be discovered using the [pyfaros](https://github.com/skylarkwireless/pyfaros) tool. You can use this tool to find the topology of the hardware connected to the server.
 
-We describe how to get the uplink and downlink demos working. Below XX can be replaced with either `ul` and `dl`.
  * Rebuild the code on both servers for RRU side the UE side.
-    * For Faros RRU and Iris UEs, pass `-DRADIO_TYPE=SOAPY_IRIS` to cmake
+    * For Faros RRU and Iris UEs (M3A uses this option), pass `-DRADIO_TYPE=SOAPY_IRIS` to cmake. M3A uses this option, and passes `-DENABLE_HDF5=true` as well to enable HDF5 files collection.
     * For USRP-based RRU and UEs, pass `-DRADIO_TYPE=SOAPY_UHD` to cmake
+    * M3A used uncoded transmission to explore the scrambling of constellations at Eve. To do so, in file `symbols.h`, set variable `static constexpr bool kDownlinkHardDemod` to true.
     * Run `make -j` to recompile the code.
  * Run the UE code on the server connected to the Iris UEs
    * For Iris UEs, run the pyfaros tool in the `data` directory as follows:
@@ -187,103 +198,25 @@ We describe how to get the uplink and downlink demos working. Below XX can be re
      </pre>
      This will output a file named `topology.json` with all the discoverable serial IDs included.
    * Modify `data/topology.json` by adding/removing serials of client Irises you'd like to include
-     from your setup.
+     from your setup. In M3A experimnets we used two UEs (Bob and Eve), and the two json files we used are `topology-vulture.json` and `topology-vulture-listener.json` for Bob and Eve respectively.
    * For USRP-based RRU and UEs, modify the existing `data/topology.json` and enter the appropriate IDs.
-   * Run `./build/data_generator --conf_file data/XX-hw.json` to generate required data files.
-   * Run `./build/user --conf_file data/XX-hw.json`.
+   * Run `./build/data_generator --conf_file data/examples/dl-vulture.json` to generate required data files. **Note:** This step does not give Eve any information about sent bits, but merely letting us check if decoded bits at Eve are correct.
+   * Run `./build/user --conf_file data/examples/dl-vulture.json`, in order to configure Bob. This is the file where we set carrier frequency, trasmit/receive gains, sample rate, mcs information and so forth.
+   * Run `./build/user --conf_file data/examples/dl-vulture-listener.json`, in order to configure Eve. Notice that the only difference in Bob's vs Eve's json is that Eve had a different `frame_schedule: BGCLGGGPGDDDG`. 
+  Consequnetly, Alice does single-user transmission while Eve overhears all the downlink signals.
  * Run Agora on the server connected to the Faros RRU
-   * scp over the generated file `data/LDPC_orig_XX_data_512_ant2.bin` from the client
-     machine to the server's `data` directory.
-   * Rebuild the code
-     * Run `make -j` to compile the code.
-   * For Faros RRU, use the pyfaros tool the same as with the UEs to generate a new `data/topology.json`
-   * Modify `data/topology.json` by adding/removing serials of your RRU Irises, and the hub.
-   * Run `./build/agora --conf_file data/XX-hw.json`.
+   * scp over the generated file `data/LDPC_orig_dl_data_512_ant1.bin` `data/LDPC_orig_dl_data_512_ant9.bin` `data/LDPC_rx_data_512_ant9.bin` and `data/orig_dl_data_512_ant1.bin`  from the client machine to the server's `data` directory. 
+   * Run `make -j` to compile the code.
+   * For Faros RRU, use the pyfaros tool the same as with the UEs to generate a new `data/topology.json`; modify `data/topology.json` by adding/removing serials of your RRU Irises, and the hub. M3A experiments are conducted using `dl-vulture.json`.
+   * Run `./build/agora --conf_file data/examples/dl-vulture.json`
 
-## Running performance test
-To test the real-time performance of Agora for processing 64x16 MU-MIMO with 20 MHz bandwidth and 64QAM modulation, we recommend using two servers 
-(one for Agora and another for the emulated RRU) and DPDK\
-for networking. 
-In our experiments, we use 2 servers each with 4 Intel Xeon Gold 6130 CPUs. 
-The servers are connected by 40 GbE Intel XL710 dual-port NICs. 
+After this step, the two log files will be generated automatically, which contains physical layer statistics of the configured transmission frame-by-frame.
 
-* **NOTE**: We recommend using at least 10 GbE NIC and a server with more than 10 cores for testing real-time performance of 8x8 MU-MIMO. For 8x8 MU-MIMO, our test on a machine with AVX-512 and CPU frequency\
-of 2.3 GHz support shows that at least 7 worker cores are required to achieve real-time performance. Additionally, Agora requires one core for the manager thread and at least 1 core for network threads.\
-
-We change "worker_thread_num" and "socket_thread_num" to change the number cores assigned to of worker threads and network threads in the json files, e.g., data/tddconfig-sim-ul.json.\
-If you do not have a powerful server or high throughput NICs, we recommend increasing the value of `--frame_duration` when you run `./build/sender`, which will increase frame duration and reduce throughput.
-
-To process 64x16 MU-MIMO in real-time, we use both ports of 40 GbE Intel XL710 NIC with DPDK (see [DPDK_README.md](DPDK_README.md))
-to get enough throughput for the traffic of 64 antennas. \
-(**NOTE**: For 100 GbE NIC, we just need to use one port to get enough thoughput.)
-
-To reduce performance variations, we did the following configurations for the server that runs Agora:
-  * **NOTE**: These steps are not strictly required if you just wanted to try out Agora and do not care about performance variations.
-  * Disable Turbo Boost to reduce performance variation by running 
-    <pre>
-    $ echo "0" | sudo tee /sys/devices/system/cpu/cpufreq/boost
-    </pre>
-  * Set CPU scaling to performance by running 
-    <pre>
-    $ sudo cpupower frequency-set -g performance
-    </pre>
-    where cpupower can be installed through
-    <pre>
-    $ sudo apt-get install -y linux-tools-$(uname -r)
-    </pre>
-  * Turn off hyper-threading. We provide an example bash script 
-	 (scripts/tune_hyperthread.sh), where the core indices are machine dependent.
-  * Set IRQ affinity to direct OS interrupts away from Agora's cores. 
-    We direct all the interrupts to core 0 in our experiments.  
-	  We provide an example bash script (scripts/set_smp_affinity.sh), 
-    where the IRQ indices are machine dependent.
-    
-The steps to collect and analyze timestamp traces are as follows:
-  * Enable DPDK in Agora.  Make sure it is compiled / configured for supporting your specific hardware NICs (see [DPDK_README.md](DPDK_README.md)).
-  * We use data/tddconfig-sim-ul.json for uplink experiments and data/tddconfig-sim-dl.json for downlink experiments.\
-    In our [paper](#documentation), we change “antenna_num”,  “ue_num” and “symbol_num_perframe” 
-    to different values to collect different data points in the figures. 
-  * Generate source data files by running
-    <pre>
-    $ ./build/data_generator --conf_file data/tddconfig-sim-ul.json
-    </pre>
-  * Run Agora as a real-time process (to prevent OS from doing context switches) using 
-    <pre>
-    $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} chrt -rr 99 ./build/agora --conf_file data/tddconfig-sim-ul.json
-    </pre>
-
-    (**NOTE**: Using a process priority 99 is dangerous. Before running it, 
-    make sure you have directed OS interrupts away from cores used by Agora. If you have not done so, run
-    <pre>
-    $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/agora --conf_file data/tddconfig-sim-ul.json
-    </pre>
-    instead to run Agora as a normal process.)
-  * Run the emulated RRU using
-    <pre>
-    $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/sender --num_threads=2 --core_offset=0 \
-      --conf_file=data/tddconfig-sim-ul.json --frame_duration=5000 --enable_slow_start=1
-    </pre>
-    For DPDK, add `--server_mac_addr=` and set it to the MAC address of the NIC used by Agora. 
-  * The timestamps will be saved in data/timeresult.txt after Agora finishes processing. We can then use a [MATLAB script](matlab/parsedata_ul.m) to process the timestamp trace. 
-  * We also provide MATLAB scripts for [uplink](matlab/parse_multi_file_ul) and [downlink](matlab/parse_multi_file_dl) that are able to process multiple timestamp files and generate figures reported in our [paper](#documentation).
-
-## Contributing to Agora
-Agora is open-source and open to your contributions. Before contributing, please read [this](CONTRIBUTING.md).
 
 ## Acknowledgment
-Agora was funded in part by NSF Grant #1518916 and by the NSF PAWR project.
+This work was supported by Cisco, Intel, NSF grants CNS-2148132, CNS-2211618, CNS-1955075, and DOD: Army Research Laboratory grant W911NF-19-2-0269.
 
 ## Documentation
-Check out [Agora Wiki](https://github.com/jianding17/Agora/wiki) for 
-Agora's design overview and flow diagram that maps massive MIMO baseband processing 
-to the actual code structure. Technical details and performance results can be found in
- * Jian Ding, Rahman Doost-Mohammady, Anuj Kalia, and Lin Zhong, "Agora: Real-time massive MIMO baseband processing in software," in Proc. of ACM CoNEXT, December 2020 ([PDF](https://www.yecl.org/publications/ding2020conext.pdf), [video](https://dl.acm.org/doi/abs/10.1145/3386367.3431296)).
-
-Doxygen documentation generation for Agora can be initiated by running the following command from the repository root directory:
-`doxygen Agora_doxygen.conf`
-The latest hosted output is located at [Agora Doxygen](https://renew-wireless.org/agora-doxy/html/index.html) 
-
-Other community resources can be found at the [RENEW Wireless Wiki](https://wiki.renew-wireless.org/)
-
+Our dataset has been released and can be found at the [RENEW Wireless Wiki](https://wiki.renew-wireless.org/)
 ## Contact
-Jian Ding (jian.ding@yale.edu)
+Corresponding author: Zhecun Liu (zl83@rice.edu)
