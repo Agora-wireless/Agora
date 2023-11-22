@@ -198,16 +198,16 @@ We recommend using one server for controlling the RRU and running Agora, and ano
      </pre>
      This will output a file named `topology.json` with all the discoverable serial IDs included.
    * Modify `data/topology.json` by adding/removing serials of client Irises you'd like to include
-     from your setup. In M3A experiments, we have two UEs (Bob and Eve) and the two json files we used are `topology-vulture.json` and `topology-vulture-listener.json` for Bob and Eve respectively.
+     from your setup. In M3A experimnets we used two UEs (Bob and Eve), and the two json files we used are `topology-vulture.json` and `topology-vulture-listener.json` for Bob and Eve respectively.
    * For USRP-based RRU and UEs, modify the existing `data/topology.json` and enter the appropriate IDs.
-   In M3A, we ran `./build/data_generator --conf_file data/examples/dl-vulture.json` to generate required data files. **Note:** This step is valid in our experiment; it indeed does not give Eve any information about sent bits but merely letting us check if decoded bits at Eve are correct.
+   * Run `./build/data_generator --conf_file data/examples/dl-vulture.json` to generate required data files. **Note:** This step does not give Eve any information about sent bits, but merely letting us check if decoded bits at Eve are correct.
    * Run `./build/user --conf_file data/examples/dl-vulture.json`, in order to configure Bob. This is the file where we set carrier frequency, trasmit/receive gains, sample rate, mcs information and so forth.
    * Run `./build/user --conf_file data/examples/dl-vulture-listener.json`, in order to configure Eve. Notice that the only difference in Bob's vs Eve's json is that Eve had a different `frame_schedule: BGCLGGGPGDDDG`. 
-    Consequnetly, using two separate json files and just different P slot positions Alice does single-user transmission while Eve overhears all the downlink signals.
+  Consequnetly, Alice does single-user transmission while Eve overhears all the downlink signals.
  * Run Agora on the server connected to the Faros RRU
    * scp over the generated file `data/LDPC_orig_dl_data_512_ant1.bin` `data/LDPC_orig_dl_data_512_ant9.bin` `data/LDPC_rx_data_512_ant9.bin` and `data/orig_dl_data_512_ant1.bin`  from the client machine to the server's `data` directory. 
    * Run `make -j` to compile the code.
-   * For Faros RRU, use the pyfaros tool the same as with the UEs to generate a new `data/topology.json`; modify `data/topology.json` by adding/removing serials of your RRU Irises, and the hub. M3A uses `dl-vulture.json`.
+   * For Faros RRU, use the pyfaros tool the same as with the UEs to generate a new `data/topology.json`; modify `data/topology.json` by adding/removing serials of your RRU Irises, and the hub. M3A experiments are conducted using `dl-vulture.json`.
    * Run `./build/agora --conf_file data/examples/dl-vulture.json`
 
 After this step, the two log files will be generated automatically, which contains physical layer statistics of the configured transmission frame-by-frame.
