@@ -189,7 +189,7 @@ We recommend using one server for controlling the RRU and running Agora, and ano
  * Rebuild the code on both servers for RRU side the UE side.
     * For Faros RRU and Iris UEs (M3A uses this option), pass `-DRADIO_TYPE=SOAPY_IRIS` to cmake. M3A uses this option, and passes `-DENABLE_HDF5=true` as well to enable HDF5 files collection.
     * For USRP-based RRU and UEs, pass `-DRADIO_TYPE=SOAPY_UHD` to cmake
-    * M3A used uncoded transmission to explore the scrambling of constellations at Eve. To do so, in `symbols.h`, set variable `static constexpr bool kDownlinkHardDemod` to true.
+    * M3A used uncoded transmission to explore the scrambling of constellations at Eve. To do so, in file `symbols.h`, set variable `static constexpr bool kDownlinkHardDemod` to true.
     * Run `make -j` to recompile the code.
  * Run the UE code on the server connected to the Iris UEs
    * For Iris UEs, run the pyfaros tool in the `data` directory as follows:
@@ -198,7 +198,7 @@ We recommend using one server for controlling the RRU and running Agora, and ano
      </pre>
      This will output a file named `topology.json` with all the discoverable serial IDs included.
    * Modify `data/topology.json` by adding/removing serials of client Irises you'd like to include
-     from your setup. In M3A experiments, we have two UEs (Bob and Eve).
+     from your setup. In M3A experiments, we have two UEs (Bob and Eve) and the two json files we used are `topology-vulture.json` and `topology-vulture-listener.json`.
    * For USRP-based RRU and UEs, modify the existing `data/topology.json` and enter the appropriate IDs.
    In M3A, we ran `./build/data_generator --conf_file data/examples/dl-vulture.json` to generate required data files. **Note:** This step is valid in our experiment; it indeed does not give Eve any information about sent bits but merely letting us check if decoded bits at Eve are correct.
    * Run `./build/user --conf_file data/examples/dl-vulture.json`, in order to configure Bob
