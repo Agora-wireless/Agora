@@ -217,16 +217,6 @@ After this step, the two log files will be generated automatically, which contai
 This work was supported by Cisco, Intel, NSF grants CNS-2148132, CNS-2211618, CNS-1955075, and DOD: Army Research Laboratory grant W911NF-19-2-0269.
 
 ## Documentation
-Check out [Agora Wiki](https://github.com/jianding17/Agora/wiki) for 
-Agora's design overview and flow diagram that maps massive MIMO baseband processing 
-to the actual code structure. Technical details and performance results can be found in
- * Jian Ding, Rahman Doost-Mohammady, Anuj Kalia, and Lin Zhong, "Agora: Real-time massive MIMO baseband processing in software," in Proc. of ACM CoNEXT, December 2020 ([PDF](https://www.yecl.org/publications/ding2020conext.pdf), [video](https://dl.acm.org/doi/abs/10.1145/3386367.3431296)).
-
-Doxygen documentation generation for Agora can be initiated by running the following command from the repository root directory:
-`doxygen Agora_doxygen.conf`
-The latest hosted output is located at [Agora Doxygen](https://renew-wireless.org/agora-doxy/html/index.html) 
-
-Other community resources can be found at the [RENEW Wireless Wiki](https://wiki.renew-wireless.org/)
-
+Our dataset has been released and can be found at the [RENEW Wireless Wiki](https://wiki.renew-wireless.org/)
 ## Contact
 Zhecun Liu (zl83@rice.edu)
