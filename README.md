@@ -189,7 +189,7 @@ We recommend using one server for controlling the RRU and running Agora, and ano
 **Note:** Faros RRU and Iris UEs can be discovered using the [pyfaros](https://github.com/skylarkwireless/pyfaros) tool. You can use this tool to find the topology of the hardware connected to the server.
 
  * Rebuild the code on both servers for RRU side the UE side.
-    * For Faros RRU and Iris UEs, pass `-DRADIO_TYPE=SOAPY_IRIS` to cmake
+    * For Faros RRU and Iris UEs (M3A uses this option), pass `-DRADIO_TYPE=SOAPY_IRIS` to cmake
     * For USRP-based RRU and UEs, pass `-DRADIO_TYPE=SOAPY_UHD` to cmake
     * Run `make -j` to recompile the code.
  * Run the UE code on the server connected to the Iris UEs
@@ -199,7 +199,7 @@ We recommend using one server for controlling the RRU and running Agora, and ano
      </pre>
      This will output a file named `topology.json` with all the discoverable serial IDs included.
    * Modify `data/topology.json` by adding/removing serials of client Irises you'd like to include
-     from your setup.
+     from your setup. In M3A experiments, we have two UEs (Bob and Eve).
    * For USRP-based RRU and UEs, modify the existing `data/topology.json` and enter the appropriate IDs.
    * Run `./build/data_generator --conf_file data/XX-hw.json` to generate required data files.
    * Run `./build/user --conf_file data/XX-hw.json`.
