@@ -30,8 +30,6 @@ Alice adopts a TDD-based transmission protocol, as illustrated in Figure below.
    * [Setting up the build environment](#setting-up-the-build-environment)
    * [Building and running with emulated RRU](#building-and-running-with-emulated-rru)
    * [Building and running with real RRU](#building-and-running-with-real-rru)
-   * [Running performance test](#running-performance-test)
- * [Contributing to Agora](#contributing-to-agora)
  * [Acknowledgment](#acknowledgment)
  * [Documentation](#documentation)
  * [Contact](#contact)
