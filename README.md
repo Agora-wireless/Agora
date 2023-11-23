@@ -190,7 +190,7 @@ We recommend using one server for controlling the RRU and running Agora, and ano
     * For Faros RRU and Iris UEs (M3A uses this option), pass `-DRADIO_TYPE=SOAPY_IRIS` to cmake. M3A uses this option, and passes `-DENABLE_HDF5=true` as well to enable HDF5 files collection.
     * For USRP-based RRU and UEs, pass `-DRADIO_TYPE=SOAPY_UHD` to cmake
     * M3A used uncoded transmission to explore the scrambling of constellations at Eve. To do so, in file `symbols.h`, set variable `static constexpr bool kDownlinkHardDemod` to true.
-    * Theree are three different beamformers implemented in M3A. To toggle between them, go to file `dozf.cc` and change `enum `
+    * There are three different beamformers implemented in M3A. To toggle between them, go to file `dozf.cc` and change `static constexpr enum M3A_Version kM3A_Version`. To set number of antennnas that are off, change `static constexpr size_t N_OFF`.
     * Run `make -j` to recompile the code.
  * Run the UE code on the server connected to the Iris UEs
    * For Iris UEs, run the pyfaros tool in the `data` directory as follows:
