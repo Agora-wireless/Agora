@@ -7,8 +7,8 @@ Check our [paper at MobiCom 23'](https://dl.acm.org/doi/10.1145/3570361.3613282)
 
 Some highlights:
 * M3A does not require either the physical location or CSI (exact or statistical) of Eve.
-* M3A can thwart passive eavesdroppers from decoding data symbols effectively, even in wavelength-scale eavesdropping proximity.
-* M3A retains reliability at Bob in practical indoor multipath environment.
+* M3A can thwart passive eavesdroppers from decoding data symbols effectively, even in wavelength-scale eavesdropping proximity in practical indoor multipath environment.
+* M3A retains reliability at Bob under diverse channel conditions.
 * M3A can be implemented in multi-antenna 5G and beyond base stations and does not require any modification in the UE.
 
 [M3A Code](https://github.com/Agora-wireless/Agora/tree/subset-modulation_fftshift) is implemented by using Agora, a complete softwarized baseband processing for Massive MIMO.
@@ -179,7 +179,7 @@ The following are steps to set up both Agora and the packet generator:
 
 ## Building and running with real RRU
 M3A is evaluated using an indoor 64-antenna [Argos massive MIMO base station](https://www.yecl.org/argos/), also commercially available from [Skylark Wireless](https://skylarkwireless.com) and are used in the [POWER-RENEW PAWR testbed](https://powderwireless.net/).
-The base-station contains four linear antennna arrays, we reserved the top array to perform our experiment.
+The base-station contains four linear antennna arrays, we reserved the top array to perform our experiment (8 radios in total).
 The BS and two Iris UEs are configured to be Alice, Bob, and Eve respectively. [See below](https://github.com/Agora-wireless/Agora/blob/subset-modulation_fftshift/images/bs%2Bue.pdf) for our setup. For downlink, a reference node outside the array (and synchronized) is required for reciprocity calibration.
 
 We recommend using one server for controlling the RRU and running Agora, and another server for controlling the UEs and running the UE code.
@@ -190,6 +190,7 @@ We recommend using one server for controlling the RRU and running Agora, and ano
     * For Faros RRU and Iris UEs (M3A uses this option), pass `-DRADIO_TYPE=SOAPY_IRIS` to cmake. M3A uses this option, and passes `-DENABLE_HDF5=true` as well to enable HDF5 files collection.
     * For USRP-based RRU and UEs, pass `-DRADIO_TYPE=SOAPY_UHD` to cmake
     * M3A used uncoded transmission to explore the scrambling of constellations at Eve. To do so, in file `symbols.h`, set variable `static constexpr bool kDownlinkHardDemod` to true.
+    * Theree are three different beamformers implemented in M3A. To toggle between them, go to file `dozf.cc` and change `enum `
     * Run `make -j` to recompile the code.
  * Run the UE code on the server connected to the Iris UEs
    * For Iris UEs, run the pyfaros tool in the `data` directory as follows:
