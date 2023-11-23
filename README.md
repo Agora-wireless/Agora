@@ -181,7 +181,7 @@ The following are steps to set up both Agora and the packet generator:
 M3A is evaluated using an indoor 64-antenna [Argos massive MIMO base station](https://www.yecl.org/argos/), also commercially available from [Skylark Wireless](https://skylarkwireless.com) and are used in the [POWER-RENEW PAWR testbed](https://powderwireless.net/).
 The base-station contains four linear antennna arrays, we reserved the top array to perform our experiment (8 radios in total).
 The BS and two Iris UEs are configured to be Alice, Bob, and Eve respectively. See below for our setup. For downlink, a reference node outside the array (and synchronized) is required for reciprocity calibration.
-<img src="https://github.com/Agora-wireless/Agora/blob/subset-modulation_fftshift/images/bs%2Bue.pdf" width="39%"/>
+<img src="https://github.com/Agora-wireless/Agora/blob/subset-modulation_fftshift/images/bs_2ue.png" width="39%"/>
 
 
 We recommend using one server for controlling the RRU and running Agora, and another server for controlling the UEs and running the UE code.
