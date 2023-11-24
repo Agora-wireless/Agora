@@ -217,6 +217,8 @@ After this step, the two log files will be generated automatically, which contai
 
 ## HDF5 files analysis using MATLAB Scripts
 In this section, we provide some examples for using MATLAB scripts to analyze and plot PHY data in HDF5 files.
+  * Run function `inspect_single_frame(dataset_filename, inspect_frame, verbose)` in MATLAB command window; where the first argument is the name of h5 file to analyze, second argument the specific frame number, and verbose should be `true` to disply h5 file attributes
+  * Below shows example output figures by running `inspect_single_frame("UeRxData-loc10.h5", 999, "false")`
 
 
 ## Acknowledgment

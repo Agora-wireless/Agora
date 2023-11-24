@@ -1,4 +1,15 @@
-function [data_phase_corr, data_sc_idx, evm, snr] = process_rx_frame(configs, tx_pilot_cxdouble, tx_data_cxdouble, rx_pilot_cxdouble, rx_data_cxdouble)
+function [data_phase_corr, data_sc_idx, evm, snr, evm_considx] = ...
+    process_rx_frame_showEVM(configs, tx_pilot_cxdouble, tx_data_cxdouble, rx_pilot_cxdouble, rx_data_cxdouble, cons_idx, order)
+
+% -- cons_idx is an array that contains indices of transmit constellations of interests, to compare their EVM percentage
+% based on all collected frames.
+% E.g., for 16-QAM, the value each element of cons_idx can take is from 0
+% to 15.
+
+% -- order: 2, 4, 16, 64, which stands for BPSK, QPSK, 16-QAM, and 64-QAM
+
+% --evm_considx: EVM percentage, displayed in the same order as in the
+% cons_idx
 
 % configs HAS BEEN DEFINED in inspect.m, which is following:
 %     configs = [samples_per_slot tx_zero_prefix_len data_size data_start data_stop fft_size cp_len ...
@@ -22,6 +33,9 @@ function [data_phase_corr, data_sc_idx, evm, snr] = process_rx_frame(configs, tx
     start_id = cp_len + tx_zero_prefix_len;
     snr = zeros(1, total_users);
     evm = zeros(1, total_users);
+    %-----
+    evm_considx_tmp = zeros(dl_data_symbols, length(cons_idx));
+    %-----
     cl = 0;   % UNUSED variable
     nz_start_idx = (fft_size - data_size)/2;
     nz_sc_idx = nz_start_idx+1:nz_start_idx+data_size;
@@ -59,20 +73,21 @@ function [data_phase_corr, data_sc_idx, evm, snr] = process_rx_frame(configs, tx
           % for this 'D' in the loop
           tx_dataonly = tx_data_cxdouble(data_sc_idx, u, d);
           rx_dataonly = data_phase_corr(data_sc_idx, d, u);
-          tx_demod = demod_sym(tx_dataonly, 16); % 16 stands for 16-QAM
-          rx_demod = demod_sym(rx_dataonly, 16);
-          figure;
-          % cm = confusionchart(tx_demod, rx_demod, 'Normalization','row-normalized');
-          cm = confusionchart(tx_demod, rx_demod);
-          set(gca, 'FontSize',20);
-          cm.XLabel = 'Received Symbols';
-          cm.YLabel = 'Sent Symbols';
-          cm.FontSize=20;
-          cm.GridVisible = 'off';
-          cm.RowSummary = 'row-normalized';
-          cm.ColumnSummary = 'absolute';
+          tx_demod = demod_sym(tx_dataonly, order); % the transmit constellations, 16 for 16-QAM
+          rx_demod = demod_sym(rx_dataonly, order);
 
-          cm.Title = ['Error Matrix, Data Slot ', num2str(d)];
+          for l=1:length(cons_idx)
+              idx = find(tx_demod == cons_idx(l));
+              txconst_l = mod_sym(cons_idx(l), order).* ones(length(idx),1); % a vector of sent constellation
+              rxconst_l = rx_dataonly(idx);                                  % a vectir of receive constellation (complex numbers)
+              evm_considx_tmp(d, l) = mean(abs((txconst_l - rxconst_l).^2));
+          end
+
+%           figure;
+%           cm = confusionchart(tx_demod, rx_demod, 'Normalization','row-normalized');
+%           cm.XLabel = 'Received Symbols';
+%           cm.YLabel = 'Sent Symbols';
+%           cm.Title = ['Error Matrix, Data Slot ', num2str(d)];
           %-----
 
           evm_mat = abs(data_phase_corr(data_sc_idx, d, u) - tx_data_cxdouble(data_sc_idx, u, d)).^2;
@@ -81,12 +96,14 @@ function [data_phase_corr, data_sc_idx, evm, snr] = process_rx_frame(configs, tx
         end
         % clear d
 
+        % ---
+        evm_considx = mean(evm_considx_tmp, 1);
+        % ---
+
         snr(u) = 10*log10(1./mean(aevms(u, :))); % calculate in dB scale.
         evm(u) = mean(aevms(u, :)) * 100;
-        figure; plot(wrapTo2Pi(angle(ch_est_mean)), LineWidth=2); xlabel('SC Index'); ylabel('Phase [rad]'); grid on
-        thisAxis=gca; thisAxis.FontSize=16;
-        figure; plot(10.*log10((abs(ch_est_mean))), LineWidth=2); xlabel('SC Index'); ylabel('Magnitude [dB]'); grid on
-        thisAxis=gca; thisAxis.FontSize=16;
+        % figure; plot(wrapTo2Pi(angle(ch_est_mean))); xlabel('SC Index'); ylabel('Phase [rad]'); grid on
+        % figure; plot(10.*log10((abs(ch_est_mean)))); xlabel('SC Index'); ylabel('Magnitude [dB]'); grid on
     end
 
 

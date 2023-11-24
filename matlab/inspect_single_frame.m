@@ -125,32 +125,45 @@ function inspect_single_frame(dataset_filename, inspect_frame, verbose)
     tiledlayout(2,1)
     %Top (Real)
     nexttile;
-    plot(real(combined_rx));
+    plot(real(combined_rx), LineWidth=1.5);
     axis([0 inf -1 1]);
     title('Rx Real (I)');
+    thisAxis =gca; thisAxis.FontSize=16;
     %Bottom (Q)
     nexttile;
-    plot(imag(combined_rx));
+    plot(imag(combined_rx), LineWidth=1.5);
     axis([0 inf -1 1]);
     title('Rx Imag (Q)');
+    thisAxis =gca; thisAxis.FontSize=16;
     
 
     for u=1:total_users
         rx_cnstl = demul_data(data_sc_idx, : , u);
         tx_cnstl = tx_data_cxdouble(data_sc_idx, :, u);
         figure('Name', ['Constellation [User ', num2str(u), ']']);
-        pt_size = 18;
-        scatter(real(rx_cnstl(:)), imag(rx_cnstl(:)),pt_size,'r','filled');  % reshape the rx_constl mat into single col
+        pt_size = 40;
+
+        % scatter(real(rx_cnstl(:)), imag(rx_cnstl(:)),pt_size,'r','filled');  % reshape the rx_constl mat into single col
+        % scatter(real(rx_cnstl(:)), imag(rx_cnstl(:)),pt_size,);  % reshape the rx_constl mat into single col
         hold on
+
         pt_size = 250;
         scatter(real(tx_cnstl(:)), imag(tx_cnstl(:)),pt_size, 'b', 'p', 'filled');
-        title(['Constellation [User ', num2str(u), ', from Frame ', num2str(inspect_frame), ']']);
+        % title(['Constellation [User ', num2str(u), ', from Frame ', num2str(inspect_frame), ']']);
         hold on 
-        scatter(real(rx_cnstl(:,1)), imag(rx_cnstl(:,1)),7,'green','filled');
-        scatter(real(rx_cnstl(:,2)), imag(rx_cnstl(:,2)),7,'black','filled');
-        legend('Superimposed','Sent','From Slot1','From Slot2')
+
+        %scatter(real(rx_cnstl(:,1)), imag(rx_cnstl(:,1)), 20, 'green', 'filled');
+        %scatter(real(rx_cnstl(:,2)), imag(rx_cnstl(:,2)), 20, 'black', 'filled');
+        scatter(real(rx_cnstl(:,1)), imag(rx_cnstl(:,1)), Marker="o", MarkerEdgeColor=[0.85,0.33,0.10], SizeData=25, LineWidth=1.5);
+        scatter(real(rx_cnstl(:,2)), imag(rx_cnstl(:,2)), Marker="o",MarkerEdgeColor=[0.47,0.67,0.19], SizeData=25, LineWidth=1.5);
+
+        % legend('Superimposed','Sent','From Slot1','From Slot2')
+        legend('Sent','Slot1','Slot2', Location='best', EdgeColor='w', FontSize=14)
         grid on
         xlabel('I'); ylabel('Q')
+        set(gca, 'FontSize',20);
+        set(gca, 'LineWidth', 1.5);
+        axis([-1.5 1.5 -1.5 1.5]);
     end
 
     clear total_users tx_data_cxdouble rx_beacon_cxdouble rx_syms_cxdouble tx_syms_cxdouble combined_rx;
