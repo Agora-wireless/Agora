@@ -215,6 +215,9 @@ We recommend using one server for controlling the RRU and running Agora, and ano
 
 After this step, the two log files will be generated automatically, which contains physical layer statistics of the configured transmission frame-by-frame.
 
+## HDF5 files analysis using MATLAB Scripts
+In this section, we provide some examples for using MATLAB scripts to analyze and plot PHY data in HDF5 files.
+
 
 ## Acknowledgment
 This work was supported by Cisco, Intel, NSF grants CNS-2148132, CNS-2211618, CNS-1955075, and DOD: Army Research Laboratory grant W911NF-19-2-0269.
