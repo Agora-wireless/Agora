@@ -5,14 +5,14 @@ M3A: Multipath Multicarrier Misinformation to Adversaries.
 M3A is a multi-antenna multicarrier OFDM/OFDMA transmission system that allows the sender (Alice) to deliver data symbols to legitimate users (Bob) while simultaneously sending misinformation to eavesdroppers (Eve). As a result, the decoded sysbols at Eve are positioned randomly across the I-Q plane. Meanwhile, the data symbol integrity at Bob is still successfully retained. To achieve these, M3A adopts a novel digital baseband algorithm and exploits rich multipath characteristics of physical channels within the Sub-6GHz frequeny range.
 Check our [paper at MobiCom 23'](https://dl.acm.org/doi/10.1145/3570361.3613282) for more details.
 
+[M3A Code](https://github.com/Agora-wireless/Agora/tree/subset-modulation_fftshift) is implemented by using Agora, a complete softwarized baseband processing for Massive MIMO.
+More detailed installation and running instructions are detailed below.
+
 Some highlights:
 * M3A does not require either the physical location or CSI (exact or statistical) of Eve.
 * M3A can thwart passive eavesdroppers from decoding data symbols effectively, even in wavelength-scale eavesdropping proximity in practical indoor multipath environment.
 * M3A retains reliability at Bob under diverse channel conditions.
 * M3A can be implemented in multi-antenna 5G and beyond base stations and does not require any modification in the UE.
-
-[M3A Code](https://github.com/Agora-wireless/Agora/tree/subset-modulation_fftshift) is implemented by using Agora, a complete softwarized baseband processing for Massive MIMO.
-More detailed installation and running instructions are detailed below.
 
 ## Project Dataset
 This dataset was collected by [Zhecun Liu](mailto:zl83@rice.edu) from Rice University, in a typical lab room that consists of multiple objects, namely
