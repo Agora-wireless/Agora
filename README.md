@@ -21,6 +21,7 @@ The original purpose of this dataset is to compare the reliability and security 
 There is an obstacle near location 20, deteriorating signal strength between Alice and Bob there.
 We use a fixed 16-QAM modulation during the experiments.
 Alice adopts a TDD-based transmission protocol, as illustrated in Figure below.
+<img src="https://github.com/Agora-wireless/Agora/blob/subset-modulation_fftshift/images/timeline.png" width="39%"/>
 
 ## Dataset Description
 
@@ -182,7 +183,6 @@ M3A is evaluated using an indoor 64-antenna [Argos massive MIMO base station](ht
 The base-station contains four linear antennna arrays, we reserved the top array to perform our experiment (8 radios in total).
 The BS and two Iris UEs are configured to be Alice, Bob, and Eve respectively. See below for our setup. For downlink, a reference node outside the array (and synchronized) is required for reciprocity calibration.
 <img src="https://github.com/Agora-wireless/Agora/blob/subset-modulation_fftshift/images/bs_2ue.png" width="39%"/>
-
 
 We recommend using one server for controlling the RRU and running Agora, and another server for controlling the UEs and running the UE code.
  
