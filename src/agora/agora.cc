@@ -576,15 +576,6 @@ void Agora::Start() {
               EventData(EventType::kPacketToRp, rsm.latency_, rsm.core_num_));
         } break;
 
-        case EventType::kPacketFromClient: {
-          RxPacket* rx = rx_tag_t(event.tags_[0u]).rx_packet_;
-          Packet* pkt = rx->RawPacket();
-          fft_queue_arr_.at(pkt->frame_id_ % kFrameWnd)
-              .push(fft_req_tag_t(event.tags_[0]));
-          AGORA_LOG_INFO("Agora: Received explicit pilot from client %zu\n",
-                         pkt->ant_id_);
-        } break;
-
         case EventType::kRANUpdate: {
           RanConfig rc;
           rc.n_antennas_ = event.tags_[0];
@@ -1171,16 +1162,16 @@ void Agora::InitializeThreads() {
   if (kUseArgos || kUseUHD || kUsePureUHD) {
     packet_tx_rx_ = std::make_unique<PacketTxRxRadio>(
         config_, config_->CoreOffset() + 1, &message_queue_,
-        message_->GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_,
-        tx_ptoks_ptr_, agora_memory_->GetUlSocket(),
+        message_->GetConq(EventType::kPacketTX, 0), &wcc_rx_queue_,
+        rx_ptoks_ptr_, tx_ptoks_ptr_, agora_memory_->GetUlSocket(),
         agora_memory_->GetUlSocketSize() / config_->PacketLength(),
         this->stats_->FrameStart(), agora_memory_->GetDlSocket());
 #if defined(USE_DPDK)
   } else if (kUseDPDK) {
     packet_tx_rx_ = std::make_unique<PacketTxRxDpdk>(
         config_, config_->CoreOffset() + 1, &message_queue_,
-        message_->GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_,
-        tx_ptoks_ptr_, agora_memory_->GetUlSocket(),
+        message_->GetConq(EventType::kPacketTX, 0), &wcc_rx_queue_,
+        rx_ptoks_ptr_, tx_ptoks_ptr_, agora_memory_->GetUlSocket(),
         agora_memory_->GetUlSocketSize() / config_->PacketLength(),
         this->stats_->FrameStart(), agora_memory_->GetDlSocket());
 #endif
@@ -1188,8 +1179,8 @@ void Agora::InitializeThreads() {
     /* Default to the simulator */
     packet_tx_rx_ = std::make_unique<PacketTxRxSim>(
         config_, config_->CoreOffset() + 1, &message_queue_,
-        message_->GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_,
-        tx_ptoks_ptr_, agora_memory_->GetUlSocket(),
+        message_->GetConq(EventType::kPacketTX, 0), &wcc_rx_queue_,
+        rx_ptoks_ptr_, tx_ptoks_ptr_, agora_memory_->GetUlSocket(),
         agora_memory_->GetUlSocketSize() / config_->PacketLength(),
         this->stats_->FrameStart(), agora_memory_->GetDlSocket());
   }
@@ -1216,6 +1207,18 @@ void Agora::InitializeThreads() {
         config_, rp_cpu_core, &rp_request_queue_, &rp_response_queue_);
     rp_std_thread_ =
         std::thread(&ResourceProvisionerThread::RunEventLoop, rp_thread_.get());
+  }
+
+  if (config_->UseExplicitCSI()) {
+    const size_t wired_cpu_core = config_->CoreOffset() +
+                                  config_->SocketThreadNum() +
+                                  config_->WorkerThreadNum() + 2;
+    wcc_thread_ = std::make_unique<WiredControlChannel>(
+        config_, wired_cpu_core, wired_cpu_core, config_->BsServerAddr(),
+        config_->WccRxPort(), config_->UeServerAddr(), config_->WccTxPort(),
+        &wcc_rx_queue_, &wcc_rx_queue_);
+    wcc_std_thread_ =
+        std::thread(&WiredControlChannel::RunRxEventLoop, wcc_thread_.get());
   }
 
   // Create workers

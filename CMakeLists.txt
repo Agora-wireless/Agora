@@ -457,6 +457,7 @@ set(COMMON_SOURCES
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(SHARED_TXRX_SOURCES
+  src/agora/txrx/client_comm.cc
   src/agora/txrx/packet_txrx.cc
   src/agora/txrx/workers/txrx_worker.cc)
 add_library(shared_txrx_sources_lib OBJECT ${SHARED_TXRX_SOURCES})
@@ -484,7 +485,6 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/mac/mac_thread_basestation.cc
   src/agora/txrx/packet_txrx_sim.cc
   src/agora/txrx/workers/txrx_worker_sim.cc
-  src/agora/txrx/client_comm.cc
   src/resource_provisioner/resource_provisioner_thread.cc)
 
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})

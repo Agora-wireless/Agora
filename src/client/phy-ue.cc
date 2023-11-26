@@ -85,6 +85,8 @@ PhyUe::PhyUe(Config* config)
       kFrameWnd * config_->UeAntNum() * kDefaultQueueSize);
   to_mac_queue_ = moodycamel::ConcurrentQueue<EventData>(
       kFrameWnd * config_->UeAntNum() * kDefaultQueueSize);
+  wcc_tx_queue_ = moodycamel::ConcurrentQueue<EventData>(
+      kFrameWnd * config_->UeAntNum() * kDefaultQueueSize);
 
   for (size_t i = 0; i < rx_thread_num_; i++) {
     rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(complete_queue_);
@@ -104,14 +106,14 @@ PhyUe::PhyUe(Config* config)
   if (kUseArgos || kUsePureUHD) {
     ru_ = std::make_unique<PacketTxRxClientRadio>(
         config_, config_->UeCoreOffset() + 1, &complete_queue_, &tx_queue_,
-        rx_ptoks_ptr_, tx_ptoks_ptr_, rx_buffer_,
+        &wcc_tx_queue_, rx_ptoks_ptr_, tx_ptoks_ptr_, rx_buffer_,
         rx_buffer_size_ / config->PacketLength(), stats_->FrameStart(),
         tx_buffer_);
     //} else if (kUseUHD) {
   } else {
     ru_ = std::make_unique<PacketTxRxClientSim>(
         config_, config_->UeCoreOffset() + 1, &complete_queue_, &tx_queue_,
-        rx_ptoks_ptr_, tx_ptoks_ptr_, rx_buffer_,
+        &wcc_tx_queue_, rx_ptoks_ptr_, tx_ptoks_ptr_, rx_buffer_,
         rx_buffer_size_ / config->PacketLength(), stats_->FrameStart(),
         tx_buffer_);
   }
@@ -150,6 +152,15 @@ PhyUe::PhyUe(Config* config)
     new_recorder->Start();
   }
 
+  if (config_->UseExplicitCSI()) {
+    core_offset_worker += config_->UeWorkerThreadNum() + 1;
+    wcc_thread_ = std::make_unique<WiredControlChannel>(
+        config_, core_offset_worker, core_offset_worker,
+        config_->UeServerAddr(), config_->WccTxPort(), config_->BsServerAddr(),
+        config_->WccRxPort(), &wcc_tx_queue_, &wcc_tx_queue_);
+    wcc_std_thread_ =
+        std::thread(&WiredControlChannel::RunTxEventLoop, wcc_thread_.get());
+  }
   // initilize all kinds of checkers
   // Init the frame work tracking structure
   for (size_t frame = 0; frame < this->frame_tasks_.size(); frame++) {
@@ -157,6 +168,7 @@ PhyUe::PhyUe(Config* config)
   }
   decode_counters_.Init(dl_data_symbol_perframe_, config_->UeAntNum());
   demul_counters_.Init(dl_data_symbol_perframe_, config_->UeAntNum());
+  beacon_counters_.Init(config_->Frame().NumBeaconSyms(), config_->UeAntNum());
   fft_dlpilot_counters_.Init(config->Frame().ClientDlPilotSymbols(),
                              config_->UeAntNum());
   fft_dldata_counters_.Init(dl_data_symbol_perframe_, config_->UeAntNum());
@@ -176,12 +188,19 @@ PhyUe::PhyUe(Config* config)
   }
 
   // This usage doesn't effect the user num_reciprocity_pkts_per_frame_;
+  size_t dl_pilots_num =
+      config->UseExplicitCSI() ? config->Frame().NumDLCalSyms() : 0;
   rx_counters_.num_rx_pkts_per_frame_ =
-      config_->UeAntNum() *
-      (config_->Frame().NumDLSyms() + config_->Frame().NumBeaconSyms());
+      config_->UeAntNum() * (config_->Frame().NumDLSyms() +
+                             config_->Frame().NumBeaconSyms() + dl_pilots_num);
+  rx_counters_.num_beacon_pkts_per_frame_ =
+      config_->UeAntNum() * config_->Frame().NumBeaconSyms();
   rx_counters_.num_pilot_pkts_per_frame_ =
       config_->UeAntNum() * config_->Frame().ClientDlPilotSymbols();
+  rx_counters_.num_reciprocity_pkts_per_frame_ =
+      config_->UeAntNum() * config_->Frame().NumDLCalSyms();
 
+  csi_feedback_deferral_.resize(kFrameWnd);
   rx_downlink_deferral_.resize(kFrameWnd);
 
   // Mac counters for downlink data
@@ -204,6 +223,10 @@ PhyUe::~PhyUe() {
 
   if constexpr (kEnableMac) {
     mac_std_thread_.join();
+  }
+
+  if (config_->UseExplicitCSI()) {
+    wcc_std_thread_.join();
   }
 
   for (size_t i = 0; i < rx_thread_num_; i++) {
@@ -259,10 +282,25 @@ void PhyUe::ReceiveDownlinkSymbol(Packet* rx_packet, size_t tag) {
 
       defferal_queue->push(EventData(EventType::kFFT, tag));
     }
-  } else if (symbol_type == SymbolType::kBeacon) {
-    ScheduleWork(EventData(EventType::kBeaconProc, tag));
   } else if (symbol_type == SymbolType::kCalDL) {
-    ScheduleWork(EventData(EventType::kExplicitCSI, tag));
+    if (beacon_counters_.IsLastSymbol(rx_packet->frame_id_)) {
+      ScheduleWork(EventData(EventType::kCsiFeedback, tag));
+    } else {
+      std::queue<EventData>* defferal_queue =
+          &csi_feedback_deferral_.at(frame_slot);
+      defferal_queue->push(EventData(EventType::kCsiFeedback, tag));
+    }
+  }
+}
+
+void PhyUe::ScheduleDefferedCsiFeedback(size_t frame_id) {
+  const size_t frame_slot = frame_id % kFrameWnd;
+  std::queue<EventData>* defferal_queue =
+      &csi_feedback_deferral_.at(frame_slot);
+
+  while (!defferal_queue->empty()) {
+    ScheduleWork(defferal_queue->front());
+    defferal_queue->pop();
   }
 }
 
@@ -333,6 +371,7 @@ void PhyUe::Start() {
   // for task_queue, main thread is producer, it is single-producer &
   // multiple consumer for task queue uplink
   moodycamel::ProducerToken ptok_mac(to_mac_queue_);
+  moodycamel::ProducerToken ptok_wcc(wcc_tx_queue_);
 
   // for message_queue, main thread is a consumer, it is multiple
   // producers & single consumer for message_queue
@@ -379,6 +418,7 @@ void PhyUe::Start() {
           const size_t symbol_id = pkt->symbol_id_;
           const size_t ant_id = pkt->ant_id_;
           const size_t frame_slot = frame_id % kFrameWnd;
+          auto symbol_type = config_->GetSymbolType(symbol_id);
           RtAssert(pkt->frame_id_ < (cur_frame_id + kFrameWnd),
                    "Error: Received packet for future frame beyond frame "
                    "window. This can happen if PHY is running "
@@ -410,6 +450,7 @@ void PhyUe::Start() {
               PrintPerFrameDone(PrintType::kPacketRXPilots, frame_id);
             }
           }
+
           rx_counters_.num_pkts_.at(frame_slot)++;
           if (rx_counters_.num_pkts_.at(frame_slot) ==
               rx_counters_.num_rx_pkts_per_frame_) {
@@ -419,46 +460,62 @@ void PhyUe::Start() {
           }
 
           // Schedule uplink pilots transmission and uplink processing
-          if (symbol_id == config_->Frame().GetBeaconSymbolLast()) {
-            // Schedule Pilot after receiving last beacon
-            // (Only when in Downlink Only mode, otherwise the pilots
-            // will be transmitted with the uplink data)
-            if (ul_symbol_perframe_ == 0) {
-              const EventData do_tx_pilot_task(
-                  EventType::kPacketPilotTX,
-                  gen_tag_t::FrmUe(frame_id, ant_id).tag_);
-              ScheduleTask(do_tx_pilot_task, &tx_queue_,
-                           *tx_ptoks_ptr_[ru_->AntNumToWorkerId(ant_id)]);
-            } else {
-              // Schedule the Uplink tasks
-              for (size_t symbol_idx = 0;
-                   symbol_idx < config_->Frame().NumULSyms(); symbol_idx++) {
-                if (symbol_idx < config_->Frame().ClientUlPilotSymbols()) {
-                  EventData do_ifft_task(
-                      EventType::kIFFT,
-                      gen_tag_t::FrmSymUe(
-                          frame_id, config_->Frame().GetULSymbol(symbol_idx),
-                          ant_id)
-                          .tag_);
-                  ScheduleWork(do_ifft_task);
-                } else {
-                  EventData do_encode_task(
-                      EventType::kEncode,
-                      gen_tag_t::FrmSymUe(
-                          frame_id, config_->Frame().GetULSymbol(symbol_idx),
-                          ant_id)
-                          .tag_);
-                  ScheduleWork(do_encode_task);
-                }
-              }  // For all UL Symbols
+          //if (symbol_id == config_->Frame().GetBeaconSymbolLast()) {
+          if (config_->Frame().GetBeaconSymbolIdx(symbol_id) != SIZE_MAX) {
+            rx_counters_.num_beacon_pkts_.at(frame_slot)++;
+            ScheduleWork(EventData(EventType::kBeaconProc, event.tags_[0u]));
+            if (rx_counters_.num_beacon_pkts_.at(frame_slot) ==
+                rx_counters_.num_beacon_pkts_per_frame_) {
+              rx_counters_.num_beacon_pkts_.at(frame_slot) = 0;
+              // Schedule Pilot after receiving last beacon
+              // (Only when in Downlink Only mode, otherwise the pilots
+              // will be transmitted with the uplink data)
+              if (ul_symbol_perframe_ == 0) {
+                const EventData do_tx_pilot_task(
+                    EventType::kPacketPilotTX,
+                    gen_tag_t::FrmUe(frame_id, ant_id).tag_);
+                ScheduleTask(do_tx_pilot_task, &tx_queue_,
+                             *tx_ptoks_ptr_[ru_->AntNumToWorkerId(ant_id)]);
+              } else {
+                // Schedule the Uplink tasks
+                for (size_t symbol_idx = 0;
+                     symbol_idx < config_->Frame().NumULSyms(); symbol_idx++) {
+                  if (symbol_idx < config_->Frame().ClientUlPilotSymbols()) {
+                    EventData do_ifft_task(
+                        EventType::kIFFT,
+                        gen_tag_t::FrmSymUe(
+                            frame_id, config_->Frame().GetULSymbol(symbol_idx),
+                            ant_id)
+                            .tag_);
+                    ScheduleWork(do_ifft_task);
+                  } else {
+                    EventData do_encode_task(
+                        EventType::kEncode,
+                        gen_tag_t::FrmSymUe(
+                            frame_id, config_->Frame().GetULSymbol(symbol_idx),
+                            ant_id)
+                            .tag_);
+                    ScheduleWork(do_encode_task);
+                  }
+                }  // For all UL Symbols
+              }
             }
           }
 
-          SymbolType symbol_type = config_->GetSymbolType(symbol_id);
-          if (symbol_type == SymbolType::kDL) {
+          if (symbol_type == SymbolType::kDL &&
+              symbol_type == SymbolType::kCalDL) {
             // Defer downlink processing (all pilot symbols must be fft'd
             // first)
             ReceiveDownlinkSymbol(pkt, event.tags_[0]);
+          } else if (symbol_type == SymbolType::kCalDL) {
+            if (beacon_counters_.IsLastSymbol(frame_id)) {
+              ScheduleWork(EventData(EventType::kCsiFeedback, event.tags_[0]));
+            } else {
+              std::queue<EventData>* defferal_queue =
+                  &csi_feedback_deferral_.at(frame_slot);
+              defferal_queue->push(
+                  EventData(EventType::kCsiFeedback, event.tags_[0]));
+            }
           } else {
             rx->Free();
           }
@@ -467,7 +524,21 @@ void PhyUe::Start() {
         case EventType::kBeaconProc: {
           const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          const size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
+          //const size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
+          const bool tasks_complete =
+              beacon_counters_.CompleteTask(frame_id, symbol_id);
+          if (tasks_complete) {
+            const bool beacon_complete =
+                beacon_counters_.CompleteSymbol(frame_id);
+            if (beacon_complete) {
+              ScheduleDefferedCsiFeedback(frame_id);
+            }
+          }
+
+        } break;
+        case EventType::kCsiFeedback: {
+          ScheduleTask(EventData(EventType::kPacketToRemote, event.tags_[0]),
+                       &wcc_tx_queue_, ptok_wcc);
 
         } break;
         case EventType::kFFTPilot: {
@@ -624,7 +695,8 @@ void PhyUe::Start() {
 
           if (kDebugPrintPacketsToMac) {
             AGORA_LOG_INFO(
-                "PhyUe: sent decoded packet for (frame %zu, symbol %zu:%zu) to "
+                "PhyUe: sent decoded packet for (frame %zu, symbol %zu:%zu) "
+                "to "
                 "MAC\n",
                 frame_id, symbol_id, dl_symbol_idx);
           }

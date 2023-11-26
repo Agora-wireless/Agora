@@ -56,10 +56,10 @@ enum class EventType : int {
   kPacketToMac,
   kPacketFromRp,
   kPacketToRp,
-  kPacketFromClient,
-  kPacketToClient,
+  kPacketFromRemote,
+  kPacketToRemote,
   kBeaconProc,
-  kExplicitCSI,
+  kCsiFeedback,
   kFFTPilot,
   kSNRReport,    // Signal new SNR measurement from PHY to MAC
   kRANUpdate,    // Signal new RAN config to Agora
@@ -235,7 +235,7 @@ enum class ThreadType {
   kWorkerTXRX,
   kWorkerMacTXRX,
   kWorkerRpTXRX,
-  kWorkerCWC,
+  kWorkerWCC,
   kMasterRX,
   kMasterTX,
   kRecorderWorker
@@ -265,8 +265,8 @@ static inline std::string ThreadTypeStr(ThreadType thread_type) {
       return "MAC TXRX";
     case ThreadType::kWorkerRpTXRX:
       return "RP TXRX";
-    case ThreadType::kWorkerCWC:
-      return "Client Control TXRX";
+    case ThreadType::kWorkerWCC:
+      return "Wired Control Channel TXRX";
     case ThreadType::kMasterRX:
       return "Master (RX)";
     case ThreadType::kMasterTX:

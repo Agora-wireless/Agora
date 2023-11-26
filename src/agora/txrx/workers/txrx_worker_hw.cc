@@ -21,6 +21,7 @@ TxRxWorkerHw::TxRxWorkerHw(
     size_t interface_offset, Config* const config, size_t* rx_frame_start,
     moodycamel::ConcurrentQueue<EventData>* event_notify_q,
     moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
+    moodycamel::ConcurrentQueue<EventData>* wired_ctrl_q,
     moodycamel::ProducerToken& tx_producer,
     moodycamel::ProducerToken& notify_producer,
     std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
@@ -28,26 +29,14 @@ TxRxWorkerHw::TxRxWorkerHw(
     std::atomic<bool>& can_proceed, RadioSet& radio_config)
     : TxRxWorker(core_offset, tid, interface_count, interface_offset,
                  config->NumChannels(), config, rx_frame_start, event_notify_q,
-                 tx_pending_q, tx_producer, notify_producer, rx_memory,
-                 tx_memory, sync_mutex, sync_cond, can_proceed),
+                 tx_pending_q, wired_ctrl_q, tx_producer, notify_producer,
+                 rx_memory, tx_memory, sync_mutex, sync_cond, can_proceed),
       radio_config_(radio_config),
       program_start_ticks_(0),
       freq_ghz_(GetTime::MeasureRdtscFreq()),
       zeros_(config->SampsPerSymbol(), std::complex<int16_t>(0u, 0u)),
       first_symbol_(interface_count, true) {
   InitRxStatus();
-  if (config->UseExplicitCSI()) {
-    const size_t wired_cpu_core = config->CoreOffset() +
-                                  config->SocketThreadNum() +
-                                  config->WorkerThreadNum() + 2;
-    wired_thread_ = new UserWiredChannel(
-        config, wired_cpu_core, &cwc_request_queue_, &cwc_response_queue_);
-    /*cwc_std_thread_ =
-        std::thread(&ClientWiredComm::RunEventLoop, cwc_thread_.get());*/
-    /*if (config_->UseExplicitCSI()) {
-        cwc_std_thread_.join();
-    }*/
-  }
 }
 
 TxRxWorkerHw::~TxRxWorkerHw() = default;
@@ -97,10 +86,9 @@ void TxRxWorkerHw::DoTxRx() {
     // If no items transmitted, then try to receive
     if (0 == tx_items) {
       if (tid_ == 0) {  // only listen in on one thread
-        RxPacket* user_pkt(wired_thread_->ReceiveUdpPacketsFromClient());
-        if (user_pkt != NULL) {
-          const EventData rx_message(EventType::kPacketRX,
-                                     rx_tag_t(user_pkt).tag_);
+        EventData event;
+        if (wired_ctrl_q_->try_dequeue(event)) {
+          const EventData rx_message(EventType::kPacketRX, event.tags_[0]);
           NotifyComplete(rx_message);
         }
       }

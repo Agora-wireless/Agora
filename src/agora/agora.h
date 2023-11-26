@@ -16,6 +16,7 @@
 
 #include "agora_buffer.h"
 #include "agora_worker.h"
+#include "client_comm.h"
 #include "concurrentqueue.h"
 #include "mac_scheduler.h"
 #include "mac_thread_basestation.h"
@@ -129,6 +130,11 @@ class Agora {
   std::unique_ptr<ResourceProvisionerThread> rp_thread_;
   std::thread rp_std_thread_;
 
+  // The thread running wired control channel functions
+  std::unique_ptr<WiredControlChannel> wcc_thread_;
+  // Handle for the wired control channel thread
+  std::thread wcc_std_thread_;
+
   std::unique_ptr<MacScheduler> mac_sched_;
   std::unique_ptr<Stats> stats_;
   std::unique_ptr<PhyStats> phy_stats_;
@@ -189,6 +195,10 @@ class Agora {
   // Resource Provisioner queue
   moodycamel::ConcurrentQueue<EventData> rp_request_queue_;
   moodycamel::ConcurrentQueue<EventData> rp_response_queue_;
+
+  // Wired control channel queue
+  moodycamel::ConcurrentQueue<EventData> wcc_rx_queue_;
+  moodycamel::ConcurrentQueue<EventData> wcc_tx_queue_;
 
   moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];

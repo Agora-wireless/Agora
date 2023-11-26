@@ -12,7 +12,7 @@
 /**
  * @brief Implementations of this class provide packet I/O for Agora.
  *
- * In the "Argos" mode, this class provides SoapySDR-based communication for
+ * In the "Hw" mode, this class provides SoapySDR-based communication for
  * Agora (running on the base station server or client) for communicating
  * with real wireless hardware peers (antenna hubs for the server, UE devices
  * for the client).
@@ -23,6 +23,7 @@ class PacketTxRxSim : public PacketTxRx {
   PacketTxRxSim(Config* const cfg, size_t core_offset,
                 moodycamel::ConcurrentQueue<EventData>* event_notify_q,
                 moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
+                moodycamel::ConcurrentQueue<EventData>* wired_ctrl_q,
                 moodycamel::ProducerToken** notify_producer_tokens,
                 moodycamel::ProducerToken** tx_producer_tokens,
                 Table<char>& rx_buffer, size_t packet_num_in_buffer,

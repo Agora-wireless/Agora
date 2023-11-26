@@ -24,6 +24,7 @@ class TxRxWorker {
              Config* const config, size_t* rx_frame_start,
              moodycamel::ConcurrentQueue<EventData>* event_notify_q,
              moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
+             moodycamel::ConcurrentQueue<EventData>* wired_ctrl_q,
              moodycamel::ProducerToken& tx_producer,
              moodycamel::ProducerToken& notify_producer,
              std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
@@ -63,6 +64,8 @@ class TxRxWorker {
   std::mutex& mutex_;
   std::condition_variable& cond_;
   std::atomic<bool>& can_proceed_;
+
+  moodycamel::ConcurrentQueue<EventData>* wired_ctrl_q_;
 
  private:
   Config* const cfg_;

@@ -346,8 +346,8 @@ class Config {
   inline size_t RpRxPort() const { return this->rp_rx_port_; }
   inline size_t RpTxPort() const { return this->rp_tx_port_; }
 
-  inline size_t CwcRxPort() const { return this->cwc_rx_port_; }
-  inline size_t CwcTxPort() const { return this->cwc_tx_port_; }
+  inline size_t WccRxPort() const { return this->wcc_rx_port_; }
+  inline size_t WccTxPort() const { return this->wcc_tx_port_; }
 
   inline const std::string& LogListenerAddr() const {
     return this->log_listener_addr_;
@@ -991,8 +991,8 @@ class Config {
   size_t rp_tx_port_;
 
   // Port ID at CWC
-  size_t cwc_rx_port_;
-  size_t cwc_tx_port_;
+  size_t wcc_rx_port_;
+  size_t wcc_tx_port_;
 
   // Port ID at log listening server
   size_t log_listener_port_;

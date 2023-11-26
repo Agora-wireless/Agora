@@ -119,7 +119,7 @@ class UeWorker {
   void DoDecodeUe(DoDecodeClient* decoder, size_t tag);
 
   void DoBeaconProc(size_t tag);
-  void DoTxExplicitCSI(size_t tag);
+  void DoSendCsiFeedback(size_t tag);
 
   size_t tid_;
 
@@ -146,10 +146,7 @@ class UeWorker {
   Table<complex_float>& modul_buffer_;
   Table<complex_float>& ifft_buffer_;
   char* const tx_buffer_;
-  std::vector<float> cfo_;
-  // A preallocated buffer to store PHY UDP packets received via recv()
-  std::vector<std::byte> phy_udp_buf_;
-  std::unique_ptr<UDPComm> phy_udp_comm_;
+  Table<float> cfo_;
 
   // Downlink
   Table<char>& rx_buffer_;

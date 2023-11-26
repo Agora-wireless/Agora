@@ -288,6 +288,8 @@ Config::Config(std::string jsonfilename)
   bs_rru_port_ = tdd_conf.value("bs_rru_port", 9000);
   ue_rru_port_ = tdd_conf.value("ue_rru_port", 7000);
   ue_server_port_ = tdd_conf.value("ue_server_port", 6000);
+  wcc_tx_port_ = tdd_conf.value("wired_tx_port", 8130);
+  wcc_rx_port_ = tdd_conf.value("wired_rx_port", 8140);
 
   dpdk_num_ports_ = tdd_conf.value("dpdk_num_ports", 1);
   dpdk_port_offset_ = tdd_conf.value("dpdk_port_offset", 0);
