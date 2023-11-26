@@ -1,5 +1,5 @@
 /**
- * @file test_arma_cube_slice_2x2.cc
+ * @file test_batch_mm.cc
  * @brief Testing slice-wise multiplication of a 2x2xN cube with 2x1xN matrix
  *        used in equalization and phase tracking.
  */
@@ -32,6 +32,12 @@ double time_batch_mm_arma_loop_slices(size_t vec_len, int dim,
   }
   tsc_end = GetTime::Rdtsc();
 
+  // // Broadcast operation with subcarrier grouping
+  // arma::cx_mat temp_b_mat(dim, 1, arma::fill::randu);
+  // tsc_start = GetTime::Rdtsc();
+  // cub_c = cub_a.each_slice() * temp_b_mat;
+  // tsc_end = GetTime::Rdtsc();
+
   duration_ms = GetTime::CyclesToMs(tsc_end - tsc_start, freq_ghz);
   // printf("Time measured = %.2f ms\n", duration_ms);
   return duration_ms;
@@ -47,7 +53,7 @@ double time_batch_mm_arma_loop_slices(size_t vec_len, int dim,
  * multiplication.
  */
 double time_batch_mm_arma_decomp_vec(size_t vec_len,
-                                      int dim, double freq_ghz) {
+                                     int dim, double freq_ghz) {
   size_t tsc_start, tsc_end;
   double duration_ms;
 
@@ -123,7 +129,7 @@ double time_batch_mm_arma_decomp_vec(size_t vec_len,
  * multiplication.
  */
 double time_batch_mm_arma_decomp_vec_from_cube(size_t vec_len, int dim,
-                                                     double freq_ghz) {
+                                               double freq_ghz) {
   size_t tsc_start, tsc_end;
   double duration_ms;
 
@@ -200,7 +206,7 @@ double time_batch_mm_arma_decomp_vec_from_cube(size_t vec_len, int dim,
  * Test loop-based 4x4xN slice-wise multiplication with 4x1xN matrix with MKL.
  */
 double time_batch_mm_mkl_cblas_cgemm_loop(size_t vec_len, int dim,
-                                                double freq_ghz) {
+                                          double freq_ghz) {
   size_t tsc_start, tsc_end;
   double duration_ms;
 
@@ -265,7 +271,7 @@ double time_batch_mm_mkl_cblas_cgemm_loop(size_t vec_len, int dim,
  * (clbas interface).
  */
 double time_batch_mm_mkl_cblas_cgemm_batch(size_t vec_len, int dim,
-                                                 double freq_ghz) {
+                                           double freq_ghz) {
   size_t tsc_start, tsc_end;
   double duration_ms;
 
@@ -339,7 +345,7 @@ double time_batch_mm_mkl_cblas_cgemm_batch(size_t vec_len, int dim,
   return duration_ms;
 }
 
-TEST(TestArmaMKL, CubeMMSlicewise) {
+TEST(TestBatchMatMult, TimingAnalysis) {
   int iter = 1000;
   size_t vec_len = 768; // number of subcarriers in this case
   int dim = 4;
