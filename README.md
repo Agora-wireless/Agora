@@ -27,7 +27,7 @@ A reference node outside the array (and synchronized) has been included for reci
 The dataset compares the reliability and security performance of M3A against downlink conjugate beamforming as the baseline, over 20 locations for different Alice-Bob, Alice-Eve channels.
 In test topology shown below, there is an obstacle near location 20, deteriorating signal strength between Alice and Bob there.
 
-<img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/test_topology.png" width="45%"/>
+<img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/test_topology.png" width="40%"/>
 
 We use a fixed 16-QAM modulation during the experiments.
 Alice adopts a TDD-based transmission protocol, as illustrated in Figure below.
@@ -35,7 +35,9 @@ Alice adopts a TDD-based transmission protocol, as illustrated in Figure below.
 <img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/timeline.png" width="45%"/>
 
 ## Dataset Description
-* Directory `M3A-data/Data-reliabilityExp/XX/loc#` represents the collected PHY status per TDD frame using beamforming scheme XX when Bob is at location # (`XX` can be either `BF`, `FASM`, `M3A`, or `M3Alc` and `#` can be any integer from 1 to 20). The BER results is calculated at the end of log file, based on 1,000 transmitted TDD frames. At each location, we repeat five times to transmit 5,000 frames in total.
+* Directory
+`M3A-data/Data-reliabilityExp/XX/loc#` represents the collected PHY status per TDD frame using beamforming scheme XX when Bob is at location # (`XX` can be either `BF`, `FASM`, `M3A`, or `M3Alc` and `#` can be any integer from 1 to 20).
+The BER results is calculated at the end of log file, based on 1,000 transmitted TDD frames. At each location, we repeat five times to transmit 5,000 frames in total.
 * Directory
 * Directory
 * Directory
