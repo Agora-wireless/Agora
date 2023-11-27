@@ -50,6 +50,8 @@ As a comparison, we repeated the experiment using BF; the data is stored in `M3A
 `M3A-data/Data-wavelengthExp/dir/M3A/xlam` contains Eve's log file and .h5 file when Eve is of `x` unit of wavelengths distance away from Bob along direction `dir`.
 There are six different directions in this measurement, and see below a 3D view of experimental setup with distances normalized with respect to carrier wavelength.
 
+<img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/3dView.png" width="40%"/>
+
 
 ## Contents
  * [Build M3A using Agora](#Build-M3A-using-Agora)
