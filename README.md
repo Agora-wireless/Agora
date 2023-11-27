@@ -45,7 +45,10 @@ We then switched to different beamforming strategies, after finishing all 20 loc
 `M3A-data/Data-securityExp/security-M3A/LOG_FILES` contains collected PHY status per TDD frame when Eve is located at one of the 20 locations (while Bob is at location-8).
 In addition to the BER, we further collected HDF5 files which contains fine-grained PHY statistics (e.g., the receive constellations) in `H5_FILES`.
 The detailed instruction on how to analyze them using scripts are given in later section.
+As a comparison, we repeated the experiment using BF; the data is stored in `M3A-data/Data-securityExp/security-M3A/`.
 * Directory
+`M3A-data/Data-wavelengthExp/dir/M3A/xlam` contains Eve's log file and .h5 file when Eve is of `x` unit of wavelengths distance away from Bob along direction `dir`.
+There are six different directions in this measurement, and see below a 3D view of experimental setup with distances normalized with respect to carrier wavelength.
 
 
 ## Contents
