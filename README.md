@@ -35,7 +35,7 @@ Alice adopts a TDD-based transmission protocol, as illustrated in Figure below.
 <img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/timeline.png" width="45%"/>
 
 ## Dataset Description
-* Directory
+* Directory `M3A-data/Data-reliabilityExp/XX/loc#` represents the collected PHY status per TDD frame using beamforming scheme XX when Bob is at location # (`XX` can be either `BF`, `FASM`, `M3A`, or `M3Alc` and `#` can be any integer from 1 to 20). The BER results is calculated at the end of log file, based on 1,000 transmitted TDD frames. At each location, we repeat five times to transmit 5,000 frames in total.
 * Directory
 * Directory
 * Directory
