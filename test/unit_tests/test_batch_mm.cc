@@ -315,6 +315,9 @@ double time_batch_mm_mkl_cblas_cgemm_batch(size_t vec_len, int dim,
   MKL_INT group_size = vec_len;
 
   tsc_start = GetTime::Rdtsc();
+  // Using cblas_cgemm3m_batch() instead of cblas_cgemm_batch() gives around
+  // 50% performance improvement (time measured = 333.73 ms vs. 682.66 ms)
+  // cblas_cgemm3m_batch(CblasColMajor, Trans_Array, Trans_Array,
   cblas_cgemm_batch(CblasColMajor, Trans_Array, Trans_Array,
                     M_Array, N_Array, K_Array,
                     &alpha,
