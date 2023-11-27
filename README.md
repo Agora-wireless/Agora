@@ -21,6 +21,7 @@ The original purpose of this dataset is to compare the reliability and security 
 There is an obstacle near location 20, deteriorating signal strength between Alice and Bob there.
 We use a fixed 16-QAM modulation during the experiments.
 Alice adopts a TDD-based transmission protocol, as illustrated in Figure below.
+
 <img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/timeline.png" width="39%"/>
 
 ## Dataset Description
