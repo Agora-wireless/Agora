@@ -22,17 +22,17 @@ The BS consists of four main components: a remote radio head (RRH), a hub unit (
 The BS and two Iris UEs are configured to be Alice, Bob, and Eve respectively. 
 A reference node outside the array (and synchronized) has been included for reciprocity calibration.
 
-<img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/bs_2ue.png" width="39%"/>
+<img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/bs_2ue.png" width="45%"/>
 
 The dataset compares the reliability and security performance of M3A against downlink conjugate beamforming as the baseline, over 20 locations for different Alice-Bob, Alice-Eve channels.
 In test topology shown below, there is an obstacle near location 20, deteriorating signal strength between Alice and Bob there.
 
-
+<img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/test_topology.png" width="45%"/>
 
 We use a fixed 16-QAM modulation during the experiments.
 Alice adopts a TDD-based transmission protocol, as illustrated in Figure below.
 
-<img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/timeline.png" width="39%"/>
+<img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/timeline.png" width="45%"/>
 
 ## Dataset Description
 * Directory
