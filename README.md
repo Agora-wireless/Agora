@@ -14,7 +14,18 @@ Some highlights:
 * M3A retains reliability at Bob under diverse channel conditions.
 * M3A can be implemented in multi-antenna 5G and beyond base stations and does not require any modification in the UE.
 
-## Project Dataset
+## Contents
+ * [Project Dataset](#-Project-Dataset)
+ * [Dataset Description](#-Dataset-Description)
+ * [Build M3A using Agora](#Build-M3A-using-Agora)
+   * [Setting up the build environment](##setting-up-the-build-environment)
+   * [Building and running with real RRU](##building-and-running-with-real-rru)
+ * [HDF5 files analysis using MATLAB scripts](#HDF5-files-analysis-using-MATLAB-Scripts)
+ * [Acknowledgment](#acknowledgment)
+ * [Documentation](#documentation)
+ * [Contact](#contact)
+
+# Project Dataset
 This dataset was collected by [Zhecun Liu](mailto:zl83@rice.edu) from Rice University, in a typical lab room that consists of multiple objects, namely
 chairs, tables, and numerous other objects which create a natural multipath environment. 
 The setup is shown in figure below, which contains two user nodes (UE) and one base-station (BS). 
@@ -39,7 +50,7 @@ The first `D` slot carries a preamble symbol, allowing a receiver (Bob and Eve) 
 
 <img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/timeline.png" width="50%"/>
 
-## Dataset Description
+# Dataset Description
 * Directory
 `M3A-data/Data-reliabilityExp/XX/loc#` represents the collected PHY status per TDD frame using beamforming scheme XX when Bob is at location # (`XX` can be either `BF`, `FASM`, `M3A`, or `M3Alc` and `#` can be any integer from 1 to 20).
 Here, we solely consider Alice and Bob to study the reliability at Bob, and we adopt Bob's BER as the performance metric.
@@ -60,14 +71,6 @@ There are six different directions in this measurement, and see below a 3D view 
 
 <img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/3dView.png" width="35%"/>
 
-
-## Contents
- * [Build M3A using Agora](#Build-M3A-using-Agora)
-   * [Setting up the build environment](#setting-up-the-build-environment)
-   * [Building and running with real RRU](#building-and-running-with-real-rru)
- * [Acknowledgment](#acknowledgment)
- * [Documentation](#documentation)
- * [Contact](#contact)
  
  
 # Build M3A using Agora
@@ -160,7 +163,7 @@ If you are running them on the same machine, make sure Agora and UEs are using d
 
 After this step, the two log files will be generated automatically, which contains physical layer statistics of the configured transmission frame-by-frame.
 
-## HDF5 files analysis using MATLAB Scripts
+# HDF5 files analysis using MATLAB Scripts
 In this section, we provide some examples for using MATLAB scripts to analyze and plot PHY data in HDF5 files.
   * Run function `inspect_single_frame(dataset_filename, inspect_frame, verbose)` in MATLAB command window; where the first argument is the name of h5 file to analyze, second argument the specific frame number, and verbose should be `true` to disply h5 file attributes
   * Below shows example output figures by running `inspect_single_frame("UeRxData-loc10.h5", 999, "false")`, including the receive constellation plot at Eve over two downlink transmissions, receive time-domain waveform, symbol detection error matrices, and the magnitude and phase of the effective CSIR.
