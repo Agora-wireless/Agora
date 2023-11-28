@@ -50,7 +50,7 @@ As a comparison, we repeated the experiment using BF; the data is stored in `M3A
 `M3A-data/Data-wavelengthExp/dir/M3A/xlam` contains Eve's log file and .h5 file when Eve is of `x` unit of wavelengths distance away from Bob along direction `dir`.
 There are six different directions in this measurement, and see below a 3D view of experimental setup with distances normalized with respect to carrier wavelength.
 
-<img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/3dView.png" width="40%"/>
+<img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/3dView.png" width="35%"/>
 
 
 ## Contents
@@ -208,8 +208,9 @@ The following are steps to set up both Agora and the packet generator:
 ## Building and running with real RRU
 M3A is evaluated using an indoor 64-antenna [Argos massive MIMO base station](https://www.yecl.org/argos/), also commercially available from [Skylark Wireless](https://skylarkwireless.com) and are used in the [POWER-RENEW PAWR testbed](https://powderwireless.net/).
 The base-station contains four linear antennna arrays, we reserved the top array to perform our experiment (8 radios in total).
-The BS and two Iris UEs are configured to be Alice, Bob, and Eve respectively. See below for our setup. For downlink, a reference node outside the array (and synchronized) is required for reciprocity calibration.
-<img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/bs_2ue.png" width="39%"/>
+The BS and two Iris UEs are configured to be Alice, Bob, and Eve respectively. The hardware we used are illustrated below. 
+
+<img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/hw-zoomin.png" width="39%"/>
 
 We recommend using one server for controlling the RRU and running Agora, and another server for controlling the UEs and running the UE code.
  
