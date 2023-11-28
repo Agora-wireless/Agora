@@ -31,8 +31,12 @@ In test topology shown below, there is an obstacle near location 20, deteriorati
 
 We use a fixed 16-QAM modulation during the experiments.
 Alice adopts a TDD-based transmission protocol, as illustrated in Figure below.
+We configure Bob and Eve so that they have different uplink pilot transmission slot `P`, while it's only during Bob's `P` slot that Alice activates her reception window (highlighted below).
+This way Both Alice and Bob essentially are agnostic to the presence of Eve.
+Finally, Bob and Eve both are in receive state when Alice sending downlink signals during the three `D` slots. 
+The first `D` slot carries a preamble symbol, allowing a receiver (Bob and Eve) equalize the channel.
 
-<img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/timeline.png" width="35%"/>
+<img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/timeline.png" width="50%"/>
 
 ## Dataset Description
 * Directory
