@@ -15,8 +15,8 @@ Some highlights:
 * M3A can be implemented in multi-antenna 5G and beyond base stations and does not require any modification in the UE.
 
 ## Contents
- * [Project Dataset](#-Project-Dataset)
- * [Dataset Description](#-Dataset-Description)
+ * [Project Dataset](#Project-Dataset)
+ * [Dataset Description](#Dataset-Description)
  * [Build M3A using Agora](#Build-M3A-using-Agora)
    * [Setting up the build environment](##setting-up-the-build-environment)
    * [Building and running with real RRU](##building-and-running-with-real-rru)
