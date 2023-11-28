@@ -161,7 +161,8 @@ If you are running them on the same machine, make sure Agora and UEs are using d
    * For Faros RRU, use the pyfaros tool the same as with the UEs to generate a new `data/topology.json`; modify `data/topology.json` by adding/removing serials of your RRU Irises, and the hub. M3A experiments are conducted using `dl-vulture.json`.
    * Run `./build/agora --conf_file data/examples/dl-vulture.json`
 
-After this step, the two log files will be generated automatically, which contains physical layer statistics of the configured transmission frame-by-frame.
+After this step, the two log files will be generated automatically, which contains physical layer statistics of the configured transmission frame-by-frame. 
+If passing `-DENABLE_HDF5=true` during cmake, the HDF5 files should appear as well in Agora folder.
 
 # HDF5 files analysis using MATLAB Scripts
 In this section, we provide some examples for using MATLAB scripts to analyze and plot PHY data in HDF5 files.
