@@ -64,7 +64,6 @@ There are six different directions in this measurement, and see below a 3D view 
 ## Contents
  * [Build M3A using Agora](#Build-M3A-using-Agora)
    * [Setting up the build environment](#setting-up-the-build-environment)
-   * [Building and running with emulated RRU](#building-and-running-with-emulated-rru)
    * [Building and running with real RRU](#building-and-running-with-real-rru)
  * [Acknowledgment](#acknowledgment)
  * [Documentation](#documentation)
@@ -72,8 +71,9 @@ There are six different directions in this measurement, and see below a 3D view 
  
  
 # Build M3A using Agora
-Agora is a complete software realization of real-time MaMIMO baseband. Agora currently only builds and runs on Linux, and has been tested on Ubuntu 16.04, 18.04, and 20.04. 
-  Agora requires CMake 2.8+ and works with both GNU and Intel compilers with C++17 support. 
+Agora is a complete software realization of real-time MaMIMO baseband. 
+Agora currently only builds and runs on Linux, and has been tested on Ubuntu 16.04, 18.04, and 20.04. 
+Agora requires CMake 2.8+ and works with both GNU and Intel compilers with C++17 support. 
 ## Setting up the build environment
   * Setup CI: run
     <pre>
@@ -106,10 +106,6 @@ Agora is a complete software realization of real-time MaMIMO baseband. Agora cur
     * Optional: DPDK
        * Refer to [DPDK_README.md](DPDK_README.md) for configuration and installation instructions.
 
-## Building and running with emulated RRU
-We provide a high performance [packet generator](simulator) to emulate the RRU. This generator allows Agora to run and be tested without actual RRU hardware.\
-The following are steps to set up both Agora and the packet generator:
-
  * Build Agora. This step also builds the emulated RRU, a data generator that generates random input data files, an end-to-end test that checks correctness of end results for both uplink and downlink,\
  and several unit tests for testing either performance or correctness of individual functions.
     <pre>
@@ -124,95 +120,7 @@ The following are steps to set up both Agora and the packet generator:
     <pre>
     $ ./test/test_agora/test_agora.sh 10 out # Runs test for 10 iterations
     </pre>
-
-#### Run Agora with emulated RRU traffic
-   * **NOTE**: We recommend running Agora and the emulated RRU on two different machines.\
-   If you are running them on the same machine, make sure Agora and the emulated RRU are using different set of cores,
-     otherwise there will be performance slow down. 
      
-   When running Agora and the emulated RRU on two different machines, the following steps use Linux networking stack for packet I/O.\
-     Agora also supports using DPDK to bypass the kernel for packet I/O. 
-     See [DPDK_README.md](DPDK_README.md) for instructions of running emulated RRU and Agora with DPDK. 
-   
-   * First, return to the base directory (`cd ..`), then run
-   <pre>
-   $ ./build/data_generator --conf_file data/tddconfig-sim-ul.json
-   </pre>
-     to generate data files.
-   * In one terminal, run 
-   <pre>
-   $ ./build/agora --conf_file data/tddconfig-sim-ul.json
-   </pre>
-    to start Agora with uplink configuration.
-   * In another terminal, run
-   <pre>
-   $ ./build/sender --num_threads=2 --core_offset=1 --frame_duration=5000 --enable_slow_start=1 --conf_file=data/tddconfig-sim-ul.json
-   </pre>
-   to start the emulated RRU with uplink configuration.
-   * To test the real-time performance of Agora, see the [Running performance test](#running-performance-test) section below.
-
-#### Run Agora with channel simulator and clients
-   * First, return to the base directory (`cd ..`), then run
-   <pre>
-   $ ./build/data_generator --conf_file data/chsim.json
-   </pre>
-    to generate data files.
-   * In one terminal, run
-   <pre>
-   $ ./build/user --conf_file data/chsim.json
-   </pre>
-     to start clients with
-     combined uplink & downlink configuration.
-   * In another terminal, run
-   <pre>
-   $ ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 24 --conf_file data/chsim.json
-   </pre>
-   * In another terminal, run
-   <pre>
-   $ ./build/agora --conf_file data/chsim.json
-   </pre>
-   to start Agora with the combined configuration.
-   * Note: make sure Agora and sender are using different set of cores, otherwise there will be performance slow down.
-
-#### Run Agora with channel simulator, clients, and mac enabled
-   * Compile the code with
-   <pre>
-   $ cmake .. -DENABLE_MAC=true
-   </pre>
-   * Uplink Testing (`--conf_file mac-ul-sim.json`)
-   * Downlink Testing  (`--conf_file mac-dl-sim.json`)
-   * Combined Testing  (`--conf_file mac-sim.json`)
-     * Terminal 1:
-     <pre>
-       $./build/data_generator --conf_file data/mac-sim.json
-     </pre>
-       to generate data files.
-     <pre>
-       $./build/user --conf_file data/mac-sim.json
-     </pre>
-       to start users.
-     * Terminal 2:
-     <pre>
-     $ ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 28 --conf_file data/mac-sim.json
-     </pre>
-       to run the channel simulator
-     * Terminal 3:
-     <pre>
-       $ ./build/macuser --enable_slow_start 1 --conf_file data/mac-sim.json
-     </pre>
-      to run to user mac app.  Specify `--data_file ""` to generate patterned data and `--conf_file` options as necessary.
-     * Terminal 4:
-     <pre>
-     $ ./build/agora --conf_file data/mac-sim.json
-     </pre>
-      run agora before running macbs.  Run macuser -> agora -> macbs in quick succession. 
-     * Terminal 5:
-     <pre>
-     $ ./build/macbs --enable_slow_start 1 --conf_file data/mac-sim.json
-     </pre>
-     to run to base station mac app. specify `--data_file ""` to generate patterned data and `--conf_file` options as necessary.
-   * Note: make sure agora / user / chsim / macuser / macbs are using different set of cores, otherwise there will be performance slow down.
-
 ## Building and running with real RRU
 M3A is evaluated using an indoor 64-antenna [Argos massive MIMO base station](https://www.yecl.org/argos/), also commercially available from [Skylark Wireless](https://skylarkwireless.com) and are used in the [POWER-RENEW PAWR testbed](https://powderwireless.net/).
 The base-station contains four linear antennna arrays, we reserved the top array to perform our experiment (8 radios in total).
@@ -220,7 +128,8 @@ The BS and two Iris UEs are configured to be Alice, Bob, and Eve respectively. T
 
 <img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/hw-zoomin.png" width="39%"/>
 
-We recommend using one server for controlling the RRU and running Agora, and another server for controlling the UEs and running the UE code.
+**NOTE**: We recommend using one server for controlling the RRU and running Agora, and another server for controlling the UEs and running the UE code.
+If you are running them on the same machine, make sure Agora and UEs are using different set of cores, otherwise there will be performance slow down. 
  
 **Note:** Faros RRU and Iris UEs can be discovered using the [pyfaros](https://github.com/skylarkwireless/pyfaros) tool. You can use this tool to find the topology of the hardware connected to the server.
 
