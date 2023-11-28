@@ -24,17 +24,18 @@ A reference node outside the array (and synchronized) has been included for reci
 
 <img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/bs_2ue.png" width="45%"/>
 
-The dataset compares the reliability and security performance of M3A against downlink conjugate beamforming as the baseline, over 20 locations for different Alice-Bob, Alice-Eve channels.
+The dataset compares the reliability and security performance of M3A and its variants against downlink conjugate beamforming as the baseline, over 20 locations for different Alice-Bob/Eve channels.
 In test topology shown below, there is an obstacle near location 20, deteriorating signal strength between Alice and Bob there.
 
 <img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/test_topology.png" width="35%"/>
 
 We use a fixed 16-QAM modulation during the experiments.
-Alice adopts a TDD-based transmission protocol, as illustrated in Figure below.
-We configure Bob and Eve so that they have different uplink pilot transmission slot `P`, while it's only during Bob's `P` slot that Alice activates her reception window (highlighted below).
-This way Both Alice and Bob essentially are agnostic to the presence of Eve.
-Finally, Bob and Eve both are in receive state when Alice sending downlink signals during the three `D` slots. 
-The first `D` slot carries a preamble symbol, allowing a receiver (Bob and Eve) equalize the channel.
+Operational parameters such as amplifier gains, modulation order, and the number of subcarriers, are configured using JSON files.
+Alice adopts a TDD-based transmission protocol, as illustrated in timeline figure below.
+Note that we configure Bob and Eve so that they send their uplink pilot, for the CSIT acquisition, in different times (indicated by the transmission slot `P`).
+Since Alice is configured to activate her reception window (highlighted below) during only Bob's `P` slot that , both Alice and Bob essentially are agnostic to the presence of Eve.
+Finally, Bob and Eve both are in receive state, when Alice sending downlink signals during the three `D` slots. 
+The first `D` slot carries a preamble symbol, allowing a receiver (Bob and Eve) calculate the CSIR and equalize the channel.
 
 <img src="https://github.com/Agora-wireless/Agora/blob/M3A/images/timeline.png" width="50%"/>
 
