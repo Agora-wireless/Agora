@@ -176,7 +176,7 @@ EventData DoFFT::Launch(size_t tag) {
   size_t start_tsc1 = GetTime::WorkerRdtsc();
   duration_stat->task_duration_.at(1) += start_tsc1 - start_tsc;
 
-  if (sym_type == SymbolType::kCalDL || cfg_->UseExplicitCSI()) {
+  if (false && sym_type == SymbolType::kCalDL && cfg_->UseExplicitCSI()) {
     float cfo = static_cast<float>(pkt->fill_[0]);
     arma::fvec theta =
         (-2 * M_PI * cfo / cfg_->Rate()) *
@@ -221,6 +221,11 @@ EventData DoFFT::Launch(size_t tag) {
     }
     PartialTranspose(csi_buffers_[frame_slot][pilot_symbol_id], ant_id,
                      SymbolType::kPilot);
+    // initially do this for dl_csi until valid data is received
+    //if (frame_id < cfg_->BsAntNum()) {
+    PartialTranspose(dl_csi_buffers_[frame_slot][pilot_symbol_id], ant_id,
+                     SymbolType::kPilot);
+    //}
 
     // Expand partial CSI from freq-orth pilot to full CSI per UE
     // TODO 1. allow pilot sc group size different than kTransposeBlockSize
@@ -268,9 +273,9 @@ EventData DoFFT::Launch(size_t tag) {
     RtAssert(radio_id != cfg_->RefRadio(cell_id),
              "Received a Cal Ul symbol for an antenna on the reference radio");
   } else if (sym_type == SymbolType::kCalDL) {
-    if (!cfg_->UseExplicitCSI() && ant_id == cfg_->RefAnt(cell_id)) {
+    const size_t pilot_tx_ant = cfg_->RecipCalDlAnt(frame_id, symbol_id);
+    if (cfg_->UseExplicitCSI() == false && ant_id == cfg_->RefAnt(cell_id)) {
       //Find out what antenna transmitted a pilot on this symbol 'C'
-      const size_t pilot_tx_ant = cfg_->RecipCalDlAnt(frame_id, symbol_id);
       const size_t cal_index = cfg_->RecipCalUlRxIndex(frame_id, pilot_tx_ant);
 
       AGORA_LOG_TRACE(
@@ -283,11 +288,10 @@ EventData DoFFT::Launch(size_t tag) {
           &calib_dl_buffer_[cal_index][pilot_tx_ant * cfg_->OfdmDataNum()];
       PartialTranspose(calib_dl_ptr, pilot_tx_ant, sym_type);
       phy_stats_->UpdateCalibPilotSnr(cal_index, 0, pilot_tx_ant, fft_inout_);
-    } else if (cfg_->UseExplicitCSI()) {
-      const size_t pilot_tx_ant = cfg_->RecipCalDlAnt(frame_id, symbol_id);
+    } /*else if (cfg_->UseExplicitCSI()) {
       PartialTranspose(dl_csi_buffers_[frame_slot][ant_id], pilot_tx_ant,
                        SymbolType::kPilot);
-    }
+    }*/
     /*RtAssert(
         radio_id == cfg_->RefRadio(cell_id),
         "Received a Cal Dl symbol for an antenna not on the reference radio");*/

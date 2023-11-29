@@ -222,6 +222,7 @@ class PhyUe {
   moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* mac_rx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* mac_tx_ptoks_ptr_[kMaxThreads];
+  moodycamel::ProducerToken* wcc_ptok_;
 
   // all checkers
   FrameCounters tx_counters_;

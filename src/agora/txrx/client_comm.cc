@@ -59,13 +59,14 @@ WiredControlChannel::~WiredControlChannel() {
  * RP -> ReceiveUdpPacketsFromRp() -> SendEventToAgora(payload) -> Agora
  */
 void WiredControlChannel::SendEventToLocalPhy(std::byte* data) {
-  RxPacket* rxpkt = reinterpret_cast<RxPacket*>(data);
-  auto* pkt = rxpkt->RawPacket();
+  RxPacket rxpkt(reinterpret_cast<Packet*>(data));
+  auto* pkt = rxpkt.RawPacket();
+  rxpkt.Use();
 
   // create event from pkt
   EventData msg(EventType::kPacketFromRemote, rx_tag_t(rxpkt).tag_);
   AGORA_LOG_INFO(
-      "WiredControlChannel: Sending core update data to Agora of "
+      "WiredControlChannel: Received wired control data for "
       "Frame %zu, Symbol %zu, Ant %zu\n",
       pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
   RtAssert(rx_queue_->enqueue(msg),
@@ -97,10 +98,12 @@ void WiredControlChannel::ReceiveEventFromLocalPhy() {
   }
 
   if (event.event_type_ == EventType::kPacketToRemote) {
+    RxPacket* rx = rx_tag_t(event.tags_[0u]).rx_packet_;
+    Packet* pkt = rx->RawPacket();
     AGORA_LOG_INFO(
-        "WiredControlChannel: Received status from Agora of latency %zu, "
-        "core_num %zu\n",
-        event.tags_[0], event.tags_[1]);
+        "WiredControlChannel: Transmitting wired control data for Frame "
+        "%zu, Symbol %zu, Ant %zu\n",
+        pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
     SendPacketToRemotePhy(event);
   }
 }
@@ -123,15 +126,16 @@ void WiredControlChannel::RunTxEventLoop() {
       log_filename_.c_str());
 
   PinToCoreWithOffset(ThreadType::kWorkerWCC, tx_core_offset_,
-                      0 /* thread ID */);
+                      0 /* thread ID */, false, true);
   // keep the frequency of function call
   size_t last_frame_tx_tsc = 0;
 
   while (cfg_->Running() == true) {
-    if ((GetTime::Rdtsc() - last_frame_tx_tsc) > tsc_delta_) {
+    ReceiveEventFromLocalPhy();
+    /*if ((GetTime::Rdtsc() - last_frame_tx_tsc) > tsc_delta_) {
       ReceiveEventFromLocalPhy();
       last_frame_tx_tsc = GetTime::Rdtsc();
-    }
+    }*/
   }
 }
 
@@ -142,14 +146,15 @@ void WiredControlChannel::RunRxEventLoop() {
       log_filename_.c_str());
 
   PinToCoreWithOffset(ThreadType::kWorkerWCC, rx_core_offset_,
-                      0 /* thread ID */);
+                      0 /* thread ID */, false, true);
   // keep the frequency of function call
   size_t last_frame_rx_tsc = 0;
 
   while (cfg_->Running() == true) {
-    if ((GetTime::Rdtsc() - last_frame_rx_tsc) > tsc_delta_) {
+    ReceivePacketFromRemotePhy();
+    /*if ((GetTime::Rdtsc() - last_frame_rx_tsc) > tsc_delta_) {
       ReceivePacketFromRemotePhy();
       last_frame_rx_tsc = GetTime::Rdtsc();
-    }
+    }*/
   }
 }

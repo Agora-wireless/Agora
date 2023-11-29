@@ -782,7 +782,8 @@ void RadioSoapySdr::ConfigureTddModeBs(bool is_ref_radio) {
   for (size_t s = 0; s < sched_size; s++) {
     char c = cfg_->Frame().FrameIdentifier().at(s);
     if (c == 'C') {
-      sched.replace(s, 1, is_ref_radio ? "R" : "T");
+      sched.replace(s, 1,
+                    is_ref_radio ? (cfg_->UseExplicitCSI() ? "G" : "R") : "T");
     } else if (c == 'L') {
       sched.replace(s, 1, is_ref_radio ? "T" : "R");
     } else if (c == 'P') {

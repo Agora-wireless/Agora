@@ -110,7 +110,9 @@ void DoBeamWeights::ComputePrecoder(
   arma::cx_fmat mat_ul_beam(reinterpret_cast<arma::cx_float*>(ul_beam_mem),
                             cfg_->SpatialStreamsNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_beam_tmp;
-  if (cfg_->UseExplicitCSI()) {
+  if (cfg_->Frame().NumULSyms() > 0 ||
+      (cfg_->Frame().NumDLSyms() > 0 && kUseUlZfForDownlink == true &&
+       cfg_->UseExplicitCSI() == false)) {
     switch (cfg_->BeamformingAlgo()) {
       case CommsLib::BeamformingAlgorithm::kZF:
         if (kUseInverseForZF) {
@@ -139,6 +141,23 @@ void DoBeamWeights::ComputePrecoder(
         break;
       default:
         AGORA_LOG_ERROR("Beamforming algorithm is not implemented!");
+    }
+    mat_ul_beam = mat_ul_beam_tmp;
+    for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {
+      // insert back column of zeros corresponding to ref node
+      if (cfg_->ExternalRefNode(i) == true) {
+        mat_ul_beam.insert_cols(
+            (cfg_->RefRadio(i) * cfg_->NumChannels()),
+            arma::cx_fmat(cfg_->SpatialStreamsNum(), cfg_->NumChannels(),
+                          arma::fill::zeros));
+      }
+    }
+    if (kEnableMatLog) {
+      phy_stats_->UpdateUlBeam(frame_id, cur_sc_id, mat_ul_beam.st());
+    }
+    if (kPrintBeamStats) {
+      const float rcond = arma::rcond(mat_csi.t() * mat_csi);
+      phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
     }
   }
 
@@ -208,22 +227,6 @@ void DoBeamWeights::ComputePrecoder(
     if (kEnableMatLog) {
       phy_stats_->UpdateDlBeam(frame_id, cur_sc_id, mat_dl_beam);
     }
-  }
-  for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {
-    if (cfg_->ExternalRefNode(i) == true) {
-      mat_ul_beam_tmp.insert_cols(
-          (cfg_->RefRadio(i) * cfg_->NumChannels()),
-          arma::cx_fmat(cfg_->SpatialStreamsNum(), cfg_->NumChannels(),
-                        arma::fill::zeros));
-    }
-  }
-  mat_ul_beam = mat_ul_beam_tmp;
-  if (kEnableMatLog) {
-    phy_stats_->UpdateUlBeam(frame_id, cur_sc_id, mat_ul_beam.st());
-  }
-  if (kPrintBeamStats) {
-    const float rcond = arma::rcond(mat_csi.t() * mat_csi);
-    phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
   }
 }
 

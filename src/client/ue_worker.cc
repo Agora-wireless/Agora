@@ -212,8 +212,6 @@ void UeWorker::DoSendCsiFeedback(size_t tag) {
   auto symbol_type = config_.GetSymbolType(symbol_id);
   if (symbol_type == SymbolType::kCalDL) {
     pkt->fill_[0] = static_cast<uint32_t>(cfo_[frame_slot][ant_id]);
-    /*phy_udp_comm_->Send(reinterpret_cast<std::byte*>(pkt),
-                        config_.PacketLength());*/
   }
   EventData explicit_csi_event = EventData(EventType::kCsiFeedback, tag);
   RtAssert(notify_queue_.enqueue(*ptok_.get(), explicit_csi_event),

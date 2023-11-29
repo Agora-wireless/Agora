@@ -130,9 +130,9 @@ void Agora::SendSnrReport(EventType event_type, size_t frame_id,
 
 void Agora::ScheduleDownlinkProcessing(size_t frame_id) {
   // Schedule broadcast symbols generation
-  if (config_->Frame().NumDlControlSyms() > 0) {
+  /*if (config_->Frame().NumDlControlSyms() > 0) {
     ScheduleBroadCastSymbols(EventType::kBroadcast, frame_id);
-  }
+  }*/
 
   // Schedule beamformed pilot symbols mapping
   size_t num_pilot_symbols = config_->Frame().ClientDlPilotSymbols();
@@ -971,7 +971,6 @@ void Agora::HandleEventFft(size_t tag) {
              (sym_type == SymbolType::kCalUL)) {
     stats_->PrintPerSymbolDone(PrintType::kFFTCal, frame_id, symbol_id,
                                rc_counters_.GetSymbolCount(frame_id) + 1);
-
     const bool last_rc_task = this->rc_counters_.CompleteTask(frame_id);
     if (last_rc_task == true) {
       stats_->PrintPerFrameDone(PrintType::kFFTCal, frame_id);
@@ -1099,7 +1098,7 @@ void Agora::InitializeCounters() {
   const size_t num_rx_ul_cal_antennas = cfg->BfAntNum();
   // Same as the number of rx reference antennas (ref ant + other channels)
   const size_t num_rx_dl_cal_antennas = cfg->UseExplicitCSI()
-                                            ? cfg->BfAntNum()
+                                            ? cfg->UeAntNum()
                                             : cfg->BsAntNum() - cfg->BfAntNum();
 
   rx_counters_.num_reciprocity_pkts_per_frame_ =
@@ -1120,7 +1119,7 @@ void Agora::InitializeCounters() {
   fft_cur_frame_for_symbol_ =
       std::vector<size_t>(cfg->Frame().NumULSyms(), SIZE_MAX);
 
-  rc_counters_.Init(cfg->BsAntNum());
+  rc_counters_.Init(cfg->UseExplicitCSI() ? cfg->UeAntNum() : cfg->BsAntNum());
 
   beam_counters_.Init(cfg->BeamEventsPerSymbol());
 
@@ -1150,7 +1149,7 @@ void Agora::InitializeCounters() {
     //    std::vector<size_t>(config_->Frame().NumDLSyms(), SIZE_MAX);
     ifft_counters_.Init(config_->Frame().NumDLSyms(), config_->BsAntNum());
     tx_counters_.Init(
-        config_->Frame().NumDlControlSyms() + config_->Frame().NumDLSyms(),
+        /*config_->Frame().NumDlControlSyms() +*/ config_->Frame().NumDLSyms(),
         config_->BsAntNum());
     // mac data is sent per frame, so we set max symbol to 1
     mac_to_phy_counters_.Init(1, config_->SpatialStreamsNum());

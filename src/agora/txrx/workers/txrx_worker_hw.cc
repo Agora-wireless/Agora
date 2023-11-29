@@ -88,6 +88,7 @@ void TxRxWorkerHw::DoTxRx() {
       if (tid_ == 0) {  // only listen in on one thread
         EventData event;
         if (wired_ctrl_q_->try_dequeue(event)) {
+          assert(event.event_type_ == EventType::kPacketFromRemote);
           const EventData rx_message(EventType::kPacketRX, event.tags_[0]);
           NotifyComplete(rx_message);
         }
@@ -257,10 +258,11 @@ std::vector<RxPacket*> TxRxWorkerHw::DoRx(size_t interface_id,
       }
 
       const bool cal_rx =
-          (radio_id != Configuration()->RefRadio(cell_id) &&
-           Configuration()->IsCalUlPilot(global_frame_id, global_symbol_id)) ||
-          (radio_id == Configuration()->RefRadio(cell_id) &&
-           Configuration()->IsCalDlPilot(global_frame_id, global_symbol_id));
+          (Configuration()->UseExplicitCSI() == false) &&
+          ((radio_id != Configuration()->RefRadio(cell_id) &&
+            Configuration()->IsCalUlPilot(global_frame_id, global_symbol_id)) ||
+           (radio_id == Configuration()->RefRadio(cell_id) &&
+            Configuration()->IsCalDlPilot(global_frame_id, global_symbol_id)));
       const bool ignore_rx_data =
           (invalid_rx_symbol == true) ||
           ((Configuration()->HwFramer() == false) &&
@@ -712,7 +714,7 @@ bool TxRxWorkerHw::IsRxSymbol(size_t interface, size_t symbol_id) {
     is_rx = true;
   } else if ((reference_radio == radio_id) &&
              (symbol_type == SymbolType::kCalDL)) {
-    is_rx = true;
+    is_rx = !Configuration()->UseExplicitCSI();
   } else if ((reference_radio != radio_id) &&
              (symbol_type == SymbolType::kCalUL)) {
     is_rx = true;

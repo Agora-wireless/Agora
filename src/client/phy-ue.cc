@@ -98,6 +98,8 @@ PhyUe::PhyUe(Config* config)
   work_producer_token_ =
       std::make_unique<moodycamel::ProducerToken>(work_queue_);
 
+  wcc_ptok_ = new moodycamel::ProducerToken(wcc_tx_queue_);
+
   // uplink buffers init (tx)
   InitializeUplinkBuffers();
   // downlink buffers init (rx)
@@ -191,8 +193,8 @@ PhyUe::PhyUe(Config* config)
   size_t dl_pilots_num =
       config->UseExplicitCSI() ? config->Frame().NumDLCalSyms() : 0;
   rx_counters_.num_rx_pkts_per_frame_ =
-      config_->UeAntNum() * (config_->Frame().NumDLSyms() +
-                             config_->Frame().NumBeaconSyms() + dl_pilots_num);
+      config_->UeAntNum() *
+      (config_->Frame().NumDLSyms() + config_->Frame().NumBeaconSyms());
   rx_counters_.num_beacon_pkts_per_frame_ =
       config_->UeAntNum() * config_->Frame().NumBeaconSyms();
   rx_counters_.num_pilot_pkts_per_frame_ =
@@ -283,13 +285,16 @@ void PhyUe::ReceiveDownlinkSymbol(Packet* rx_packet, size_t tag) {
       defferal_queue->push(EventData(EventType::kFFT, tag));
     }
   } else if (symbol_type == SymbolType::kCalDL) {
-    if (beacon_counters_.IsLastSymbol(rx_packet->frame_id_)) {
+    //ScheduleWork(EventData(EventType::kCsiFeedback, tag));
+    ScheduleTask(EventData(EventType::kPacketToRemote, tag), &wcc_tx_queue_,
+                 *wcc_ptok_);
+    /*if (beacon_counters_.IsLastSymbol(rx_packet->frame_id_)) {
       ScheduleWork(EventData(EventType::kCsiFeedback, tag));
     } else {
       std::queue<EventData>* defferal_queue =
           &csi_feedback_deferral_.at(frame_slot);
       defferal_queue->push(EventData(EventType::kCsiFeedback, tag));
-    }
+    }*/
   }
 }
 
@@ -371,7 +376,6 @@ void PhyUe::Start() {
   // for task_queue, main thread is producer, it is single-producer &
   // multiple consumer for task queue uplink
   moodycamel::ProducerToken ptok_mac(to_mac_queue_);
-  moodycamel::ProducerToken ptok_wcc(wcc_tx_queue_);
 
   // for message_queue, main thread is a consumer, it is multiple
   // producers & single consumer for message_queue
@@ -463,7 +467,7 @@ void PhyUe::Start() {
           //if (symbol_id == config_->Frame().GetBeaconSymbolLast()) {
           if (config_->Frame().GetBeaconSymbolIdx(symbol_id) != SIZE_MAX) {
             rx_counters_.num_beacon_pkts_.at(frame_slot)++;
-            ScheduleWork(EventData(EventType::kBeaconProc, event.tags_[0u]));
+            //ScheduleWork(EventData(EventType::kBeaconProc, event.tags_[0u]));
             if (rx_counters_.num_beacon_pkts_.at(frame_slot) ==
                 rx_counters_.num_beacon_pkts_per_frame_) {
               rx_counters_.num_beacon_pkts_.at(frame_slot) = 0;
@@ -502,20 +506,12 @@ void PhyUe::Start() {
             }
           }
 
-          if (symbol_type == SymbolType::kDL &&
+          if (symbol_type == SymbolType::kDL ||
               symbol_type == SymbolType::kCalDL) {
-            // Defer downlink processing (all pilot symbols must be fft'd
-            // first)
-            ReceiveDownlinkSymbol(pkt, event.tags_[0]);
-          } else if (symbol_type == SymbolType::kCalDL) {
-            if (beacon_counters_.IsLastSymbol(frame_id)) {
-              ScheduleWork(EventData(EventType::kCsiFeedback, event.tags_[0]));
-            } else {
-              std::queue<EventData>* defferal_queue =
-                  &csi_feedback_deferral_.at(frame_slot);
-              defferal_queue->push(
-                  EventData(EventType::kCsiFeedback, event.tags_[0]));
+            if (symbol_type == SymbolType::kCalDL) {
+              std::cout << "Received Cal DL Symbol here! Why?" << std::endl;
             }
+            ReceiveDownlinkSymbol(pkt, event.tags_[0]);
           } else {
             rx->Free();
           }
@@ -538,7 +534,7 @@ void PhyUe::Start() {
         } break;
         case EventType::kCsiFeedback: {
           ScheduleTask(EventData(EventType::kPacketToRemote, event.tags_[0]),
-                       &wcc_tx_queue_, ptok_wcc);
+                       &wcc_tx_queue_, *wcc_ptok_);
 
         } break;
         case EventType::kFFTPilot: {

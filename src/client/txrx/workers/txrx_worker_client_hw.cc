@@ -284,6 +284,22 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(
                 }
                 rx_packet->Free();
                 break;
+              } else if (Configuration()->GetSymbolType(global_symbol_id) ==
+                         SymbolType::kCalDL) {
+                const EventData feedback_event(EventType::kPacketToRemote,
+                                               rx_tag_t(*rx_packet).tag_);
+                if (wired_ctrl_q_->try_enqueue(*wired_ctrl_token_,
+                                               feedback_event) == false) {
+                  AGORA_LOG_INFO(
+                      "Wired Ctrl Queue: Cannot enqueue task, need more "
+                      "memory");
+                  if (wired_ctrl_q_->enqueue(*wired_ctrl_token_,
+                                             feedback_event) == false) {
+                    AGORA_LOG_INFO("Wired Ctrl Queue: task enqueue failed\n");
+                    throw std::runtime_error(
+                        "Wired Ctrl Queue: task enqueue failed");
+                  }
+                }
               } else {
                 // Push kPacketRX event into the queue.
                 const EventData rx_message(EventType::kPacketRX,
