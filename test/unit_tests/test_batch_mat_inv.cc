@@ -240,51 +240,41 @@ void batch_mat_inv_sympd_arma_decomp_vec_simp_intrinsic(size_t vec_len, int dim,
   arma::cx_fvec vec_a_prod_10(vec_len, arma::fill::zeros);
   arma::cx_fvec vec_a_prod_11(vec_len, arma::fill::zeros);
   arma::cx_fvec vec_a_det(vec_len, arma::fill::zeros);
-  arma::cx_fvec vec_a_inv_00(vec_len, arma::fill::zeros);
-  arma::cx_fvec vec_a_inv_01(vec_len, arma::fill::zeros);
-  arma::cx_fvec vec_a_inv_10(vec_len, arma::fill::zeros);
-  arma::cx_fvec vec_a_inv_11(vec_len, arma::fill::zeros);
-  arma::cx_fvec vec_b_00(vec_len, arma::fill::zeros);
-  arma::cx_fvec vec_b_01(vec_len, arma::fill::zeros);
-  arma::cx_fvec vec_b_10(vec_len, arma::fill::zeros);
-  arma::cx_fvec vec_b_11(vec_len, arma::fill::zeros);
 
   tsc_start = GetTime::Rdtsc();
-  vec_a_00 = cub_a(arma::span(0), arma::span(0), arma::span::all);
-  vec_a_01 = cub_a(arma::span(0), arma::span(1), arma::span::all);
-  vec_a_10 = cub_a(arma::span(1), arma::span(0), arma::span::all);
-  vec_a_11 = cub_a(arma::span(1), arma::span(1), arma::span::all);
+
+  // Prepare operands, use interinsic vectors (continuous memory) to accelerate
+  vec_a_00 = cub_a.tube(0, 0);
+  vec_a_01 = cub_a.tube(0, 1);
+  vec_a_10 = cub_a.tube(1, 0);
+  vec_a_11 = cub_a.tube(1, 1);
   vec_a_conj_00 = arma::conj(vec_a_00);
   vec_a_conj_01 = arma::conj(vec_a_01);
   vec_a_conj_10 = arma::conj(vec_a_10);
   vec_a_conj_11 = arma::conj(vec_a_11);
+
   // a' = a^2 + c^2, b' = a*b + c*d, c' = a*b + c*d, d' = b^2 + d^2
   vec_a_prod_00 = vec_a_00 % vec_a_conj_00 + vec_a_10 % vec_a_conj_10;
   vec_a_prod_01 = vec_a_conj_00 % vec_a_01 + vec_a_conj_10 % vec_a_11;
   vec_a_prod_10 = arma::conj(vec_a_prod_01); // computationally equivalent
-  // vec_a_prod_10 = vec_a_00 % vec_a_conj_01 + vec_a_10 % vec_a_conj_11;
   vec_a_prod_11 = vec_a_conj_01 % vec_a_01 + vec_a_conj_11 % vec_a_11;
 
   // a_det = a'*d' - b'*c'
-  // vec_a_det = (vec_a_prod_01 % vec_a_prod_10);
   vec_a_det = (vec_a_prod_00 % vec_a_prod_11) - (vec_a_prod_01 % vec_a_prod_10);
+
   // use reciprocal for division since multiplication is faster
   vec_a_det = 1.0 / vec_a_det;
 
   // a''' = a''*a + b''*b, b''' = a''*c + b''*d
   // c''' = c''*a + d''*b, d''' = c''*c + d''*d
-  vec_b_00 = (vec_a_prod_11 % vec_a_conj_00 - vec_a_prod_01 % vec_a_conj_01) %
-             vec_a_det;
-  vec_b_01 = (vec_a_prod_11 % vec_a_conj_10 - vec_a_prod_01 % vec_a_conj_11) %
-              vec_a_det;
-  vec_b_10 = (-vec_a_prod_10 % vec_a_conj_00 + vec_a_prod_00 % vec_a_conj_01) %
-              vec_a_det;
-  vec_b_11 = (-vec_a_prod_10 % vec_a_conj_10 + vec_a_prod_00 % vec_a_conj_11) %
-              vec_a_det;
-  cub_b(arma::span(0), arma::span(0), arma::span::all) = vec_b_00;
-  cub_b(arma::span(0), arma::span(1), arma::span::all) = vec_b_01;
-  cub_b(arma::span(1), arma::span(0), arma::span::all) = vec_b_10;
-  cub_b(arma::span(1), arma::span(1), arma::span::all) = vec_b_11;
+  cub_b.tube(0, 0) =
+    (vec_a_prod_11 % vec_a_conj_00 - vec_a_prod_01 % vec_a_conj_01) % vec_a_det;
+  cub_b.tube(0, 1) =
+    (vec_a_prod_11 % vec_a_conj_10 - vec_a_prod_01 % vec_a_conj_11) % vec_a_det;
+  cub_b.tube(1, 0) = 
+    (vec_a_prod_00 % vec_a_conj_01 - vec_a_prod_10 % vec_a_conj_00) % vec_a_det;
+  cub_b.tube(1, 1) =
+    (vec_a_prod_00 % vec_a_conj_11 - vec_a_prod_10 % vec_a_conj_10) % vec_a_det;
 
   tsc_end = GetTime::Rdtsc();
   duration_ms = GetTime::CyclesToMs(tsc_end - tsc_start, freq_ghz);
