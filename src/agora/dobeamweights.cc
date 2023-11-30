@@ -414,6 +414,9 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
   const size_t last_sc_id =
       base_sc_id +
       std::min(cfg_->BeamBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
+  // printf("BeamBlockSize: %zu, OfdmDataNum: %zu,"
+  //        " base_sc_id: %zu, last_sc_id: %zu\n",
+  //        cfg_->BeamBlockSize(), cfg_->OfdmDataNum(), base_sc_id, last_sc_id);
 
   // Default: Handle each subcarrier one by one
   size_t sc_inc = 1;
@@ -435,8 +438,9 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
       cfg_->SpatialStreamsNum() == 1 &&
       cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kZF &&
       cfg_->Frame().NumDLSyms() == 0 &&
-      num_ext_ref_ == 0) {
-    if (start_sc == 0) {
+      num_ext_ref_ == 0 &&
+      kUseInverseForZF) {
+    if (start_sc == 0) { // TODO: fix this with beam blk size & sc group'n setup
       const size_t start_tsc1 = GetTime::WorkerRdtsc();
 
       // TODO: set flag to switch whether to group SCs
@@ -472,6 +476,192 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
       duration_stat_->task_count_++;
       duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;
     }
+    return;
+  } else if (cfg_->BsAntNum() == 2 && cfg_->UeAntNum() == 2 &&
+             cfg_->SpatialStreamsNum() == 2 &&
+             cfg_->BeamformingAlgo() == CommsLib::BeamformingAlgorithm::kZF &&
+             cfg_->Frame().NumDLSyms() == 0 &&
+             num_ext_ref_ == 0 &&
+             kUseInverseForZF) {
+    // if (start_sc == 0 && frame_id == 0) {
+    //   printf("Using 2x2 ZF\n");
+    // }
+
+    const size_t sc_vec_len = cfg_->OfdmDataNum() / sc_inc;
+    arma::cx_fcube cub_csi(cfg_->BsAntNum(), cfg_->SpatialStreamsNum(),
+                           sc_vec_len);
+    arma::cx_fcube cub_ul_beam(cfg_->SpatialStreamsNum(), cfg_->BsAntNum(),
+                               sc_vec_len);
+
+    const size_t start_tsc1 = GetTime::WorkerRdtsc();
+
+    // Gather CSI
+    // Handle each subcarrier in the block (base_sc_id : last_sc_id -1)
+    for (size_t cur_sc_id = start_sc; cur_sc_id < last_sc_id;
+         cur_sc_id = cur_sc_id + sc_inc) {
+
+      // Gather CSI matrices of each pilot from partially-transposed CSIs.
+      arma::uvec ue_list = mac_sched_->ScheduledUeList(frame_id, cur_sc_id);
+      for (size_t selected_ue_idx = 0;
+          selected_ue_idx < cfg_->SpatialStreamsNum(); selected_ue_idx++) {
+        size_t ue_idx = ue_list.at(selected_ue_idx);
+        auto* dst_csi_ptr = reinterpret_cast<float*>(
+            csi_gather_buffer_ + cfg_->BsAntNum() * selected_ue_idx);
+        if (kUsePartialTrans) {
+          PartialTransposeGather(
+              cur_sc_id,
+              reinterpret_cast<float*>(csi_buffers_[frame_slot][ue_idx]),
+              dst_csi_ptr, cfg_->BsAntNum());
+        } else {
+          TransposeGather(
+              cur_sc_id,
+              reinterpret_cast<float*>(csi_buffers_[frame_slot][ue_idx]),
+              dst_csi_ptr, cfg_->BsAntNum(), cfg_->OfdmDataNum());
+        }
+      }
+
+      arma::cx_fmat mat_csi_temp((arma::cx_float*)csi_gather_buffer_,
+                                 cfg_->BsAntNum(),
+                                 cfg_->SpatialStreamsNum(), false);
+
+      cub_csi.slice(cur_sc_id) = mat_csi_temp;
+    }
+    // complex_float* cx_src = &csi_buffers_[frame_slot][ue_idx][start_sc];
+    // for (size_t i = 0; i < sc_vec_len; ++i) {
+    //   // cub_csi.slice(i) = *(arma::cx_float*)(cx_src + i*sc_inc);
+    //   cub_csi.slice(i) = arma::cx_fmat(
+    //       (arma::cx_float*)(cx_src + i*sc_inc), cfg_->BsAntNum(),
+    //       cfg_->SpatialStreamsNum(), false);
+    // }
+
+    const size_t start_tsc2 = GetTime::WorkerRdtsc();
+    duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
+    
+    // for (size_t cur_sc_id = start_sc; cur_sc_id < last_sc_id;
+    //      cur_sc_id = cur_sc_id + sc_inc) {
+    //   arma::cx_fmat mat_csi = cub_csi.slice(cur_sc_id);
+
+    //   // arma::cx_fmat mat_ul_beam_tmp;
+    //   // if (kUseInverseForZF) {
+    //   //   try {
+    //   //     mat_ul_beam_tmp =
+    //   //         arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
+    //   //   } catch (std::runtime_error&) {
+    //   //     AGORA_LOG_WARN(
+    //   //         "Failed to invert channel matrix, falling back to pinv()\n");
+    //   //     arma::pinv(mat_ul_beam_tmp, mat_csi, 1e-2, "dc");
+    //   //   }
+    //   // } else {
+    //   //   arma::pinv(mat_ul_beam_tmp, mat_csi, 1e-2, "dc");
+    //   // }
+    //   // cub_ul_beam.slice(cur_sc_id) = mat_ul_beam_tmp;
+
+    //   cub_ul_beam.slice(cur_sc_id) =
+    //     arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
+    // }
+
+    // Equivalent to: arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
+
+    // A = [ a b ], B = [a''' b''']
+    //     [ c d ]      [c''' d''']
+
+    // // temporary storages
+    // // Product of A^T and A = A', A' = [a^2 + c^2, a*b + c*d] = [a' b']
+    // //                                 [a*b + c*d, b^2 + d^2]   [c' d']
+    // // Inversion of A' = A'' = [a'' b''] = [d'  -b'] / (a'*d' - b'*c')
+    // //                         [c'' d'']   [-c'  a']
+    // // Multiplication of A'' and A = [a''' b'''] = [a''*a + b''*c  a''*b + b''*d]
+    // //                               [c''' d''']   [c''*a + d''*c  c''*b + d''*d]
+    arma::cx_fvec vec_a_00(sc_vec_len, arma::fill::zeros);
+    arma::cx_fvec vec_a_01(sc_vec_len, arma::fill::zeros);
+    arma::cx_fvec vec_a_10(sc_vec_len, arma::fill::zeros);
+    arma::cx_fvec vec_a_11(sc_vec_len, arma::fill::zeros);
+    arma::cx_fvec vec_a_conj_00(sc_vec_len, arma::fill::zeros);
+    arma::cx_fvec vec_a_conj_01(sc_vec_len, arma::fill::zeros);
+    arma::cx_fvec vec_a_conj_10(sc_vec_len, arma::fill::zeros);
+    arma::cx_fvec vec_a_conj_11(sc_vec_len, arma::fill::zeros);
+    arma::cx_fvec vec_a_prod_00(sc_vec_len, arma::fill::zeros);
+    arma::cx_fvec vec_a_prod_01(sc_vec_len, arma::fill::zeros);
+    arma::cx_fvec vec_a_prod_10(sc_vec_len, arma::fill::zeros);
+    arma::cx_fvec vec_a_prod_11(sc_vec_len, arma::fill::zeros);
+    arma::cx_fvec vec_a_det(sc_vec_len, arma::fill::zeros);
+    arma::cx_fvec vec_b_00(sc_vec_len, arma::fill::zeros);
+    arma::cx_fvec vec_b_01(sc_vec_len, arma::fill::zeros);
+    arma::cx_fvec vec_b_10(sc_vec_len, arma::fill::zeros);
+    arma::cx_fvec vec_b_11(sc_vec_len, arma::fill::zeros);
+
+    vec_a_00 = cub_csi.tube(0, 0);
+    vec_a_01 = cub_csi.tube(0, 1);
+    vec_a_10 = cub_csi.tube(1, 0);
+    vec_a_11 = cub_csi.tube(1, 1);
+    vec_a_conj_00 = arma::conj(vec_a_00);
+    vec_a_conj_01 = arma::conj(vec_a_01);
+    vec_a_conj_10 = arma::conj(vec_a_10);
+    vec_a_conj_11 = arma::conj(vec_a_11);
+    // a' = a^2 + c^2, b' = a*b + c*d, c' = a*b + c*d, d' = b^2 + d^2
+    vec_a_prod_00 = vec_a_00 % vec_a_conj_00 + vec_a_10 % vec_a_conj_10;
+    vec_a_prod_01 = vec_a_conj_00 % vec_a_01 + vec_a_conj_10 % vec_a_11;
+    vec_a_prod_10 = arma::conj(vec_a_prod_01); // computationally equivalent
+    vec_a_prod_11 = vec_a_conj_01 % vec_a_01 + vec_a_conj_11 % vec_a_11;
+
+    // basically move the scalar det to the end, and substitute inversed matrix
+    // to the operand of the second multiplication
+
+    // a_det = a'*d' - b'*c'
+    vec_a_det = (vec_a_prod_00 % vec_a_prod_11) -
+                (vec_a_prod_01 % vec_a_prod_10);
+
+    // check if the channel matrix is invertible
+    if (vec_a_det.is_zero()) {
+      AGORA_LOG_ERROR("Channel matrix not invertible\n");
+    } else if (vec_a_det.is_zero(1e-10)) {
+      // float lowest > 1e-38, normal range > 1e-8
+      AGORA_LOG_WARN("Channel matrix seems not invertible\n");
+    }
+
+    // use reciprocal for division since multiplication is faster
+    vec_a_det = 1.0 / vec_a_det;
+
+    // a''' = a''*a + b''*b, b''' = a''*c + b''*d
+    // c''' = c''*a + d''*b, d''' = c''*c + d''*d
+    cub_ul_beam.tube(0, 0) =
+      (vec_a_prod_11 % vec_a_conj_00 - vec_a_prod_01 % vec_a_conj_01) %
+      vec_a_det;
+    cub_ul_beam.tube(0, 1) =
+      (vec_a_prod_11 % vec_a_conj_10 - vec_a_prod_01 % vec_a_conj_11) %
+      vec_a_det;
+    cub_ul_beam.tube(1, 0) =
+      (vec_a_prod_00 % vec_a_conj_01 - vec_a_prod_10 % vec_a_conj_00) %
+      vec_a_det;
+    cub_ul_beam.tube(1, 1) =
+      (vec_a_prod_00 % vec_a_conj_11 - vec_a_prod_10 % vec_a_conj_10) %
+      vec_a_det;
+
+    const size_t start_tsc3 = GetTime::WorkerRdtsc();
+    duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
+
+    for (size_t cur_sc_id = start_sc; cur_sc_id < last_sc_id;
+        cur_sc_id = cur_sc_id + sc_inc) {
+      complex_float* ul_beam_mem = ul_beam_matrices_[frame_slot][cur_sc_id];
+      arma::cx_fmat mat_ul_beam(reinterpret_cast<arma::cx_float*>(ul_beam_mem),
+                            cfg_->SpatialStreamsNum(), cfg_->BsAntNum(), false);
+      mat_ul_beam = cub_ul_beam.slice(cur_sc_id);
+    }
+    // // Distribute beam weights
+    // complex_float* ul_beam_mem = ul_beam_matrices_[frame_slot][start_sc];
+    // for (size_t i = 0; i < sc_vec_len; ++i) {
+    //   arma::cx_fmat mat_ul_beam = arma::cx_fmat(
+    //       (arma::cx_float*)(ul_beam_mem + i*sc_inc),
+    //       cfg_->SpatialStreamsNum(), cfg_->BsAntNum(), false);
+    //   mat_ul_beam = cub_ul_beam.slice(i);
+    //   // *(arma::cx_float*)(ul_beam_mem + i*sc_inc) = cub_ul_beam.slice(i);
+    // }
+
+    duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
+    duration_stat_->task_count_++;
+    printf("start_sc: %zu, last_sc_id: %zu, sc_inc: %zu\n",
+           start_sc, last_sc_id, sc_inc);
+    duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;
     return;
   }
 
