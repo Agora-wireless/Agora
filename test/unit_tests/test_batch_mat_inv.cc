@@ -32,8 +32,6 @@ void batch_mat_inv_sympd_arma_loop_slices(size_t vec_len, int dim,
   }
   tsc_end = GetTime::Rdtsc();
 
-  // cub_b.print("cub_b");
-
   duration_ms = GetTime::CyclesToMs(tsc_end - tsc_start, freq_ghz);
   // printf("Time measured = %.2f ms\n", duration_ms);
 }
@@ -115,10 +113,8 @@ void batch_mat_inv_sympd_arma_decomp_vec(size_t vec_len, int dim,
   cub_b.tube(1, 1) =
     cub_a_inv.tube(1, 0) % cub_a_conj.tube(1, 0) +
     cub_a_inv.tube(1, 1) % cub_a_conj.tube(1, 1);
+
   tsc_end = GetTime::Rdtsc();
-
-  // cub_b = cub_a_prod;
-
   duration_ms = GetTime::CyclesToMs(tsc_end - tsc_start, freq_ghz);
   // printf("Time measured = %.2f ms\n", duration_ms);
 }
@@ -176,9 +172,12 @@ void batch_mat_inv_sympd_arma_decomp_vec_simp(size_t vec_len, int dim,
   // to the operand of the second multiplication
 
   // a_det = a'*d' - b'*c'
+
+  // cub_a_det.tube(0, 0) =
+  //   cub_a_prod.tube(0, 1) % cub_a_prod.tube(1, 0);
   cub_a_det.tube(0, 0) =
-    cub_a_prod.tube(0, 0) % cub_a_prod.tube(1, 1) -
-    cub_a_prod.tube(0, 1) % cub_a_prod.tube(1, 0);
+    (cub_a_prod.tube(0, 0) % cub_a_prod.tube(1, 1)) -
+    (cub_a_prod.tube(0, 1) % cub_a_prod.tube(1, 0));
 
   // a''' = a''*a + b''*b, b''' = a''*c + b''*d
   // c''' = c''*a + d''*b, d''' = c''*c + d''*d
@@ -194,10 +193,100 @@ void batch_mat_inv_sympd_arma_decomp_vec_simp(size_t vec_len, int dim,
   cub_b.tube(1, 1) =
     (-cub_a_prod.tube(1, 0) % cub_a_conj.tube(1, 0) +
       cub_a_prod.tube(0, 0) % cub_a_conj.tube(1, 1)) / cub_a_det.tube(0, 0);
+
   tsc_end = GetTime::Rdtsc();
+  duration_ms = GetTime::CyclesToMs(tsc_end - tsc_start, freq_ghz);
+  // printf("Time measured = %.2f ms\n", duration_ms);
+}
 
-  // cub_b = cub_a_prod;
+/*
+ * Test 2x2xN cube slice-wise matrix inversion with vector decomposition.
+ * Simplified version of the above function (but not as straitforward).
+ * 
+ * Use intrinsic vectors as operands.
+ */
+void batch_mat_inv_sympd_arma_decomp_vec_simp_intrinsic(size_t vec_len, int dim,
+                                                        double freq_ghz,
+                                                        double& duration_ms,
+                                                        arma::cx_fcube cub_a,
+                                                        arma::cx_fcube& cub_b) {
+  RtAssert(dim == 2, "Only support 2x2 matrix inversion");
 
+  size_t tsc_start, tsc_end;
+  
+  // A = [ a b ], B = [a''' b''']
+  //     [ c d ]      [c''' d''']
+  // arma::cx_fcube cub_a(dim, dim, vec_len, arma::fill::randu);
+  // arma::cx_fcube cub_b(dim, dim, vec_len, arma::fill::zeros);
+
+  // temporary storages
+  // Product of A^T and A = A', A' = [a^2 + c^2, a*b + c*d] = [a' b']
+  //                                 [a*b + c*d, b^2 + d^2]   [c' d']
+  // Inversion of A' = A'' = [a'' b''] = [d'  -b'] / (a'*d' - b'*c')
+  //                         [c'' d'']   [-c'  a']
+  // Multiplication of A'' and A = [a''' b'''] = [a''*a + b''*c  a''*b + b''*d]
+  //                               [c''' d''']   [c''*a + d''*c  c''*b + d''*d]
+
+  arma::cx_fvec vec_a_00(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_a_01(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_a_10(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_a_11(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_a_conj_00(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_a_conj_01(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_a_conj_10(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_a_conj_11(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_a_prod_00(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_a_prod_01(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_a_prod_10(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_a_prod_11(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_a_det(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_a_inv_00(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_a_inv_01(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_a_inv_10(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_a_inv_11(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_b_00(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_b_01(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_b_10(vec_len, arma::fill::zeros);
+  arma::cx_fvec vec_b_11(vec_len, arma::fill::zeros);
+
+  tsc_start = GetTime::Rdtsc();
+  vec_a_00 = cub_a(arma::span(0), arma::span(0), arma::span::all);
+  vec_a_01 = cub_a(arma::span(0), arma::span(1), arma::span::all);
+  vec_a_10 = cub_a(arma::span(1), arma::span(0), arma::span::all);
+  vec_a_11 = cub_a(arma::span(1), arma::span(1), arma::span::all);
+  vec_a_conj_00 = arma::conj(vec_a_00);
+  vec_a_conj_01 = arma::conj(vec_a_01);
+  vec_a_conj_10 = arma::conj(vec_a_10);
+  vec_a_conj_11 = arma::conj(vec_a_11);
+  // a' = a^2 + c^2, b' = a*b + c*d, c' = a*b + c*d, d' = b^2 + d^2
+  vec_a_prod_00 = vec_a_00 % vec_a_conj_00 + vec_a_10 % vec_a_conj_10;
+  vec_a_prod_01 = vec_a_conj_00 % vec_a_01 + vec_a_conj_10 % vec_a_11;
+  vec_a_prod_10 = arma::conj(vec_a_prod_01); // computationally equivalent
+  // vec_a_prod_10 = vec_a_00 % vec_a_conj_01 + vec_a_10 % vec_a_conj_11;
+  vec_a_prod_11 = vec_a_conj_01 % vec_a_01 + vec_a_conj_11 % vec_a_11;
+
+  // a_det = a'*d' - b'*c'
+  // vec_a_det = (vec_a_prod_01 % vec_a_prod_10);
+  vec_a_det = (vec_a_prod_00 % vec_a_prod_11) - (vec_a_prod_01 % vec_a_prod_10);
+  // use reciprocal for division since multiplication is faster
+  vec_a_det = 1.0 / vec_a_det;
+
+  // a''' = a''*a + b''*b, b''' = a''*c + b''*d
+  // c''' = c''*a + d''*b, d''' = c''*c + d''*d
+  vec_b_00 = (vec_a_prod_11 % vec_a_conj_00 - vec_a_prod_01 % vec_a_conj_01) %
+             vec_a_det;
+  vec_b_01 = (vec_a_prod_11 % vec_a_conj_10 - vec_a_prod_01 % vec_a_conj_11) %
+              vec_a_det;
+  vec_b_10 = (-vec_a_prod_10 % vec_a_conj_00 + vec_a_prod_00 % vec_a_conj_01) %
+              vec_a_det;
+  vec_b_11 = (-vec_a_prod_10 % vec_a_conj_10 + vec_a_prod_00 % vec_a_conj_11) %
+              vec_a_det;
+  cub_b(arma::span(0), arma::span(0), arma::span::all) = vec_b_00;
+  cub_b(arma::span(0), arma::span(1), arma::span::all) = vec_b_01;
+  cub_b(arma::span(1), arma::span(0), arma::span::all) = vec_b_10;
+  cub_b(arma::span(1), arma::span(1), arma::span::all) = vec_b_11;
+
+  tsc_end = GetTime::Rdtsc();
   duration_ms = GetTime::CyclesToMs(tsc_end - tsc_start, freq_ghz);
   // printf("Time measured = %.2f ms\n", duration_ms);
 }
@@ -209,6 +298,7 @@ TEST(TestBatchMatInv, TimingAnalysis) {
   double time_ms_loop = 0.0;
   double time_ms_vectors = 0.0;
   double time_ms_vectors_simp = 0.0;
+  double time_ms_vectors_simp_intrinsic = 0.0;
   double freq_ghz = GetTime::MeasureRdtscFreq();
 
   double time_ms_tmp = 0.0;
@@ -229,8 +319,12 @@ TEST(TestBatchMatInv, TimingAnalysis) {
     time_ms_vectors += time_ms_tmp;
 
     batch_mat_inv_sympd_arma_decomp_vec_simp(vec_len, dim, freq_ghz, 
-                                             time_ms_tmp, cub_src ,cub_res);
+                                             time_ms_tmp, cub_src, cub_res);
     time_ms_vectors_simp += time_ms_tmp;
+    batch_mat_inv_sympd_arma_decomp_vec_simp_intrinsic(vec_len, dim, freq_ghz, 
+                                                       time_ms_tmp, cub_src,
+                                                       cub_res);
+    time_ms_vectors_simp_intrinsic += time_ms_tmp;
   }
   printf("[arma] (sympd) Time for %dx loops of slices = %.2f ms\n",
          iter, time_ms_loop);
@@ -238,6 +332,8 @@ TEST(TestBatchMatInv, TimingAnalysis) {
          iter, time_ms_vectors);
   printf("[arma] (sympd) Time for %dx vector decomposition (vec_simp) = %.2f ms\n",
          iter, time_ms_vectors_simp);
+  printf("[arma] (sympd) Time for %dx vector decomposition (vec_simp_intrinsic) = %.2f ms\n",
+         iter, time_ms_vectors_simp_intrinsic);
 }
 
 TEST(TestBatchMatInv, Correctness) {
@@ -267,10 +363,18 @@ TEST(TestBatchMatInv, Correctness) {
 
   batch_mat_inv_sympd_arma_decomp_vec_simp(vec_len, dim, freq_ghz,
                                            time_ms_dummy, cub_a, cub_b_2);
+
+  // Method 4: vector decomposition (simplified, intrinsic)
+  arma::cx_fcube cub_b_3(dim, dim, vec_len, arma::fill::zeros);
+
+  batch_mat_inv_sympd_arma_decomp_vec_simp_intrinsic(vec_len, dim, freq_ghz,
+                                                     time_ms_dummy, cub_a,
+                                                     cub_b_3);
   
   // Check the results
   EXPECT_TRUE(arma::approx_equal(cub_b, cub_b_1, "reldiff", 1e-2));
   EXPECT_TRUE(arma::approx_equal(cub_b, cub_b_2, "reldiff", 1e-2));
+  EXPECT_TRUE(arma::approx_equal(cub_b, cub_b_3, "reldiff", 1e-2));
 }
 
 int main(int argc, char** argv) {
