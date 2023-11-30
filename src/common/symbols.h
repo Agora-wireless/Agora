@@ -58,8 +58,6 @@ enum class EventType : int {
   kPacketToRp,
   kPacketFromRemote,
   kPacketToRemote,
-  kBeaconProc,
-  kCsiFeedback,
   kFFTPilot,
   kSNRReport,    // Signal new SNR measurement from PHY to MAC
   kRANUpdate,    // Signal new RAN config to Agora
@@ -200,7 +198,7 @@ static constexpr bool kUsePartialTrans = true;
 
 // Enable hard demodulation and disable LDPC decoding
 // Useful for evaluating constellation quality
-static constexpr bool kDownlinkHardDemod = true;
+static constexpr bool kDownlinkHardDemod = false;
 static constexpr bool kUplinkHardDemod = false;
 
 static constexpr bool kExportConstellation = false;

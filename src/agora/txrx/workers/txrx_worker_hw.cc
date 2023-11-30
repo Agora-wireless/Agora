@@ -85,14 +85,6 @@ void TxRxWorkerHw::DoTxRx() {
     const size_t tx_items = DoTx(time0);
     // If no items transmitted, then try to receive
     if (0 == tx_items) {
-      if (tid_ == 0) {  // only listen in on one thread
-        EventData event;
-        if (wired_ctrl_q_->try_dequeue(event)) {
-          assert(event.event_type_ == EventType::kPacketFromRemote);
-          const EventData rx_message(EventType::kPacketRX, event.tags_[0]);
-          NotifyComplete(rx_message);
-        }
-      }
       if (kSymbolTimingEnabled) {
         rx_times.at(receive_attempt.interface_).start_ticks_ = GetTime::Rdtsc();
       }
@@ -552,12 +544,12 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
           TxBeaconHw(tx_frame_id, radio_id, time0);
         }
 
-        if (Configuration()->Frame().NumDlControlSyms() > 0) {
-          TxBcastSymbolsHw(tx_frame_id, radio_id, time0);
-        }
-
         if (Configuration()->Frame().IsRecCalEnabled()) {
           TxReciprocityCalibPilots(tx_frame_id, radio_id, time0);
+        }
+
+        if (Configuration()->Frame().NumDlControlSyms() > 0) {
+          TxBcastSymbolsHw(tx_frame_id, radio_id, time0);
         }
       }
 
@@ -911,7 +903,7 @@ void TxRxWorkerHw::ScheduleTxInit(size_t frames_to_schedule, long long time0) {
         TxBeaconHw(frame, radio, time0);
       }
 
-      //Keep the assumption that Cal is before an 'D' symbols
+      //Keep the assumption that Cal is before 'D' and 'S'symbols
       // Maybe a good idea to combine / optimize the schedule by iterating through the entire frame symbol by symbol
       if (Configuration()->Frame().IsRecCalEnabled() == true) {
         TxReciprocityCalibPilots(frame, radio, time0);

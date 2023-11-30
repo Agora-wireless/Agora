@@ -54,6 +54,10 @@ TxRxWorkerSim::TxRxWorkerSim(
         config->BsRruAddr().c_str(), rem_port_id);
   }
   beacon_buffer_.resize(config->PacketLength());
+  tx_pilot_.resize(config->PacketLength());
+  auto* pilot_pkt = reinterpret_cast<Packet*>(tx_pilot_.data());
+  std::memcpy(pilot_pkt->data_, config->PilotCi16().data(),
+              config->PacketLength() - Packet::kOffsetOfData);
 }
 
 TxRxWorkerSim::~TxRxWorkerSim() = default;
@@ -167,6 +171,48 @@ void TxRxWorkerSim::SendBeacon(size_t frame_id) {
 
         udp_comm_.at(interface)->Send(beacon_buffer_.data(),
                                       beacon_buffer_.size());
+      }
+    }
+  }
+  if (Configuration()->UseExplicitCSI() &&
+      Configuration()->Frame().NumDLCalSyms() > 0) {
+    auto* pkt = reinterpret_cast<Packet*>(beacon_buffer_.data());
+
+    // For each C only 1 channel / antenna can send pilots.  All others send zeros for now, per schedule.
+    for (size_t dl_cal_sym_idx = 0;
+         dl_cal_sym_idx < Configuration()->Frame().NumDLCalSyms();
+         dl_cal_sym_idx++) {
+      const size_t tx_symbol_id =
+          Configuration()->Frame().GetDLCalSymbol(dl_cal_sym_idx);
+      //The antenna index that sends a DL pilot on this symbol
+      const size_t calib_antenna =
+          Configuration()->RecipCalDlAnt(frame_id, tx_symbol_id);
+      for (size_t interface = 0u; interface < num_interfaces_; interface++) {
+        const size_t global_interface_id = interface + interface_offset_;
+        for (size_t channel = 0u; channel < channels_per_interface_;
+             channel++) {
+          const size_t ant_id =
+              ((global_interface_id * channels_per_interface_) + channel);
+
+          AGORA_LOG_FRAME(
+              "TxRxWorkerSim[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
+              "%zu, Ant %zu) dl pilot tx has data %d on interface %zu\n",
+              tid_, frame_id, tx_symbol_id, radio_id, calib_antenna == ant_id,
+              global_interface_id);
+
+          if (calib_antenna == ant_id) {
+            auto* pilot_pkt = reinterpret_cast<Packet*>(tx_pilot_.data());
+            new (pilot_pkt)
+                Packet(frame_id, tx_symbol_id, 0 /* cell_id */, ant_id);
+
+            udp_comm_.at(interface)->Send(tx_pilot_.data(), tx_pilot_.size());
+          } else {
+            new (pkt) Packet(frame_id, tx_symbol_id, 0 /* cell_id */, ant_id);
+
+            udp_comm_.at(interface)->Send(beacon_buffer_.data(),
+                                          beacon_buffer_.size());
+          }
+        }
       }
     }
   }

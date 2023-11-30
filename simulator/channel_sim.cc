@@ -78,8 +78,9 @@ ChannelSim::ChannelSim(const Config* const config, size_t bs_thread_num,
   // initialize parameters from config
 
   ::srand(time(nullptr));
-  dl_data_plus_bcast_symbols_ =
-      cfg_->Frame().NumDLSyms() + cfg_->Frame().NumDlBcastSyms();
+  dl_data_plus_bcast_symbols_ = cfg_->Frame().NumDLSyms() +
+                                cfg_->Frame().NumDlBcastSyms() +
+                                cfg_->Frame().NumDLCalSyms();
   ul_data_plus_pilot_symbols_ =
       cfg_->Frame().NumULSyms() + cfg_->Frame().NumPilotSyms();
 
@@ -185,6 +186,7 @@ void ChannelSim::Run() {
             //Rx from base station
             case SymbolType::kBeacon:
             case SymbolType::kControl:
+            case SymbolType::kCalDL:
             case SymbolType::kDL: {
               const bool last_antenna =
                   bs_rx_.CompleteTask(frame_id, symbol_id);
@@ -262,6 +264,7 @@ void ChannelSim::Run() {
             //Tx to ue
             case SymbolType::kBeacon:
             case SymbolType::kControl:
+            case SymbolType::kCalDL:
             case SymbolType::kDL: {
               const bool last_symbol = ue_tx_.CompleteTask(frame_id);
               AGORA_LOG_SYMBOL(
@@ -602,7 +605,7 @@ void ChannelSim::DoTxUser(ChSimWorkerStorage* local, size_t tag) {
   AGORA_LOG_TRACE(
       "Channel Sim[%zu]: SimdConvertShortToFloat: DoTxUser Length %lld samps "
       "%lld bs ants %lld data size %zu\n",
-      local->Id(), fmat_src->n_elem, fmat_src->n_cols, fmat_src->n_rows,
+      local->Id(), fmat_src->n_elem, fmat_src->n_rows, fmat_src->n_cols,
       sizeof(arma::cx_float));
 
   arma::cx_fmat* fmat_noisy = local->BsOutput();

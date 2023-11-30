@@ -184,10 +184,10 @@ void DoBeamWeights::ComputePrecoder(
             } catch (std::runtime_error&) {
               AGORA_LOG_WARN(
                   "Failed to invert channel matrix, falling back to pinv()\n");
-              arma::pinv(mat_dl_beam_tmp, mat_csi, 1e-2, "dc");
+              arma::pinv(mat_dl_beam_tmp, mat_dl_csi, 1e-2, "dc");
             }
           } else {
-            arma::pinv(mat_dl_beam_tmp, mat_csi, 1e-2, "dc");
+            arma::pinv(mat_dl_beam_tmp, mat_dl_csi, 1e-2, "dc");
           }
           break;
         case CommsLib::BeamformingAlgorithm::kMMSE:

@@ -21,7 +21,6 @@
 #include "mkl_dfti.h"
 #include "simd_types.h"
 #include "stats.h"
-#include "udp_comm.h"
 
 class UeWorker {
  public:
@@ -118,9 +117,6 @@ class UeWorker {
   void DoDemul(size_t tag);
   void DoDecodeUe(DoDecodeClient* decoder, size_t tag);
 
-  void DoBeaconProc(size_t tag);
-  void DoSendCsiFeedback(size_t tag);
-
   size_t tid_;
 
   DFTI_DESCRIPTOR_HANDLE mkl_handle_;
@@ -146,7 +142,6 @@ class UeWorker {
   Table<complex_float>& modul_buffer_;
   Table<complex_float>& ifft_buffer_;
   char* const tx_buffer_;
-  Table<float> cfo_;
 
   // Downlink
   Table<char>& rx_buffer_;

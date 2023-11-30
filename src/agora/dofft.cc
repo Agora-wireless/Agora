@@ -176,6 +176,7 @@ EventData DoFFT::Launch(size_t tag) {
   size_t start_tsc1 = GetTime::WorkerRdtsc();
   duration_stat->task_duration_.at(1) += start_tsc1 - start_tsc;
 
+  // CFO correction of downlink pilot feedback
   if (false && sym_type == SymbolType::kCalDL && cfg_->UseExplicitCSI()) {
     float cfo = static_cast<float>(pkt->fill_[0]);
     arma::fvec theta =

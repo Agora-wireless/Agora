@@ -489,11 +489,15 @@ class Config {
     const auto type = GetSymbolType(symbol_id);
     if (type == SymbolType::kBeacon) {
       symbol_idx = Frame().GetBeaconSymbolIdx(symbol_id);
-    } else if (type == SymbolType::kControl) {
+    } else if (type == SymbolType::kCalDL) {
       symbol_idx =
-          Frame().GetDLControlSymbolIdx(symbol_id) + Frame().NumBeaconSyms();
+          Frame().GetDLCalSymbolIdx(symbol_id) + Frame().NumBeaconSyms();
+    } else if (type == SymbolType::kControl) {
+      symbol_idx = Frame().GetDLControlSymbolIdx(symbol_id) +
+                   Frame().NumBeaconSyms() + Frame().NumDLCalSyms();
     } else if (type == SymbolType::kDL) {
-      symbol_idx = Frame().GetDLSymbolIdx(symbol_id) + Frame().NumDlBcastSyms();
+      symbol_idx = Frame().GetDLSymbolIdx(symbol_id) +
+                   Frame().NumDlBcastSyms() + Frame().NumDLCalSyms();
     } else {
       throw std::runtime_error("Invalid BS Beacon or DL symbol id " +
                                std::to_string(symbol_id));

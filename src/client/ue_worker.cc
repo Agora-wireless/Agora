@@ -72,15 +72,11 @@ UeWorker::UeWorker(
   (void)DftiCreateDescriptor(&mkl_handle_, DFTI_SINGLE, DFTI_COMPLEX, 1,
                              config_.OfdmCaNum());
   (void)DftiCommitDescriptor(mkl_handle_);
-
-  cfo_.Calloc(kFrameWnd, config_.UeAntNum(),
-              Agora_memory::Alignment_t::kAlign64);
 }
 
 UeWorker::~UeWorker() {
   DftiFreeDescriptor(&mkl_handle_);
   FreeBuffer1d(&rx_samps_tmp_);
-  cfo_.Free();
   AGORA_LOG_INFO("UeWorker[%zu] Terminated\n", tid_);
 }
 
@@ -142,12 +138,6 @@ void UeWorker::TaskThread(size_t core_offset) {
         case EventType::kFFT: {
           DoFftData(event.tags_[0]);
         } break;
-        case EventType::kBeaconProc: {
-          DoBeaconProc(event.tags_[0]);
-        } break;
-        case EventType::kCsiFeedback: {
-          DoSendCsiFeedback(event.tags_[0]);
-        } break;
         default: {
           AGORA_LOG_INFO("***** Invalid Event Type [%d] in Work Queue\n",
                          static_cast<int>(event.event_type_));
@@ -160,64 +150,6 @@ void UeWorker::TaskThread(size_t core_offset) {
 //////////////////////////////////////////////////////////
 //                   DOWNLINK Operations                //
 //////////////////////////////////////////////////////////
-void UeWorker::DoBeaconProc(size_t tag) {
-  const size_t start_tsc = GetTime::Rdtsc();
-  Packet* pkt = rx_tag_t(tag).rx_packet_->RawPacket();
-  const size_t frame_id = pkt->frame_id_;
-  const size_t frame_slot = frame_id % kFrameWnd;
-  const size_t symbol_id = pkt->symbol_id_;
-  const size_t ant_id = pkt->ant_id_;
-  auto symbol_type = config_.GetSymbolType(symbol_id);
-  if (symbol_type == SymbolType::kBeacon) {
-    static constexpr size_t kWindowAlignment = 64;
-    size_t sample_window = config_.SampsPerSymbol();
-    const size_t padded_window =
-        (((sample_window / kWindowAlignment) + 1) * kWindowAlignment);
-
-    //Allocate memory, only used for beacon detection
-    std::vector<std::complex<float>> beacon_sym_cf32(
-        padded_window, std::complex<float>(0.0f, 0.0f));
-
-    // convert entire frame data to complex float for sync detection
-    ConvertShortToFloat(reinterpret_cast<const short*>(pkt->data_),
-                        reinterpret_cast<float*>(beacon_sym_cf32.data()),
-                        sample_window * 2);
-    int sync_index = CommsLib::FindBeaconAvx(
-        beacon_sym_cf32, config_.GoldCf32(), config_.ClCorrScale().at(ant_id));
-    sync_index -= 2 * config_.GoldCf32().size();
-    cfo_[frame_slot][ant_id] =
-        CommsLib::EstimateCFO(beacon_sym_cf32, sync_index,
-                              config_.GoldCf32().size());  // beacon_repeat = 2
-  }
-  size_t cfo_est_duration_stat = GetTime::Rdtsc() - start_tsc;
-  AGORA_LOG_INFO(
-      "UeWorker[%zu]: CFO Estimation (frame %zu, symbol %zu, ant %zu) Duration "
-      "%2.4f ms\n",
-      tid_, frame_id, symbol_id, ant_id,
-      GetTime::CyclesToMs(cfo_est_duration_stat, GetTime::MeasureRdtscFreq()));
-  fft_req_tag_t(tag).rx_packet_->Free();
-  EventData beacon_finish_event =
-      EventData(EventType::kBeaconProc,
-                gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_);
-  RtAssert(notify_queue_.enqueue(*ptok_.get(), beacon_finish_event),
-           "UeWorker: Beacon Proc message enqueue failed");
-}
-
-void UeWorker::DoSendCsiFeedback(size_t tag) {
-  Packet* pkt = rx_tag_t(tag).rx_packet_->RawPacket();
-  const size_t frame_id = pkt->frame_id_;
-  const size_t frame_slot = frame_id % kFrameWnd;
-  const size_t symbol_id = pkt->symbol_id_;
-  const size_t ant_id = pkt->ant_id_;
-  auto symbol_type = config_.GetSymbolType(symbol_id);
-  if (symbol_type == SymbolType::kCalDL) {
-    pkt->fill_[0] = static_cast<uint32_t>(cfo_[frame_slot][ant_id]);
-  }
-  EventData explicit_csi_event = EventData(EventType::kCsiFeedback, tag);
-  RtAssert(notify_queue_.enqueue(*ptok_.get(), explicit_csi_event),
-           "UeWorker: Explicit CSI Proc message enqueue failed");
-}
-
 void UeWorker::DoFftPilot(size_t tag) {
   const size_t start_tsc = GetTime::Rdtsc();
 

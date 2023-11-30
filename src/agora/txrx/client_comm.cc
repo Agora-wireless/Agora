@@ -64,7 +64,7 @@ void WiredControlChannel::SendEventToLocalPhy(std::byte* data) {
   rxpkt.Use();
 
   // create event from pkt
-  EventData msg(EventType::kPacketFromRemote, rx_tag_t(rxpkt).tag_);
+  EventData msg(EventType::kPacketRX, rx_tag_t(rxpkt).tag_);
   AGORA_LOG_INFO(
       "WiredControlChannel: Received wired control data for "
       "Frame %zu, Symbol %zu, Ant %zu\n",
@@ -109,7 +109,8 @@ void WiredControlChannel::ReceiveEventFromLocalPhy() {
 }
 
 void WiredControlChannel::SendPacketToRemotePhy(EventData event) {
-  assert(event.event_type_ == EventType::kPacketToRemote);
+  RtAssert(event.event_type_ == EventType::kPacketToRemote,
+           "Unexpected Event! Only kPacketToRemote is expected.");
   /*const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
   const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
   const size_t ue_id = gen_tag_t(event.tags_[0]).ant_id_;*/

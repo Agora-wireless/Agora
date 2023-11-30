@@ -40,6 +40,7 @@ class TxRxWorkerSim : public TxRxWorker {
   //socket for incomming messages (received data)
   std::vector<std::unique_ptr<UDPComm>> udp_comm_;
   std::vector<std::byte> beacon_buffer_;
+  std::vector<std::byte> tx_pilot_;
   double beacon_send_time_;
 };
 #endif  // TXRX_WORKER_SIM_H_

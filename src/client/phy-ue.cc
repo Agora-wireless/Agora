@@ -170,7 +170,6 @@ PhyUe::PhyUe(Config* config)
   }
   decode_counters_.Init(dl_data_symbol_perframe_, config_->UeAntNum());
   demul_counters_.Init(dl_data_symbol_perframe_, config_->UeAntNum());
-  beacon_counters_.Init(config_->Frame().NumBeaconSyms(), config_->UeAntNum());
   fft_dlpilot_counters_.Init(config->Frame().ClientDlPilotSymbols(),
                              config_->UeAntNum());
   fft_dldata_counters_.Init(dl_data_symbol_perframe_, config_->UeAntNum());
@@ -190,19 +189,14 @@ PhyUe::PhyUe(Config* config)
   }
 
   // This usage doesn't effect the user num_reciprocity_pkts_per_frame_;
-  size_t dl_pilots_num =
-      config->UseExplicitCSI() ? config->Frame().NumDLCalSyms() : 0;
   rx_counters_.num_rx_pkts_per_frame_ =
       config_->UeAntNum() *
       (config_->Frame().NumDLSyms() + config_->Frame().NumBeaconSyms());
-  rx_counters_.num_beacon_pkts_per_frame_ =
-      config_->UeAntNum() * config_->Frame().NumBeaconSyms();
   rx_counters_.num_pilot_pkts_per_frame_ =
       config_->UeAntNum() * config_->Frame().ClientDlPilotSymbols();
   rx_counters_.num_reciprocity_pkts_per_frame_ =
       config_->UeAntNum() * config_->Frame().NumDLCalSyms();
 
-  csi_feedback_deferral_.resize(kFrameWnd);
   rx_downlink_deferral_.resize(kFrameWnd);
 
   // Mac counters for downlink data
@@ -267,45 +261,17 @@ void PhyUe::ScheduleWork(EventData do_task) {
 
 void PhyUe::ReceiveDownlinkSymbol(Packet* rx_packet, size_t tag) {
   const size_t frame_slot = rx_packet->frame_id_ % kFrameWnd;
-  auto symbol_type = config_->GetSymbolType(rx_packet->symbol_id_);
+  const size_t dl_symbol_idx =
+      config_->Frame().GetDLSymbolIdx(rx_packet->symbol_id_);
+  if (dl_symbol_idx < config_->Frame().ClientDlPilotSymbols()) {
+    ScheduleWork(EventData(EventType::kFFTPilot, tag));
+  } else if (fft_dlpilot_counters_.IsLastSymbol(rx_packet->frame_id_)) {
+    ScheduleWork(EventData(EventType::kFFT, tag));
+  } else {
+    std::queue<EventData>* defferal_queue =
+        &rx_downlink_deferral_.at(frame_slot);
 
-  // if symbol is a pilot or we are finished with all pilot ffts for the given
-  // frame
-  if (symbol_type == SymbolType::kDL) {
-    const size_t dl_symbol_idx =
-        config_->Frame().GetDLSymbolIdx(rx_packet->symbol_id_);
-    if (dl_symbol_idx < config_->Frame().ClientDlPilotSymbols()) {
-      ScheduleWork(EventData(EventType::kFFTPilot, tag));
-    } else if (fft_dlpilot_counters_.IsLastSymbol(rx_packet->frame_id_)) {
-      ScheduleWork(EventData(EventType::kFFT, tag));
-    } else {
-      std::queue<EventData>* defferal_queue =
-          &rx_downlink_deferral_.at(frame_slot);
-
-      defferal_queue->push(EventData(EventType::kFFT, tag));
-    }
-  } else if (symbol_type == SymbolType::kCalDL) {
-    //ScheduleWork(EventData(EventType::kCsiFeedback, tag));
-    ScheduleTask(EventData(EventType::kPacketToRemote, tag), &wcc_tx_queue_,
-                 *wcc_ptok_);
-    /*if (beacon_counters_.IsLastSymbol(rx_packet->frame_id_)) {
-      ScheduleWork(EventData(EventType::kCsiFeedback, tag));
-    } else {
-      std::queue<EventData>* defferal_queue =
-          &csi_feedback_deferral_.at(frame_slot);
-      defferal_queue->push(EventData(EventType::kCsiFeedback, tag));
-    }*/
-  }
-}
-
-void PhyUe::ScheduleDefferedCsiFeedback(size_t frame_id) {
-  const size_t frame_slot = frame_id % kFrameWnd;
-  std::queue<EventData>* defferal_queue =
-      &csi_feedback_deferral_.at(frame_slot);
-
-  while (!defferal_queue->empty()) {
-    ScheduleWork(defferal_queue->front());
-    defferal_queue->pop();
+    defferal_queue->push(EventData(EventType::kFFT, tag));
   }
 }
 
@@ -464,79 +430,48 @@ void PhyUe::Start() {
           }
 
           // Schedule uplink pilots transmission and uplink processing
-          //if (symbol_id == config_->Frame().GetBeaconSymbolLast()) {
-          if (config_->Frame().GetBeaconSymbolIdx(symbol_id) != SIZE_MAX) {
-            rx_counters_.num_beacon_pkts_.at(frame_slot)++;
-            //ScheduleWork(EventData(EventType::kBeaconProc, event.tags_[0u]));
-            if (rx_counters_.num_beacon_pkts_.at(frame_slot) ==
-                rx_counters_.num_beacon_pkts_per_frame_) {
-              rx_counters_.num_beacon_pkts_.at(frame_slot) = 0;
-              // Schedule Pilot after receiving last beacon
-              // (Only when in Downlink Only mode, otherwise the pilots
-              // will be transmitted with the uplink data)
-              if (ul_symbol_perframe_ == 0) {
-                const EventData do_tx_pilot_task(
-                    EventType::kPacketPilotTX,
-                    gen_tag_t::FrmUe(frame_id, ant_id).tag_);
-                ScheduleTask(do_tx_pilot_task, &tx_queue_,
-                             *tx_ptoks_ptr_[ru_->AntNumToWorkerId(ant_id)]);
-              } else {
-                // Schedule the Uplink tasks
-                for (size_t symbol_idx = 0;
-                     symbol_idx < config_->Frame().NumULSyms(); symbol_idx++) {
-                  if (symbol_idx < config_->Frame().ClientUlPilotSymbols()) {
-                    EventData do_ifft_task(
-                        EventType::kIFFT,
-                        gen_tag_t::FrmSymUe(
-                            frame_id, config_->Frame().GetULSymbol(symbol_idx),
-                            ant_id)
-                            .tag_);
-                    ScheduleWork(do_ifft_task);
-                  } else {
-                    EventData do_encode_task(
-                        EventType::kEncode,
-                        gen_tag_t::FrmSymUe(
-                            frame_id, config_->Frame().GetULSymbol(symbol_idx),
-                            ant_id)
-                            .tag_);
-                    ScheduleWork(do_encode_task);
-                  }
-                }  // For all UL Symbols
-              }
+          if (symbol_id == config_->Frame().GetBeaconSymbolLast()) {
+            // Schedule Pilot after receiving last beacon
+            // (Only when in Downlink Only mode, otherwise the pilots
+            // will be transmitted with the uplink data)
+            if (ul_symbol_perframe_ == 0) {
+              const EventData do_tx_pilot_task(
+                  EventType::kPacketPilotTX,
+                  gen_tag_t::FrmUe(frame_id, ant_id).tag_);
+              ScheduleTask(do_tx_pilot_task, &tx_queue_,
+                           *tx_ptoks_ptr_[ru_->AntNumToWorkerId(ant_id)]);
+            } else {
+              // Schedule the Uplink tasks
+              for (size_t symbol_idx = 0;
+                   symbol_idx < config_->Frame().NumULSyms(); symbol_idx++) {
+                if (symbol_idx < config_->Frame().ClientUlPilotSymbols()) {
+                  EventData do_ifft_task(
+                      EventType::kIFFT,
+                      gen_tag_t::FrmSymUe(
+                          frame_id, config_->Frame().GetULSymbol(symbol_idx),
+                          ant_id)
+                          .tag_);
+                  ScheduleWork(do_ifft_task);
+                } else {
+                  EventData do_encode_task(
+                      EventType::kEncode,
+                      gen_tag_t::FrmSymUe(
+                          frame_id, config_->Frame().GetULSymbol(symbol_idx),
+                          ant_id)
+                          .tag_);
+                  ScheduleWork(do_encode_task);
+                }
+              }  // For all UL Symbols
             }
           }
 
-          if (symbol_type == SymbolType::kDL ||
-              symbol_type == SymbolType::kCalDL) {
-            if (symbol_type == SymbolType::kCalDL) {
-              std::cout << "Received Cal DL Symbol here! Why?" << std::endl;
-            }
+          if (symbol_type == SymbolType::kDL) {
             ReceiveDownlinkSymbol(pkt, event.tags_[0]);
           } else {
             rx->Free();
           }
         } break;
 
-        case EventType::kBeaconProc: {
-          const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          //const size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
-          const bool tasks_complete =
-              beacon_counters_.CompleteTask(frame_id, symbol_id);
-          if (tasks_complete) {
-            const bool beacon_complete =
-                beacon_counters_.CompleteSymbol(frame_id);
-            if (beacon_complete) {
-              ScheduleDefferedCsiFeedback(frame_id);
-            }
-          }
-
-        } break;
-        case EventType::kCsiFeedback: {
-          ScheduleTask(EventData(EventType::kPacketToRemote, event.tags_[0]),
-                       &wcc_tx_queue_, *wcc_ptok_);
-
-        } break;
         case EventType::kFFTPilot: {
           const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;

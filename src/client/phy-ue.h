@@ -57,12 +57,10 @@ class PhyUe {
   void PrintPerFrameDone(PrintType print_type, size_t frame_id);
 
   void ReceiveDownlinkSymbol(Packet* rx_packet, size_t tag);
-  void ScheduleDefferedCsiFeedback(size_t frame_id);
   void ScheduleDefferedDownlinkSymbols(size_t frame_id);
   void ClearCsi(size_t frame_id);
 
   std::vector<std::queue<EventData>> rx_downlink_deferral_;
-  std::vector<std::queue<EventData>> csi_feedback_deferral_;
   std::unique_ptr<MacScheduler> mac_sched_;
   std::unique_ptr<Stats> stats_;
   std::unique_ptr<PhyStats> phy_stats_;
@@ -231,7 +229,6 @@ class PhyUe {
   FrameCounters demul_counters_;
   FrameCounters fft_dldata_counters_;
   FrameCounters fft_dlpilot_counters_;
-  FrameCounters beacon_counters_;
   // Uplink (Tx)
   FrameCounters encode_counter_;
   FrameCounters modulation_counters_;

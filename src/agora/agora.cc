@@ -130,9 +130,9 @@ void Agora::SendSnrReport(EventType event_type, size_t frame_id,
 
 void Agora::ScheduleDownlinkProcessing(size_t frame_id) {
   // Schedule broadcast symbols generation
-  /*if (config_->Frame().NumDlControlSyms() > 0) {
+  if (config_->Frame().NumDlControlSyms() > 0) {
     ScheduleBroadCastSymbols(EventType::kBroadcast, frame_id);
-  }*/
+  }
 
   // Schedule beamformed pilot symbols mapping
   size_t num_pilot_symbols = config_->Frame().ClientDlPilotSymbols();
@@ -1149,7 +1149,7 @@ void Agora::InitializeCounters() {
     //    std::vector<size_t>(config_->Frame().NumDLSyms(), SIZE_MAX);
     ifft_counters_.Init(config_->Frame().NumDLSyms(), config_->BsAntNum());
     tx_counters_.Init(
-        /*config_->Frame().NumDlControlSyms() +*/ config_->Frame().NumDLSyms(),
+        config_->Frame().NumDlControlSyms() + config_->Frame().NumDLSyms(),
         config_->BsAntNum());
     // mac data is sent per frame, so we set max symbol to 1
     mac_to_phy_counters_.Init(1, config_->SpatialStreamsNum());
@@ -1215,7 +1215,7 @@ void Agora::InitializeThreads() {
     wcc_thread_ = std::make_unique<WiredControlChannel>(
         config_, wired_cpu_core, wired_cpu_core, config_->BsServerAddr(),
         config_->WccRxPort(), config_->UeServerAddr(), config_->WccTxPort(),
-        &wcc_rx_queue_, &wcc_rx_queue_);
+        &message_queue_, &wcc_rx_queue_);
     wcc_std_thread_ =
         std::thread(&WiredControlChannel::RunRxEventLoop, wcc_thread_.get());
   }

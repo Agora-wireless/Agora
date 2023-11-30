@@ -336,10 +336,6 @@ class RxCounters {
   // num_pkt[i] is the total number of packets we've received for frame i
   std::array<size_t, kFrameWnd> num_pkts_;
 
-  // num_beacon_pkts[i] is the total number of beacon packets we've received
-  // for frame i
-  std::array<size_t, kFrameWnd> num_beacon_pkts_;
-
   // num_pilot_pkts[i] is the total number of pilot packets we've received
   // for frame i
   std::array<size_t, kFrameWnd> num_pilot_pkts_;
@@ -351,9 +347,6 @@ class RxCounters {
   // Number of packets we'll receive per frame on the uplink
   size_t num_rx_pkts_per_frame_;
 
-  // Number of beacon packets we'll receive per frame
-  size_t num_beacon_pkts_per_frame_;
-
   // Number of pilot packets we'll receive per frame
   size_t num_pilot_pkts_per_frame_;
 
@@ -363,7 +356,6 @@ class RxCounters {
   RxCounters() {
     num_pkts_.fill(0);
     num_pilot_pkts_.fill(0);
-    num_beacon_pkts_.fill(0);
     num_reciprocity_pkts_.fill(0);
   }
 };
