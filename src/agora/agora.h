@@ -203,6 +203,7 @@ class Agora {
   moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
 
+  size_t num_txrx_tokens_;
   uint8_t schedule_process_flags_;
   std::queue<size_t> encode_deferral_;
 

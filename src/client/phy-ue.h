@@ -83,6 +83,7 @@ class PhyUe {
   void ScheduleWork(EventData do_task);
 
   std::unique_ptr<moodycamel::ProducerToken> work_producer_token_;
+  std::unique_ptr<moodycamel::ProducerToken> wired_token_;
 
   void InitializeVarsFromCfg();
 
@@ -220,7 +221,6 @@ class PhyUe {
   moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* mac_rx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* mac_tx_ptoks_ptr_[kMaxThreads];
-  moodycamel::ProducerToken* wcc_ptok_;
 
   // all checkers
   FrameCounters tx_counters_;

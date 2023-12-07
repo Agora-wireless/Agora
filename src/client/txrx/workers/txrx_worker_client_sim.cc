@@ -61,6 +61,18 @@ TxRxWorkerClientSim::TxRxWorkerClientSim(
                   config->PacketLength() - Packet::kOffsetOfData);
     }
   }
+  size_t core_offset_worker = config->UeCoreOffset() + 1 +
+                              config->UeSocketThreadNum() + kEnableMac +
+                              config->UeWorkerThreadNum() + 1;
+  if (config->UseExplicitCSI()) {
+    char* dummy_buffer;
+    wcc_thread_ = std::make_unique<WiredControlChannel>(
+        config, core_offset_worker, core_offset_worker, config->UeServerAddr(),
+        config->WccTxPort(), config->BsServerAddr(), config->WccRxPort(),
+        wcc_tx_queue_, wcc_tx_queue_, wcc_tx_producer_, dummy_buffer, 0);
+    /*wcc_std_thread_ =
+        std::thread(&WiredControlChannel::RunTxEventLoop, wcc_thread_.get());*/
+  }
 }
 
 TxRxWorkerClientSim::~TxRxWorkerClientSim() = default;
@@ -129,17 +141,27 @@ std::vector<Packet*> TxRxWorkerClientSim::RecvEnqueue(size_t interface_id) {
                SymbolType::kCalDL) {
       const EventData feedback_event(EventType::kPacketToRemote,
                                      rx_tag_t(&rx_placement).tag_);
-      if (wired_ctrl_q_->try_enqueue(*wired_ctrl_token_, feedback_event) ==
+      AGORA_LOG_INFO(
+          "WiredControlChannel: Transmitting wired control data for Frame "
+          "%zu, Symbol %zu, Ant %zu\n",
+          pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
+      wcc_thread_->SendPacketToRemotePhy(feedback_event);
+      /*if (wired_ctrl_q_->try_enqueue(*wired_ctrl_token_, feedback_event) ==
           false) {
-        AGORA_LOG_INFO(
+        AGORA_LOG_ERROR(
             "Wired Ctrl Queue: Cannot enqueue task, need more "
             "memory");
         if (wired_ctrl_q_->enqueue(*wired_ctrl_token_, feedback_event) ==
             false) {
-          AGORA_LOG_INFO("Wired Ctrl Queue: task enqueue failed\n");
+          AGORA_LOG_ERROR("Wired Ctrl Queue: task enqueue failed\n");
           throw std::runtime_error("Wired Ctrl Queue: task enqueue failed");
         }
       }
+      AGORA_LOG_INFO(
+          "TxRxWorkerClient: Queued event for calibration symbols at frame %zu "
+          "for antenna %zu\n",
+          pkt->frame_id_, pkt->ant_id_);*/
+      ReturnRxPacket(rx_placement);
     } else {
       // Push kPacketRX event into the queue.
       const EventData rx_message(EventType::kPacketRX,

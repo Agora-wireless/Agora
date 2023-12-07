@@ -98,8 +98,6 @@ PhyUe::PhyUe(Config* config)
   work_producer_token_ =
       std::make_unique<moodycamel::ProducerToken>(work_queue_);
 
-  wcc_ptok_ = new moodycamel::ProducerToken(wcc_tx_queue_);
-
   // uplink buffers init (tx)
   InitializeUplinkBuffers();
   // downlink buffers init (rx)
@@ -138,31 +136,25 @@ PhyUe::PhyUe(Config* config)
         ul_syms_buffer_, modul_buffer_, ifft_buffer_, tx_buffer_, rx_buffer_,
         csi_buffer_, equal_buffer_, non_null_sc_ind_, fft_buffer_,
         demod_buffer_, decoded_buffer_, ue_pilot_vec_);
-
+    // Worker internally calculates the core offset
     new_worker->Start(core_offset_worker);
     workers_.push_back(std::move(new_worker));
   }
 
+  core_offset_worker = config_->UeCoreOffset() + 1 + rx_thread_num_ +
+                       config_->UeWorkerThreadNum();
   if (kRecordDownlinkFrame && config_->Frame().NumDLSyms() > 0) {
     auto& new_recorder = recorders_.emplace_back(
         std::make_unique<Agora_recorder::RecorderThread>(
-            config_, 0, core_offset_worker + config_->UeWorkerThreadNum(),
+            config_, 0, core_offset_worker,
             kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntNum() *
                 kDefaultQueueSize,
             0, config_->UeAntNum(), kRecordFrameInterval, Direction::kDownlink,
             kRecorderTypes, true));
+    core_offset_worker++;
     new_recorder->Start();
   }
 
-  if (config_->UseExplicitCSI()) {
-    core_offset_worker += config_->UeWorkerThreadNum() + 1;
-    wcc_thread_ = std::make_unique<WiredControlChannel>(
-        config_, core_offset_worker, core_offset_worker,
-        config_->UeServerAddr(), config_->WccTxPort(), config_->BsServerAddr(),
-        config_->WccRxPort(), &wcc_tx_queue_, &wcc_tx_queue_);
-    wcc_std_thread_ =
-        std::thread(&WiredControlChannel::RunTxEventLoop, wcc_thread_.get());
-  }
   // initilize all kinds of checkers
   // Init the frame work tracking structure
   for (size_t frame = 0; frame < this->frame_tasks_.size(); frame++) {

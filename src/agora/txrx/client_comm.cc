@@ -9,19 +9,23 @@
 
 // ticks every ~1s
 WiredControlChannel::WiredControlChannel(
-    Config* cfg, size_t tx_core_offset, size_t rx_core_offset,
+    Config* cfg, size_t rx_core_offset, size_t tx_core_offset,
     std::string local_addr, size_t local_port, std::string remote_addr,
     size_t remote_port, moodycamel::ConcurrentQueue<EventData>* rx_queue,
     moodycamel::ConcurrentQueue<EventData>* tx_queue,
-    const std::string& log_filename)
+    moodycamel::ProducerToken* rx_producer, char* rx_socket_buf,
+    size_t rx_pkt_num, const std::string& log_filename)
     : cfg_(cfg),
       freq_ghz_(GetTime::MeasureRdtscFreq()),
-      tsc_delta_((cfg_->GetFrameDurationSec() * 1e9) / freq_ghz_ * 1000),
-      tx_core_offset_(tx_core_offset),
+      tsc_delta_((cfg_->GetFrameDurationSec() * 1e9) / freq_ghz_),
       rx_core_offset_(rx_core_offset),
+      tx_core_offset_(tx_core_offset),
       pkt_tracker_(0),
       rx_queue_(rx_queue),
-      tx_queue_(tx_queue) {
+      tx_queue_(tx_queue),
+      rx_producer_(rx_producer),
+      rx_socket_buf_(rx_socket_buf),
+      max_pkt_cnt_(rx_pkt_num) {
   // Set up log file
   if (log_filename.empty() == false) {
     log_filename_ = log_filename;  // Use a non-default log filename
@@ -36,9 +40,11 @@ WiredControlChannel::WiredControlChannel(
 
   const size_t udp_pkt_len = cfg_->PacketLength();
   udp_pkt_buf_.resize(udp_pkt_len);
-
-  rx_socket_buf_.Calloc(kFrameWnd, cfg_->PacketLength(),
-                        Agora_memory::Alignment_t::kAlign64);
+  for (size_t buffer = 0; buffer < max_pkt_cnt_; buffer++) {
+    auto* pkt_loc = reinterpret_cast<Packet*>(
+        &rx_socket_buf_[buffer * cfg_->PacketLength()]);
+    rx_packets_.emplace_back(pkt_loc);
+  }
 
   AGORA_LOG_INFO(
       "WiredControlChannel: Setting up UDP server for Wired Control Channel "
@@ -51,50 +57,103 @@ WiredControlChannel::WiredControlChannel(
 
 WiredControlChannel::~WiredControlChannel() {
   std::fclose(log_file_);
-  rx_socket_buf_.Free();
+  //delete tx_producer_;
   AGORA_LOG_INFO("WiredControlChannel: Thread destroyed\n");
 }
 
-/*
- * RP -> ReceiveUdpPacketsFromRp() -> SendEventToAgora(payload) -> Agora
- */
-void WiredControlChannel::SendEventToLocalPhy(std::byte* data) {
-  RxPacket rxpkt(reinterpret_cast<Packet*>(data));
-  auto* pkt = rxpkt.RawPacket();
-  rxpkt.Use();
+RxPacket& WiredControlChannel::GetRxPacket() {
+  RxPacket& new_packet = rx_packets_.at(pkt_tracker_);
+  AGORA_LOG_TRACE(
+      "WiredControlChannel: Getting new rx packet at location %ld\n",
+      reinterpret_cast<intptr_t>(&new_packet));
 
-  // create event from pkt
-  EventData msg(EventType::kPacketRX, rx_tag_t(rxpkt).tag_);
-  AGORA_LOG_INFO(
-      "WiredControlChannel: Received wired control data for "
-      "Frame %zu, Symbol %zu, Ant %zu\n",
-      pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
-  RtAssert(rx_queue_->enqueue(msg),
-           "WiredControlChannel: Failed to enqueue control packet");
+  // if rx_buffer is full, exit
+  if (new_packet.Empty() == false) {
+    AGORA_LOG_ERROR("WiredControlChannel: rx buffer full, memory overrun\n");
+    throw std::runtime_error("rx buffer full, memory overrun");
+  }
+  // Mark the packet as used
+  new_packet.Use();
+
+  pkt_tracker_ = (pkt_tracker_ + 1);
+  //Round robbin
+  if (pkt_tracker_ == max_pkt_cnt_) {
+    pkt_tracker_ = 0;
+  }
+  return new_packet;
 }
 
-void WiredControlChannel::ReceivePacketFromRemotePhy() {
-  std::byte* pkt_udp = GetNextPacketBuff();
-  std::memset(pkt_udp, 0, cfg_->PacketLength());
-  ssize_t ret = udp_comm_->Recv(pkt_udp, cfg_->PacketLength());
+void WiredControlChannel::ReturnRxPacket(RxPacket& unused_packet) {
+  size_t new_index;
+  //Decrement the rx_memory_idx
+  if (pkt_tracker_ == 0) {
+    new_index = max_pkt_cnt_ - 1;
+  } else {
+    new_index = pkt_tracker_ - 1;
+  }
+  const RxPacket& returned_packet = rx_packets_.at(new_index);
+  //Make sure we are returning the correct packet, used for extra error checking
+  if (&returned_packet != &unused_packet) {
+    AGORA_LOG_WARN(
+        "WiredControlChannel: returned memory that wasn't used last at address "
+        "%ld\n",
+        reinterpret_cast<intptr_t>(&unused_packet));
+  } else {
+    //If they are the same, reuse the old position
+    pkt_tracker_ = new_index;
+  }
+  // if the returned packet is free, something is wrong
+  if (unused_packet.Empty()) {
+    AGORA_LOG_ERROR(
+        "WiredControlChannel: rx buffer returned free memory at address %ld\n",
+        reinterpret_cast<intptr_t>(&unused_packet));
+    throw std::runtime_error(
+        "WiredControlChannel: rx buffer returned free memory");
+  }
+  // Mark the packet as free
+  unused_packet.Free();
+}
+
+bool WiredControlChannel::SendEventToLocalPhy(RxPacket& rx_packet) {
+  // create event from pkt
+  EventData msg(EventType::kPacketRX, rx_tag_t(rx_packet).tag_);
+  auto enqueue_status = rx_queue_->enqueue(*rx_producer_, msg);
+  if (enqueue_status == false) {
+    throw std::runtime_error(
+        "WiredControlChannel: Failed to enqueue control packet");
+  }
+  return enqueue_status;
+}
+
+bool WiredControlChannel::ReceivePacketFromRemotePhy() {
+  RxPacket& rx_packet = GetRxPacket();
+  Packet* pkt = rx_packet.RawPacket();
+
+  ssize_t ret =
+      udp_comm_->Recv(reinterpret_cast<std::byte*>(pkt), cfg_->PacketLength());
   if (ret == 0) {
     AGORA_LOG_TRACE("WiredControlChannel: No data received\n");
-    return;
+    ReturnRxPacket(rx_packet);
+    return false;
   } else if (ret < 0) {
     AGORA_LOG_TRACE("WiredControlChannel: Error in reception %zu\n", ret);
     cfg_->Running(false);
-    return;
+    return false;
+  } else if (ret < cfg_->PacketLength()) {
+    AGORA_LOG_ERROR(
+        "ReceivePacketFromRemotePhy: Udp Recv failed to receive all expected "
+        "bytes");
+    cfg_->Running(false);
+    return false;
   }
-  SendEventToLocalPhy(pkt_udp);
+  return SendEventToLocalPhy(rx_packet);
 }
 
-/*
- * Agora -> ReceiveEventFromAgora() -> SendUdpPacketsToRp(event) -> RP
- */
-void WiredControlChannel::ReceiveEventFromLocalPhy() {
+bool WiredControlChannel::ReceiveEventFromLocalPhy() {
   EventData event;
-  if (tx_queue_->try_dequeue(event) == false) {
-    return;
+  if (tx_queue_->try_dequeue_from_producer(*tx_producer_, event) == false) {
+    AGORA_LOG_ERROR("Wired Ctrl Dequeue: task dequeue failed\n");
+    return false;
   }
 
   if (event.event_type_ == EventType::kPacketToRemote) {
@@ -105,19 +164,18 @@ void WiredControlChannel::ReceiveEventFromLocalPhy() {
         "%zu, Symbol %zu, Ant %zu\n",
         pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
     SendPacketToRemotePhy(event);
+    return true;
   }
+  AGORA_LOG_ERROR("Wired Ctrl Dequeue: not a kPacketToRemote event!\n");
+  return false;
 }
 
 void WiredControlChannel::SendPacketToRemotePhy(EventData event) {
   RtAssert(event.event_type_ == EventType::kPacketToRemote,
            "Unexpected Event! Only kPacketToRemote is expected.");
-  /*const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-  const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-  const size_t ue_id = gen_tag_t(event.tags_[0]).ant_id_;*/
   RxPacket* rxpkt = rx_tag_t(event.tags_[0]).rx_packet_;
   Packet* pkt = rxpkt->RawPacket();
   udp_comm_->Send(reinterpret_cast<std::byte*>(pkt), cfg_->PacketLength());
-  rxpkt->Free();
 }
 
 void WiredControlChannel::RunTxEventLoop() {
@@ -130,13 +188,19 @@ void WiredControlChannel::RunTxEventLoop() {
                       0 /* thread ID */, false, true);
   // keep the frequency of function call
   size_t last_frame_tx_tsc = 0;
-
+  size_t frame = 0;
   while (cfg_->Running() == true) {
-    ReceiveEventFromLocalPhy();
-    /*if ((GetTime::Rdtsc() - last_frame_tx_tsc) > tsc_delta_) {
-      ReceiveEventFromLocalPhy();
+    size_t packet_count = 0;
+    if ((GetTime::Rdtsc() - last_frame_tx_tsc) > tsc_delta_) {
+      while (cfg_->Running() == true &&
+             //((GetTime::Rdtsc() - last_frame_tx_tsc) < tsc_delta_) &&
+             packet_count < cfg_->Frame().NumDLCalSyms() * cfg_->UeAntNum()) {
+        if (ReceiveEventFromLocalPhy()) packet_count++;
+      }
       last_frame_tx_tsc = GetTime::Rdtsc();
-    }*/
+      AGORA_LOG_INFO("Finished sending %zu calibration symbols in Frame %zu.\n",
+                     packet_count, frame++);
+    }
   }
 }
 
@@ -152,10 +216,13 @@ void WiredControlChannel::RunRxEventLoop() {
   size_t last_frame_rx_tsc = 0;
 
   while (cfg_->Running() == true) {
-    ReceivePacketFromRemotePhy();
-    /*if ((GetTime::Rdtsc() - last_frame_rx_tsc) > tsc_delta_) {
-      ReceivePacketFromRemotePhy();
+    if ((GetTime::Rdtsc() - last_frame_rx_tsc) > tsc_delta_) {
+      size_t packet_count = 0;
+      while (cfg_->Running() == true &&
+             packet_count < cfg_->Frame().NumDLCalSyms() * cfg_->UeAntNum()) {
+        if (ReceivePacketFromRemotePhy()) packet_count++;
+      }
       last_frame_rx_tsc = GetTime::Rdtsc();
-    }*/
+    }
   }
 }

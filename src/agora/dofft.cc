@@ -12,6 +12,7 @@
 static constexpr bool kPrintFFTInput = false;
 static constexpr bool kPrintInputPilot = false;
 static constexpr bool kPrintPilotCorrStats = false;
+static constexpr bool kEnableCfoCorrection = false;
 
 DoFFT::DoFFT(Config* config, size_t tid, Table<complex_float>& data_buffer,
              PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
@@ -177,7 +178,8 @@ EventData DoFFT::Launch(size_t tag) {
   duration_stat->task_duration_.at(1) += start_tsc1 - start_tsc;
 
   // CFO correction of downlink pilot feedback
-  if (false && sym_type == SymbolType::kCalDL && cfg_->UseExplicitCSI()) {
+  if (kEnableCfoCorrection && sym_type == SymbolType::kCalDL &&
+      cfg_->UseExplicitCSI()) {
     float cfo = static_cast<float>(pkt->fill_[0]);
     arma::fvec theta =
         (-2 * M_PI * cfo / cfg_->Rate()) *

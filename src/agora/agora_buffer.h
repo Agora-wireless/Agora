@@ -69,6 +69,8 @@ class AgoraBuffer {
   inline Table<complex_float>& GetCalibUl() { return calib_ul_buffer_; }
   inline Table<complex_float>& GetCalibDl() { return calib_dl_buffer_; }
   inline Table<complex_float>& GetCalib() { return calib_buffer_; }
+  inline size_t GetFeedbackSocketSize() const { return dl_feedback_buf_size_; }
+  inline char* GetFeedbackSocket() { return dl_feedback_buffer_; }
 
  private:
   void AllocateTables();
@@ -76,6 +78,7 @@ class AgoraBuffer {
 
   Config* const config_;
   const size_t ul_socket_buf_size_;
+  size_t dl_feedback_buf_size_;
 
   PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffer_;
   PtrGrid<kFrameWnd, kMaxUEs, complex_float> dl_csi_buffer_;
@@ -99,6 +102,7 @@ class AgoraBuffer {
   char* dl_socket_buffer_;
   Table<complex_float> calib_ul_buffer_;
   Table<complex_float> calib_dl_buffer_;
+  char* dl_feedback_buffer_;
 };
 
 struct SchedInfo {

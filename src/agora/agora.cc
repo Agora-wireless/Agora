@@ -304,7 +304,7 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
   size_t total_events = 0;
   size_t remaining_events = events_list.size();
   if (is_turn_to_dequeue_from_io) {
-    for (size_t i = 0; i < config_->SocketThreadNum(); i++) {
+    for (size_t i = 0; i < config_->SocketThreadNum() + 1; i++) {
       if (remaining_events > 0) {
         //Restrict the amount from each socket
         const size_t request_events =
@@ -979,7 +979,7 @@ void Agora::HandleEventFft(size_t tag) {
       this->rc_last_frame_ = frame_id;
 
       // See if the calibration has completed
-      if (kPrintPhyStats) {
+      if (kPrintPhyStats && config_->UseExplicitCSI() == false) {
         const size_t frames_for_cal = config_->RecipCalFrameCnt();
 
         if ((frame_id % frames_for_cal) == 0 && (frame_id > 0)) {
@@ -1011,6 +1011,10 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
     }
   } else if (config_->IsCalDlPilot(frame_id, symbol_id) ||
              config_->IsCalUlPilot(frame_id, symbol_id)) {
+    AGORA_LOG_INFO(
+        "WiredControlChannel: Received wired control data for "
+        "Frame %zu, Symbol %zu\n",
+        frame_id, symbol_id);
     rx_counters_.num_reciprocity_pkts_.at(frame_slot)++;
     if (rx_counters_.num_reciprocity_pkts_.at(frame_slot) ==
         rx_counters_.num_reciprocity_pkts_per_frame_) {
@@ -1059,7 +1063,7 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
 
 /// \todo move this to the MessageInfo class..
 void Agora::InitializeQueues() {
-  const int data_symbol_num_perframe = config_->Frame().NumDataSyms();
+  const int data_symbol_num_perframe = config_->Frame().NumTotalSyms();
   message_queue_ = moodycamel::ConcurrentQueue<EventData>(
       kDefaultMessageQueueSize * data_symbol_num_perframe);
 
@@ -1067,7 +1071,8 @@ void Agora::InitializeQueues() {
   message_ = std::make_unique<MessageInfo>(kDefaultWorkerQueueSize *
                                            data_symbol_num_perframe);
 
-  for (size_t i = 0; i < config_->SocketThreadNum(); i++) {
+  num_txrx_tokens_ = config_->SocketThreadNum() + config_->UseExplicitCSI();
+  for (size_t i = 0; i < num_txrx_tokens_; i++) {
     rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(message_queue_);
     tx_ptoks_ptr_[i] = new moodycamel::ProducerToken(
         *(message_->GetConq(EventType::kPacketTX, 0)));
@@ -1079,7 +1084,7 @@ void Agora::FreeQueues() {
   // remove tokens for each doer
   message_.reset();
 
-  for (size_t i = 0; i < config_->SocketThreadNum(); i++) {
+  for (size_t i = 0; i < num_txrx_tokens_; i++) {
     delete rx_ptoks_ptr_[i];
     delete tx_ptoks_ptr_[i];
     rx_ptoks_ptr_[i] = nullptr;
@@ -1119,7 +1124,9 @@ void Agora::InitializeCounters() {
   fft_cur_frame_for_symbol_ =
       std::vector<size_t>(cfg->Frame().NumULSyms(), SIZE_MAX);
 
-  rc_counters_.Init(cfg->UseExplicitCSI() ? cfg->UeAntNum() : cfg->BsAntNum());
+  rc_counters_.Init(cfg->UseExplicitCSI()
+                        ? cfg->Frame().NumDLCalSyms() * cfg->UeAntNum()
+                        : cfg->BsAntNum());
 
   beam_counters_.Init(cfg->BeamEventsPerSymbol());
 
@@ -1161,7 +1168,7 @@ void Agora::InitializeThreads() {
   if (kUseArgos || kUseUHD || kUsePureUHD) {
     packet_tx_rx_ = std::make_unique<PacketTxRxRadio>(
         config_, config_->CoreOffset() + 1, &message_queue_,
-        message_->GetConq(EventType::kPacketTX, 0), &wcc_rx_queue_,
+        message_->GetConq(EventType::kPacketTX, 0), &message_queue_,
         rx_ptoks_ptr_, tx_ptoks_ptr_, agora_memory_->GetUlSocket(),
         agora_memory_->GetUlSocketSize() / config_->PacketLength(),
         this->stats_->FrameStart(), agora_memory_->GetDlSocket());
@@ -1169,7 +1176,7 @@ void Agora::InitializeThreads() {
   } else if (kUseDPDK) {
     packet_tx_rx_ = std::make_unique<PacketTxRxDpdk>(
         config_, config_->CoreOffset() + 1, &message_queue_,
-        message_->GetConq(EventType::kPacketTX, 0), &wcc_rx_queue_,
+        message_->GetConq(EventType::kPacketTX, 0), &message_queue_,
         rx_ptoks_ptr_, tx_ptoks_ptr_, agora_memory_->GetUlSocket(),
         agora_memory_->GetUlSocketSize() / config_->PacketLength(),
         this->stats_->FrameStart(), agora_memory_->GetDlSocket());
@@ -1178,10 +1185,24 @@ void Agora::InitializeThreads() {
     /* Default to the simulator */
     packet_tx_rx_ = std::make_unique<PacketTxRxSim>(
         config_, config_->CoreOffset() + 1, &message_queue_,
-        message_->GetConq(EventType::kPacketTX, 0), &wcc_rx_queue_,
+        message_->GetConq(EventType::kPacketTX, 0), &message_queue_,
         rx_ptoks_ptr_, tx_ptoks_ptr_, agora_memory_->GetUlSocket(),
         agora_memory_->GetUlSocketSize() / config_->PacketLength(),
         this->stats_->FrameStart(), agora_memory_->GetDlSocket());
+  }
+
+  if (config_->UseExplicitCSI()) {
+    const size_t wired_cpu_core =
+        config_->CoreOffset() + config_->SocketThreadNum() + 1 +
+        config_->WorkerThreadNum() + (config_->DynamicCoreAlloc() ? 1 : 0);
+    wcc_thread_ = std::make_unique<WiredControlChannel>(
+        config_, wired_cpu_core, wired_cpu_core, config_->BsServerAddr(),
+        config_->WccRxPort(), config_->UeServerAddr(), config_->WccTxPort(),
+        &message_queue_, &message_queue_, rx_ptoks_ptr_[num_txrx_tokens_ - 1],
+        agora_memory_->GetFeedbackSocket(),
+        agora_memory_->GetFeedbackSocketSize());
+    wcc_std_thread_ =
+        std::thread(&WiredControlChannel::RunRxEventLoop, wcc_thread_.get());
   }
 
   if constexpr (kEnableMac) {
@@ -1206,18 +1227,6 @@ void Agora::InitializeThreads() {
         config_, rp_cpu_core, &rp_request_queue_, &rp_response_queue_);
     rp_std_thread_ =
         std::thread(&ResourceProvisionerThread::RunEventLoop, rp_thread_.get());
-  }
-
-  if (config_->UseExplicitCSI()) {
-    const size_t wired_cpu_core = config_->CoreOffset() +
-                                  config_->SocketThreadNum() +
-                                  config_->WorkerThreadNum() + 2;
-    wcc_thread_ = std::make_unique<WiredControlChannel>(
-        config_, wired_cpu_core, wired_cpu_core, config_->BsServerAddr(),
-        config_->WccRxPort(), config_->UeServerAddr(), config_->WccTxPort(),
-        &message_queue_, &wcc_rx_queue_);
-    wcc_std_thread_ =
-        std::thread(&WiredControlChannel::RunRxEventLoop, wcc_thread_.get());
   }
 
   // Create workers
