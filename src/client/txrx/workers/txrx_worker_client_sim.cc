@@ -61,11 +61,11 @@ TxRxWorkerClientSim::TxRxWorkerClientSim(
                   config->PacketLength() - Packet::kOffsetOfData);
     }
   }
-  size_t core_offset_worker = config->UeCoreOffset() + 1 +
-                              config->UeSocketThreadNum() + kEnableMac +
-                              config->UeWorkerThreadNum() + 1;
   if (config->UseExplicitCSI()) {
     char* dummy_buffer;
+    size_t core_offset_worker = config->UeCoreOffset() + 1 +
+                                config->UeSocketThreadNum() + kEnableMac +
+                                config->UeWorkerThreadNum() + 1;
     wcc_thread_ = std::make_unique<WiredControlChannel>(
         config, core_offset_worker, core_offset_worker, config->UeServerAddr(),
         config->WccTxPort(), config->BsServerAddr(), config->WccRxPort(),

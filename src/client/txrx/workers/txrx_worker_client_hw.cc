@@ -64,6 +64,18 @@ TxRxWorkerClientHw::TxRxWorkerClientHw(
         reinterpret_cast<intptr_t>(scratch_rx_memory.RawPacket()),
         reinterpret_cast<intptr_t>(scratch_rx_memory.RawPacket()->data_));
   }
+  if (config->UseExplicitCSI()) {
+    char* dummy_buffer;
+    size_t core_offset_worker = config->UeCoreOffset() + 1 +
+                                config->UeSocketThreadNum() + kEnableMac +
+                                config->UeWorkerThreadNum() + 1;
+    wcc_thread_ = std::make_unique<WiredControlChannel>(
+        config, core_offset_worker, core_offset_worker, config->UeServerAddr(),
+        config->WccTxPort(), config->BsServerAddr(), config->WccRxPort(),
+        wcc_tx_queue_, wcc_tx_queue_, wcc_tx_producer_, dummy_buffer, 0);
+    /*wcc_std_thread_ =
+        std::thread(&WiredControlChannel::RunTxEventLoop, wcc_thread_.get());*/
+  }
   //throw std::runtime_error("Rx Prt locations");
   RtAssert(interface_count == 1,
            "Interface count must be set to 1 for use with this class");
@@ -288,7 +300,13 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(
                          SymbolType::kCalDL) {
                 const EventData feedback_event(EventType::kPacketToRemote,
                                                rx_tag_t(*rx_packet).tag_);
-                if (wired_ctrl_q_->try_enqueue(*wired_ctrl_token_,
+                AGORA_LOG_INFO(
+                    "WiredControlChannel: Transmitting wired control data for "
+                    "Frame "
+                    "%zu, Symbol %zu, Ant %zu\n",
+                    raw_pkt->frame_id_, raw_pkt->symbol_id_, raw_pkt->ant_id_);
+                wcc_thread_->SendPacketToRemotePhy(feedback_event);
+                /*if (wired_ctrl_q_->try_enqueue(*wired_ctrl_token_,
                                                feedback_event) == false) {
                   AGORA_LOG_INFO(
                       "Wired Ctrl Queue: Cannot enqueue task, need more "
@@ -299,7 +317,8 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(
                     throw std::runtime_error(
                         "Wired Ctrl Queue: task enqueue failed");
                   }
-                }
+                }*/
+                rx_packet->Free();
               } else {
                 // Push kPacketRX event into the queue.
                 const EventData rx_message(EventType::kPacketRX,
