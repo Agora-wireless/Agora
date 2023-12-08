@@ -23,7 +23,6 @@
   "worker_thread_num": 25,
   "socket_thread_num": 1,
   "max_frame": 300,
-  "enable_profiling": true,
   "profiling_frame": 250,
   "sample_rate": 7.68e6,
   "noise_level": 0.01
