@@ -137,8 +137,9 @@ std::vector<Packet*> TxRxWorkerClientSim::RecvEnqueue(size_t interface_id) {
             ctrl_frame_id, pkt->frame_id_);
       }
       ReturnRxPacket(rx_placement);
-    } else if (Configuration()->GetSymbolType(symbol_id) ==
-               SymbolType::kCalDL) {
+    } else if (Configuration()->UseExplicitCSI() == true &&
+               Configuration()->GetSymbolType(symbol_id) ==
+                   SymbolType::kCalDL) {
       const EventData feedback_event(EventType::kPacketToRemote,
                                      rx_tag_t(&rx_placement).tag_);
       AGORA_LOG_INFO(

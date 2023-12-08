@@ -304,7 +304,7 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
   size_t total_events = 0;
   size_t remaining_events = events_list.size();
   if (is_turn_to_dequeue_from_io) {
-    for (size_t i = 0; i < config_->SocketThreadNum() + 1; i++) {
+    for (size_t i = 0; i < num_txrx_tokens_; i++) {
       if (remaining_events > 0) {
         //Restrict the amount from each socket
         const size_t request_events =
@@ -979,7 +979,7 @@ void Agora::HandleEventFft(size_t tag) {
       this->rc_last_frame_ = frame_id;
 
       // See if the calibration has completed
-      if (kPrintPhyStats && config_->UseExplicitCSI() == false) {
+      if (kPrintPhyStats) {
         const size_t frames_for_cal = config_->RecipCalFrameCnt();
 
         if ((frame_id % frames_for_cal) == 0 && (frame_id > 0)) {

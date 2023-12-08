@@ -544,13 +544,14 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
           TxBeaconHw(tx_frame_id, radio_id, time0);
         }
 
-        if (Configuration()->Frame().IsRecCalEnabled()) {
+        if (Configuration()->Frame().IsRecCalEnabled() == true ||
+            Configuration()->UseExplicitCSI() == true) {
           TxReciprocityCalibPilots(tx_frame_id, radio_id, time0);
         }
 
-        if (Configuration()->Frame().NumDlControlSyms() > 0) {
+        /*if (Configuration()->Frame().NumDlControlSyms() > 0) {
           TxBcastSymbolsHw(tx_frame_id, radio_id, time0);
-        }
+        }*/
       }
 
       std::vector<const void*> txbuf(channels_per_interface_);
@@ -905,7 +906,8 @@ void TxRxWorkerHw::ScheduleTxInit(size_t frames_to_schedule, long long time0) {
 
       //Keep the assumption that Cal is before 'D' and 'S'symbols
       // Maybe a good idea to combine / optimize the schedule by iterating through the entire frame symbol by symbol
-      if (Configuration()->Frame().IsRecCalEnabled() == true) {
+      if (Configuration()->Frame().IsRecCalEnabled() == true ||
+          Configuration()->UseExplicitCSI() == true) {
         TxReciprocityCalibPilots(frame, radio, time0);
       }
 

@@ -176,7 +176,8 @@ class Config {
   // Returns the number of frames to obtain a full set of RecipCal data
   // assumes that bf_ant_num_ % frame_.NumDLCalSyms() == 0
   inline size_t RecipCalFrameCnt() const {
-    if ((frame_.IsRecCalEnabled() == false) || (frame_.NumDLCalSyms() == 0)) {
+    if (((use_explicit_csi_ == true) && (frame_.NumDLCalSyms() == 0)) ||
+        ((use_explicit_csi_ == false) && (frame_.IsRecCalEnabled() == false))) {
       return 0;
     } else {
       assert((bf_ant_num_ % frame_.NumDLCalSyms()) == 0);

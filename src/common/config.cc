@@ -86,6 +86,7 @@ Config::Config(std::string jsonfilename)
   }
   SetCpuLayoutOnNumaNodes(true, excluded_);
   dynamic_core_allocation_ = tdd_conf.value("dynamic_core", false);
+  use_explicit_csi_ = tdd_conf.value("explicit_csi", false);
 
   num_cells_ = tdd_conf.value("cells", 1);
   num_radios_ = 0;
@@ -126,13 +127,22 @@ Config::Config(std::string jsonfilename)
 
       auto refnode_serial = serials_conf.value("reference", "");
       if (refnode_serial.empty()) {
-        AGORA_LOG_INFO(
-            "No reference node ID found in topology file! Taking the last node "
-            "%s as reference node!\n",
-            radio_id_.back().c_str());
-        refnode_serial = radio_id_.back();
-        ref_radio_.push_back(radio_id_.size() - 1);
+        if (use_explicit_csi_ == false) {
+          AGORA_LOG_INFO(
+              "No reference node ID found in topology file! Taking the last "
+              "node "
+              "%s as reference node!\n",
+              radio_id_.back().c_str());
+          refnode_serial = radio_id_.back();
+          ref_radio_.push_back(radio_id_.size() - 1);
+        } else {
+          ref_radio_.push_back(SIZE_MAX);
+        }
       } else {
+        RtAssert(
+            use_explicit_csi_ == false,
+            "Use of reference radio in explicit CSI mode is not supportted! "
+            "Make sure to remove the ref radio from topology file.\n");
         auto serial_iterator =
             std::find(sdr_serials.begin(), sdr_serials.end(), refnode_serial);
         if (serial_iterator == sdr_serials.end()) {
@@ -273,7 +283,6 @@ Config::Config(std::string jsonfilename)
   beamforming_str_ = tdd_conf.value("beamforming", "ZF");
   beamforming_algo_ = kBeamformingStr.at(beamforming_str_);
   num_spatial_streams_ = tdd_conf.value("spatial_streams", ue_ant_num_);
-  use_explicit_csi_ = tdd_conf.value("explicit_csi", false);
 
   rp_remote_host_name_ = tdd_conf.value("rp_remote_host_name", "127.0.0.1");
   rp_tx_port_ = tdd_conf.value("rp_tx_port", 3000);
@@ -588,7 +597,7 @@ Config::Config(std::string jsonfilename)
 
   frame_.SetClientPilotSyms(client_ul_pilot_syms, client_dl_pilot_syms);
 
-  if ((freq_orthogonal_pilot_ == false) &&
+  if ((freq_orthogonal_pilot_ == false) && (use_explicit_csi_ == false) &&
       (ue_ant_num_ != frame_.NumPilotSyms())) {
     RtAssert(
         false,
