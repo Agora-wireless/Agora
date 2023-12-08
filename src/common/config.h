@@ -323,7 +323,6 @@ class Config {
   inline int UeRruPort() const { return this->ue_rru_port_; }
 
   inline size_t FramesToTest() const { return this->frames_to_test_; }
-  inline bool EnableProfiling() const {return this->enable_profiling_; }
   inline size_t FrameToProfile() const { return this->frame_to_profile_; }
   inline float NoiseLevel() const { return this->noise_level_; }
 
@@ -663,29 +662,6 @@ class Config {
     }
   }
 
-  inline void TryEnqueueLogStatsMaster(moodycamel::ConcurrentQueue<EventData>* mc_queue,
-                                       const EventData& event,
-                                       size_t frame_id,
-                                       size_t symbol_id) {
-    size_t enqueue_start_tsc_ = 0;
-    size_t enqueue_end_tsc_ = 0;
-    if (frame_id == this->frame_to_profile_) {
-      enqueue_start_tsc_ = GetTime::WorkerRdtsc();
-    }
-    TryEnqueueFallback(mc_queue,
-                       event);
-    if (frame_id == this->frame_to_profile_) {
-      enqueue_end_tsc_ = GetTime::WorkerRdtsc();
-      enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_start_ =
-        enqueue_start_tsc_;
-      enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_end_ =
-        enqueue_end_tsc_;
-      enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].event_type_ =
-        event.event_type_;
-      enqueue_stats_id_.at(symbol_id)++;
-    }
-  }
-
   inline void LogDequeueStatsMaster(EventType event_type,
                                     size_t frame_id,
                                     size_t tsc_dequeue_start,
@@ -696,43 +672,37 @@ class Config {
     dequeue_stats_id_++;
   }
 
-  inline void UpdateDequeueTscWorker(int tid,
-                                     size_t frame_id,
-                                     size_t dequeue_tsc,
-                                     size_t valid_dequeue_tsc) {
-    total_worker_dequeue_tsc_[tid][frame_id] += dequeue_tsc;
-    total_worker_valid_dequeue_tsc_[tid][frame_id] += valid_dequeue_tsc;
-  }
-
-  inline void UpdateEnqueueTscWorker(int tid,
-                                     size_t frame_id,
-                                     size_t enqueue_tsc) {
-    total_worker_enqueue_tsc_[tid][frame_id] += enqueue_tsc;
-    worker_num_valid_enqueue_[tid][frame_id]++;
-  }
-
-  inline void LogEnqueueStatsWorker(int tid,
-                                    size_t symbol_id,
-                                    size_t start_tsc,
-                                    size_t end_tsc,
-                                    EventType event_type) {
-    size_t id = worker_enqueue_stats_id_[tid][symbol_id];
-    worker_enqueue_stats_[tid][symbol_id][id].tsc_start_ = start_tsc;
-    worker_enqueue_stats_[tid][symbol_id][id].tsc_end_ = end_tsc;
-    worker_enqueue_stats_[tid][symbol_id][id].event_type_ = event_type;
-    worker_enqueue_stats_id_[tid][symbol_id]++;
-  }
-
   inline void LogDequeueStatsWorker(int tid,
+                                    size_t frame_id,
                                     size_t symbol_id,
                                     size_t start_tsc,
                                     size_t end_tsc,
+                                    size_t diff_tsc,
+                                    size_t valid_diff_tsc,
                                     EventType event_type) {
     size_t id = worker_dequeue_stats_id_[tid][symbol_id];
     worker_dequeue_stats_[tid][symbol_id][id].tsc_start_ = start_tsc;
     worker_dequeue_stats_[tid][symbol_id][id].tsc_end_ = end_tsc;
     worker_dequeue_stats_[tid][symbol_id][id].event_type_ = event_type;
     worker_dequeue_stats_id_[tid][symbol_id]++;
+    total_worker_dequeue_tsc_[tid][frame_id] += diff_tsc;
+    total_worker_valid_dequeue_tsc_[tid][frame_id] += valid_diff_tsc;
+  }
+
+  inline void LogEnqueueStatsWorker(int tid,
+                                    size_t frame_id,
+                                    size_t symbol_id,
+                                    size_t start_tsc,
+                                    size_t end_tsc,
+                                    size_t diff_tsc,
+                                    EventType event_type) {
+    size_t id = worker_enqueue_stats_id_[tid][symbol_id];
+    worker_enqueue_stats_[tid][symbol_id][id].tsc_start_ = start_tsc;
+    worker_enqueue_stats_[tid][symbol_id][id].tsc_end_ = end_tsc;
+    worker_enqueue_stats_[tid][symbol_id][id].event_type_ = event_type;
+    worker_enqueue_stats_id_[tid][symbol_id]++;
+    total_worker_enqueue_tsc_[tid][frame_id] += diff_tsc;
+    worker_num_valid_enqueue_[tid][frame_id]++;
   }
 
   // Task enqueue/dequeue start and end timestamps and task type
@@ -757,9 +727,9 @@ class Config {
       worker_num_valid_enqueue_ = {};
 
   std::array<std::array<std::array<QueueTsStat, kMaxLoggingEventsWorker>, kMaxSymbols>,
-             kMaxThreads> worker_enqueue_stats_;
+      kMaxThreads> worker_enqueue_stats_;
   std::array<std::array<std::array<QueueTsStat, kMaxLoggingEventsWorker>, kMaxSymbols>,
-             kMaxThreads> worker_dequeue_stats_;
+      kMaxThreads> worker_dequeue_stats_;
   std::array<std::array<size_t, kMaxSymbols>, kMaxThreads>
       worker_enqueue_stats_id_ = {};
   std::array<std::array<size_t, kMaxSymbols>, kMaxThreads>
@@ -1128,9 +1098,6 @@ class Config {
   // Number of frames_ sent by sender during testing = number of frames_
   // processed by Agora before exiting.
   size_t frames_to_test_;
-
-  // Flag to enable profiling
-  size_t enable_profiling_;
 
   // Frame number for which the timestamps of different tasks are logged for profiling
   size_t frame_to_profile_;

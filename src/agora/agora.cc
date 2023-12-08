@@ -118,12 +118,14 @@ void Agora::SendSnrReport(EventType event_type, size_t frame_id,
   assert(event_type == EventType::kSNRReport);
   unused(event_type);
   auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
+  size_t qid = frame_id & 0x1;
   for (size_t i = 0; i < config_->UeAntNum(); i++) {
     EventData snr_report(EventType::kSNRReport, base_tag.tag_);
     snr_report.num_tags_ = 2;
     const float snr = this->phy_stats_->GetEvmSnr(frame_id, i);
     std::memcpy(&snr_report.tags_[1], &snr, sizeof(float));
     config_->TryEnqueueLogStatsMaster(&mac_request_queue_,
+                                      message_->GetPtok(event_type, qid),
                                       snr_report,
                                       frame_id,
                                       symbol_id);
@@ -294,8 +296,10 @@ void Agora::ScheduleUsers(EventType event_type, size_t frame_id,
   assert(event_type == EventType::kPacketToMac);
   auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
 
+  size_t qid = frame_id & 0x1;
   for (size_t i = 0; i < config_->SpatialStreamsNum(); i++) {
     config_->TryEnqueueLogStatsMaster(&mac_request_queue_,
+                                      message_->GetPtok(event_type, qid),
                                       EventData(EventType::kPacketToMac, base_tag.tag_),
                                       frame_id,
                                       symbol_id);

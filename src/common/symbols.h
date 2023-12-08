@@ -68,7 +68,7 @@ static constexpr size_t kNumEventTypes =
     static_cast<size_t>(EventType::kThreadTermination) + 1;
 
 // Define a mapping from EventType to string
-static const std::array<std::string, kNumEventTypes> eventTypeToString = {
+static const std::array<std::string, kNumEventTypes> kEventTypeToString = {
   "PacketRX",
   "FFT",
   "Beam",

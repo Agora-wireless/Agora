@@ -276,7 +276,7 @@ void Stats::SaveToFile() {
   }
   std::fclose(fp_debug);
 
-  if (config_->EnableProfiling() == true) {
+  if (config_->FrameToProfile() >= 0) {
 
     AGORA_LOG_INFO("Stats: Printing Agora configurations to %s\n",
                    kAgoraConfigFilename.c_str());
@@ -422,7 +422,7 @@ void Stats::SaveToFile() {
     std::fclose(fp_debug_detailed);
   }
 
-  if (config_->EnableProfiling() == true) {
+  if (config_->FrameToProfile() >= 0) {
 
     FILE* fp_master = std::fopen(kMasterFilename.c_str(), "w");
 
@@ -442,7 +442,7 @@ void Stats::SaveToFile() {
                      "Master frame %zu symbol %zu: enqueue task %s tsc "
                      "[%zu-%zu] = %.3f\n",
                      config_->FrameToProfile(), i,
-                     eventTypeToString.at(static_cast<size_t>(config_->enqueue_stats_[i][j].event_type_)).c_str(),
+                     kEventTypeToString.at(static_cast<size_t>(config_->enqueue_stats_[i][j].event_type_)).c_str(),
                      config_->enqueue_stats_[i][j].tsc_end_,
                      config_->enqueue_stats_[i][j].tsc_start_,
                      GetTime::CyclesToUs(config_->enqueue_stats_[i][j].tsc_end_ -
@@ -455,7 +455,7 @@ void Stats::SaveToFile() {
       std::fprintf(fp_master,
                    "Master frame %zu: dequeue task %s tsc [%zu-%zu] = %.3f\n",
                    config_->FrameToProfile(),
-                   eventTypeToString.at(static_cast<size_t>(config_->dequeue_stats_[i].event_type_)).c_str(),
+                   kEventTypeToString.at(static_cast<size_t>(config_->dequeue_stats_[i].event_type_)).c_str(),
                    config_->dequeue_stats_[i].tsc_end_, config_->dequeue_stats_[i].tsc_start_,
                    GetTime::CyclesToUs(config_->dequeue_stats_[i].tsc_end_ - 
                                        config_->dequeue_stats_[i].tsc_start_,
@@ -464,7 +464,7 @@ void Stats::SaveToFile() {
     std::fclose(fp_master);
   }
 
-  if (config_->EnableProfiling() == true) {
+  if (config_->FrameToProfile() >= 0) {
 
     FILE* fp_worker = std::fopen(kWorkerFilename.c_str(), "w");
 
@@ -495,7 +495,7 @@ void Stats::SaveToFile() {
             fp_worker,
             "Worker %zu frame %zu symbol %zu: enqueue task %s tsc [%zu-%zu] = %.3f\n",
             tid, config_->FrameToProfile(), i,
-            eventTypeToString.at(static_cast<size_t>(config_->worker_enqueue_stats_[tid][i][j].event_type_)).c_str(),
+            kEventTypeToString.at(static_cast<size_t>(config_->worker_enqueue_stats_[tid][i][j].event_type_)).c_str(),
             config_->worker_enqueue_stats_[tid][i][j].tsc_end_,
             config_->worker_enqueue_stats_[tid][i][j].tsc_start_,
             GetTime::CyclesToUs(config_->worker_enqueue_stats_[tid][i][j].tsc_end_ -
@@ -510,7 +510,7 @@ void Stats::SaveToFile() {
             "Worker %zu frame %zu symbol %zu: dequeue task %s tsc [%zu-%zu] = "
             "%.3f\n",
             tid, config_->FrameToProfile(), i,
-            eventTypeToString.at(static_cast<size_t>(config_->worker_dequeue_stats_[tid][i][j].event_type_)).c_str(),
+            kEventTypeToString.at(static_cast<size_t>(config_->worker_dequeue_stats_[tid][i][j].event_type_)).c_str(),
             config_->worker_dequeue_stats_[tid][i][j].tsc_end_,
             config_->worker_dequeue_stats_[tid][i][j].tsc_start_,
             GetTime::CyclesToUs(config_->worker_dequeue_stats_[tid][i][j].tsc_end_ -
