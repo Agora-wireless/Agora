@@ -24,6 +24,7 @@ static constexpr float kBeaconDetectWindow = 2.33f;
 static constexpr size_t kBeaconsToStart = 2;
 static constexpr bool kPrintClientBeaconSNR = true;
 static constexpr ssize_t kMaxBeaconAdjust = 5;
+static constexpr bool kPrintExplicitDlPilot = false;
 
 TxRxWorkerClientHw::TxRxWorkerClientHw(
     size_t core_offset, size_t tid, size_t interface_count,
@@ -307,17 +308,19 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(
                     "%zu, Symbol %zu, Ant %zu\n",
                     raw_pkt->frame_id_, raw_pkt->symbol_id_, raw_pkt->ant_id_);
                 wcc_thread_->SendPacketToRemotePhy(feedback_event);
-                if (global_frame_id % kFrameWnd == kFrameWnd - 1) {
-                  std::stringstream ss;
-                  ss << "FFT_input_" << global_frame_id << "_"
-                     << global_symbol_id << "=[";
-                  for (size_t i = 0; i < Configuration()->SampsPerSymbol();
-                       i++) {
-                    ss << raw_pkt->data_[2 * i] << "+1j*"
-                       << raw_pkt->data_[2 * i + 1] << " ";
+                if (kPrintExplicitDlPilot) {
+                  if (global_frame_id % kFrameWnd == kFrameWnd - 1) {
+                    std::stringstream ss;
+                    ss << "FFT_input_" << global_frame_id << "_"
+                       << global_symbol_id << "=[";
+                    for (size_t i = 0; i < Configuration()->SampsPerSymbol();
+                         i++) {
+                      ss << raw_pkt->data_[2 * i] << "+1j*"
+                         << raw_pkt->data_[2 * i + 1] << " ";
+                    }
+                    ss << "];" << std::endl;
+                    std::cout << ss.str();
                   }
-                  ss << "];" << std::endl;
-                  std::cout << ss.str();
                 }
                 /*if (wired_ctrl_q_->try_enqueue(*wired_ctrl_token_,
                                                feedback_event) == false) {

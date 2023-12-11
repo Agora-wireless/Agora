@@ -544,8 +544,7 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
           TxBeaconHw(tx_frame_id, radio_id, time0);
         }
 
-        if (Configuration()->Frame().IsRecCalEnabled() == true ||
-            Configuration()->UseExplicitCSI() == true) {
+        if (Configuration()->Frame().NumDLCalSyms() > 0) {
           TxReciprocityCalibPilots(tx_frame_id, radio_id, time0);
         }
 

@@ -109,7 +109,11 @@ EventData DoFFT::Launch(size_t tag) {
   } else {
     size_t sample_offset = cfg_->OfdmRxZeroPrefixBs();
     if (sym_type == SymbolType::kCalDL) {
-      sample_offset = cfg_->OfdmRxZeroPrefixCalDl();
+      if (cfg_->UseExplicitCSI()) {
+        sample_offset = cfg_->OfdmRxZeroPrefixBs();
+      } else {
+        sample_offset = cfg_->OfdmRxZeroPrefixCalDl();
+      }
     } else if (sym_type == SymbolType::kCalUL) {
       sample_offset = cfg_->OfdmRxZeroPrefixCalUl();
     }
@@ -290,7 +294,7 @@ EventData DoFFT::Launch(size_t tag) {
           &calib_dl_buffer_[cal_index][pilot_tx_ant * cfg_->OfdmDataNum()];
       PartialTranspose(calib_dl_ptr, pilot_tx_ant, sym_type);
       phy_stats_->UpdateCalibPilotSnr(cal_index, 0, pilot_tx_ant, fft_inout_);
-    } else if (cfg_->UseExplicitCSI()) {
+    } else if (cfg_->UseExplicitCSI() && frame_id >= kFrameWnd) {
       PartialTranspose(dl_csi_buffers_[frame_slot][ant_id], pilot_tx_ant,
                        SymbolType::kPilot);
       phy_stats_->UpdateCalibPilotSnr(cal_index, 0, pilot_tx_ant, fft_inout_);
