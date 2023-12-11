@@ -433,32 +433,32 @@ void Stats::SaveToFile() {
   
     std::fprintf(
       fp_master, "Master frame %zu: dequeue %zu tasks, start: %zu\n",
-      config_->FrameToProfile(), config_->dequeue_stats_id_,
+      config_->FrameToProfile(), this->dequeue_stats_id_,
       MasterGetTsc(TsType::kFirstSymbolRX, config_->FrameToProfile()));
 
     for (size_t i = 0; i < config_->Frame().NumTotalSyms(); i++) {
-      for (size_t j = 0; j < config_->enqueue_stats_id_.at(i); j++) {
+      for (size_t j = 0; j < this->enqueue_stats_id_.at(i); j++) {
         std::fprintf(fp_master,
                      "Master frame %zu symbol %zu: enqueue task %s tsc "
                      "[%zu-%zu] = %.3f\n",
                      config_->FrameToProfile(), i,
-                     kEventTypeToString.at(static_cast<size_t>(config_->enqueue_stats_[i][j].event_type_)).c_str(),
-                     config_->enqueue_stats_[i][j].tsc_end_,
-                     config_->enqueue_stats_[i][j].tsc_start_,
-                     GetTime::CyclesToUs(config_->enqueue_stats_[i][j].tsc_end_ -
-                                         config_->enqueue_stats_[i][j].tsc_start_,
+                     kEventTypeToString.at(static_cast<size_t>(this->enqueue_stats_[i][j].event_type_)).c_str(),
+                     this->enqueue_stats_[i][j].tsc_end_,
+                     this->enqueue_stats_[i][j].tsc_start_,
+                     GetTime::CyclesToUs(this->enqueue_stats_[i][j].tsc_end_ -
+                                         this->enqueue_stats_[i][j].tsc_start_,
                                          config_->FreqGhz()));
       }
     }
 
-    for (size_t i = 0; i < config_->dequeue_stats_id_; i++) {
+    for (size_t i = 0; i < this->dequeue_stats_id_; i++) {
       std::fprintf(fp_master,
                    "Master frame %zu: dequeue task %s tsc [%zu-%zu] = %.3f\n",
                    config_->FrameToProfile(),
-                   kEventTypeToString.at(static_cast<size_t>(config_->dequeue_stats_[i].event_type_)).c_str(),
-                   config_->dequeue_stats_[i].tsc_end_, config_->dequeue_stats_[i].tsc_start_,
-                   GetTime::CyclesToUs(config_->dequeue_stats_[i].tsc_end_ - 
-                                       config_->dequeue_stats_[i].tsc_start_,
+                   kEventTypeToString.at(static_cast<size_t>(this->dequeue_stats_[i].event_type_)).c_str(),
+                   this->dequeue_stats_[i].tsc_end_, this->dequeue_stats_[i].tsc_start_,
+                   GetTime::CyclesToUs(this->dequeue_stats_[i].tsc_end_ - 
+                                       this->dequeue_stats_[i].tsc_start_,
                                        config_->FreqGhz()));
     }
     std::fclose(fp_master);
@@ -480,41 +480,41 @@ void Stats::SaveToFile() {
           fp_worker,
           "Worker %zu frame %zu: %zu enqueue takes %.2f us, dequeue takes %.2f us"
           "(non-empty: %.2f)\n",
-          tid, i, config_->worker_num_valid_enqueue_[tid][i],
-          GetTime::CyclesToUs(config_->total_worker_enqueue_tsc_[tid][i],
+          tid, i, this->worker_num_valid_enqueue_[tid][i],
+          GetTime::CyclesToUs(this->total_worker_enqueue_tsc_[tid][i],
                               config_->FreqGhz()),
-          GetTime::CyclesToUs(config_->total_worker_dequeue_tsc_[tid][i],
+          GetTime::CyclesToUs(this->total_worker_dequeue_tsc_[tid][i],
                               config_->FreqGhz()),
-          GetTime::CyclesToUs(config_->total_worker_valid_dequeue_tsc_[tid][i],
+          GetTime::CyclesToUs(this->total_worker_valid_dequeue_tsc_[tid][i],
                               config_->FreqGhz()));
       }
 
       for (size_t i = 0; i < config_->Frame().NumTotalSyms(); i++) {
-        for (size_t j = 0; j < config_->worker_enqueue_stats_id_[tid].at(i); j++) {
+        for (size_t j = 0; j < this->worker_enqueue_stats_id_[tid].at(i); j++) {
           std::fprintf(
             fp_worker,
             "Worker %zu frame %zu symbol %zu: enqueue task %s tsc [%zu-%zu] = %.3f\n",
             tid, config_->FrameToProfile(), i,
-            kEventTypeToString.at(static_cast<size_t>(config_->worker_enqueue_stats_[tid][i][j].event_type_)).c_str(),
-            config_->worker_enqueue_stats_[tid][i][j].tsc_end_,
-            config_->worker_enqueue_stats_[tid][i][j].tsc_start_,
-            GetTime::CyclesToUs(config_->worker_enqueue_stats_[tid][i][j].tsc_end_ -
-                                config_->worker_enqueue_stats_[tid][i][j].tsc_start_,
+            kEventTypeToString.at(static_cast<size_t>(this->worker_enqueue_stats_[tid][i][j].event_type_)).c_str(),
+            this->worker_enqueue_stats_[tid][i][j].tsc_end_,
+            this->worker_enqueue_stats_[tid][i][j].tsc_start_,
+            GetTime::CyclesToUs(this->worker_enqueue_stats_[tid][i][j].tsc_end_ -
+                                this->worker_enqueue_stats_[tid][i][j].tsc_start_,
                                 config_->FreqGhz()));
         }
       }
       for (size_t i = 0; i < config_->Frame().NumTotalSyms(); i++) {
-        for (size_t j = 0; j < config_->worker_dequeue_stats_id_[tid].at(i); j++) {
+        for (size_t j = 0; j < this->worker_dequeue_stats_id_[tid].at(i); j++) {
           std::fprintf(
             fp_worker,
             "Worker %zu frame %zu symbol %zu: dequeue task %s tsc [%zu-%zu] = "
             "%.3f\n",
             tid, config_->FrameToProfile(), i,
-            kEventTypeToString.at(static_cast<size_t>(config_->worker_dequeue_stats_[tid][i][j].event_type_)).c_str(),
-            config_->worker_dequeue_stats_[tid][i][j].tsc_end_,
-            config_->worker_dequeue_stats_[tid][i][j].tsc_start_,
-            GetTime::CyclesToUs(config_->worker_dequeue_stats_[tid][i][j].tsc_end_ -
-                                config_->worker_dequeue_stats_[tid][i][j].tsc_start_,
+            kEventTypeToString.at(static_cast<size_t>(this->worker_dequeue_stats_[tid][i][j].event_type_)).c_str(),
+            this->worker_dequeue_stats_[tid][i][j].tsc_end_,
+            this->worker_dequeue_stats_[tid][i][j].tsc_start_,
+            GetTime::CyclesToUs(this->worker_dequeue_stats_[tid][i][j].tsc_end_ -
+                                this->worker_dequeue_stats_[tid][i][j].tsc_start_,
                                 config_->FreqGhz()));
         }
       }
