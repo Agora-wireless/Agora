@@ -273,9 +273,9 @@ void UeWorker::DoFftPilot(size_t tag) {
          csi_buffer_ptr[i]  = csiInterp_tmp(i);
     }
 
-    for (size_t i=0; i < 9; i++) { 
-      std::cout << csi_buffer_ptr[i] << std::endl;
-    }
+    // for (size_t i=0; i < 9; i++) { 
+    //   std::cout << csi_buffer_ptr[i] << std::endl;
+    // }
 
 
 
