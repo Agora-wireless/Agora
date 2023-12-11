@@ -69,26 +69,25 @@ static constexpr size_t kNumEventTypes =
 
 // Define a mapping from EventType to string
 static const std::array<std::string, kNumEventTypes> kEventTypeToString = {
-  "PacketRX",
-  "FFT",
-  "Beam",
-  "Demul",
-  "IFFT",
-  "Precode",
-  "PacketTX",
-  "PacketPilotTX",
-  "Decode",
-  "Encode",
-  "Modul",
-  "PacketFromMac",
-  "PacketToMac",
-  "FFTPilot",
-  "SNRReport",
-  "RANUpdate",
-  "RBIndicator",
-  "Broadcast",
-  "ThreadTermination"
-};
+    "PacketRX",
+    "FFT",
+    "Beam",
+    "Demul",
+    "IFFT",
+    "Precode",
+    "PacketTX",
+    "PacketPilotTX",
+    "Decode",
+    "Encode",
+    "Modul",
+    "PacketFromMac",
+    "PacketToMac",
+    "FFTPilot",
+    "SNRReport",
+    "RANUpdate",
+    "RBIndicator",
+    "Broadcast",
+    "ThreadTermination"};
 
 // Types of Agora Doers
 enum class DoerType : size_t {
