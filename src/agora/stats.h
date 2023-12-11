@@ -222,18 +222,18 @@ class Stats {
       moodycamel::ConcurrentQueue<EventData>* mc_queue,
       moodycamel::ProducerToken* producer_token, const EventData& event,
       size_t frame_to_profile, size_t frame_id, size_t symbol_id) {
-    size_t enqueue_start_tsc_ = 0;
-    size_t enqueue_end_tsc_ = 0;
+    size_t enqueue_start_tsc = 0;
+    size_t enqueue_end_tsc = 0;
     if (frame_id == frame_to_profile) {
-      enqueue_start_tsc_ = GetTime::WorkerRdtsc();
+      enqueue_start_tsc = GetTime::WorkerRdtsc();
     }
     TryEnqueueFallback(mc_queue, producer_token, event);
     if (frame_id == frame_to_profile) {
-      enqueue_end_tsc_ = GetTime::WorkerRdtsc();
+      enqueue_end_tsc = GetTime::WorkerRdtsc();
       enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_start_ =
-          enqueue_start_tsc_;
+          enqueue_start_tsc;
       enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_end_ =
-          enqueue_end_tsc_;
+          enqueue_end_tsc;
       enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].event_type_ =
           event.event_type_;
       enqueue_stats_id_.at(symbol_id)++;

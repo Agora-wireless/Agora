@@ -386,10 +386,10 @@ void Agora::Start() {
   while ((config_->Running() == true) &&
          (SignalHandler::GotExitSignal() == false)) {
     // Get a batch of events
-    size_t dequeue_start_tsc_ = GetTime::WorkerRdtsc();
+    size_t dequeue_start_tsc = GetTime::WorkerRdtsc();
     const size_t num_events =
         FetchEvent(events_list, is_turn_to_dequeue_from_io);
-    size_t dequeue_end_tsc_ = GetTime::WorkerRdtsc();
+    size_t dequeue_end_tsc = GetTime::WorkerRdtsc();
     is_turn_to_dequeue_from_io = !is_turn_to_dequeue_from_io;
 
     // Handle each event
@@ -398,7 +398,7 @@ void Agora::Start() {
       size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
       if (frame_id == this->config_->FrameToProfile()) {
         stats_->LogDequeueStatsMaster(event.event_type_, frame_id,
-                                      dequeue_start_tsc_, dequeue_end_tsc_);
+                                      dequeue_start_tsc, dequeue_end_tsc);
       }
 
       // FFT processing is scheduled after falling through the switch
