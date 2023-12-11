@@ -1199,7 +1199,7 @@ void Agora::InitializeThreads() {
         config_, wired_cpu_core, wired_cpu_core, config_->BsServerAddr(),
         config_->WccRxPort(), config_->UeServerAddr(), config_->WccTxPort(),
         &message_queue_, &message_queue_, rx_ptoks_ptr_[num_txrx_tokens_ - 1],
-        agora_memory_->GetFeedbackSocket(),
+        tx_ptoks_ptr_[num_txrx_tokens_ - 1], agora_memory_->GetFeedbackSocket(),
         agora_memory_->GetFeedbackSocketSize());
     wcc_std_thread_ =
         std::thread(&WiredControlChannel::RunRxEventLoop, wcc_thread_.get());

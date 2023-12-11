@@ -66,7 +66,6 @@ class TxRxWorker {
   std::atomic<bool>& can_proceed_;
 
   moodycamel::ConcurrentQueue<EventData>* wired_ctrl_q_;
-  moodycamel::ProducerToken* wired_ctrl_token_;
 
  private:
   Config* const cfg_;

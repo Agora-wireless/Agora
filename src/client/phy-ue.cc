@@ -94,6 +94,9 @@ PhyUe::PhyUe(Config* config)
     mac_rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(complete_queue_);
     mac_tx_ptoks_ptr_[i] = new moodycamel::ProducerToken(to_mac_queue_);
   }
+  if (config_->UseExplicitCSI()) {
+    tx_ptoks_ptr_[rx_thread_num_] = new moodycamel::ProducerToken(tx_queue_);
+  }
 
   work_producer_token_ =
       std::make_unique<moodycamel::ProducerToken>(work_queue_);
@@ -153,6 +156,17 @@ PhyUe::PhyUe(Config* config)
             kRecorderTypes, true));
     core_offset_worker++;
     new_recorder->Start();
+  }
+
+  if (config->UseExplicitCSI()) {
+    char* dummy_buffer;
+    wcc_thread_ = std::make_unique<WiredControlChannel>(
+        config, core_offset_worker, core_offset_worker, config->UeServerAddr(),
+        config->WccTxPort(), config->BsServerAddr(), config->WccRxPort(),
+        &complete_queue_, &tx_queue_, rx_ptoks_ptr_[rx_thread_num_],
+        tx_ptoks_ptr_[rx_thread_num_], dummy_buffer, 0);
+    wcc_std_thread_ =
+        std::thread(&WiredControlChannel::RunTxEventLoop, wcc_thread_.get());
   }
 
   // initilize all kinds of checkers
@@ -215,6 +229,7 @@ PhyUe::~PhyUe() {
 
   if (config_->UseExplicitCSI()) {
     wcc_std_thread_.join();
+    tx_ptoks_ptr_[rx_thread_num_];
   }
 
   for (size_t i = 0; i < rx_thread_num_; i++) {
@@ -464,6 +479,9 @@ void PhyUe::Start() {
           }
         } break;
 
+        case EventType::kPacketToRemote: {
+          ScheduleTask(event, &tx_queue_, *tx_ptoks_ptr_[rx_thread_num_]);
+        } break;
         case EventType::kFFTPilot: {
           const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;

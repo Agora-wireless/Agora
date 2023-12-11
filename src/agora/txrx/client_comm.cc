@@ -13,7 +13,8 @@ WiredControlChannel::WiredControlChannel(
     std::string local_addr, size_t local_port, std::string remote_addr,
     size_t remote_port, moodycamel::ConcurrentQueue<EventData>* rx_queue,
     moodycamel::ConcurrentQueue<EventData>* tx_queue,
-    moodycamel::ProducerToken* rx_producer, char* rx_socket_buf,
+    moodycamel::ProducerToken* rx_producer,
+    moodycamel::ProducerToken* tx_producer, char* rx_socket_buf,
     size_t rx_pkt_num, const std::string& log_filename)
     : cfg_(cfg),
       freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -24,6 +25,7 @@ WiredControlChannel::WiredControlChannel(
       rx_queue_(rx_queue),
       tx_queue_(tx_queue),
       rx_producer_(rx_producer),
+      tx_producer_(tx_producer),
       rx_socket_buf_(rx_socket_buf),
       max_pkt_cnt_(rx_pkt_num) {
   // Set up log file
@@ -152,7 +154,6 @@ bool WiredControlChannel::ReceivePacketFromRemotePhy() {
 bool WiredControlChannel::ReceiveEventFromLocalPhy() {
   EventData event;
   if (tx_queue_->try_dequeue_from_producer(*tx_producer_, event) == false) {
-    AGORA_LOG_ERROR("Wired Ctrl Dequeue: task dequeue failed\n");
     return false;
   }
 
@@ -176,6 +177,11 @@ void WiredControlChannel::SendPacketToRemotePhy(EventData event) {
   RxPacket* rxpkt = rx_tag_t(event.tags_[0]).rx_packet_;
   Packet* pkt = rxpkt->RawPacket();
   udp_comm_->Send(reinterpret_cast<std::byte*>(pkt), cfg_->PacketLength());
+  AGORA_LOG_INFO(
+      "WiredControlChannel: Transmitting wired control data for Frame "
+      "%zu, Symbol %zu, Ant %zu\n",
+      pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
+  rx_tag_t(event.tags_[0]).rx_packet_->Free();
 }
 
 void WiredControlChannel::RunTxEventLoop() {
@@ -198,8 +204,6 @@ void WiredControlChannel::RunTxEventLoop() {
         if (ReceiveEventFromLocalPhy()) packet_count++;
       }
       last_frame_tx_tsc = GetTime::Rdtsc();
-      AGORA_LOG_INFO("Finished sending %zu calibration symbols in Frame %zu.\n",
-                     packet_count, frame++);
     }
   }
 }

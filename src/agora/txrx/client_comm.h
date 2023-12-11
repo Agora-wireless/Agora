@@ -36,6 +36,7 @@ class WiredControlChannel {
                       moodycamel::ConcurrentQueue<EventData>* rx_queue,
                       moodycamel::ConcurrentQueue<EventData>* tx_queue,
                       moodycamel::ProducerToken* rx_producer,
+                      moodycamel::ProducerToken* tx_producer,
                       char* rx_socket_buf, size_t rx_pkt_num,
                       const std::string& log_filename = "");
 
@@ -45,10 +46,10 @@ class WiredControlChannel {
   // remote applicationsand sends them to the master thread.
   void RunRxEventLoop();
   void RunTxEventLoop();
-  void SendPacketToRemotePhy(EventData event);
 
  private:
-  // Communicate with RP via UDP
+  // Communicate with Remote Phy via UDP
+  void SendPacketToRemotePhy(EventData event);
   bool SendEventToLocalPhy(RxPacket& data);
   bool ReceivePacketFromRemotePhy();
   bool ReceiveEventFromLocalPhy();

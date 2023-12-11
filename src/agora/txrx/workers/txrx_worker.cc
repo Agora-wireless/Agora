@@ -39,9 +39,7 @@ TxRxWorker::TxRxWorker(size_t core_offset, size_t tid, size_t interface_count,
       wired_ctrl_q_(wired_ctrl_q),
       tx_producer_token_(tx_producer),
       notify_producer_token_(notify_producer),
-      started_(false) {
-  wired_ctrl_token_ = new moodycamel::ProducerToken(*wired_ctrl_q_);
-}
+      started_(false) {}
 
 TxRxWorker::~TxRxWorker() { Stop(); }
 
