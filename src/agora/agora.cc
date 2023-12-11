@@ -397,8 +397,9 @@ void Agora::Start() {
       EventData& event = events_list.at(ev_i);
       size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
       if (frame_id == this->config_->FrameToProfile()) {
-        stats_->LogDequeueStatsMaster(event.event_type_, frame_id,
-                                      dequeue_start_tsc, dequeue_end_tsc);
+        stats_->LogDequeueStatsMaster(event.event_type_,
+                                      dequeue_start_tsc,
+                                      dequeue_end_tsc);
       }
 
       // FFT processing is scheduled after falling through the switch
