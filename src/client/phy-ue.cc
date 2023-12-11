@@ -85,8 +85,6 @@ PhyUe::PhyUe(Config* config)
       kFrameWnd * config_->UeAntNum() * kDefaultQueueSize);
   to_mac_queue_ = moodycamel::ConcurrentQueue<EventData>(
       kFrameWnd * config_->UeAntNum() * kDefaultQueueSize);
-  wcc_tx_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * config_->UeAntNum() * kDefaultQueueSize);
 
   for (size_t i = 0; i < rx_thread_num_; i++) {
     rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(complete_queue_);
@@ -109,14 +107,14 @@ PhyUe::PhyUe(Config* config)
   if (kUseArgos || kUsePureUHD) {
     ru_ = std::make_unique<PacketTxRxClientRadio>(
         config_, config_->UeCoreOffset() + 1, &complete_queue_, &tx_queue_,
-        &wcc_tx_queue_, rx_ptoks_ptr_, tx_ptoks_ptr_, rx_buffer_,
+        rx_ptoks_ptr_, tx_ptoks_ptr_, rx_buffer_,
         rx_buffer_size_ / config->PacketLength(), stats_->FrameStart(),
         tx_buffer_);
     //} else if (kUseUHD) {
   } else {
     ru_ = std::make_unique<PacketTxRxClientSim>(
         config_, config_->UeCoreOffset() + 1, &complete_queue_, &tx_queue_,
-        &wcc_tx_queue_, rx_ptoks_ptr_, tx_ptoks_ptr_, rx_buffer_,
+        rx_ptoks_ptr_, tx_ptoks_ptr_, rx_buffer_,
         rx_buffer_size_ / config->PacketLength(), stats_->FrameStart(),
         tx_buffer_);
   }

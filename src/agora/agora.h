@@ -196,10 +196,6 @@ class Agora {
   moodycamel::ConcurrentQueue<EventData> rp_request_queue_;
   moodycamel::ConcurrentQueue<EventData> rp_response_queue_;
 
-  // Wired control channel queue
-  moodycamel::ConcurrentQueue<EventData> wcc_rx_queue_;
-  moodycamel::ConcurrentQueue<EventData> wcc_tx_queue_;
-
   moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
 

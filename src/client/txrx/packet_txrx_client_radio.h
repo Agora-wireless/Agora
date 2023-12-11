@@ -25,7 +25,6 @@ class PacketTxRxClientRadio : public PacketTxRx {
   PacketTxRxClientRadio(Config* const cfg, size_t core_offset,
                         moodycamel::ConcurrentQueue<EventData>* event_notify_q,
                         moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
-                        moodycamel::ConcurrentQueue<EventData>* wired_ctrl_q,
                         moodycamel::ProducerToken** notify_producer_tokens,
                         moodycamel::ProducerToken** tx_producer_tokens,
                         Table<char>& rx_buffer, size_t packet_num_in_buffer,

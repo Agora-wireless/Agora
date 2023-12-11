@@ -9,7 +9,6 @@
 #include <memory>
 #include <vector>
 
-#include "client_comm.h"
 #include "message.h"
 #include "txrx_worker.h"
 #include "udp_comm.h"
@@ -21,7 +20,6 @@ class TxRxWorkerClientSim : public TxRxWorker {
                       size_t* rx_frame_start,
                       moodycamel::ConcurrentQueue<EventData>* event_notify_q,
                       moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
-                      moodycamel::ConcurrentQueue<EventData>* wired_ctrl_q,
                       moodycamel::ProducerToken& tx_producer,
                       moodycamel::ProducerToken& notify_producer,
                       std::vector<RxPacket>& rx_memory,
@@ -39,9 +37,6 @@ class TxRxWorkerClientSim : public TxRxWorker {
 
   //1 for each responsible interface (ie radio)
   std::vector<std::unique_ptr<UDPComm>> udp_comm_;
-  std::unique_ptr<WiredControlChannel> wcc_thread_;
-  moodycamel::ConcurrentQueue<EventData>* wcc_tx_queue_;
-  moodycamel::ProducerToken* wcc_tx_producer_;
 
   //Helper tx vectors
   std::vector<std::vector<std::vector<uint8_t>>> tx_pkt_pilot_;

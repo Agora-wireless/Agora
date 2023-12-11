@@ -27,7 +27,6 @@ TxRxWorkerSim::TxRxWorkerSim(
     size_t interface_offset, Config* const config, size_t* rx_frame_start,
     moodycamel::ConcurrentQueue<EventData>* event_notify_q,
     moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
-    moodycamel::ConcurrentQueue<EventData>* wired_ctrl_q,
     moodycamel::ProducerToken& tx_producer,
     moodycamel::ProducerToken& notify_producer,
     std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
@@ -35,8 +34,8 @@ TxRxWorkerSim::TxRxWorkerSim(
     std::atomic<bool>& can_proceed)
     : TxRxWorker(core_offset, tid, interface_count, interface_offset,
                  config->NumChannels(), config, rx_frame_start, event_notify_q,
-                 tx_pending_q, wired_ctrl_q, tx_producer, notify_producer,
-                 rx_memory, tx_memory, sync_mutex, sync_cond, can_proceed) {
+                 tx_pending_q, tx_producer, notify_producer, rx_memory,
+                 tx_memory, sync_mutex, sync_cond, can_proceed) {
   for (size_t interface = 0; interface < num_interfaces_; ++interface) {
     const uint16_t local_port_id =
         config->BsServerPort() + interface + interface_offset_;

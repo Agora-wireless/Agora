@@ -23,7 +23,6 @@ class TxRxWorkerClientUhd : public TxRxWorker {
                       size_t* rx_frame_start,
                       moodycamel::ConcurrentQueue<EventData>* event_notify_q,
                       moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
-                      moodycamel::ConcurrentQueue<EventData>* wired_ctrl_q,
                       moodycamel::ProducerToken& tx_producer,
                       moodycamel::ProducerToken& notify_producer,
                       std::vector<RxPacket>& rx_memory,

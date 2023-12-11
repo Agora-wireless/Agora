@@ -23,7 +23,6 @@ class TxRxWorkerClientHw : public TxRxWorker {
                      size_t* rx_frame_start,
                      moodycamel::ConcurrentQueue<EventData>* event_notify_q,
                      moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
-                     moodycamel::ConcurrentQueue<EventData>* wired_ctrl_q,
                      moodycamel::ProducerToken& tx_producer,
                      moodycamel::ProducerToken& notify_producer,
                      std::vector<RxPacket>& rx_memory,
@@ -76,8 +75,5 @@ class TxRxWorkerClientHw : public TxRxWorker {
 
   //For each interface.
   std::vector<TxRxWorkerRx::RxStatusTracker> rx_status_;
-  std::unique_ptr<WiredControlChannel> wcc_thread_;
-  moodycamel::ConcurrentQueue<EventData>* wcc_tx_queue_;
-  moodycamel::ProducerToken* wcc_tx_producer_;
 };
 #endif  // TXRX_WORKER_CLIENT_HW_H_

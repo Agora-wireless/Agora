@@ -212,7 +212,6 @@ class PhyUe {
 
   moodycamel::ConcurrentQueue<EventData> tx_queue_;
   moodycamel::ConcurrentQueue<EventData> to_mac_queue_;
-  moodycamel::ConcurrentQueue<EventData> wcc_tx_queue_;
 
   // std::vector<std::thread> worker_threads_;
   std::vector<std::unique_ptr<UeWorker>> workers_;
