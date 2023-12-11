@@ -17,14 +17,14 @@
 
 #include "armadillo"
 #include "common_typedef_sdk.h"
+#include "concurrent_queue_wrapper.h"
 #include "framestats.h"
+#include "gettime.h"
 #include "ldpc_config.h"
 #include "memory_manage.h"
 #include "nlohmann/json.hpp"
 #include "symbols.h"
 #include "utils.h"
-#include "gettime.h"
-#include "concurrent_queue_wrapper.h"
 
 class Config {
  public:

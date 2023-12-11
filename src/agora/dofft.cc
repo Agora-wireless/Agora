@@ -115,8 +115,10 @@ EventData DoFFT::Launch(size_t tag) {
                             cfg_->OfdmCaNum() * 2);
   }
   if (kDebugPrintInTask) {
-    std::printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu, symbol type: %zu\n", tid_,
-                frame_id, symbol_id, ant_id, static_cast<size_t>(sym_type));
+    std::printf(
+        "In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu, symbol type: "
+        "%zu\n",
+        tid_, frame_id, symbol_id, ant_id, static_cast<size_t>(sym_type));
   }
 
   if ((kPrintPilotCorrStats == true) &&

@@ -187,37 +187,37 @@ void AgoraWorker::WorkerThread(int tid) {
   while (config_->Running() == true && active_core_.at(tid) == true) {
     for (size_t i = 0; i < computers_vec.size(); i++) {
       if (computers_vec.at(i)->TryLaunch(
-            *message_->GetConq(events_vec.at(i), cur_qid),
-            message_->GetCompQueue(cur_qid),
-            message_->GetWorkerPtok(cur_qid, tid))) {
+              *message_->GetConq(events_vec.at(i), cur_qid),
+              message_->GetCompQueue(cur_qid),
+              message_->GetWorkerPtok(cur_qid, tid))) {
         empty_queue = false;
 
-        if (((computers_vec.at(i)->enq_deq_tsc_worker_.frame_id_ == config_->FrameToProfile()) and
-             (cur_qid == (computers_vec.at(i)->enq_deq_tsc_worker_.frame_id_ & 0x1)))) {
-          size_t symbol_id = computers_vec.at(i)->enq_deq_tsc_worker_.symbol_id_;
-          if (symbol_id > config_->Frame().NumTotalSyms())
-          {
-            symbol_id = 0; // kBeam event does not have a valid symbol_id
+        if (((computers_vec.at(i)->enq_deq_tsc_worker_.frame_id_ ==
+              config_->FrameToProfile()) and
+             (cur_qid ==
+              (computers_vec.at(i)->enq_deq_tsc_worker_.frame_id_ & 0x1)))) {
+          size_t symbol_id =
+              computers_vec.at(i)->enq_deq_tsc_worker_.symbol_id_;
+          if (symbol_id > config_->Frame().NumTotalSyms()) {
+            symbol_id = 0;  // kBeam event does not have a valid symbol_id
           }
 
           stats_->LogDequeueStatsWorker(
-            tid,
-            computers_vec.at(i)->enq_deq_tsc_worker_.frame_id_,
-            symbol_id,
-            computers_vec.at(i)->enq_deq_tsc_worker_.dequeue_start_tsc_,
-            computers_vec.at(i)->enq_deq_tsc_worker_.dequeue_end_tsc_,
-            computers_vec.at(i)->enq_deq_tsc_worker_.dequeue_diff_tsc_,
-            computers_vec.at(i)->enq_deq_tsc_worker_.valid_dequeue_diff_tsc_,
-            events_vec.at(i));
+              tid, computers_vec.at(i)->enq_deq_tsc_worker_.frame_id_,
+              symbol_id,
+              computers_vec.at(i)->enq_deq_tsc_worker_.dequeue_start_tsc_,
+              computers_vec.at(i)->enq_deq_tsc_worker_.dequeue_end_tsc_,
+              computers_vec.at(i)->enq_deq_tsc_worker_.dequeue_diff_tsc_,
+              computers_vec.at(i)->enq_deq_tsc_worker_.valid_dequeue_diff_tsc_,
+              events_vec.at(i));
 
           stats_->LogEnqueueStatsWorker(
-            tid,
-            computers_vec.at(i)->enq_deq_tsc_worker_.frame_id_,
-            symbol_id,
-            computers_vec.at(i)->enq_deq_tsc_worker_.enqueue_start_tsc_,
-            computers_vec.at(i)->enq_deq_tsc_worker_.enqueue_end_tsc_,
-            computers_vec.at(i)->enq_deq_tsc_worker_.enqueue_diff_tsc_,
-            events_vec.at(i));
+              tid, computers_vec.at(i)->enq_deq_tsc_worker_.frame_id_,
+              symbol_id,
+              computers_vec.at(i)->enq_deq_tsc_worker_.enqueue_start_tsc_,
+              computers_vec.at(i)->enq_deq_tsc_worker_.enqueue_end_tsc_,
+              computers_vec.at(i)->enq_deq_tsc_worker_.enqueue_diff_tsc_,
+              events_vec.at(i));
         }
         break;
       }
