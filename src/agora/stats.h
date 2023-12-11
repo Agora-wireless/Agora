@@ -240,7 +240,7 @@ class Stats {
     }
   };
 
-  inline void LogDequeueStatsMaster(EventType event_type, size_t frame_id,
+  inline void LogDequeueStatsMaster(EventType event_type,
                                     size_t tsc_dequeue_start,
                                     size_t tsc_dequeue_end) {
     dequeue_stats_[dequeue_stats_id_].tsc_start_ = tsc_dequeue_start;
