@@ -46,7 +46,7 @@
     /* 2nd tx gain decreased, for a better performance
     under equal power allocation on agora */
     "ue_tx_gain_a": [
-        81,
+        76,
         76
     ],
     "ue_rx_gain_b": [
