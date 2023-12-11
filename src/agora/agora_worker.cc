@@ -59,7 +59,7 @@ void AgoraWorker::UpdateCores(RPControlMsg rcm) {
   AGORA_LOG_INFO("=================================\n");
   AGORA_LOG_INFO(
       "Agora: Updating compute resources for workers thread - currently used: "
-      "%ld,total: %ld\n",
+      "%ld, total: %ld\n",
       workers_.size(),
       sysconf(_SC_NPROCESSORS_ONLN) - base_worker_core_offset_);
 
@@ -184,7 +184,7 @@ void AgoraWorker::WorkerThread(int tid) {
   size_t cur_qid = 0;
   size_t empty_queue_itrs = 0;
   bool empty_queue = true;
-  while (config_->Running() == true) {
+  while (config_->Running() == true && active_core_.at(tid) == true) {
     for (size_t i = 0; i < computers_vec.size(); i++) {
       if (computers_vec.at(i)->TryLaunch(
             *message_->GetConq(events_vec.at(i), cur_qid),
@@ -200,7 +200,7 @@ void AgoraWorker::WorkerThread(int tid) {
             symbol_id = 0; // kBeam event does not have a valid symbol_id
           }
 
-          config_->LogDequeueStatsWorker(
+          stats_->LogDequeueStatsWorker(
             tid,
             computers_vec.at(i)->enq_deq_tsc_worker_.frame_id_,
             symbol_id,
@@ -210,7 +210,7 @@ void AgoraWorker::WorkerThread(int tid) {
             computers_vec.at(i)->enq_deq_tsc_worker_.valid_dequeue_diff_tsc_,
             events_vec.at(i));
 
-          config_->LogEnqueueStatsWorker(
+          stats_->LogEnqueueStatsWorker(
             tid,
             computers_vec.at(i)->enq_deq_tsc_worker_.frame_id_,
             symbol_id,
