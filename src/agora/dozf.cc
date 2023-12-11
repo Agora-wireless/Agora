@@ -8,6 +8,8 @@
 #include "concurrent_queue_wrapper.h"
 #include "doer.h"
 
+// this branch has already been deleted!
+
 static constexpr bool kUseSIMDGather = true;
 // Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.
 // This is faster but less accurate than using an SVD-based pseudoinverse.
