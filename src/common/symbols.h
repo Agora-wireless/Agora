@@ -67,6 +67,28 @@ enum class EventType : int {
 static constexpr size_t kNumEventTypes =
     static_cast<size_t>(EventType::kThreadTermination) + 1;
 
+// Define a mapping from EventType to string
+static const std::array<std::string, kNumEventTypes> kEventTypeToString = {
+    "PacketRX",
+    "FFT",
+    "Beam",
+    "Demul",
+    "IFFT",
+    "Precode",
+    "PacketTX",
+    "PacketPilotTX",
+    "Decode",
+    "Encode",
+    "Modul",
+    "PacketFromMac",
+    "PacketToMac",
+    "FFTPilot",
+    "SNRReport",
+    "RANUpdate",
+    "RBIndicator",
+    "Broadcast",
+    "ThreadTermination"};
+
 // Types of Agora Doers
 enum class DoerType : size_t {
   kFFT,
@@ -288,6 +310,12 @@ static const std::map<char, SymbolType> kSymbolMap = {
     {'U', SymbolType::kUL},     {'S', SymbolType::kControl}};
 
 enum class SubcarrierType { kNull, kDMRS, kPTRS, kData };
+
+// Maximum number of events allowed for all threads per symbol in a logging frame
+static constexpr size_t kMaxLoggingEventsMaster = 100000;
+
+// Maximum number of events allowed per thread per symbol in a logging frame
+static constexpr size_t kMaxLoggingEventsWorker = 1024;
 
 // Maximum number of symbols per frame allowed by Agora
 static constexpr size_t kMaxSymbols = 140;
