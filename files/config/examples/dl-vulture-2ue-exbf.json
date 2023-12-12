@@ -24,7 +24,7 @@
     "ofdm_rx_zero_prefix_cal_dl": 324,
     "ofdm_rx_zero_prefix_cal_ul": 136,
     "frame_schedule": [
-        "BGCCCCCCCGGGGGGPGDDDGG"
+        "BGCCCCCCCGGGGGGPPGDDDGG"
     ],
     "client_dl_pilot_syms": 1,
     "beamsweep": false,
