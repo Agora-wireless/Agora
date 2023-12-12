@@ -16,6 +16,12 @@ static const std::string kStatsDataFilename =
     kStatsOutputFilePath + "timeresult.txt";
 static const std::string kStatsDetailedDataFilename =
     kStatsOutputFilePath + "timeresult_detail.txt";
+static const std::string kAgoraConfigFilename =
+    kStatsOutputFilePath + "agora_config.txt";
+static const std::string kMasterFilename =
+    kStatsOutputFilePath + "timestamps_master.txt";
+static const std::string kWorkerFilename =
+    kStatsOutputFilePath + "timestamps_workers.txt";
 
 Stats::Stats(const Config* const cfg)
     : config_(cfg),
@@ -42,7 +48,7 @@ void Stats::PopulateSummary(FrameSummary* frame_summary, size_t thread_id,
 
   for (size_t j = 0; j < break_down_num_; j++) {
     frame_summary->us_this_thread_.at(j) = GetTime::CyclesToUs(
-        ds->task_duration_.at(j) - ds_old->task_duration_.at(j), freq_ghz_);
+        (ds->task_duration_.at(j) - ds_old->task_duration_.at(j)), freq_ghz_);
     frame_summary->us_avg_threads_.at(j) +=
         frame_summary->us_this_thread_.at(j);
   }
@@ -127,9 +133,9 @@ void Stats::UpdateStats(size_t frame_id) {
       sum_us += us_avg;
     }
 
-    for (size_t i = 1; i < this->break_down_num_; i++) {
+    for (size_t i = 0; i < this->break_down_num_; i++) {
       for (size_t doer = 0; doer < work_summary.size(); doer++) {
-        this->doer_breakdown_us_.at(doer).at(i - 1).at(frame_slot) =
+        this->doer_breakdown_us_.at(doer).at(i).at(frame_slot) =
             work_summary.at(doer).us_avg_threads_.at(i);
       }
     }
@@ -183,12 +189,12 @@ void Stats::SaveToFile() {
   // the combined case
   if ((config_->Frame().NumDLSyms() > 0) &&
       (config_->Frame().NumULSyms() > 0)) {
-    std::fprintf(fp_debug,
-                 "Pilot RX by socket threads (= reference time), "
-                 "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
-                 "kBeamDone, kPrecodeDone, kIFFTDone, kEncodeDone, kDemulDone, "
-                 "kDecodeDone, kRXDone, time in CSI, time in "
-                 "FFT, time in Beamweights, time in Demul, time in Decode\n");
+    std::fprintf(
+        fp_debug,
+        "Pilot RX by socket threads (= reference time), "
+        "kFirstSymbolRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
+        "kBeamDone, kRXDone, kDemulDone, kDecodeDone, kEncodeDone, "
+        "kPrecodeDone, kIFFTDone, kTXDone\n");
 
     for (size_t frame = 0; frame < total_stat_frames; frame++) {
       const size_t i = (first_frame_idx + frame) % kNumStatsFrames;
@@ -198,31 +204,27 @@ void Stats::SaveToFile() {
       }
       std::fprintf(
           fp_debug,
-          "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
-          "%.3f %.3f %.3f %.3f %.3f\n",
+          "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n",
           GetTime::CyclesToUs(ref_tsc - this->creation_tsc_, this->freq_ghz_),
           MasterGetUsFromRef(TsType::kFirstSymbolRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
           MasterGetUsFromRef(TsType::kPilotAllRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kFFTPilotsDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kBeamDone, i, ref_tsc),
-          MasterGetUsFromRef(TsType::kPrecodeDone, i, ref_tsc),
-          MasterGetUsFromRef(TsType::kIFFTDone, i, ref_tsc),
-          MasterGetUsFromRef(TsType::kEncodeDone, i, ref_tsc),
+          MasterGetUsFromRef(TsType::kRXDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kDemulDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kDecodeDone, i, ref_tsc),
-          MasterGetUsFromRef(TsType::kRXDone, i, ref_tsc),
-          this->doer_us_.at(static_cast<size_t>(DoerType::kCSI)).at(i),
-          this->doer_us_.at(static_cast<size_t>(DoerType::kFFT)).at(i),
-          this->doer_us_.at(static_cast<size_t>(DoerType::kBeam)).at(i),
-          this->doer_us_.at(static_cast<size_t>(DoerType::kDemul)).at(i),
-          this->doer_us_.at(static_cast<size_t>(DoerType::kDecode)).at(i));
+          MasterGetUsFromRef(TsType::kEncodeDone, i, ref_tsc),
+          MasterGetUsFromRef(TsType::kPrecodeDone, i, ref_tsc),
+          MasterGetUsFromRef(TsType::kIFFTDone, i, ref_tsc),
+          MasterGetUsFromRef(TsType::kTXDone, i, ref_tsc));
     }
   } else if (config_->Frame().NumDLSyms() > 0) {
-    std::fprintf(fp_debug,
-                 "Pilot RX by socket threads (= reference time), "
-                 "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
-                 "kBeamDone, kPrecodeDone, kIFFTDone, kEncodeDone, kRXDone\n");
+    std::fprintf(
+        fp_debug,
+        "Pilot RX by socket threads (= reference time), "
+        "kFirstSymbolRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
+        "kBeamDone, kPrecodeDone, kIFFTDone, kEncodeDone, kRXDone\n");
     for (size_t frame = 0; frame < total_stat_frames; frame++) {
       const size_t i = (first_frame_idx + frame) % kNumStatsFrames;
       size_t ref_tsc = SIZE_MAX;
@@ -230,7 +232,7 @@ void Stats::SaveToFile() {
         ref_tsc = std::min(ref_tsc, this->frame_start_[j][i]);
       }
       std::fprintf(
-          fp_debug, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f \n",
+          fp_debug, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n",
           GetTime::CyclesToUs(ref_tsc - this->creation_tsc_, this->freq_ghz_),
           MasterGetUsFromRef(TsType::kFirstSymbolRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
@@ -247,9 +249,8 @@ void Stats::SaveToFile() {
     std::fprintf(
         fp_debug,
         "Pilot RX by socket threads (= reference time), "
-        "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
-        "kBeamDone, kDemulDone, kDecodeDone, kRXDone, time in CSI, time in "
-        "FFT, time in Beamweights, time in Demul, time in Decode\n");
+        "kFirstSymbolRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
+        "kBeamDone, kDemulDone, kDecodeDone, kRXDone\n");
     for (size_t frame = 0; frame < total_stat_frames; frame++) {
       const size_t i = (first_frame_idx + frame) % kNumStatsFrames;
       size_t ref_tsc = SIZE_MAX;
@@ -257,9 +258,7 @@ void Stats::SaveToFile() {
         ref_tsc = std::min(ref_tsc, this->frame_start_[j][i]);
       }
       std::fprintf(
-          fp_debug,
-          "%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.3f %.3f %.3f "
-          "%.3f %.3f\n",
+          fp_debug, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n",
           GetTime::CyclesToUs(ref_tsc - this->creation_tsc_, this->freq_ghz_),
           MasterGetUsFromRef(TsType::kFirstSymbolRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
@@ -268,58 +267,90 @@ void Stats::SaveToFile() {
           MasterGetUsFromRef(TsType::kBeamDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kDemulDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kDecodeDone, i, ref_tsc),
-          MasterGetUsFromRef(TsType::kRXDone, i, ref_tsc),
-          this->doer_us_.at(static_cast<size_t>(DoerType::kCSI)).at(i),
-          this->doer_us_.at(static_cast<size_t>(DoerType::kFFT)).at(i),
-          this->doer_us_.at(static_cast<size_t>(DoerType::kBeam)).at(i),
-          this->doer_us_.at(static_cast<size_t>(DoerType::kDemul)).at(i),
-          this->doer_us_.at(static_cast<size_t>(DoerType::kDecode)).at(i));
+          MasterGetUsFromRef(TsType::kRXDone, i, ref_tsc));
     }
   } else {
     // Shouldn't happen
     RtAssert(false,
              std::string("No uplink or downlink symbols in the frame\n"));
   }
-
   std::fclose(fp_debug);
 
-  if (kIsWorkerTimingEnabled == true) {
+  if (config_->FrameToProfile() >= 0) {
+    AGORA_LOG_INFO("Stats: Printing Agora configurations to %s\n",
+                   kAgoraConfigFilename.c_str());
+
+    FILE* fp_agora_config = std::fopen(kAgoraConfigFilename.c_str(), "w");
+
+    RtAssert(fp_agora_config != nullptr,
+             std::string("Open file failed ") + std::to_string(errno));
+
+    // Print Agora configuration parameters
+    std::fprintf(
+        fp_agora_config,
+        "freq_ghz, rate, fft_size, ofdm_data_num, samps_per_symbol, "
+        "demul_block_size, bs_radio_num, ue_radio_num, worker_thread_num, "
+        "pilot_symbol_num_perframe, ul_symbol_num_perframe, "
+        "dl_symbol_num_perframe, total_symbol_num_perframe, max_frame, "
+        "profiling_frame\n");
+
+    std::fprintf(
+        fp_agora_config,
+        "%f %.0f %zu %zu %zu %zu %zu %zu %zu %zu %zu %zu %zu %zu %zu\n",
+        config_->FreqGhz(), config_->Rate(), config_->OfdmCaNum(),
+        config_->OfdmDataNum(), config_->SampsPerSymbol(),
+        config_->DemulBlockSize(), config_->NumRadios(), config_->UeNum(),
+        config_->WorkerThreadNum(), config_->Frame().NumPilotSyms(),
+        config_->Frame().NumULSyms(), config_->Frame().NumDLSyms(),
+        config_->Frame().NumTotalSyms(), config_->FramesToTest(),
+        config_->FrameToProfile());
+
+    std::fclose(fp_agora_config);
+
     AGORA_LOG_INFO("Stats: Printing detailed results to %s\n",
                    kStatsDetailedDataFilename.c_str());
 
     FILE* fp_debug_detailed =
         std::fopen(kStatsDetailedDataFilename.c_str(), "w");
+
     RtAssert(fp_debug_detailed != nullptr,
              std::string("Open file failed ") + std::to_string(errno));
+
     // Print the header
-    std::fprintf(fp_debug_detailed,
-                 "fft_0, fft_1, fft_2, beam_0, beam_1, beam_2, demul_0, "
-                 "demul_1, demul_2, "
-                 "decode_0, decode_1, decode_2\n");
+    std::fprintf(
+        fp_debug_detailed,
+        "fft_0, fft_1, fft_2, csi_0, csi_1, csi_2, "
+        "beam_0, beam_1, beam_2, demul_0, demul_1, demul_2, "
+        "decode_0, decode_1, decode_2, encode_0, encode_1, encode_2, "
+        "ifft_0, ifft_1, ifft_2, broadcast_0, broadcast_1, broadcast_2, "
+        "precode_0, precode_1, precode_2, rc_0, rc_1, rc_2\n");
 
     for (size_t frame = 0; frame < total_stat_frames; frame++) {
       const size_t i = (first_frame_idx + frame) % kNumStatsFrames;
       std::fprintf(
           fp_debug_detailed,
-          "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n",
+          "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
+          "%.3f %.3f "
+          "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
+          "%.3f %.3f\n",
           this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kFFT))
-                  .at(0)
-                  .at(i) +
-              this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kCSI))
-                  .at(0)
-                  .at(i),
+              .at(0)
+              .at(i),
           this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kFFT))
-                  .at(1)
-                  .at(i) +
-              this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kCSI))
-                  .at(1)
-                  .at(i),
+              .at(1)
+              .at(i),
           this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kFFT))
-                  .at(2)
-                  .at(i) +
-              this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kCSI))
-                  .at(2)
-                  .at(i),
+              .at(2)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kCSI))
+              .at(0)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kCSI))
+              .at(1)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kCSI))
+              .at(2)
+              .at(i),
           this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kBeam))
               .at(0)
               .at(i),
@@ -345,10 +376,171 @@ void Stats::SaveToFile() {
               .at(1)
               .at(i),
           this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kDecode))
+              .at(2)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kEncode))
+              .at(0)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kEncode))
+              .at(1)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kEncode))
+              .at(2)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kIFFT))
+              .at(0)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kIFFT))
+              .at(1)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kIFFT))
+              .at(2)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kBroadcast))
+              .at(0)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kBroadcast))
+              .at(1)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kBroadcast))
+              .at(2)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kPrecode))
+              .at(0)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kPrecode))
+              .at(1)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kPrecode))
+              .at(2)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kRC))
+              .at(0)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kRC))
+              .at(1)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kRC))
               .at(2)
               .at(i));
     }
     std::fclose(fp_debug_detailed);
+  }
+
+  if (config_->FrameToProfile() >= 0) {
+    FILE* fp_master = std::fopen(kMasterFilename.c_str(), "w");
+
+    RtAssert(fp_master != nullptr,
+             std::string("Open file failed ") + std::to_string(errno));
+
+    std::printf("Master: Saving breakdown timestamps to %s\n",
+                kMasterFilename.c_str());
+
+    std::fprintf(
+        fp_master, "Master frame %zu: dequeue %zu tasks, start: %zu\n",
+        config_->FrameToProfile(), this->dequeue_stats_id_,
+        MasterGetTsc(TsType::kFirstSymbolRX, config_->FrameToProfile()));
+
+    for (size_t i = 0; i < config_->Frame().NumTotalSyms(); i++) {
+      for (size_t j = 0; j < this->enqueue_stats_id_.at(i); j++) {
+        std::fprintf(
+            fp_master,
+            "Master frame %zu symbol %zu: enqueue task %s tsc "
+            "[%zu-%zu] = %.3f\n",
+            config_->FrameToProfile(), i,
+            kEventTypeToString
+                .at(static_cast<size_t>(this->enqueue_stats_[i][j].event_type_))
+                .c_str(),
+            this->enqueue_stats_[i][j].tsc_end_,
+            this->enqueue_stats_[i][j].tsc_start_,
+            GetTime::CyclesToUs(this->enqueue_stats_[i][j].tsc_end_ -
+                                    this->enqueue_stats_[i][j].tsc_start_,
+                                config_->FreqGhz()));
+      }
+    }
+
+    for (size_t i = 0; i < this->dequeue_stats_id_; i++) {
+      std::fprintf(
+          fp_master, "Master frame %zu: dequeue task %s tsc [%zu-%zu] = %.3f\n",
+          config_->FrameToProfile(),
+          kEventTypeToString
+              .at(static_cast<size_t>(this->dequeue_stats_[i].event_type_))
+              .c_str(),
+          this->dequeue_stats_[i].tsc_end_, this->dequeue_stats_[i].tsc_start_,
+          GetTime::CyclesToUs(this->dequeue_stats_[i].tsc_end_ -
+                                  this->dequeue_stats_[i].tsc_start_,
+                              config_->FreqGhz()));
+    }
+    std::fclose(fp_master);
+  }
+
+  if (config_->FrameToProfile() >= 0) {
+    FILE* fp_worker = std::fopen(kWorkerFilename.c_str(), "w");
+
+    RtAssert(fp_worker != nullptr,
+             std::string("Open file failed ") + std::to_string(errno));
+
+    std::printf("Saving breakdown timestamps of workers to %s\n",
+                kWorkerFilename.c_str());
+
+    for (size_t tid = 0; tid < task_thread_num_; tid++) {
+      for (size_t i = config_->FrameToProfile(); i <= this->last_frame_id_;
+           i += 2000) {
+        std::fprintf(
+            fp_worker,
+            "Worker %zu frame %zu: %zu enqueue takes %.2f us, dequeue takes "
+            "%.2f us"
+            "(non-empty: %.2f)\n",
+            tid, i, this->worker_num_valid_enqueue_[tid][i],
+            GetTime::CyclesToUs(this->total_worker_enqueue_tsc_[tid][i],
+                                config_->FreqGhz()),
+            GetTime::CyclesToUs(this->total_worker_dequeue_tsc_[tid][i],
+                                config_->FreqGhz()),
+            GetTime::CyclesToUs(this->total_worker_valid_dequeue_tsc_[tid][i],
+                                config_->FreqGhz()));
+      }
+
+      for (size_t i = 0; i < config_->Frame().NumTotalSyms(); i++) {
+        for (size_t j = 0; j < this->worker_enqueue_stats_id_[tid].at(i); j++) {
+          std::fprintf(
+              fp_worker,
+              "Worker %zu frame %zu symbol %zu: enqueue task %s tsc [%zu-%zu] "
+              "= %.3f\n",
+              tid, config_->FrameToProfile(), i,
+              kEventTypeToString
+                  .at(static_cast<size_t>(
+                      this->worker_enqueue_stats_[tid][i][j].event_type_))
+                  .c_str(),
+              this->worker_enqueue_stats_[tid][i][j].tsc_end_,
+              this->worker_enqueue_stats_[tid][i][j].tsc_start_,
+              GetTime::CyclesToUs(
+                  this->worker_enqueue_stats_[tid][i][j].tsc_end_ -
+                      this->worker_enqueue_stats_[tid][i][j].tsc_start_,
+                  config_->FreqGhz()));
+        }
+      }
+      for (size_t i = 0; i < config_->Frame().NumTotalSyms(); i++) {
+        for (size_t j = 0; j < this->worker_dequeue_stats_id_[tid].at(i); j++) {
+          std::fprintf(
+              fp_worker,
+              "Worker %zu frame %zu symbol %zu: dequeue task %s tsc [%zu-%zu] "
+              "= "
+              "%.3f\n",
+              tid, config_->FrameToProfile(), i,
+              kEventTypeToString
+                  .at(static_cast<size_t>(
+                      this->worker_dequeue_stats_[tid][i][j].event_type_))
+                  .c_str(),
+              this->worker_dequeue_stats_[tid][i][j].tsc_end_,
+              this->worker_dequeue_stats_[tid][i][j].tsc_start_,
+              GetTime::CyclesToUs(
+                  this->worker_dequeue_stats_[tid][i][j].tsc_end_ -
+                      this->worker_dequeue_stats_[tid][i][j].tsc_start_,
+                  config_->FreqGhz()));
+        }
+      }
+    }
+    std::fclose(fp_worker);
   }
 }
 
