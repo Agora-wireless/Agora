@@ -19,6 +19,7 @@
 #include "packet_txrx_sim.h"
 #include "signal_handler.h"
 
+static const bool kPrintAdaptUes = false;
 static const bool kDebugPrintPacketsFromMac = false;
 static const bool kDebugDeferral = true;
 
@@ -72,6 +73,7 @@ Agora::Agora(Config* const cfg)
   InitializeQueues();
   InitializeCounters();
   InitializeThreads();
+  InitializeUesFromFile();
 
   if (kRecordUplinkFrame) {
     recorder_ = std::make_unique<Agora_recorder::RecorderThread>(
@@ -390,8 +392,8 @@ void Agora::Start() {
 
   while ((config_->Running() == true) &&
          (SignalHandler::GotExitSignal() == false)) {
-    // Get a batch of events
     size_t dequeue_start_tsc_ = GetTime::WorkerRdtsc();
+    // Get a batch of events
     const size_t num_events =
         FetchEvent(events_list, is_turn_to_dequeue_from_io);
     size_t dequeue_end_tsc_ = GetTime::WorkerRdtsc();
@@ -413,6 +415,27 @@ void Agora::Start() {
         case EventType::kPacketRX: {
           RxPacket* rx = rx_tag_t(event.tags_[0u]).rx_packet_;
           Packet* pkt = rx->RawPacket();
+
+          if ((config_->AdaptUes() == true) and
+              (config_->SpatialStreamsNum() != adapt_ues_array_.at(pkt->frame_id_))) {
+            AGORA_LOG_INFO("[ALERTTTTTT]: Spatial Streams Update!!! "
+              "previous number of spatial streams: %zu, "
+              "updated number of spatial streams: %zu, frame id: %zu \n",
+              config_->SpatialStreamsNum(),
+              adapt_ues_array_.at(pkt->frame_id_),
+              frame_tracking_.cur_proc_frame_id_);
+              config_->UpdateSpatialStreamsNum(adapt_ues_array_.at(pkt->frame_id_));
+              ReInitializeCounters();
+          }
+
+          AGORA_LOG_TRACE("Agora: event_type_ %s, cur_sche_frame_id_ %zu, "
+            "frame_id_ %zu, symbol_id_ %zu, ant_id_ %zu, adapt ue(s) %zu\n",
+            "kPacketRX",
+            frame_tracking_.cur_sche_frame_id_,
+            pkt->frame_id_,
+            pkt->symbol_id_,
+            pkt->ant_id_,
+            adapt_ues_array_.at(pkt->frame_id_));
 
           if (recorder_ != nullptr) {
             rx->Use();
@@ -578,26 +601,53 @@ void Agora::Start() {
         case EventType::kPacketFromRp: {
           // Control message from RP
           RPControlMsg rcm;
-          rcm.add_core_ = event.tags_[0];
-          rcm.remove_core_ = event.tags_[1];
-          AGORA_LOG_INFO(
-              "Agora: Received cores update data from RP of add_cores %zu,"
-              "remove_cores %zu\n",
-              rcm.add_core_, rcm.remove_core_);
-          worker_set_->UpdateCores(rcm);
+          rcm.msg_type_ = event.tags_[0];
+          rcm.msg_arg_1_ = event.tags_[1];
+          rcm.msg_arg_2_ = event.tags_[2];
+
+          if (rcm.msg_type_ == 1) {
+            AGORA_LOG_INFO(
+              "Agora: Received cores update data from RP of add cores %zu,"
+              "remove cores %zu\n", rcm.msg_arg_1_, rcm.msg_arg_2_);
+            worker_set_->UpdateCores(rcm);
+          } else {
+            RtAssert(false, "Invalid msg type from RP\n");
+          }
         } break;
 
         case EventType::kPacketToRp: {
-          // Status info to RP
-          RPStatusMsg rsm;
-          rsm.latency_ = this->stats_->MeasureLastFrameLatency();
-          rsm.core_num_ = worker_set_->GetCoresInfo();
-          AGORA_LOG_INFO(
-              "Agora: Sending status to RP of latency %zu, core_num %zu\n",
-              rsm.latency_, rsm.core_num_);
-          TryEnqueueFallback(
+          // Control message from RP
+          RPControlMsg rcm;
+          rcm.msg_type_ = event.tags_[0];
+
+          if (rcm.msg_type_ == 0) {
+            // Initial cores info to RP
+            RPStatusMsg rsm;
+            rsm.status_msg_0_ = cfg->CoreOffset() + 1 + cfg->SocketThreadNum() +
+                                (cfg->DynamicCoreAlloc() ? 1 : 0); // Cores allocated for rest
+            rsm.status_msg_1_ = sysconf(_SC_NPROCESSORS_ONLN); // Total cores available
+            rsm.status_msg_2_ = kMinWorkers;
+            AGORA_LOG_INFO(
+              "Agora: Sending cores details to RP of rest of alloc %zu, max cores %zu, min workers %zu\n",
+              rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_);
+            TryEnqueueFallback(
               &rp_request_queue_,
-              EventData(EventType::kPacketToRp, rsm.latency_, rsm.core_num_));
+              EventData(EventType::kPacketToRp, rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_));
+          } else if (rcm.msg_type_ == 1) {
+            // Current cores, latency and frame info to RP
+            RPStatusMsg rsm;
+            rsm.status_msg_0_ = this->stats_->MeasureLastFrameLatency();
+            rsm.status_msg_1_ = worker_set_->GetCoresInfo();
+            rsm.status_msg_2_ = this->stats_->LastFrameId();
+            AGORA_LOG_INFO(
+              "Agora: Sending status to RP of latency %zu, current workers %zu, last frame id %zu\n",
+              rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_);
+            TryEnqueueFallback(
+              &rp_request_queue_,
+              EventData(EventType::kPacketToRp, rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_));
+          } else {
+            RtAssert(false, "Invalid msg type to RP\n");
+          }
         } break;
 
         case EventType::kRANUpdate: {
@@ -1115,6 +1165,29 @@ void Agora::FreeQueues() {
   }
 }
 
+void Agora::ReInitializeCounters() {
+  const auto& cfg = config_;
+
+  AGORA_LOG_INFO("Agora: Re-Initializing counters with %zu spatial stream(s)\n",
+    cfg->SpatialStreamsNum());
+
+  decode_counters_.Init(
+      cfg->Frame().NumULSyms(),
+      cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
+        cfg->SpatialStreamsNum());
+
+  tomac_counters_.Init(cfg->Frame().NumULSyms(), cfg->SpatialStreamsNum());
+
+  if (config_->Frame().NumDLSyms() > 0) {
+    encode_counters_.Init(
+        config_->Frame().NumDlDataSyms(),
+        config_->LdpcConfig(Direction::kDownlink).NumBlocksInSymbol() *
+            config_->SpatialStreamsNum());
+    // mac data is sent per frame, so we set max symbol to 1
+    mac_to_phy_counters_.Init(1, config_->SpatialStreamsNum());
+  }
+}
+
 void Agora::InitializeCounters() {
   const auto& cfg = config_;
 
@@ -1260,6 +1333,40 @@ void Agora::InitializeThreads() {
   }
 }
 
+void Agora::InitializeUesFromFile() {
+  adapt_ues_array_.resize(config_->FramesToTest());
+
+  static const std::string filename =
+    kOutputFilepath + "adapt_ueant" + std::to_string(config_->UeAntNum()) + ".bin";
+
+  AGORA_LOG_INFO("Agora: Reading adaptable number of UEs across frames from %s\n",
+                  filename.c_str());
+
+  FILE* fp = std::fopen(filename.c_str(), "rb");
+  RtAssert(fp != nullptr, "Failed to open adapt UEs file");
+
+  const size_t expected_count = config_->FramesToTest();
+  const size_t actual_count =
+    std::fread(&adapt_ues_array_.at(0), sizeof(uint8_t), expected_count, fp);
+
+  if (expected_count != actual_count) {
+      std::fprintf(
+          stderr,
+          "Agora: Failed to read adapt UEs file %s. expected "
+          "%zu number of UE entries but read %zu. Errno %s\n",
+          filename.c_str(), expected_count, actual_count, strerror(errno));
+      throw std::runtime_error("Agora: Failed to read adapt UEs file");
+  }
+  if (kPrintAdaptUes) {
+    std::printf("Agora: Adapted number of UEs across %zu frames\n",
+      config_->FramesToTest());
+    for (size_t n = 0; n < config_->FramesToTest(); n++) {
+      std::printf("%u ", adapt_ues_array_.at(n));
+    }
+    std::printf("\n");
+  }
+}
+
 void Agora::SaveDecodeDataToFile(int frame_id) {
   const auto& cfg = config_;
   const size_t num_decoded_bytes =
@@ -1272,7 +1379,7 @@ void Agora::SaveDecodeDataToFile(int frame_id) {
     AGORA_LOG_ERROR("SaveDecodeDataToFile error creating file pointer\n");
   } else {
     for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
-      for (size_t j = 0; j < cfg->UeAntNum(); j++) {
+      for (size_t j = 0; j < cfg->SpatialStreamsNum(); j++) {
         const int8_t* ptr =
             agora_memory_->GetDecod()[(frame_id % kFrameWnd)][i][j];
         const auto write_status =

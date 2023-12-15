@@ -40,12 +40,13 @@ static void ReadFromFile(const std::string& filename, Table<TableType>& data,
           filename.c_str(), i, read_elements, elements, strerror(errno));
     }
   }
+  fclose(fp);
 }
 
 static void ReadFromFileUl(const std::string& filename, Table<uint8_t>& data,
                            int num_bytes_per_ue, Config const* const cfg) {
   ReadFromFile(filename, data, cfg->Frame().NumULSyms(),
-               (num_bytes_per_ue * cfg->UeAntNum()), sizeof(uint8_t));
+               (num_bytes_per_ue * cfg->SpatialStreamsNum()), sizeof(uint8_t));
 }
 
 static void ReadFromFileDl(const std::string& filename, Table<short>& data,
@@ -55,20 +56,22 @@ static void ReadFromFileDl(const std::string& filename, Table<short>& data,
 }
 
 static unsigned int CheckCorrectnessUl(Config const* const cfg) {
+  int bs_ant_num = cfg->BsAntNum();
   int ue_num = cfg->UeAntNum();
+  int spatial_streams_num = cfg->SpatialStreamsNum();
   int num_uplink_syms = cfg->Frame().NumULSyms();
   int ofdm_data_num = cfg->OfdmDataNum();
   int ul_pilot_syms = cfg->Frame().ClientUlPilotSymbols();
 
   const std::string raw_data_filename =
-      kUlCheckFilePrefix + std::to_string(cfg->OfdmCaNum()) + "_ant" +
-      std::to_string(cfg->UeAntNum()) + ".bin";
+      kUlCheckFilePrefix + std::to_string(cfg->OfdmCaNum()) + "_ueant" +
+      std::to_string(spatial_streams_num) + ".bin";
 
   Table<uint8_t> raw_data;
   Table<uint8_t> output_data;
-  raw_data.Calloc(num_uplink_syms, (ofdm_data_num * ue_num),
+  raw_data.Calloc(num_uplink_syms, (ofdm_data_num * spatial_streams_num),
                   Agora_memory::Alignment_t::kAlign64);
-  output_data.Calloc(num_uplink_syms, (ofdm_data_num * ue_num),
+  output_data.Calloc(num_uplink_syms, (ofdm_data_num * spatial_streams_num),
                      Agora_memory::Alignment_t::kAlign64);
 
   int num_bytes_per_ue =
@@ -76,17 +79,17 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg) {
       3 * cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
   ReadFromFileUl(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
   ReadFromFileUl(kDecodedFilename, output_data, num_bytes_per_ue, cfg);
-
   std::printf(
-      "check_correctness_ul: ue %d, ul syms %d, ofdm %d, ul pilots %d, bytes "
-      "per UE %d.\n",
-      ue_num, num_uplink_syms, ofdm_data_num, ul_pilot_syms, num_bytes_per_ue);
+      "check_correctness_ul: bs ant %d, ues %d, spatial streams (last frame) %d, "
+      "ul syms %d, ofdm %d, ul pilots %d, bytes per UE %d.\n",
+      bs_ant_num, ue_num, spatial_streams_num, num_uplink_syms, ofdm_data_num,
+      ul_pilot_syms, num_bytes_per_ue);
 
   unsigned int error_cnt = 0;
   unsigned int total_count = 0;
   for (int i = 0; i < num_uplink_syms; i++) {
     if (i >= ul_pilot_syms) {
-      for (int ue = 0; ue < ue_num; ue++) {
+      for (int ue = 0; ue < spatial_streams_num; ue++) {
         for (int j = 0; j < num_bytes_per_ue; j++) {
           total_count++;
           int offset_in_raw = num_bytes_per_ue * ue + j;
@@ -112,13 +115,16 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg) {
 
 unsigned int CheckCorrectnessDl(Config const* const cfg) {
   const size_t bs_ant_num = cfg->BsAntNum();
+  const size_t ue_num = cfg->UeAntNum();
+  const size_t spatial_streams_num = cfg->SpatialStreamsNum();
   const size_t num_data_syms = cfg->Frame().NumDLSyms();
   const size_t ofdm_ca_num = cfg->OfdmCaNum();
   const size_t samps_per_symbol = cfg->SampsPerSymbol();
 
-  std::string raw_data_filename = kDlCheckFilePrefix +
-                                  std::to_string(ofdm_ca_num) + "_ant" +
-                                  std::to_string(bs_ant_num) + ".bin";
+	std::string raw_data_filename = kDlCheckFilePrefix +
+                                  std::to_string(ofdm_ca_num) + "_bsant" +
+                                  std::to_string(bs_ant_num) + "_ueant" +
+                                  std::to_string(spatial_streams_num) + ".bin";
 
   Table<short> raw_data;
   Table<short> tx_data;
@@ -130,9 +136,9 @@ unsigned int CheckCorrectnessDl(Config const* const cfg) {
   ReadFromFileDl(raw_data_filename, raw_data, samps_per_symbol, cfg);
   ReadFromFileDl(kTxFilename, tx_data, samps_per_symbol, cfg);
   std::printf(
-      "check_correctness_dl: bs ant %zu, dl syms %zu, ofdm %zu, samps per %zu. "
-      "\n",
-      bs_ant_num, num_data_syms, ofdm_ca_num, samps_per_symbol);
+      "check_correctness_dl: bs ant %zu, ues %zu, spatial streams (last frame) %zu, "
+      " dl syms %zu, ofdm %zu, samps per symb %zu. \n",
+      bs_ant_num, ue_num, spatial_streams_num, num_data_syms, ofdm_ca_num, samps_per_symbol);
 
   unsigned int error_cnt = 0;
   float sum_diff = 0;

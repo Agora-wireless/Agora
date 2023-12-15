@@ -42,6 +42,7 @@ class Config {
   inline size_t BfAntNum() const { return this->bf_ant_num_; }
   inline size_t UeNum() const { return this->ue_num_; }
   inline size_t UeAntNum() const { return this->ue_ant_num_; }
+  inline bool AdaptUes() const { return this->adapt_ues_; }
   inline size_t UeAntOffset() const { return this->ue_ant_offset_; }
   inline size_t UeAntTotal() const { return this->ue_ant_total_; }
 
@@ -114,6 +115,9 @@ class Config {
   inline bool ImbalanceCalEn() const { return this->imbalance_cal_en_; }
   inline size_t BeamformingAlgo() const { return this->beamforming_algo_; }
   inline std::string Beamforming() const { return this->beamforming_str_; }
+  inline void UpdateSpatialStreamsNum(size_t num_spatial_streams) {
+    this->num_spatial_streams_ = num_spatial_streams;
+  }
   inline size_t SpatialStreamsNum() const { return this->num_spatial_streams_; }
   inline bool ExternalRefNode(size_t id) const {
     return this->external_ref_node_.at(id);
@@ -516,6 +520,11 @@ class Config {
     return symbol_idx;
   }
 
+  /// Return the symbol duration in seconds
+  inline double GetSymbolDurationSec() const {
+    return (this->samps_per_symbol_ / this->rate_);
+  }
+
   /// Return the frame duration in seconds
   inline double GetFrameDurationSec() const {
     return ((this->frame_.NumTotalSyms() * this->samps_per_symbol_) /
@@ -581,8 +590,12 @@ class Config {
       num_bytes_per_cb = this->ul_num_bytes_per_cb_;
       num_blocks_in_symbol = this->ul_ldpc_config_.NumBlocksInSymbol();
     }
-    return &info_bits[symbol_id][Roundup<64>(num_bytes_per_cb) *
-                                 (num_blocks_in_symbol * ue_id + cb_id)];
+    return &info_bits[symbol_id][(Roundup<64>(num_bytes_per_cb) *
+                                 num_blocks_in_symbol *
+                                 this->ue_ant_num_ *
+                                 (this->num_spatial_streams_ - 1)) +
+                                 (Roundup<64>(num_bytes_per_cb) *
+                                 num_blocks_in_symbol * ue_id)];
   }
 
   /// Get encoded_buffer for this frame, symbol, user and code block ID
@@ -794,6 +807,9 @@ class Config {
   size_t ue_num_;
   // The count of ue antennas an instance is responsable for
   size_t ue_ant_num_;
+  // Feature to adapt the number of ues from 1 to ue_ant_num_
+  // across frames_to_test_ frames
+  bool adapt_ues_;
 
   // Total number of us antennas in this experiment including the ones
   // instantiated on other runs/machines.
