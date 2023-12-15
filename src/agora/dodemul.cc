@@ -9,6 +9,11 @@
 #include "modulation.h"
 
 static constexpr bool kUseSIMDGather = true;
+static constexpr bool kPrintBeamWeights = false;
+static constexpr bool kPrintInputData = false;
+static constexpr bool kPrintEquOutput = false;
+static constexpr bool kPrintDemulInput = false;
+static constexpr bool kPrintDemulOutput = false;
 
 DoDemul::DoDemul(
     Config* config, int tid, Table<complex_float>& data_buffer,
@@ -44,7 +49,7 @@ DoDemul::DoDemul(
   arma::cx_float* ue_pilot_ptr =
       reinterpret_cast<arma::cx_float*>(cfg_->UeSpecificPilot()[0]);
   arma::cx_fmat mat_pilot_data(ue_pilot_ptr, cfg_->OfdmDataNum(),
-                               cfg_->UeAntNum(), false);
+                               cfg_->SpatialStreamsNum(), false);
   ue_pilot_data_ = mat_pilot_data.st();
 
 #if defined(USE_MKL_JIT)
@@ -216,21 +221,70 @@ EventData DoDemul::Launch(size_t tag) {
 
       arma::cx_float* data_ptr = reinterpret_cast<arma::cx_float*>(
           &data_gather_buffer_[j * cfg_->BsAntNum()]);
-      // size_t start_tsc2 = worker_rdtsc();
+
       arma::cx_float* ul_beam_ptr = reinterpret_cast<arma::cx_float*>(
           ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
 
       size_t start_tsc2 = GetTime::WorkerRdtsc();
-#if defined(USE_MKL_JIT)
-      mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_beam_ptr,
-                     (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
-#else
+// #if defined(USE_MKL_JIT)
+//       mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_beam_ptr,
+//                    (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
+// #else
       arma::cx_fmat mat_data(data_ptr, cfg_->BsAntNum(), 1, false);
 
       arma::cx_fmat mat_ul_beam(ul_beam_ptr, cfg_->SpatialStreamsNum(),
                                 cfg_->BsAntNum(), false);
       mat_equaled = mat_ul_beam * mat_data;
-#endif
+// #endif
+
+      if (kPrintInputData) {
+        if (cur_sc_id == 0) {
+          arma::cx_fmat mat_ul_beam(ul_beam_ptr,
+                                    cfg_->SpatialStreamsNum(), cfg_->BsAntNum(), false);
+          std::printf("UL Beam Weights (in demul): frame %zu, cur sc id %zu, rows %lld, cols %lld\n",
+            frame_id, cur_sc_id, mat_ul_beam.n_rows, mat_ul_beam.n_cols);
+          for (arma::uword i = 0; i < mat_ul_beam.n_rows; i++) {
+            for (arma::uword j = 0; j < mat_ul_beam.n_cols; j++) {
+              std::printf("(%.3f" "+1j*" "%.3f) ", mat_ul_beam(i, j).real(), mat_ul_beam(i, j).imag());
+            }
+            std::printf("\n");
+          }
+          std::printf("\n");
+        }
+      }
+
+      if (kPrintInputData) {
+        if (cur_sc_id == 0) {
+          arma::cx_fmat mat_data(data_ptr,
+                                 cfg_->BsAntNum(), 1, false);
+          std::printf("UL Data: frame %zu, cur sc id %zu, rows %lld, cols %lld\n",
+            frame_id, cur_sc_id, mat_data.n_rows, mat_data.n_cols);
+          for (arma::uword i = 0; i < mat_data.n_rows; i++) {
+            for (arma::uword j = 0; j < mat_data.n_cols; j++) {
+              std::printf("(%.3f" "+1j*" "%.3f) ", mat_data(i, j).real(), mat_data(i, j).imag());
+            }
+            std::printf("\n");
+          }
+          std::printf("\n");
+        }
+      }
+
+      if (kPrintEquOutput) {
+        if (cur_sc_id == 0) {
+          arma::cx_fmat mat_equal(equal_ptr,
+                                  cfg_->SpatialStreamsNum(), 1, false);
+          std::printf("Equalized output: frame %zu, cur sc id %zu, rows %lld, cols %lld\n",
+            frame_id, cur_sc_id, mat_equal.n_rows, mat_equal.n_cols);
+          for (arma::uword i = 0; i < mat_equal.n_rows; i++) {
+            for (arma::uword j = 0; j < mat_equal.n_cols; j++) {
+              std::printf("(%.3f" "+1j*" "%.3f) ", mat_equal(i, j).real(), mat_equal(i, j).imag());
+            }
+            std::printf("\n");
+          }
+          std::printf("\n");
+        }
+      }
+
       auto ue_list = mac_sched_->ScheduledUeList(frame_id, cur_sc_id);
       if (symbol_idx_ul <
           cfg_->Frame().ClientUlPilotSymbols()) {  // Calc new phase shift
@@ -313,6 +367,7 @@ EventData DoDemul::Launch(size_t tag) {
       equal_t_ptr += 8;
       equal_ptr += cfg_->SpatialStreamsNum() * k_num_double_in_sim_d256 * 2;
     }
+    equal_ptr = reinterpret_cast<float*>(equaled_buffer_temp_ + ss_id);
     equal_t_ptr = (float*)(equaled_buffer_temp_transposed_);
     int8_t* demod_ptr = demod_buffers_[frame_slot][symbol_idx_ul][ss_id] +
                         (cfg_->ModOrderBits(Direction::kUplink) * base_sc_id);
@@ -345,15 +400,29 @@ EventData DoDemul::Launch(size_t tag) {
                                     block_error);
     }
 
-    // std::printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
-    //     tid, frame_id, symbol_idx_ul, base_sc_id);
-    // cout << "Demuled data : \n ";
-    // cout << " UE " << ue_id << ": ";
-    // for (int k = 0; k < max_sc_ite * cfg->ModOrderBits(Direction::kUplink); k++)
-    //   std::printf("%i ", demul_ptr[k]);
-    // cout << endl;
-  }
+    if (kPrintDemulInput) {
+      if (base_sc_id == 0) {
+        std::printf("Demul input: frame: %zu, symbol: %zu, ss id: %zu, "
+          "base sc id: %zu, max sc ite: %zu\n",
+          frame_id, symbol_idx_ul, ss_id, base_sc_id, max_sc_ite);
+        for (size_t k = 0; k < max_sc_ite; k++)
+          std::printf("%f ", equal_ptr[k]);
+        std::printf("\n");
+      }
+    }
 
+    if (kPrintDemulOutput) {
+      if (base_sc_id == 0) {
+        std::printf("Demuled data: frame: %zu, symbol: %zu, ss id: %zu, base sc id: %zu, "
+          "num sc: %zu\n",
+          frame_id, symbol_idx_ul, ss_id, base_sc_id,
+          max_sc_ite * cfg_->ModOrderBits(Direction::kUplink));
+        for (size_t k = 0; k < max_sc_ite * cfg_->ModOrderBits(Direction::kUplink); k++)
+          std::printf("%i ", demod_ptr[k]);
+        std::printf("\n");
+      }
+    }
+  }
   duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
   duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
   return {EventType::kDemul, tag};

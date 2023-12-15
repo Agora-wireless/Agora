@@ -33,7 +33,7 @@ DoPrecode::DoPrecode(
 #if defined(USE_MKL_JIT)
   MKL_Complex8 alpha = {1, 0};
   MKL_Complex8 beta = {0, 0};
-  // Input: A: BsAntNum() x UeAntNum() , B: UeAntNum() x 1
+  // Input: A: BsAntNum() x SpatialStreamsNum() , B: SpatialStreamsNum() x 1
   // Output: C: BsAntNum() x 1
   // Leading dimensions: A: bs_ant_num(), B: ue_num(), C: bs_ant_num()
   mkl_jit_status_t status = mkl_jit_create_cgemm(
@@ -197,10 +197,10 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
            : 0));
   arma::cx_float* precoded_ptr = reinterpret_cast<arma::cx_float*>(
       precoded_buffer_temp_ + sc_id_in_block * cfg_->BsAntNum());
-#if defined(USE_MKL_JIT)
-  my_cgemm_(jitter_, (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
-            (MKL_Complex8*)precoded_ptr);
-#else
+// #if defined(USE_MKL_JIT)
+//   my_cgemm_(jitter_, (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
+//             (MKL_Complex8*)precoded_ptr);
+// #else
   arma::cx_fmat mat_precoder(precoder_ptr, cfg_->BsAntNum(),
                              cfg_->SpatialStreamsNum(), false);
   arma::cx_fmat mat_data(data_ptr, cfg_->SpatialStreamsNum(), 1, false);
@@ -209,5 +209,5 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
   // cout << "Precoder: \n" << mat_precoder << endl;
   // cout << "Data: \n" << mat_data << endl;
   // cout << "Precoded data: \n" << mat_precoded << endl;
-#endif
+// #endif
 }

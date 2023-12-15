@@ -46,9 +46,9 @@ EventData DoDecode::Launch(size_t tag) {
   const size_t num_bytes_per_cb = cfg_->NumBytesPerCb(Direction::kUplink);
   if (kDebugPrintInTask == true) {
     std::printf(
-        "In doDecode thread %d: frame: %zu, symbol: %zu, code block: "
-        "%zu, ue: %zu offset %zu\n",
-        tid_, frame_id, symbol_id, cur_cb_id, ue_id, symbol_offset);
+        "In doDecode thread %d: frame: %zu, symbol: %zu, cur cb: "
+        "%zu, cb: %zu, ue: %zu symbol offset %zu\n",
+        tid_, frame_id, symbol_id, cur_cb_id, cb_id, ue_id, symbol_offset);
   }
 
   size_t start_tsc = GetTime::WorkerRdtsc();

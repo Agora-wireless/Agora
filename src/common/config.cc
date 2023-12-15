@@ -199,6 +199,7 @@ Config::Config(std::string jsonfilename)
   num_ue_channels_ = std::min(ue_channel_.size(), kMaxChannels);
   bs_ant_num_ = num_channels_ * num_radios_;
   ue_ant_num_ = ue_num_ * num_ue_channels_;
+  adapt_ues_ = tdd_conf.value("adapt_ues", false);
 
   bf_ant_num_ = bs_ant_num_;
   for (size_t i = 0; i < num_cells_; i++) {
@@ -649,6 +650,7 @@ Config::Config(std::string jsonfilename)
   } else {
     worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
   }
+  worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
   socket_thread_num_ = tdd_conf.value("socket_thread_num", 4);
   ue_core_offset_ = tdd_conf.value("ue_core_offset", 0);
   ue_worker_thread_num_ = tdd_conf.value("ue_worker_thread_num", 25);
@@ -844,6 +846,7 @@ Config::Config(std::string jsonfilename)
       "\t%zu DL codeblocks per symbol, %zu DL bytes per code block,\n"
       "\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame,\n"
       "\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame,\n"
+      "\tSymbol time %.3f usec\n"
       "\tFrame time %.3f usec\n"
       "Uplink Max Mac data per-user tp (Mbps) %.3f\n"
       "Downlink Max Mac data per-user tp (Mbps) %.3f\n"
@@ -862,6 +865,7 @@ Config::Config(std::string jsonfilename)
       dl_ldpc_config_.NumBlocksInSymbol(), dl_num_bytes_per_cb_,
       ul_mac_data_bytes_num_perframe_, ul_mac_bytes_num_perframe_,
       dl_mac_data_bytes_num_perframe_, dl_mac_bytes_num_perframe_,
+      this->GetSymbolDurationSec() * 1e6,
       this->GetFrameDurationSec() * 1e6,
       (ul_mac_data_bytes_num_perframe_ * 8.0f) /
           (this->GetFrameDurationSec() * 1e6),
@@ -1247,9 +1251,10 @@ void Config::GenData() {
       Roundup<64>(this->dl_num_bytes_per_cb_) *
       this->dl_ldpc_config_.NumBlocksInSymbol();
   dl_bits_.Calloc(this->frame_.NumDLSyms(),
-                  dl_num_bytes_per_ue_pad * this->ue_ant_num_,
+                  dl_num_bytes_per_ue_pad * this->ue_ant_num_ * this->ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
-  dl_iq_f_.Calloc(this->frame_.NumDLSyms(), ofdm_data_num_ * ue_ant_num_,
+  dl_iq_f_.Calloc(this->frame_.NumDLSyms(),
+                  this->ofdm_data_num_ * this->ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
   dl_iq_t_.Calloc(this->frame_.NumDLSyms(),
                   this->samps_per_symbol_ * this->ue_ant_num_,
@@ -1259,7 +1264,7 @@ void Config::GenData() {
       Roundup<64>(this->ul_num_bytes_per_cb_) *
       this->ul_ldpc_config_.NumBlocksInSymbol();
   ul_bits_.Calloc(this->frame_.NumULSyms(),
-                  ul_num_bytes_per_ue_pad * this->ue_ant_num_,
+                  ul_num_bytes_per_ue_pad * this->ue_ant_num_ * this->ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
   ul_iq_f_.Calloc(this->frame_.NumULSyms(),
                   this->ofdm_data_num_ * this->ue_ant_num_,
@@ -1282,81 +1287,107 @@ void Config::GenData() {
   }
 #else
   if (this->frame_.NumUlDataSyms() > 0) {
-    const std::string ul_data_file =
-        kUlDataFilePrefix + std::to_string(this->ofdm_ca_num_) + "_ant" +
-        std::to_string(this->ue_ant_total_) + ".bin";
-    AGORA_LOG_SYMBOL("Config: Reading raw ul data from %s\n",
-                     ul_data_file.c_str());
-    FILE* fd = std::fopen(ul_data_file.c_str(), "rb");
-    if (fd == nullptr) {
-      AGORA_LOG_ERROR("Failed to open antenna file %s. Error %s.\n",
-                      ul_data_file.c_str(), strerror(errno));
-      throw std::runtime_error("Config: Failed to open antenna file");
-    }
+    for (size_t ue_ant_id = 1; ue_ant_id <= this->ue_ant_num_; ue_ant_id++) {
+      const std::string ul_data_file =
+        kUlDataFilePrefix + std::to_string(this->ofdm_ca_num_) + "_ueant" +
+        std::to_string(ue_ant_id) + ".bin";
+      AGORA_LOG_INFO("Config: Reading raw ul data for %zu UE(s) from %s\n",
+                     ue_ant_id, ul_data_file.c_str());
+      FILE* fd = std::fopen(ul_data_file.c_str(), "rb");
+      if (fd == nullptr) {
+        AGORA_LOG_ERROR("Failed to open antenna file %s. Error %s.\n",
+                        ul_data_file.c_str(), strerror(errno));
+        throw std::runtime_error("Config: Failed to open ul antenna file");
+      }
 
-    for (size_t i = this->frame_.ClientUlPilotSymbols();
-         i < this->frame_.NumULSyms(); i++) {
-      if (std::fseek(fd, (ul_data_bytes_num_persymbol_ * this->ue_ant_offset_),
-                     SEEK_CUR) != 0) {
-        AGORA_LOG_ERROR(
+      for (size_t i = this->frame_.ClientUlPilotSymbols();
+        i < this->frame_.NumULSyms(); i++) {
+        if (std::fseek(fd, (ul_data_bytes_num_persymbol_ * this->ue_ant_offset_),
+            SEEK_CUR) != 0) {
+          AGORA_LOG_ERROR(
             " *** Error: failed to seek propertly (pre) into %s file\n",
             ul_data_file.c_str());
-        RtAssert(false,
-                 "Failed to seek propertly into " + ul_data_file + "file\n");
-      }
-      for (size_t j = 0; j < this->ue_ant_num_; j++) {
-        size_t r = std::fread(this->ul_bits_[i] + (j * ul_num_bytes_per_ue_pad),
-                              sizeof(int8_t), ul_data_bytes_num_persymbol_, fd);
-        if (r < ul_data_bytes_num_persymbol_) {
-          AGORA_LOG_ERROR(
+          RtAssert(false,
+                   "Failed to seek propertly into " + ul_data_file + "file\n");
+        }
+        for (size_t j = 0; j < ue_ant_id; j++) {
+          size_t r = std::fread(this->ul_bits_[i] +
+                                (ul_num_bytes_per_ue_pad * this->ue_ant_num_ * (ue_ant_id - 1)) +
+                                (j * ul_num_bytes_per_ue_pad),
+                                sizeof(int8_t), ul_data_bytes_num_persymbol_, fd);
+          if (r < ul_data_bytes_num_persymbol_) {
+            AGORA_LOG_ERROR(
               " *** Error: Uplink bad read from file %s (batch %zu : %zu) "
               "%zu : %zu\n",
               ul_data_file.c_str(), i, j, r, ul_data_bytes_num_persymbol_);
+          }
         }
-      }
-      if (std::fseek(fd,
-                     ul_data_bytes_num_persymbol_ *
-                         (this->ue_ant_total_ - this->ue_ant_offset_ -
-                          this->ue_ant_num_),
-                     SEEK_CUR) != 0) {
-        AGORA_LOG_ERROR(
+        if (std::fseek(fd,
+            ul_data_bytes_num_persymbol_ *
+            (this->ue_ant_total_ - this->ue_ant_offset_ -
+            this->ue_ant_num_),
+            SEEK_CUR) != 0) {
+          AGORA_LOG_ERROR(
             " *** Error: failed to seek propertly (post) into %s file\n",
             ul_data_file.c_str());
-        RtAssert(false,
-                 "Failed to seek propertly into " + ul_data_file + "file\n");
+          RtAssert(false,
+                   "Failed to seek propertly into " + ul_data_file + "file\n");
+        }
       }
+      std::fclose(fd);
     }
-    std::fclose(fd);
   }
 
   if (this->frame_.NumDlDataSyms() > 0) {
-    const std::string dl_data_file =
-        kDlDataFilePrefix + std::to_string(this->ofdm_ca_num_) + "_ant" +
-        std::to_string(this->ue_ant_total_) + ".bin";
+    for (size_t ue_ant_id = 1; ue_ant_id <= this->ue_ant_num_; ue_ant_id++) {
+      const std::string dl_data_file =
+        kDlDataFilePrefix + std::to_string(this->ofdm_ca_num_) + "_ueant" +
+        std::to_string(ue_ant_id) + ".bin";
+      AGORA_LOG_INFO("Config: Reading raw dl data for %zu UE(s) from %s\n",
+                     ue_ant_id, dl_data_file.c_str());
+      FILE* fd = std::fopen(dl_data_file.c_str(), "rb");
+      if (fd == nullptr) {
+        AGORA_LOG_ERROR("Failed to open antenna file %s. Error %s.\n",
+                        dl_data_file.c_str(), strerror(errno));
+        throw std::runtime_error("Config: Failed to open dl antenna file");
+      }
 
-    AGORA_LOG_SYMBOL("Config: Reading raw dl data from %s\n",
-                     dl_data_file.c_str());
-    FILE* fd = std::fopen(dl_data_file.c_str(), "rb");
-    if (fd == nullptr) {
-      AGORA_LOG_ERROR("Failed to open antenna file %s. Error %s.\n",
-                      dl_data_file.c_str(), strerror(errno));
-      throw std::runtime_error("Config: Failed to open dl antenna file");
-    }
-
-    for (size_t i = this->frame_.ClientDlPilotSymbols();
-         i < this->frame_.NumDLSyms(); i++) {
-      for (size_t j = 0; j < this->ue_ant_num_; j++) {
-        size_t r = std::fread(this->dl_bits_[i] + j * dl_num_bytes_per_ue_pad,
-                              sizeof(int8_t), dl_data_bytes_num_persymbol_, fd);
-        if (r < dl_data_bytes_num_persymbol_) {
+      for (size_t i = this->frame_.ClientDlPilotSymbols();
+        i < this->frame_.NumDLSyms(); i++) {
+        if (std::fseek(fd, (dl_data_bytes_num_persymbol_ * this->ue_ant_offset_),
+            SEEK_CUR) != 0) {
           AGORA_LOG_ERROR(
+            " *** Error: failed to seek propertly (pre) into %s file\n",
+            dl_data_file.c_str());
+          RtAssert(false,
+                   "Failed to seek propertly into " + dl_data_file + "file\n");
+        }
+        for (size_t j = 0; j < ue_ant_id; j++) {
+          size_t r = std::fread(this->dl_bits_[i] +
+                                (dl_num_bytes_per_ue_pad * this->ue_ant_num_ * (ue_ant_id - 1)) +
+                                (j * dl_num_bytes_per_ue_pad),
+                                sizeof(int8_t), dl_data_bytes_num_persymbol_, fd);
+          if (r < dl_data_bytes_num_persymbol_) {
+            AGORA_LOG_ERROR(
               "***Error: Downlink bad read from file %s (batch %zu : %zu) "
-              "\n",
-              dl_data_file.c_str(), i, j);
+              "%zu : %zu\n",
+              dl_data_file.c_str(), i, j, r, dl_data_bytes_num_persymbol_);
+          }
+        }
+        if (std::fseek(fd,
+            dl_data_bytes_num_persymbol_ *
+            (this->ue_ant_total_ - this->ue_ant_offset_ -
+            this->ue_ant_num_),
+            SEEK_CUR) != 0) {
+          AGORA_LOG_ERROR(
+            " *** Error: failed to seek propertly (post) into %s file\n",
+            dl_data_file.c_str());
+          RtAssert(false,
+                   "Failed to seek propertly into " + dl_data_file + "file\n");
         }
       }
+      std::fclose(fd);
     }
-    std::fclose(fd);
   }
 #endif
 
