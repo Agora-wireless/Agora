@@ -51,25 +51,6 @@ DoDemul::DoDemul(
   arma::cx_fmat mat_pilot_data(ue_pilot_ptr, cfg_->OfdmDataNum(),
                                cfg_->SpatialStreamsNum(), false);
   ue_pilot_data_ = mat_pilot_data.st();
-
-#if defined(USE_MKL_JIT)
-  MKL_Complex8 alpha = {1, 0};
-  MKL_Complex8 beta = {0, 0};
-
-  mkl_jit_status_t status =
-      mkl_jit_create_cgemm(&jitter_, MKL_COL_MAJOR, MKL_NOTRANS, MKL_NOTRANS,
-                           cfg_->SpatialStreamsNum(), 1, cfg_->BsAntNum(),
-                           &alpha, cfg_->SpatialStreamsNum(), cfg_->BsAntNum(),
-                           &beta, cfg_->SpatialStreamsNum());
-  if (MKL_JIT_ERROR == status) {
-    std::fprintf(
-        stderr,
-        "Error: insufficient memory to JIT and store the DGEMM kernel\n");
-    throw std::runtime_error(
-        "DoDemul: insufficient memory to JIT and store the DGEMM kernel");
-  }
-  mkl_jit_cgemm_ = mkl_jit_get_cgemm_ptr(jitter_);
-#endif
 }
 
 DoDemul::~DoDemul() {
@@ -226,16 +207,22 @@ EventData DoDemul::Launch(size_t tag) {
           ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
 
       size_t start_tsc2 = GetTime::WorkerRdtsc();
-// #if defined(USE_MKL_JIT)
-//       mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_beam_ptr,
-//                    (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
-// #else
+#if defined(USE_MKL_JIT)
+      MKL_Complex8 alpha = {1, 0};
+      MKL_Complex8 beta = {0, 0};
+
+      cblas_cgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
+                  cfg_->SpatialStreamsNum(), 1, cfg_->BsAntNum(),
+                  &alpha, (MKL_Complex8*)ul_beam_ptr, cfg_->SpatialStreamsNum(),
+                  (MKL_Complex8*)data_ptr, cfg_->BsAntNum(),
+                  &beta, (MKL_Complex8*)equal_ptr, cfg_->SpatialStreamsNum());
+#else
       arma::cx_fmat mat_data(data_ptr, cfg_->BsAntNum(), 1, false);
 
       arma::cx_fmat mat_ul_beam(ul_beam_ptr, cfg_->SpatialStreamsNum(),
                                 cfg_->BsAntNum(), false);
       mat_equaled = mat_ul_beam * mat_data;
-// #endif
+#endif
 
       if (kPrintInputData) {
         if (cur_sc_id == 0) {

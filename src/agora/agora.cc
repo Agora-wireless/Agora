@@ -419,7 +419,7 @@ void Agora::Start() {
           if ((config_->AdaptUes() == true) and
               (config_->SpatialStreamsNum() != adapt_ues_array_.at(pkt->frame_id_))) {
             AGORA_LOG_INFO("[ALERTTTTTT]: Spatial Streams Update!!! "
-              "previous number of spatial streams: %zu, "
+              "configured/previous number of spatial streams: %zu, "
               "updated number of spatial streams: %zu, frame id: %zu \n",
               config_->SpatialStreamsNum(),
               adapt_ues_array_.at(pkt->frame_id_),
