@@ -2,8 +2,8 @@
     "fft_size": 2048,
     "ofdm_data_num": 1200,
     "demul_block_size": 40,
-    "bs_radio_num": 2,
-    "ue_radio_num": 2,
+    "bs_radio_num": 8,
+    "ue_radio_num": 8,
     "adapt_ues": true,
     "ul_mcs" : {
       "mcs_index" : 17 /* 64QAM, 438/1024 */

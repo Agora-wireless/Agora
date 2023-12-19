@@ -607,12 +607,12 @@ void Sender::InitIqFromFilePath(const std::string& filepath) {
       std::to_string(ue_ant_id) + ".bin";
 
     FILE* fp = std::fopen(filename.c_str(), "rb");
-    AGORA_LOG_INFO("Sender: Reading rx data for %zu UE(s) from %s\n",
+    AGORA_LOG_INFO("Sender: Reading ul rx data for %zu UE(s) from %s\n",
                    ue_ant_id, filename.c_str());
     RtAssert(fp != nullptr, "Failed to open IQ data file");
 
     for (size_t i = 0; i < packets_per_frame; i++) {
-      const size_t expected_count = (cfg_->SampsPerSymbol()) * 2;
+      const size_t expected_count = (cfg_->SampsPerSymbol() * 2);
       const size_t actual_count =
         std::fread(iq_data_float[packets_per_frame * (ue_ant_id - 1) + i],
           sizeof(float), expected_count, fp);

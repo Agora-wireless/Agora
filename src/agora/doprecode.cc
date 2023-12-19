@@ -29,27 +29,6 @@ DoPrecode::DoPrecode(
   AllocBuffer1d(&precoded_buffer_temp_,
                 cfg_->DemulBlockSize() * cfg_->BsAntNum(),
                 Agora_memory::Alignment_t::kAlign64, 0);
-
-#if defined(USE_MKL_JIT)
-  MKL_Complex8 alpha = {1, 0};
-  MKL_Complex8 beta = {0, 0};
-  // Input: A: BsAntNum() x SpatialStreamsNum() , B: SpatialStreamsNum() x 1
-  // Output: C: BsAntNum() x 1
-  // Leading dimensions: A: bs_ant_num(), B: ue_num(), C: bs_ant_num()
-  mkl_jit_status_t status = mkl_jit_create_cgemm(
-      &jitter_, MKL_COL_MAJOR, MKL_NOTRANS, MKL_NOTRANS, cfg_->BsAntNum(), 1,
-      cfg_->SpatialStreamsNum(), &alpha, cfg_->BsAntNum(),
-      cfg_->SpatialStreamsNum(), &beta, cfg_->BsAntNum());
-
-  if (MKL_JIT_ERROR == status) {
-    std::fprintf(
-        stderr,
-        "Error: insufficient memory to JIT and store the DGEMM kernel\n");
-    throw std::runtime_error(
-        "DoPrecode: insufficient memory to JIT and store the DGEMM kernel");
-  }
-  my_cgemm_ = mkl_jit_get_cgemm_ptr(jitter_);
-#endif
 }
 
 DoPrecode::~DoPrecode() {
@@ -197,10 +176,16 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
            : 0));
   arma::cx_float* precoded_ptr = reinterpret_cast<arma::cx_float*>(
       precoded_buffer_temp_ + sc_id_in_block * cfg_->BsAntNum());
-// #if defined(USE_MKL_JIT)
-//   my_cgemm_(jitter_, (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
-//             (MKL_Complex8*)precoded_ptr);
-// #else
+#if defined(USE_MKL_JIT)
+  MKL_Complex8 alpha = {1, 0};
+  MKL_Complex8 beta = {0, 0};
+
+  cblas_cgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
+              cfg_->BsAntNum(), 1, cfg_->SpatialStreamsNum(),
+              &alpha, (MKL_Complex8*)precoder_ptr, cfg_->BsAntNum(),
+              (MKL_Complex8*)data_ptr, cfg_->SpatialStreamsNum(),
+              &beta, (MKL_Complex8*)precoded_ptr, cfg_->BsAntNum());
+#else
   arma::cx_fmat mat_precoder(precoder_ptr, cfg_->BsAntNum(),
                              cfg_->SpatialStreamsNum(), false);
   arma::cx_fmat mat_data(data_ptr, cfg_->SpatialStreamsNum(), 1, false);
@@ -209,5 +194,5 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
   // cout << "Precoder: \n" << mat_precoder << endl;
   // cout << "Data: \n" << mat_data << endl;
   // cout << "Precoded data: \n" << mat_precoded << endl;
-// #endif
+#endif
 }

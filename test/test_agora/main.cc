@@ -97,7 +97,7 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg) {
           if (raw_data[i][offset_in_raw] != output_data[i][offset_in_output]) {
             error_cnt++;
             if (kDebugPrintUlCorr) {
-              std::printf("(%d, %d, %u, %u)\n", i, j,
+              std::printf("(%d, %d, %d, %u, %u)\n", i, ue, j,
                           raw_data[i][offset_in_raw],
                           output_data[i][offset_in_output]);
             }
