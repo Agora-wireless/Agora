@@ -118,15 +118,12 @@ void Agora::SendSnrReport(EventType event_type, size_t frame_id,
   assert(event_type == EventType::kSNRReport);
   unused(event_type);
   auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
-  size_t qid = frame_id & 0x1;
   for (size_t i = 0; i < config_->UeAntNum(); i++) {
     EventData snr_report(EventType::kSNRReport, base_tag.tag_);
     snr_report.num_tags_ = 2;
     const float snr = this->phy_stats_->GetEvmSnr(frame_id, i);
     std::memcpy(&snr_report.tags_[1], &snr, sizeof(float));
-    stats_->TryEnqueueLogStatsMaster(
-        &mac_request_queue_, message_->GetPtok(event_type, qid), snr_report,
-        this->config_->FrameToProfile(), frame_id, symbol_id);
+    TryEnqueueFallback(&mac_request_queue_, snr_report);
     base_tag.ue_id_++;
   }
 }
@@ -138,7 +135,7 @@ void Agora::ScheduleDownlinkProcessing(size_t frame_id) {
   }
 
   // Schedule beamformed pilot symbols mapping
-  size_t num_pilot_symbols = config_->Frame().ClientDlPilotSymbols();
+  const size_t num_pilot_symbols = config_->Frame().ClientDlPilotSymbols();
   for (size_t i = 0; i < num_pilot_symbols; i++) {
     if (beam_last_frame_ == frame_id) {
       ScheduleSubcarriers(EventType::kPrecode, frame_id,
@@ -161,7 +158,7 @@ void Agora::ScheduleAntennas(EventType event_type, size_t frame_id,
   auto base_tag = gen_tag_t::FrmSymAnt(frame_id, symbol_id, 0);
 
   size_t num_blocks = config_->BsAntNum() / config_->FftBlockSize();
-  size_t num_remainder = config_->BsAntNum() % config_->FftBlockSize();
+  const size_t num_remainder = config_->BsAntNum() % config_->FftBlockSize();
   if (num_remainder > 0) {
     num_blocks++;
   }
@@ -289,12 +286,9 @@ void Agora::ScheduleUsers(EventType event_type, size_t frame_id,
   assert(event_type == EventType::kPacketToMac);
   auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
 
-  size_t qid = frame_id & 0x1;
   for (size_t i = 0; i < config_->SpatialStreamsNum(); i++) {
-    stats_->TryEnqueueLogStatsMaster(
-        &mac_request_queue_, message_->GetPtok(event_type, qid),
-        EventData(EventType::kPacketToMac, base_tag.tag_),
-        this->config_->FrameToProfile(), frame_id, symbol_id);
+    TryEnqueueFallback(&mac_request_queue_,
+                       EventData(EventType::kPacketToMac, base_tag.tag_));
     base_tag.ue_id_++;
   }
 }
@@ -302,7 +296,8 @@ void Agora::ScheduleUsers(EventType event_type, size_t frame_id,
 void Agora::ScheduleBroadCastSymbols(EventType event_type, size_t frame_id) {
   auto base_tag = gen_tag_t::FrmSym(frame_id, 0u);
   const size_t qid = (frame_id & 0x1);
-  size_t symbol_id = 0;  // kBroadcast event does not have a valid symbol_id
+  // kBroadcast event does not have a valid symbol_id
+  const size_t symbol_id = 0;
   stats_->TryEnqueueLogStatsMaster(
       message_->GetConq(event_type, qid), message_->GetPtok(event_type, qid),
       EventData(event_type, base_tag.tag_), this->config_->FrameToProfile(),
@@ -397,8 +392,7 @@ void Agora::Start() {
       EventData& event = events_list.at(ev_i);
       size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
       if (frame_id == this->config_->FrameToProfile()) {
-        stats_->LogDequeueStatsMaster(event.event_type_,
-                                      dequeue_start_tsc,
+        stats_->LogDequeueStatsMaster(event.event_type_, dequeue_start_tsc,
                                       dequeue_end_tsc);
       }
 
@@ -416,9 +410,9 @@ void Agora::Start() {
           if (pkt->frame_id_ >=
               ((frame_tracking_.cur_sche_frame_id_ + kFrameWnd))) {
             AGORA_LOG_ERROR(
-                "Error: Received packet for future frame %u beyond "
-                "frame window (= %zu + %zu). This can happen if "
-                "Agora is running slowly, e.g., in debug mode\n",
+                "Error: Received packet for future frame %u beyond frame "
+                "window (= %zu + %zu). This can happen if Agora is running "
+                "slowly, e.g., in debug mode\n",
                 pkt->frame_id_, frame_tracking_.cur_sche_frame_id_, kFrameWnd);
             cfg->Running(false);
             break;
