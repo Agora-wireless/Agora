@@ -639,8 +639,8 @@ Config::Config(std::string jsonfilename)
 
   // Agora configurations
   frames_to_test_ = tdd_conf.value("max_frame", 9600);
-  frame_to_profile_ = tdd_conf.value("profiling_frame", 250);
-  enable_profiling_ = tdd_conf.value("enable_profiling", false);
+  frame_to_profile_ =
+      tdd_conf.value("profiling_frame", -1);  // Profiling disabled by default
   core_offset_ = tdd_conf.value("core_offset", 0);
   // use all available cores
   if (dynamic_core_allocation_) {
@@ -1287,7 +1287,9 @@ void Config::GenData() {
   }
 #else
   if (this->frame_.NumUlDataSyms() > 0) {
-    for (size_t ue_ant_id = 1; ue_ant_id <= this->ue_ant_num_; ue_ant_id++) {
+    size_t ue_ant_id_start = this->AdaptUes() ? 1 : this->UeAntNum();
+    for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= this->ue_ant_num_;
+         ue_ant_id++) {
       const std::string ul_data_file =
         kUlDataFilePrefix + std::to_string(this->ofdm_ca_num_) + "_ueant" +
         std::to_string(ue_ant_id) + ".bin";
@@ -1339,7 +1341,9 @@ void Config::GenData() {
   }
 
   if (this->frame_.NumDlDataSyms() > 0) {
-    for (size_t ue_ant_id = 1; ue_ant_id <= this->ue_ant_num_; ue_ant_id++) {
+    size_t ue_ant_id_start = this->AdaptUes() ? 1 : this->UeAntNum();
+    for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= this->ue_ant_num_;
+         ue_ant_id++) {
       const std::string dl_data_file =
         kDlDataFilePrefix + std::to_string(this->ofdm_ca_num_) + "_ueant" +
         std::to_string(ue_ant_id) + ".bin";

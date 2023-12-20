@@ -7,9 +7,6 @@
   "ul_mcs": {
     "mcs_index" : 17 /*64QAM, 438/1024*/
   },
-  "dl_mcs": {
-    "mcs_index" : 29 /*256QAM, 754/1024*/
-  },
   "symbol_num_perframe": 14,
   "client_ul_pilot_syms": 0,
   "ul_data_symbol_start": 2,
@@ -23,7 +20,6 @@
   "worker_thread_num": 25,
   "socket_thread_num": 1,
   "max_frame": 300,
-  "dynamic_core": true,
   "profiling_frame": 250,
   "sample_rate": 7.68e6,
   "noise_level": 0.01

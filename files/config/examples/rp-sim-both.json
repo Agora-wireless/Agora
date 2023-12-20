@@ -8,6 +8,9 @@
     "ul_mcs" : {
       "mcs_index" : 17 /* 64QAM, 438/1024 */
     },
+    "dl_mcs": {
+      "mcs_index" : 29 /*256QAM, 754/1024*/
+    },
     "symbol_num_perframe": 14,
     "client_ul_pilot_syms": 0,
     "ul_data_symbol_start": 2,
@@ -25,6 +28,6 @@
     "rp_rx_port": 4000,
     "worker_thread_num": 5,
     "socket_thread_num": 1,
-    "max_frame": 2,
+    "max_frame": 100,
     "noise_level": 0.01
   }
