@@ -17,7 +17,9 @@
 
 #include "armadillo"
 #include "common_typedef_sdk.h"
+#include "concurrent_queue_wrapper.h"
 #include "framestats.h"
+#include "gettime.h"
 #include "ldpc_config.h"
 #include "memory_manage.h"
 #include "nlohmann/json.hpp"
@@ -327,7 +329,6 @@ class Config {
   inline int UeRruPort() const { return this->ue_rru_port_; }
 
   inline size_t FramesToTest() const { return this->frames_to_test_; }
-  inline bool EnableProfiling() const {return this->enable_profiling_; }
   inline size_t FrameToProfile() const { return this->frame_to_profile_; }
   inline float NoiseLevel() const { return this->noise_level_; }
 
@@ -1144,9 +1145,6 @@ class Config {
   // Number of frames_ sent by sender during testing = number of frames_
   // processed by Agora before exiting.
   size_t frames_to_test_;
-
-  // Flag to enable profiling
-  size_t enable_profiling_;
 
   // Frame number for which the timestamps of different tasks are logged for profiling
   size_t frame_to_profile_;

@@ -599,7 +599,9 @@ void Sender::InitIqFromFilePath(const std::string& filepath) {
                        cfg_->SampsPerSymbol() * 2,
                        Agora_memory::Alignment_t::kAlign64);
 
-  for (size_t ue_ant_id = 1; ue_ant_id <= cfg_->UeAntNum(); ue_ant_id++) {
+  size_t ue_ant_id_start = cfg_->AdaptUes() ? 1 : cfg_->UeAntNum();
+  for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= cfg_->UeAntNum();
+       ue_ant_id++) {
     const std::string filename = filepath +
       "/files/experiment/LDPC_ul_rx_data_" +
       std::to_string(cfg_->OfdmCaNum()) + "_bsant" +

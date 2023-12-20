@@ -73,12 +73,12 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     std::mt19937 gen(rd());
 
     // Define the range for adapting the number of UEs
-    std::uniform_int_distribution<> distribution(1, this->cfg_->UeAntNum());
+    std::uniform_int_distribution<> distribution(1, cfg_->UeAntNum());
 
-    uint8_t adaptUesArray[this->cfg_->FramesToTest()];
+    uint8_t adaptUesArray[cfg_->FramesToTest()];
 
-    for (size_t i = 0; i < this->cfg_->FramesToTest(); ++i) {
-      adaptUesArray[i] = this->cfg_->AdaptUes() ? distribution(gen) : this->cfg_->UeAntNum();
+    for (size_t i = 0; i < cfg_->FramesToTest(); ++i) {
+      adaptUesArray[i] = cfg_->AdaptUes() ? distribution(gen) : cfg_->UeAntNum();
     }
     const std::string filename_input =
       directory + kAdaptUesPrefix +
@@ -134,18 +134,22 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
                 pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kUplink)) &
             0xFFFF));
       }
+    }
 
+    size_t ue_ant_id_start = cfg_->AdaptUes() ? 1 : cfg_->UeAntNum();
+    for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= cfg_->UeAntNum();
+         ue_ant_id++) {
       const std::string filename_input =
         directory + kUlDataPrefix + std::to_string(this->cfg_->OfdmCaNum()) +
-        "_ueant" + std::to_string(ue_id + 1) + ".bin";
+        "_ueant" + std::to_string(ue_ant_id) + ".bin";
       AGORA_LOG_INFO("Saving uplink MAC data for %zu UE(s) to %s\n",
-        (ue_id + 1), filename_input.c_str());
+        ue_ant_id, filename_input.c_str());
       auto* fp_input = std::fopen(filename_input.c_str(), "wb");
       if (fp_input == nullptr) {
         AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
         throw std::runtime_error("Failed to create file" + filename_input);
       } else {
-        for (size_t i = 0; i < (ue_id + 1); i++) {
+        for (size_t i = 0; i < ue_ant_id; i++) {
           AGORA_LOG_TRACE("Writing UE %zu MAC data\n", i);
           const auto write_status =
             std::fwrite(reinterpret_cast<uint8_t*>(ul_mac_info.at(i).data()),
@@ -213,10 +217,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         }
         std::printf("\n");
       }
-
     }
 
-    for (size_t ue_ant_id = 1; ue_ant_id <= cfg_->UeAntNum(); ue_ant_id++) {
+    for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= cfg_->UeAntNum();
+         ue_ant_id++) {
       const std::string filename_input =
           directory + kUlLdpcDataPrefix +
           std::to_string(this->cfg_->OfdmCaNum()) + "_ueant" +
@@ -429,18 +433,20 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum(),
       Agora_memory::Alignment_t::kAlign64);
   size_t data_start = this->cfg_->CpLen() + this->cfg_->OfdmTxZeroPrefix();
-  for (size_t ue_id = 1; ue_id <= this->cfg_->UeAntNum(); ue_id++) {
+  size_t ue_ant_id_start = cfg_->AdaptUes() ? 1 : cfg_->UeAntNum();
+  for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= cfg_->UeAntNum();
+       ue_ant_id++) {
     for (size_t i = 0; i < this->cfg_->Frame().NumTotalSyms(); i++) {
       arma::cx_fmat mat_input_data(
         reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
-        this->cfg_->OfdmCaNum(), ue_id, false);
+        this->cfg_->OfdmCaNum(), ue_ant_id, false);
       arma::cx_fmat mat_output(
         reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
         this->cfg_->SampsPerSymbol(), this->cfg_->BsAntNum(), false);
 
       for (size_t j = 0; j < this->cfg_->OfdmCaNum(); j++) {
         arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_matrices[j]),
-                              this->cfg_->BsAntNum(), ue_id,
+                              this->cfg_->BsAntNum(), ue_ant_id,
                               false);
         mat_output.row(j + data_start) = mat_input_data.row(j) * mat_csi.st();
       }
@@ -460,8 +466,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     const std::string filename_rx =
       directory + kUlRxLdpcPrefix + std::to_string(this->cfg_->OfdmCaNum()) +
       "_bsant" + std::to_string(this->cfg_->BsAntNum()) +
-      "_ueant" + std::to_string(ue_id) + ".bin";
-    AGORA_LOG_INFO("Saving uplink rx data for %zu UE(s) to %s\n", ue_id,
+      "_ueant" + std::to_string(ue_ant_id) + ".bin";
+    AGORA_LOG_INFO("Saving uplink rx data for %zu UE(s) to %s\n", ue_ant_id,
       filename_rx.c_str());
     auto* fp_rx = std::fopen(filename_rx.c_str(), "wb");
     if (fp_rx == nullptr) {
@@ -487,7 +493,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     }
 
     if (kPrintUlRxData) {
-      std::printf("For %zu ue(s), rx data\n", ue_id);
+      std::printf("For %zu ue(s), rx data\n", ue_ant_id);
       for (size_t i = 0; i < 3; i++) {
         for (size_t j = 0; j < this->cfg_->OfdmCaNum() * this->cfg_->BsAntNum();
              j++) {
@@ -531,18 +537,22 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
                 pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kDownlink)) &
             0xFFFF));
       }
+    }
 
+    size_t ue_ant_id_start = cfg_->AdaptUes() ? 1 : cfg_->UeAntNum();
+    for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= cfg_->UeAntNum();
+         ue_ant_id++) {
       const std::string filename_input =
           directory + kDlDataPrefix + std::to_string(this->cfg_->OfdmCaNum()) +
-          "_ueant" + std::to_string(ue_id + 1) + ".bin";
+          "_ueant" + std::to_string(ue_ant_id) + ".bin";
       AGORA_LOG_INFO("Saving downlink MAC data for %zu UE(s) to %s\n",
-                     (ue_id + 1), filename_input.c_str());
+                     ue_ant_id, filename_input.c_str());
       auto* fp_input = std::fopen(filename_input.c_str(), "wb");
       if (fp_input == nullptr) {
         AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
         throw std::runtime_error("Failed to create file" + filename_input);
       } else {
-        for (size_t i = 0; i < (ue_id + 1); i++) {
+        for (size_t i = 0; i < ue_ant_id; i++) {
           AGORA_LOG_TRACE("Writing UE %zu MAC data\n", i);
           const auto write_status =
             std::fwrite(reinterpret_cast<uint8_t*>(dl_mac_info.at(i).data()),
@@ -622,7 +632,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     }
 
     // Save downlink information bytes to file
-    for (size_t ue_ant_id = 1; ue_ant_id <= cfg_->UeAntNum(); ue_ant_id++) {
+    for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= cfg_->UeAntNum();
+         ue_ant_id++) {
       const std::string filename_input =
           directory + kDlLdpcDataPrefix +
           std::to_string(this->cfg_->OfdmCaNum()) + "_ueant" +
@@ -727,28 +738,29 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
                       2 * this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum(),
                       Agora_memory::Alignment_t::kAlign64);
 
-    for (size_t ue_id = 1; ue_id <= this->cfg_->UeAntNum(); ue_id++) {
+    for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= this->cfg_->UeAntNum();
+         ue_ant_id++) {
       // Compute precoder
       for (size_t i = 0; i < this->cfg_->OfdmCaNum(); i++) {
         arma::cx_fmat mat_input(
           reinterpret_cast<arma::cx_float*>(csi_matrices[i]),
-          this->cfg_->BsAntNum(), ue_id, false);
+          this->cfg_->BsAntNum(), ue_ant_id, false);
         arma::cx_fmat mat_output(
           reinterpret_cast<arma::cx_float*>(precoder[i]),
-          ue_id, this->cfg_->BsAntNum(), false);
+          ue_ant_id, this->cfg_->BsAntNum(), false);
         arma::pinv(mat_output, mat_input, 1e-2, "dc");
       }
       if (kPrintDebugCSI) {
         std::printf("CSI \n");
         // for (size_t i = 0; i < this->cfg_->ofdm_ca_num(); i++)
-        for (size_t j = 0; j < ue_id * this->cfg_->BsAntNum(); j++) {
+        for (size_t j = 0; j < ue_ant_id * this->cfg_->BsAntNum(); j++) {
           std::printf("%.3f+%.3fi ",
                       csi_matrices[this->cfg_->OfdmDataStart()][j].re,
                       csi_matrices[this->cfg_->OfdmDataStart()][j].im);
         }
         std::printf("\nprecoder \n");
         // for (size_t i = 0; i < this->cfg_->ofdm_ca_num(); i++)
-        for (size_t j = 0; j < ue_id * this->cfg_->BsAntNum(); j++) {
+        for (size_t j = 0; j < ue_ant_id * this->cfg_->BsAntNum(); j++) {
           std::printf("%.3f+%.3fi ", precoder[this->cfg_->OfdmDataStart()][j].re,
                       precoder[this->cfg_->OfdmDataStart()][j].im);
         }
@@ -759,7 +771,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {
         arma::cx_fmat mat_input_data(
           reinterpret_cast<arma::cx_float*>(dl_mod_data[i]),
-          this->cfg_->OfdmCaNum(), ue_id, false);
+          this->cfg_->OfdmCaNum(), ue_ant_id, false);
 
         arma::cx_fmat mat_output(
           reinterpret_cast<arma::cx_float*>(dl_ifft_data[i]),
@@ -769,7 +781,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
              j < this->cfg_->OfdmDataNum() + this->cfg_->OfdmDataStart(); j++) {
           arma::cx_fmat mat_precoder(
             reinterpret_cast<arma::cx_float*>(precoder[j]),
-            ue_id, this->cfg_->BsAntNum(), false);
+            ue_ant_id, this->cfg_->BsAntNum(), false);
           mat_precoder /= abs(mat_precoder).max();
           mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
 
@@ -813,9 +825,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       std::string filename_dl_tx =
         directory + kDlTxPrefix + std::to_string(this->cfg_->OfdmCaNum()) +
         "_bsant" + std::to_string(this->cfg_->BsAntNum()) +
-        "_ueant" + std::to_string(ue_id) + ".bin";
+        "_ueant" + std::to_string(ue_ant_id) + ".bin";
       AGORA_LOG_INFO("Saving downlink tx data for %zu UE(s) to %s\n",
-        ue_id, filename_dl_tx.c_str());
+        ue_ant_id, filename_dl_tx.c_str());
       auto* fp_dl_tx = std::fopen(filename_dl_tx.c_str(), "wb");
       if (fp_dl_tx == nullptr) {
         AGORA_LOG_ERROR("Failed to create file %s\n", filename_dl_tx.c_str());
