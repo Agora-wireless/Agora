@@ -640,7 +640,7 @@ Config::Config(std::string jsonfilename)
   // Agora configurations
   frames_to_test_ = tdd_conf.value("max_frame", 9600);
   frame_to_profile_ =
-      tdd_conf.value("profiling_frame", -1);  // Profiling disabled by default
+      tdd_conf.value("profiling_frame", SIZE_MAX);  // Profiling disabled by default
   core_offset_ = tdd_conf.value("core_offset", 0);
   // use all available cores
   if (dynamic_core_allocation_) {
