@@ -445,8 +445,8 @@ void Stats::SaveToFile() {
       for (size_t j = 0; j < this->enqueue_stats_id_.at(i); j++) {
         std::fprintf(
             fp_master,
-            "Master frame %zu symbol %zu: enqueue task %s tsc "
-            "[%zu-%zu] = %.3f\n",
+            "Master frame %zu symbol %zu: enqueue task %s tsc [%zu-%zu] = "
+            "%.3f\n",
             config_->FrameToProfile(), i,
             kEventTypeToString
                 .at(static_cast<size_t>(this->enqueue_stats_[i][j].event_type_))
@@ -489,8 +489,7 @@ void Stats::SaveToFile() {
         std::fprintf(
             fp_worker,
             "Worker %zu frame %zu: %zu enqueue takes %.2f us, dequeue takes "
-            "%.2f us"
-            "(non-empty: %.2f)\n",
+            "%.2f us (non-empty: %.2f)\n",
             tid, i, this->worker_num_valid_enqueue_[tid][i],
             GetTime::CyclesToUs(this->total_worker_enqueue_tsc_[tid][i],
                                 config_->FreqGhz()),
