@@ -105,46 +105,53 @@ EventData DoFFT::Launch(size_t tag) {
                                                sym_type == SymbolType::kCalUL);
 
   if (calib_5g) {
-    size_t sample_offset = 0;
+    size_t sample_offset = 0;  // offset to start reading in received symbol
+    size_t calib_offset = 0;   // offset to start writing the fft input buffer
     if (sym_type == SymbolType::kCalDL) {
-      size_t sample_num = cfg_->OfdmCaNum() - cfg_->OfdmRxZeroPrefixCalDl();
+      // number of samples to copy over
+      size_t sample_num =
+          cfg_->SampsPerSymbol() - cfg_->OfdmRxZeroPrefixCalDl();
       if (symbol_id == cfg_->Frame().GetDLCalSymbol(0u)) {
         sample_offset = cfg_->OfdmRxZeroPrefixCalDl();
       } else {
-        sample_num = cfg_->OfdmRxZeroPrefixCalDl() - cfg_->CpLen();
+        calib_offset = sample_num;
+        sample_num = cfg_->OfdmRxZeroPrefixCalDl();
       }
       SimdConvertShortToFloat(
           &pkt->data_[2 * sample_offset],
-          reinterpret_cast<float*>(calib_dl_iq_buffer_[frame_slot]),
+          reinterpret_cast<float*>(calib_dl_iq_buffer_[frame_slot] +
+                                   2 * calib_offset),
           sample_num * 2);
       if (symbol_id == cfg_->Frame().GetDLCalSymbol(1u)) {
-        std::memcpy(
-            reinterpret_cast<float*>(fft_inout_),
-            reinterpret_cast<float*>(calib_dl_iq_buffer_[frame_slot] + ant_id),
-            cfg_->OfdmCaNum() * 2 * sizeof(float));
+        std::memcpy(reinterpret_cast<float*>(fft_inout_),
+                    reinterpret_cast<float*>(calib_dl_iq_buffer_[frame_slot]),
+                    cfg_->OfdmCaNum() * 2 * sizeof(float));
       }
     } else if (sym_type == SymbolType::kCalUL) {
       const size_t cal_index = cfg_->RecipCalUlRxIndex(frame_id, ant_id);
       if (cal_index != SIZE_MAX) {
-        size_t sample_num = cfg_->OfdmCaNum() - cfg_->OfdmRxZeroPrefixCalUl();
+        size_t sample_num =
+            cfg_->SampsPerSymbol() - cfg_->OfdmRxZeroPrefixCalUl();
         if (symbol_id == cfg_->Frame().GetULCalSymbol(0u)) {
           sample_offset = cfg_->OfdmRxZeroPrefixCalUl();
         } else {
-          sample_num = cfg_->OfdmRxZeroPrefixCalUl() - cfg_->CpLen();
+          calib_offset = sample_num;
+          sample_num = cfg_->OfdmRxZeroPrefixCalUl();
         }
         SimdConvertShortToFloat(
             &pkt->data_[2 * sample_offset],
-            reinterpret_cast<float*>(calib_ul_iq_buffer_[frame_slot]),
+            reinterpret_cast<float*>(calib_ul_iq_buffer_[frame_slot] +
+                                     2 * calib_offset),
             sample_num * 2);
         if (symbol_id == cfg_->Frame().GetULCalSymbol(1u)) {
           std::memcpy(reinterpret_cast<float*>(fft_inout_),
-                      reinterpret_cast<float*>(calib_ul_iq_buffer_[frame_slot] +
-                                               ant_id),
+                      reinterpret_cast<float*>(calib_ul_iq_buffer_[frame_slot]),
                       cfg_->OfdmCaNum() * 2 * sizeof(float));
         }
       }
     }
-    if (kPrintFFTInput) {
+    //if (kPrintFFTInput)
+    if (ant_id == 0 || sym_type == SymbolType::kCalDL) {
       std::stringstream ss;
       ss << "FFT_input_" << symbol_id << "_" << ant_id << "=[";
       for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {

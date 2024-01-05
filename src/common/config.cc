@@ -554,7 +554,7 @@ Config::Config(std::string jsonfilename)
     RtAssert(bf_ant_num_ >= frame_.NumDLCalSyms(),
              "Too many DL Cal symbols for the number of base station antennas");
 
-    RtAssert(((bf_ant_num_ % frame_.NumDLCalSyms()) == 0),
+    RtAssert(fivegframe_ || (bf_ant_num_ % frame_.NumDLCalSyms() == 0),
              "Number of Downlink calibration symbols per frame must complete "
              "calibration on frame boundary!");
   }

@@ -245,6 +245,7 @@ std::string FiveGConfig::FormBeaconSubframe(int format_num, size_t user_num,
   RtAssert(!calib_needed || guard_num >= 6,
            "Too few guard symbols to accomodate calibration symbols!");
   if (calib_needed) {
+    std::cout << "\n Adding CCGLLC calibration \n" << std::endl;
     subframe.replace(first_guard_id, 6, "CCGLLG");
   }
   /*
@@ -274,7 +275,9 @@ std::string FiveGConfig::FormFrame(std::string frame_schedule, size_t user_num,
     if (frame_schedule.at(i) == ',') {
       subframes[subframe_idx] = std::stoi(temp);
       // if there is downlink slot, we need to enable calibration symbols
+      // TODO: We should count downlink symbols after frame is formed
       if (subframes[subframe_idx] == 0) downlink_en = true;
+      if (subframes[subframe_idx] == 54) downlink_en = true;
       RtAssert(IsSupported(subframes[subframe_idx]),
                "Format " + std::to_string(subframes[subframe_idx]) +
                    " isn't supported.");
@@ -286,6 +289,7 @@ std::string FiveGConfig::FormFrame(std::string frame_schedule, size_t user_num,
     if (i == frame_schedule.size() - 1) {
       subframes[subframe_idx] = std::stoi(temp);
       if (subframes[subframe_idx] == 0) downlink_en = true;
+      if (subframes[subframe_idx] == 54) downlink_en = true;
     }
   }
   RtAssert(subframe_idx == 9,
