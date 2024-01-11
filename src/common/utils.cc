@@ -119,7 +119,6 @@ void SetCpuLayoutOnNumaNodes(bool verbose,
       }
     }
     std::printf("Usable Cpu count %zu\n", cpu_layout.size());
-
     numa_bitmask_free(bm);
     cpu_layout_initialized = true;
   }
