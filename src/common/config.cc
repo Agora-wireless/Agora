@@ -48,8 +48,7 @@ Config::Config(std::string jsonfilename)
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_bcast_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       frame_(""),
-      pilot_pre_ifft_(nullptr),
-      pilot_ifft_(nullptr),
+
       config_filename_(std::move(jsonfilename)) {
   auto time = std::time(nullptr);
   auto local_time = *std::localtime(&time);
@@ -70,15 +69,16 @@ Config::Config(std::string jsonfilename)
 
   // Initialize the compute configuration
   // Default exclude 1 core with id = 0
-  std::vector<size_t> excluded(1, 0);
+  excluded_.emplace_back(0);
   if (tdd_conf.contains("exclude_cores")) {
     auto exclude_cores = tdd_conf.at("exclude_cores");
-    excluded.resize(exclude_cores.size());
+    excluded_.resize(exclude_cores.size());
     for (size_t i = 0; i < exclude_cores.size(); i++) {
-      excluded.at(i) = exclude_cores.at(i);
+      excluded_.at(i) = exclude_cores.at(i);
     }
   }
-  SetCpuLayoutOnNumaNodes(true, excluded);
+  SetCpuLayoutOnNumaNodes(true, excluded_);
+  dynamic_core_allocation_ = tdd_conf.value("dynamic_core", false);
 
   num_cells_ = tdd_conf.value("cells", 1);
   num_radios_ = 0;
@@ -266,6 +266,10 @@ Config::Config(std::string jsonfilename)
   beamforming_str_ = tdd_conf.value("beamforming", "ZF");
   beamforming_algo_ = kBeamformingStr.at(beamforming_str_);
   num_spatial_streams_ = tdd_conf.value("spatial_streams", ue_ant_num_);
+
+  rp_remote_host_name_ = tdd_conf.value("rp_remote_host_name", "127.0.0.1");
+  rp_tx_port_ = tdd_conf.value("rp_tx_port", 3000);
+  rp_rx_port_ = tdd_conf.value("rp_rx_port", 4000);
 
   bs_server_addr_ = tdd_conf.value("bs_server_addr", "127.0.0.1");
   bs_rru_addr_ = tdd_conf.value("bs_rru_addr", "127.0.0.1");
@@ -529,7 +533,7 @@ Config::Config(std::string jsonfilename)
     convert a subframe formated frame into the symbol formated frame that Agora
     is designed to handle.
     */
-    if (frame.find(",") != std::string::npos) {
+    if (frame.find(',') != std::string::npos) {
       std::vector<std::string> flex_formats =
           tdd_conf.value("flex_formats", json::array());
       FiveGConfig fivegconfig = FiveGConfig(tdd_conf);
@@ -626,8 +630,17 @@ Config::Config(std::string jsonfilename)
 
   // Agora configurations
   frames_to_test_ = tdd_conf.value("max_frame", 9600);
+  frame_to_profile_ =
+      tdd_conf.value("profiling_frame", -1);  // Profiling disabled by default
   core_offset_ = tdd_conf.value("core_offset", 0);
-  worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
+  // use all available cores
+  if (dynamic_core_allocation_) {
+    worker_thread_num_ = sysconf(_SC_NPROCESSORS_ONLN) -
+                         (core_offset_ + socket_thread_num_ +
+                          (dynamic_core_allocation_ ? 1 : 0) + 1);
+  } else {
+    worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
+  }
   socket_thread_num_ = tdd_conf.value("socket_thread_num", 4);
   ue_core_offset_ = tdd_conf.value("ue_core_offset", 0);
   ue_worker_thread_num_ = tdd_conf.value("ue_worker_thread_num", 25);
@@ -690,6 +703,7 @@ Config::Config(std::string jsonfilename)
   this->UpdateCtrlMCS();
 
   freq_domain_channel_ = tdd_conf.value("freq_domain_channel", false);
+  scheduler_type_ = tdd_conf.value("scheduler_type", "round_robbin");
 
   samps_per_symbol_ =
       ofdm_tx_zero_prefix_ + ofdm_ca_num_ + cp_len_ + ofdm_tx_zero_postfix_;
@@ -831,7 +845,7 @@ Config::Config(std::string jsonfilename)
       "Basestation Network Traffic Avg  (Mbps): %.3f\n"
       "UE Network Traffic Peak (Mbps): %.3f\n"
       "UE Network Traffic Avg  (Mbps): %.3f\n"
-      "All UEs Network Traffic Avg (Mbps): %.3f\n"
+      "All UEs Network Traffic Peak (Mbps): %.3f\n"
       "All UEs Network Traffic Avg (Mbps): %.3f\n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, ul_modulation_.c_str(),
@@ -1494,10 +1508,10 @@ void Config::LoadTestVectors() {
 
   // Generate time domain ue-specific pilot symbols
   for (size_t i = 0; i < this->ue_ant_num_; i++) {
-    complex_float* ue_pilot_ = (this->freq_domain_channel_)
-                                   ? ue_pilot_pre_ifft_[i]
-                                   : ue_pilot_ifft_[i];
-    CommsLib::Ifft2tx(ue_pilot_, this->ue_specific_pilot_t_[i],
+    complex_float* ue_pilot = (this->freq_domain_channel_)
+                                  ? ue_pilot_pre_ifft_[i]
+                                  : ue_pilot_ifft_[i];
+    CommsLib::Ifft2tx(ue_pilot, this->ue_specific_pilot_t_[i],
                       this->ofdm_ca_num_, this->ofdm_tx_zero_prefix_,
                       this->cp_len_, kDebugDownlink ? 1 : this->scale_);
   }
@@ -1669,12 +1683,12 @@ void Config::Print() const {
               << "UL Bytes per CB: " << ul_num_bytes_per_cb_ << std::endl
               << "DL Bytes per CB: " << dl_num_bytes_per_cb_ << std::endl
               << "Frequency domain channel: " << freq_domain_channel_
-              << std::endl;
+              << "Scheduler type: " << scheduler_type_ << std::endl;
   }
 }
 
 extern "C" {
-__attribute__((visibility("default"))) Config* ConfigNew(char* filename) {
+__attribute__((visibility("default"))) Config* ConfigNew(const char* filename) {
   auto* cfg = new Config(filename);
   cfg->LoadTestVectors();
   return cfg;

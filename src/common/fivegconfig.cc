@@ -132,9 +132,10 @@ void FiveGConfig::ReadAndVerifyValues() {
     RtAssert(*iterator == channel_bandwidth_,
              "Specified channel bandwidth is not supported.");
     ofdm_data_num_ = channel_bandwidth_to_ofdm_data_num_.at(channel_bandwidth_);
-    for (size_t i = 0; i < valid_ffts_.size(); i++) {
-      if (valid_ffts_.at(i) > ofdm_data_num_) {
-        fft_size_ = valid_ffts_.at(i);
+    for (const auto& valid_fft : valid_ffts_) {
+      if (valid_fft > ofdm_data_num_) {
+        fft_size_ = valid_fft;
+        break;
       }
     }
   } else {
@@ -163,9 +164,10 @@ void FiveGConfig::ReadAndVerifyValues() {
         "The channel bandwidth calculated from the specified parameters "
         "is larger than the selected channel bandwidth. Try using "
         "smaller values.");
-    for (size_t i = 0; i < valid_ffts_.size(); i++) {
-      if (fft_size_ == valid_ffts_.at(i)) {
+    for (const auto& valid_fft : valid_ffts_) {
+      if (fft_size_ == valid_fft) {
         fft_is_valid = true;
+        break;
       }
     }
     RtAssert(fft_is_valid, "Specified fft_size is not a valid fft size,\n");
@@ -257,7 +259,7 @@ std::string FiveGConfig::FormFrame(std::string frame_schedule, size_t user_num,
   RtAssert(subframe_idx == 9,
            "Entered frame_schedule has less than 10 subframes.");
   // Create the frame based on the format nums in the subframe array.
-  frame += FormBeaconSubframe(subframes[0], user_num_);
+  frame += FormBeaconSubframe(subframes[0], user_num);
   for (size_t i = 1; i < kSubframesPerFrame; i++) {
     if (subframes[i] == kFlexibleSlotFormatIdx) {
       frame += flex_formats.at(flex_format_idx);
@@ -272,18 +274,17 @@ std::string FiveGConfig::FormFrame(std::string frame_schedule, size_t user_num,
  * Effects: Checks that the passed format is in the list of supported formats.
 */
 bool FiveGConfig::IsSupported(size_t format_num) const {
-  for (size_t i = 0; i < supported_formats_.size(); i++) {
-    if (format_num == supported_formats_[i]) {
+  for (const size_t& supported_format : supported_formats_) {
+    if (format_num == supported_format) {
       return true;
     }
   }
   std::string error_message =
       "User specified a non supported subframe format.\nCurrently "
       "supported subframe formats are:\n";
-  for (auto format = supported_formats_.begin();
-       format != supported_formats_.end(); format++) {
-    error_message +=
-        std::to_string(*format) + " " + format_table_.at(*format) + ".\n";
+  for (const auto& supported_format : supported_formats_) {
+    error_message += std::to_string(supported_format) + " " +
+                     format_table_.at(supported_format) + ".\n";
   }
   AGORA_LOG_ERROR(error_message);
   return false;
@@ -292,10 +293,9 @@ bool FiveGConfig::IsSupported(size_t format_num) const {
  * Effects: Sets the channel bandwidth based on the ofdm_data_num.
 */
 bool FiveGConfig::SetChannelBandwidth() {
-  for (auto iterator = channel_bandwidth_to_ofdm_data_num_.begin();
-       iterator != channel_bandwidth_to_ofdm_data_num_.end(); ++iterator) {
-    if (iterator->second >= ofdm_data_num_) {
-      channel_bandwidth_ = iterator->first;
+  for (const auto& iterator : channel_bandwidth_to_ofdm_data_num_) {
+    if (iterator.second >= ofdm_data_num_) {
+      channel_bandwidth_ = iterator.first;
       return true;
     }
   }

@@ -279,12 +279,14 @@ EventData DoDemul::Launch(size_t tag) {
         mat_phase_correct.set_real(cos(-cur_theta));
         mat_phase_correct.set_imag(sin(-cur_theta));
         mat_equaled %= mat_phase_correct;
-      }
-      // Measure EVM from ground truth
-      if (kPrintPhyStats &&
-          symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
-        phy_stats_->UpdateEvm(frame_id, data_symbol_idx_ul, cur_sc_id,
-                              mat_equaled.col(0), ue_list);
+
+        // Measure EVM from ground truth
+        if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
+          if constexpr (kEnableMac == false) {
+            phy_stats_->UpdateEvm(frame_id, data_symbol_idx_ul, cur_sc_id,
+                                  mat_equaled.col(0), ue_list);
+          }
+        }
       }
       size_t start_tsc3 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
@@ -362,5 +364,5 @@ EventData DoDemul::Launch(size_t tag) {
 
   duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
   duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
-  return EventData(EventType::kDemul, tag);
+  return {EventType::kDemul, tag};
 }

@@ -96,7 +96,7 @@ EventData DoFFT::Launch(size_t tag) {
   const size_t radio_id = ant_id / cfg_->NumChannels();
   const size_t cell_id = pkt->cell_id_;
   const SymbolType sym_type = cfg_->Frame().GetSymbolType(symbol_id);
-  const bool bypass_FFT = cfg_->FreqDomainChannel();
+  const bool bypass_fft = cfg_->FreqDomainChannel();
 
   if (kUse12BitIQ) {
     SimdConvert12bitIqToFloat(
@@ -115,8 +115,10 @@ EventData DoFFT::Launch(size_t tag) {
                             cfg_->OfdmCaNum() * 2);
   }
   if (kDebugPrintInTask) {
-    std::printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n", tid_,
-                frame_id, symbol_id, ant_id);
+    std::printf(
+        "In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu, symbol type: "
+        "%zu\n",
+        tid_, frame_id, symbol_id, ant_id, static_cast<size_t>(sym_type));
   }
 
   if ((kPrintPilotCorrStats == true) &&
@@ -174,7 +176,7 @@ EventData DoFFT::Launch(size_t tag) {
   size_t start_tsc1 = GetTime::WorkerRdtsc();
   duration_stat->task_duration_.at(1) += start_tsc1 - start_tsc;
 
-  if (bypass_FFT == false) {
+  if (bypass_fft == false) {
     DftiComputeForward(
         mkl_handle_,
         reinterpret_cast<float*>(fft_inout_));  // Compute FFT in-place
@@ -285,8 +287,8 @@ EventData DoFFT::Launch(size_t tag) {
   fft_req_tag_t(tag).rx_packet_->Free();
   duration_stat->task_count_++;
   duration_stat->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
-  return EventData(EventType::kFFT,
-                   gen_tag_t::FrmSym(pkt->frame_id_, pkt->symbol_id_).tag_);
+  return {EventType::kFFT,
+          gen_tag_t::FrmSym(pkt->frame_id_, pkt->symbol_id_).tag_};
 }
 
 void DoFFT::PartialTranspose(complex_float* out_buf, size_t ant_id,

@@ -34,7 +34,7 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
   arma::cx_fmat fmat_h;
 
   if (is_newChan) {
-    channel_model_->UpdateModel();
+    channel_model_->UpdateModel(kMeanChannelGain);
   }
 
   switch (channel_model_->GetFadingType()) {
@@ -44,14 +44,13 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
     }
 
     case ChannelModel::kSelective: {
-      const hsize_t n_rows = (cfg_->FreqDomainChannel())
-                                 ? cfg_->OfdmCaNum()
-                                 : cfg_->SampsPerSymbol();
-      const hsize_t n_cols =
-          (is_downlink) ? cfg_->UeAntNum() : cfg_->BsAntNum();
+      const size_t n_rows = (cfg_->FreqDomainChannel())
+                                ? cfg_->OfdmCaNum()
+                                : cfg_->SampsPerSymbol();
+      const size_t n_cols = (is_downlink) ? cfg_->UeAntNum() : cfg_->BsAntNum();
 
       fmat_h.zeros(n_rows, n_cols);
-      for (hsize_t h_index = 0; h_index < n_rows; h_index++) {
+      for (size_t h_index = 0; h_index < n_rows; h_index++) {
         fmat_h.row(h_index) = fmat_src.row(h_index) *
                               channel_model_->GetMatrix(is_downlink, h_index);
       }

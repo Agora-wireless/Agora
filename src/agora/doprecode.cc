@@ -146,7 +146,7 @@ EventData DoPrecode::Launch(size_t tag) {
         "subcarrier: %zu\n",
         tid_, frame_id, symbol_id, base_sc_id);
   }
-  return EventData(EventType::kPrecode, tag);
+  return {EventType::kPrecode, tag};
 }
 
 void DoPrecode::LoadInputData(size_t frame_id, size_t symbol_idx_dl,

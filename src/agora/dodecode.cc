@@ -147,5 +147,5 @@ EventData DoDecode::Launch(size_t tag) {
                 GetTime::CyclesToUs(duration, cfg_->FreqGhz()));
   }
 
-  return EventData(EventType::kDecode, tag);
+  return {EventType::kDecode, tag};
 }

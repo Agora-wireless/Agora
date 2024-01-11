@@ -77,7 +77,7 @@ struct eth_routing_info_t {
     ret << "[MAC " << mac_to_string(mac) << ", IP " << ipv4_to_string(ipv4_addr)
         << ", UDP port " << std::to_string(udp_port) << "]";
 
-    return std::string(ret.str());
+    return {ret.str()};
   }
   // This must be smaller than Transport::kMaxRoutingInfoSize, but a static
   // assert here causes a circular dependency.

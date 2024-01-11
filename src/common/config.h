@@ -17,7 +17,9 @@
 
 #include "armadillo"
 #include "common_typedef_sdk.h"
+#include "concurrent_queue_wrapper.h"
 #include "framestats.h"
+#include "gettime.h"
 #include "ldpc_config.h"
 #include "memory_manage.h"
 #include "nlohmann/json.hpp"
@@ -103,6 +105,9 @@ class Config {
   inline size_t BeaconAnt() const { return this->beacon_ant_; }
   inline size_t BeaconLen() const { return this->beacon_len_; }
 
+  inline bool DynamicCoreAlloc() const {
+    return this->dynamic_core_allocation_;
+  }
   inline bool SmoothCalib() const { return this->smooth_calib_; }
   inline bool Beamsweep() const { return this->beamsweep_; }
   inline bool SampleCalEn() const { return this->sample_cal_en_; }
@@ -180,6 +185,7 @@ class Config {
     }
   }
 
+  inline std::vector<size_t> ExcludedCores() const { return this->excluded_; }
   inline size_t CoreOffset() const { return this->core_offset_; }
   inline size_t WorkerThreadNum() const { return this->worker_thread_num_; }
   inline size_t SocketThreadNum() const { return this->socket_thread_num_; }
@@ -320,11 +326,14 @@ class Config {
   inline int UeRruPort() const { return this->ue_rru_port_; }
 
   inline size_t FramesToTest() const { return this->frames_to_test_; }
+  inline size_t FrameToProfile() const { return this->frame_to_profile_; }
   inline float NoiseLevel() const { return this->noise_level_; }
 
   inline bool FreqDomainChannel() const { return this->freq_domain_channel_; }
   inline uint16_t DpdkNumPorts() const { return this->dpdk_num_ports_; }
   inline uint16_t DpdkPortOffset() const { return this->dpdk_port_offset_; }
+
+  inline std::string SchedulerType() const { return this->scheduler_type_; }
 
   inline const std::string& DpdkMacAddrs() const {
     return this->dpdk_mac_addrs_;
@@ -335,6 +344,12 @@ class Config {
 
   inline size_t UeMacRxPort() const { return this->ue_mac_rx_port_; }
   inline size_t UeMacTxPort() const { return this->ue_mac_tx_port_; }
+
+  inline std::string RpRemoteHostName() const {
+    return this->rp_remote_host_name_;
+  }
+  inline size_t RpRxPort() const { return this->rp_rx_port_; }
+  inline size_t RpTxPort() const { return this->rp_tx_port_; }
 
   inline const std::string& LogListenerAddr() const {
     return this->log_listener_addr_;
@@ -713,10 +728,10 @@ class Config {
 
   std::vector<uint32_t> pilot_;
   std::vector<uint32_t> beacon_;
-  complex_float* pilots_;
-  complex_float* pilots_sgn_;
-  complex_float* pilot_pre_ifft_;
-  complex_float* pilot_ifft_;
+  complex_float* pilots_{nullptr};
+  complex_float* pilots_sgn_{nullptr};
+  complex_float* pilot_pre_ifft_{nullptr};
+  complex_float* pilot_ifft_{nullptr};
   Table<complex_float> ue_specific_pilot_;
   Table<complex_float> ue_pilot_pre_ifft_;
   Table<complex_float> ue_pilot_ifft_;
@@ -767,6 +782,7 @@ class Config {
   size_t beacon_ant_;
   size_t beacon_len_;
   size_t init_calib_repeat_;
+  bool dynamic_core_allocation_;
   bool smooth_calib_;
   bool beamsweep_;
   bool sample_cal_en_;
@@ -778,6 +794,7 @@ class Config {
   std::string channel_;
   std::string ue_channel_;
 
+  std::vector<size_t> excluded_;
   size_t core_offset_;
   size_t worker_thread_num_;
   size_t socket_thread_num_;
@@ -936,6 +953,11 @@ class Config {
   size_t ue_mac_rx_port_;
   size_t ue_mac_tx_port_;
 
+  // Port ID at RP
+  std::string rp_remote_host_name_;
+  size_t rp_rx_port_;
+  size_t rp_tx_port_;
+
   // Port ID at log listening server
   size_t log_listener_port_;
 
@@ -948,6 +970,9 @@ class Config {
   // Number of frames_ sent by sender during testing = number of frames_
   // processed by Agora before exiting.
   size_t frames_to_test_;
+
+  // Frame number for which the timestamps of different tasks are logged for profiling
+  size_t frame_to_profile_;
 
   // Size of tranport block given by upper layer
   size_t transport_block_size_;
@@ -969,5 +994,7 @@ class Config {
 
   // If true, channel matrix H will be applied in the frequency domain
   bool freq_domain_channel_;
+
+  std::string scheduler_type_;
 };
 #endif /* CONFIG_HPP_ */

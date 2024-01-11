@@ -39,19 +39,19 @@ static const std::map<std::string, size_t> kModulStringMap{
 static inline std::string MapModToStr(size_t mod_order) {
   switch (mod_order) {
     case 1:
-      return std::string("BPSK");
+      return {"BPSK"};
     case 2:
-      return std::string("QPSK");
+      return {"QPSK"};
     case 4:
-      return std::string("16QAM");
+      return {"16QAM"};
     case 6:
-      return std::string("64QAM");
+      return {"64QAM"};
     case 8:
-      return std::string("256QAM");
+      return {"256QAM"};
     case 10:
-      return std::string("1024QAM");
+      return {"1024QAM"};
     default:
-      return std::string("UNKNOWN!");
+      return {"UNKNOWN!"};
   }
 }
 

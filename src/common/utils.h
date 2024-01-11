@@ -41,6 +41,12 @@ void PinToCoreWithOffset(ThreadType thread, size_t base_core_offset,
                          size_t thread_id, bool allow_reuse = false,
                          bool verbose = false);
 
+/* Remove core from core_list at (core_id + core_offset) */
+void RemoveCoreFromList(int core_id, int core_offset);
+
+/* Get the number of available cores in the machine */
+size_t GetAvailableCores();
+
 void PrintCoreAssignmentSummary();
 
 template <class T>

@@ -163,7 +163,7 @@ static std::string AgoraGetFormattedTime() {
   uint32_t usec = t.tv_nsec / 1000;
 
   std::sprintf(buf, "%u:%06u", seconds, usec);
-  return std::string(buf);
+  return {buf};
 }
 // Output log message header
 static inline void AgoraOutputLogHeader(FILE* stream, int level) {
