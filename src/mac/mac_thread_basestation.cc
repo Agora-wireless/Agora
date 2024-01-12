@@ -139,13 +139,14 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
       cfg_->MacPacketsPerframe(Direction::kUplink);
   const size_t mac_payload_max_length =
       cfg_->MacPayloadMaxLength(Direction::kUplink);
-  const int8_t* src_data =
-      decoded_buffer_[(frame_id % kFrameWnd)][symbol_array_index][ue_id];
 
   std::stringstream ss;  // Debug formatting
 
   // Only non-pilot data symbols have application data.
   if (symbol_array_index >= num_pilot_symbols) {
+    const int8_t* src_data =
+        decoded_buffer_[(frame_id % kFrameWnd)]
+                       [symbol_array_index - num_pilot_symbols][ue_id];
     // The decoded symbol knows nothing about the padding / storage of the data
     const auto* pkt = reinterpret_cast<const MacPacketPacked*>(src_data);
     // Destination only contains "payload"
@@ -488,8 +489,9 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
 
     pkt->LoadData(src_packet->Data());
     // Insert CRC
-    pkt->Crc((uint16_t)(
-        crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) & 0xFFFF));
+    pkt->Crc(
+        (uint16_t)(crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) &
+                   0xFFFF));
 
     if (kLogMacPackets) {
       std::stringstream ss;
