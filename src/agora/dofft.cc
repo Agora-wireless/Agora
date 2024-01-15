@@ -229,10 +229,10 @@ EventData DoFFT::Launch(size_t tag) {
     PartialTranspose(csi_buffers_[frame_slot][pilot_symbol_id], ant_id,
                      SymbolType::kPilot);
     // initially do this for dl_csi until valid data is received
-    if (frame_id < kFrameWnd) {
-      PartialTranspose(dl_csi_buffers_[frame_slot][pilot_symbol_id], ant_id,
-                       SymbolType::kPilot);
-    }
+    // if (frame_id < kFrameWnd) {
+    //   PartialTranspose(dl_csi_buffers_[frame_slot][pilot_symbol_id], ant_id,
+    //                    SymbolType::kPilot);
+    // }
 
     // Expand partial CSI from freq-orth pilot to full CSI per UE
     // TODO 1. allow pilot sc group size different than kTransposeBlockSize
@@ -294,7 +294,8 @@ EventData DoFFT::Launch(size_t tag) {
           &calib_dl_buffer_[cal_index][pilot_tx_ant * cfg_->OfdmDataNum()];
       PartialTranspose(calib_dl_ptr, pilot_tx_ant, sym_type);
       phy_stats_->UpdateCalibPilotSnr(cal_index, 0, pilot_tx_ant, fft_inout_);
-    } else if (cfg_->UseExplicitCSI() && frame_id >= kFrameWnd) {
+    } 
+    else if (cfg_->UseExplicitCSI()) {
       PartialTranspose(dl_csi_buffers_[frame_slot][ant_id], pilot_tx_ant,
                        SymbolType::kPilot);
       phy_stats_->UpdateCalibPilotSnr(cal_index, 0, pilot_tx_ant, fft_inout_);
