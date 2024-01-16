@@ -28,7 +28,7 @@
     ],
     "client_dl_pilot_syms": 1,
     "beamsweep": false,
-    "beacon_antenna": 0,
+    "beacon_antenna": 1,
     "explicit_csi" : true,
     "hw_framer": true,
     "calibrate_digital" : false,
