@@ -84,10 +84,10 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kUplink));
         data_generator->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(
-                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kUplink)) &
-            0xFFFF));
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
+                                pkt->Data(),
+                                cfg_->MacPayloadMaxLength(Direction::kUplink)) &
+                            0xFFFF));
       }
     }
 
@@ -329,11 +329,19 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
   const std::string filename_rx = directory + kUlRxPrefix +
                                   std::to_string(cfg_->OfdmCaNum()) + "_ant" +
                                   std::to_string(cfg_->BsAntNum()) + ".bin";
+  std::complex<short>* rx_data_temp;
+  rx_data_temp =
+      static_cast<std::complex<short>*>(Agora_memory::PaddedAlignedAlloc(
+          Agora_memory::Alignment_t::kAlign64,
+          cfg_->OfdmCaNum() * cfg_->BsAntNum() * sizeof(short) * 2));
   AGORA_LOG_INFO("Saving uplink rx samples to %s\n", filename_rx.c_str());
   for (size_t i = 0; i < cfg_->Frame().NumTotalSyms(); i++) {
-    Utils::WriteBinaryFile(filename_rx, sizeof(float),
+    SimdConvertFloatToShort(reinterpret_cast<float*>(rx_data_all_symbols[i]),
+                            reinterpret_cast<short*>(rx_data_temp),
+                            2 * cfg_->OfdmCaNum() * cfg_->BsAntNum());
+    Utils::WriteBinaryFile(filename_rx, sizeof(short),
                            cfg_->OfdmCaNum() * cfg_->BsAntNum() * 2,
-                           reinterpret_cast<void*>(rx_data_all_symbols[i]),
+                           rx_data_temp,
                            i != 0);  //Do not append in the first write
   }
 
@@ -374,10 +382,10 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kDownlink));
         data_generator->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(
-                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kDownlink)) &
-            0xFFFF));
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(pkt->Data(),
+                                                    cfg_->MacPayloadMaxLength(
+                                                        Direction::kDownlink)) &
+                            0xFFFF));
       }
     }
 
