@@ -160,13 +160,14 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
   const size_t dest_packet_size =
       cfg_->MacPayloadMaxLength(Direction::kDownlink);
 
-  const int8_t* src_data =
-      decoded_buffer_[(frame_id % kFrameWnd)][symbol_array_index][ue_id];
-
   std::stringstream ss;  // Debug-only
 
   // Only non-pilot data symbols have application data.
   if (symbol_array_index >= num_pilot_symbols) {
+    const int8_t* src_data =
+        decoded_buffer_[(frame_id % kFrameWnd)]
+                       [symbol_array_index - num_pilot_symbols][ue_id];
+
     // The decoded symbol knows nothing about the padding / storage of the data
     const auto* pkt = reinterpret_cast<const MacPacketPacked*>(src_data);
     // Destination only contains "payload"

@@ -61,11 +61,11 @@ EventData DoIFFT::Launch(size_t tag) {
 
   const size_t dl_symbol_idx = cfg_->Frame().GetDLSymbolIdx(symbol_id);
   const size_t total_symbol_idx_dl =
-      cfg_->GetTotalDataSymbolIdxDl(frame_id, dl_symbol_idx);
+      cfg_->GetTotalSymbolIdxDl(frame_id, dl_symbol_idx);
   const size_t in_offset = (total_symbol_idx_dl * cfg_->BsAntNum()) + ant_id;
 
   const size_t total_symbol_idx =
-      cfg_->GetTotalSymbolIdxDl(frame_id, symbol_id);
+      cfg_->GetTotalSymbolIdxDlBcast(frame_id, symbol_id);
   const size_t out_offset = (total_symbol_idx * cfg_->BsAntNum()) + ant_id;
 
   const size_t start_tsc1 = GetTime::WorkerRdtsc();

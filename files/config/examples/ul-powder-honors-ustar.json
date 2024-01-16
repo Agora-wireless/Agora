@@ -1,13 +1,13 @@
 {
-  "serial_file": "files/topology/topology-mww-2ue.json",
+  "serial_file": "files/topology/topology-honors.json",
   "cells": 1,
   "channel": "AB",
   "frequency": 3.545e9,
   "single_gain": true,
-  "rx_gain_a": 75,
-  "tx_gain_a": 81,
-  "rx_gain_b": 75,
-  "tx_gain_b": 81,
+  "rx_gain_a": 65,
+  "tx_gain_a": 80,
+  "rx_gain_b": 65,
+  "tx_gain_b": 105,
   "sample_rate": 7.68e6,
   "ofdm_tx_zero_prefix": 160,
   "ofdm_tx_zero_postfix": 160,
@@ -20,36 +20,30 @@
   "ul_mcs": {
     "mcs_index": 10
   },
-  "beamsweep": true,
-  "beacon_antenna": 0,
+  "beamsweep": false,
+  "beacon_antenna": 21,
   "frame_schedule": [
-    "BGGGGGPGGGUUUGGG"
+    "BGGGGGPPGGUUUGGG"
   ],
   "client_ul_pilot_syms": 2,
   /* UE configuration */
   "ue_channel": "AB",
   "ue_rx_gain_a": [
-    78,
     78
   ],
   "ue_tx_gain_a": [
-    81,
-    81
+    99
   ],
   "ue_rx_gain_b": [
-    78,
     78
   ],
   "ue_tx_gain_b": [
-    81,
-    81
+    99
   ],
   "tx_advance": [
-    140,
     140
   ],
   "corr_scale": [
-    10,
     10
   ],
   "ue_hw_framer": false,
@@ -58,12 +52,12 @@
   "exclude_cores": [],
   "ue_core_offset": 48,
   "ue_worker_thread_num": 4,
-  "ue_socket_thread_num": 4,
+  "ue_socket_thread_num": 2,
   "core_offset": 16,
   "worker_thread_num": 8,
   /* 18 bs radios */
   "socket_thread_num": 4,
   "max_frame": 1000,
-  "calibrate_digital": true,
-  "freq_orthogonal_pilot": true
+  "calibrate_digital": false,
+  "freq_orthogonal_pilot": false
 }

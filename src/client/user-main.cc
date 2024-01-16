@@ -33,7 +33,7 @@ int main(int argc, char* argv[]) {
   }
 
   auto config = std::make_unique<Config>(filename.c_str());
-  config->GenData();
+  config->LoadTestVectors();
   int ret;
   try {
     SignalHandler signal_handler;

@@ -125,7 +125,7 @@ class Config {
   // Returns antenna number for rec cal dl symbol
   // Assumes that there are the same number of dl cal symbols in each frame
   inline size_t RecipCalDlAnt(size_t frame_id, size_t dl_cal_symbol) const {
-    assert(GetSymbolType(dl_cal_symbol) == SymbolType::kCalDL);
+    assert(this->Frame().GetSymbolType(dl_cal_symbol) == SymbolType::kCalDL);
     const size_t dl_cal_offset = (frame_id * frame_.NumDLCalSyms()) +
                                  frame_.GetDLCalSymbolIdx(dl_cal_symbol);
 
@@ -293,6 +293,9 @@ class Config {
   inline const LDPCconfig& BcLdpcConfig() const {
     return dl_bcast_ldpc_config_;
   }
+  inline size_t BcModOrderBits() const {
+    return this->dl_bcast_mod_order_bits_;
+  }
   inline Table<complex_float>& ModTable(Direction dir) {
     return dir == Direction::kUplink ? this->ul_mod_table_
                                      : this->dl_mod_table_;
@@ -376,7 +379,7 @@ class Config {
 
   inline const std::vector<uint32_t>& Pilot() const { return this->pilot_; };
   inline const std::vector<uint32_t>& Beacon() const { return this->beacon_; };
-  // inline const complex_float *pilots (void ) const { return this->pilots_; };
+  inline const complex_float* pilots(void) const { return this->pilots_; };
   inline const complex_float* PilotsSgn() const { return this->pilots_sgn_; };
   inline const std::vector<std::complex<float>>& CommonPilot() const {
     return this->common_pilot_;
@@ -427,29 +430,12 @@ class Config {
 
   // Public functions
   void GenPilots();
-  void GenData();
-  void GenBroadcastSlots(std::vector<std::complex<int16_t>*>& bcast_iq_samps,
-                         std::vector<size_t> ctrl_msg);
-  size_t DecodeBroadcastSlots(const int16_t* const bcast_iq_samps);
+  void LoadUplinkData();
+  void LoadDownlinkData();
+  void LoadTestVectors();
   void UpdateUlMCS(const nlohmann::json& ul_mcs_params);
   void UpdateDlMCS(const nlohmann::json& dl_mcs_params);
   void UpdateCtrlMCS();
-
-  /// TODO document and review
-  size_t GetSymbolId(size_t input_id) const;
-
-  bool IsBeacon(size_t /*frame_id*/, size_t /*symbol_id*/) const;
-  bool IsPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
-  bool IsDlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
-  bool IsCalDlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
-  bool IsCalUlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
-  bool IsDownlink(size_t /*frame_id*/, size_t /*symbol_id*/) const;
-  bool IsDownlinkBroadcast(size_t /*frame_id*/, size_t /*symbol_id*/) const;
-  bool IsUplink(size_t /*unused*/, size_t /*symbol_id*/) const;
-
-  /* Public functions that do not meet coding standard format */
-  /// Return the symbol type of this symbol in this frame
-  SymbolType GetSymbolType(size_t symbol_id) const;
 
   /// Return total number of data symbols of all frames in a buffer
   /// that holds data of kFrameWnd frames
@@ -460,18 +446,36 @@ class Config {
   /// Return total number of uplink data symbols of all frames in a buffer
   /// that holds data of kFrameWnd frames
   inline size_t GetTotalDataSymbolIdxUl(size_t frame_id,
-                                        size_t symbol_idx_ul) const {
+                                        size_t data_symbol_idx_ul) const {
+    return ((frame_id % kFrameWnd) * this->frame_.NumUlDataSyms() +
+            data_symbol_idx_ul);
+  }
+
+  /// Return total number of uplink data symbols of all frames in a buffer
+  /// that holds data of kFrameWnd frames
+  inline size_t GetTotalSymbolIdxUl(size_t frame_id,
+                                    size_t symbol_idx_ul) const {
     return ((frame_id % kFrameWnd) * this->frame_.NumULSyms() + symbol_idx_ul);
   }
 
   /// Return total number of downlink data symbols of all frames in a buffer
   /// that holds data of kFrameWnd frames
   inline size_t GetTotalDataSymbolIdxDl(size_t frame_id,
-                                        size_t symbol_idx_dl) const {
+                                        size_t data_symbol_idx_dl) const {
+    return ((frame_id % kFrameWnd) * this->frame_.NumDlDataSyms() +
+            data_symbol_idx_dl);
+  }
+
+  /// Return total number of downlink data and pilot symbols of all frames in a buffer
+  /// that holds data of kFrameWnd frames
+  inline size_t GetTotalSymbolIdxDl(size_t frame_id,
+                                    size_t symbol_idx_dl) const {
     return ((frame_id % kFrameWnd) * this->frame_.NumDLSyms() + symbol_idx_dl);
   }
 
-  inline size_t GetTotalSymbolIdxDl(size_t frame_id, size_t symbol_id) {
+  /// Return total number of downlink data, pilot, and broadcast symbols of all frames
+  /// in a buffer that holds data of kFrameWnd frames
+  inline size_t GetTotalSymbolIdxDlBcast(size_t frame_id, size_t symbol_id) {
     const size_t symbol_idx_dl =
         symbol_id < this->frame_.GetDLSymbol(0)
             ? this->frame_.GetDLControlSymbolIdx(symbol_id)
@@ -480,39 +484,6 @@ class Config {
     return (frame_id % kFrameWnd) *
                (this->frame_.NumDlControlSyms() + this->frame_.NumDLSyms()) +
            symbol_idx_dl;
-  }
-
-  //Returns Beacon+Dl symbol index
-  inline size_t GetBeaconDlIdx(size_t symbol_id) const {
-    size_t symbol_idx = SIZE_MAX;
-    const auto type = GetSymbolType(symbol_id);
-    if (type == SymbolType::kBeacon) {
-      symbol_idx = Frame().GetBeaconSymbolIdx(symbol_id);
-    } else if (type == SymbolType::kControl) {
-      symbol_idx =
-          Frame().GetDLControlSymbolIdx(symbol_id) + Frame().NumBeaconSyms();
-    } else if (type == SymbolType::kDL) {
-      symbol_idx = Frame().GetDLSymbolIdx(symbol_id) + Frame().NumDlBcastSyms();
-    } else {
-      throw std::runtime_error("Invalid BS Beacon or DL symbol id " +
-                               std::to_string(symbol_id));
-    }
-    return symbol_idx;
-  }
-
-  //Returns Pilot+Ul symbol index
-  inline size_t GetPilotUlIdx(size_t symbol_id) const {
-    size_t symbol_idx = SIZE_MAX;
-    const auto type = GetSymbolType(symbol_id);
-    if (type == SymbolType::kPilot) {
-      symbol_idx = Frame().GetPilotSymbolIdx(symbol_id);
-    } else if (type == SymbolType::kUL) {
-      symbol_idx = Frame().GetULSymbolIdx(symbol_id) + Frame().NumPilotSyms();
-    } else {
-      throw std::runtime_error("Invalid Ue Pilot or UL symbol id " +
-                               std::to_string(symbol_id));
-    }
-    return symbol_idx;
   }
 
   /// Return the frame duration in seconds
@@ -558,7 +529,7 @@ class Config {
       num_bytes_per_cb = this->dl_num_bytes_per_cb_;
       mac_packet_length = this->dl_mac_packet_length_;
     } else {
-      mac_bytes_perframe = ul_mac_bytes_num_perframe_;
+      mac_bytes_perframe = this->ul_mac_bytes_num_perframe_;
       num_bytes_per_cb = this->ul_num_bytes_per_cb_;
       mac_packet_length = this->ul_mac_packet_length_;
     }
@@ -897,8 +868,7 @@ class Config {
 
   float scale_;  // Scaling factor for all transmit symbols
 
-  bool bigstation_mode_;      // If true, use pipeline-parallel scheduling
-  bool correct_phase_shift_;  // If true, do phase shift correction
+  bool bigstation_mode_;  // If true, use pipeline-parallel scheduling
 
   // The total number of uncoded uplink data bytes in each OFDM symbol
   size_t ul_data_bytes_num_persymbol_;

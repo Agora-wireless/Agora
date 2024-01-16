@@ -479,6 +479,9 @@ void Agora::Start() {
 
           if (last_demul_task == true) {
             if (kUplinkHardDemod == false) {
+              /*  &&
+                symbol_id >= config_->Frame().GetULSymbol(
+                                 config_->Frame().ClientUlPilotSymbols())) {*/
               ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
                                  frame_id, symbol_id);
             }
@@ -525,6 +528,12 @@ void Agora::Start() {
                 } else {
                   ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
                                      frame_id, symbol_id);
+                  /*if (symbol_id >=
+                      config_->Frame().GetULSymbol(
+                          config_->Frame().ClientUlPilotSymbols())) {
+                    ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
+                                       frame_id, symbol_id);
+                  }*/
                 }
               }
             }
@@ -924,7 +933,7 @@ finish:
 void Agora::HandleEventFft(size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  const SymbolType sym_type = config_->GetSymbolType(symbol_id);
+  const SymbolType sym_type = config_->Frame().GetSymbolType(symbol_id);
 
   if (sym_type == SymbolType::kPilot) {
     const bool last_fft_task =
@@ -1017,7 +1026,8 @@ void Agora::UpdateRanConfig(RanConfig rc) {
 
 void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
   const size_t frame_slot = frame_id % kFrameWnd;
-  if (config_->IsPilot(frame_id, symbol_id)) {
+  auto symbol_type = config_->Frame().GetSymbolType(symbol_id);
+  if (symbol_type == SymbolType::kPilot) {
     rx_counters_.num_pilot_pkts_[frame_slot]++;
     if (rx_counters_.num_pilot_pkts_.at(frame_slot) ==
         rx_counters_.num_pilot_pkts_per_frame_) {
@@ -1025,8 +1035,8 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
       this->stats_->MasterSetTsc(TsType::kPilotAllRX, frame_id);
       stats_->PrintPerFrameDone(PrintType::kPacketRXPilots, frame_id);
     }
-  } else if (config_->IsCalDlPilot(frame_id, symbol_id) ||
-             config_->IsCalUlPilot(frame_id, symbol_id)) {
+  } else if (symbol_type == SymbolType::kCalDL ||
+             symbol_type == SymbolType::kCalUL) {
     rx_counters_.num_reciprocity_pkts_.at(frame_slot)++;
     if (rx_counters_.num_reciprocity_pkts_.at(frame_slot) ==
         rx_counters_.num_reciprocity_pkts_per_frame_) {
@@ -1139,6 +1149,7 @@ void Agora::InitializeCounters() {
 
   demul_counters_.Init(cfg->Frame().NumULSyms(), cfg->DemulEventsPerSymbol());
 
+  // \todo setting the first dim to NumUlDataSyms breaks the scheduler
   decode_counters_.Init(
       cfg->Frame().NumULSyms(),
       cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
@@ -1286,8 +1297,9 @@ void Agora::SaveTxDataToFile(int frame_id) {
     AGORA_LOG_ERROR("SaveTxDataToFile error creating file pointer\n");
   } else {
     for (size_t i = 0; i < cfg->Frame().NumDLSyms(); i++) {
+      size_t symbol_id = cfg->Frame().GetDLSymbol(i);
       const size_t total_data_symbol_id =
-          cfg->GetTotalDataSymbolIdxDl(frame_id, i);
+          cfg->GetTotalSymbolIdxDlBcast(frame_id, symbol_id);
 
       for (size_t ant_id = 0; ant_id < cfg->BsAntNum(); ant_id++) {
         const size_t offset = total_data_symbol_id * cfg->BsAntNum() + ant_id;
@@ -1310,8 +1322,7 @@ void Agora::SaveTxDataToFile(int frame_id) {
 
 void Agora::GetEqualData(float** ptr, int* size) {
   const auto& cfg = config_;
-  auto offset = cfg->GetTotalDataSymbolIdxUl(
-      max_equaled_frame_, cfg->Frame().ClientUlPilotSymbols());
+  auto offset = cfg->GetTotalDataSymbolIdxUl(max_equaled_frame_, 0u);
   *ptr = (float*)&agora_memory_->GetEqual()[offset][0];
   *size = cfg->UeAntNum() * cfg->OfdmDataNum() * 2;
 }

@@ -11,8 +11,7 @@
   "demul_block_size": 48,
   "cp_size": 32,
   "dl_mcs": {
-    "modulation": "16QAM",
-    "code_rate": 0.333
+    "mcs_index" : 10
   },
   "frequency": 3.6e9,
   /* Frame definition */

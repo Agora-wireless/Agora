@@ -17,5 +17,5 @@
   "worker_thread_num": 1,
   "socket_thread_num": 1,
   "max_frame": 1,
-  "noise_level": 0.01
+  "noise_level": 0.001
 }
