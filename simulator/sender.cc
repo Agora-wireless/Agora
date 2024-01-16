@@ -448,7 +448,7 @@ void* Sender::WorkerThread(int tid) {
             pkt->data_,
             iq_data_short_[(pkt->symbol_id_ * cfg_->BsAntNum()) + tag.ant_id_],
             (cfg_->SampsPerSymbol()) * (kUse12BitIQ ? 3 : 4));
-        if (cfg_->FftInRru() == true) {
+        if (cfg_->FreqDomainChannel()) {
           RunFft(pkt, fft_inout, mkl_handle);
         }
 
@@ -556,9 +556,9 @@ void Sender::InitIqFromFile(const std::string& filename) {
   iq_data_short_.Calloc(packets_per_frame, (cfg_->SampsPerSymbol()) * 2,
                         Agora_memory::Alignment_t::kAlign64);
 
-  Table<float> iq_data_float;
-  iq_data_float.Calloc(packets_per_frame, (cfg_->SampsPerSymbol()) * 2,
-                       Agora_memory::Alignment_t::kAlign64);
+  Table<short> iq_data_temp;
+  iq_data_temp.Calloc(packets_per_frame, (cfg_->SampsPerSymbol()) * 2,
+                      Agora_memory::Alignment_t::kAlign64);
 
   FILE* fp = std::fopen(filename.c_str(), "rb");
   RtAssert(fp != nullptr, "Failed to open IQ data file");
@@ -566,7 +566,7 @@ void Sender::InitIqFromFile(const std::string& filename) {
   for (size_t i = 0; i < packets_per_frame; i++) {
     const size_t expected_count = (cfg_->SampsPerSymbol()) * 2;
     const size_t actual_count =
-        std::fread(iq_data_float[i], sizeof(float), expected_count, fp);
+        std::fread(iq_data_temp[i], sizeof(short), expected_count, fp);
     if (expected_count != actual_count) {
       std::fprintf(
           stderr,
@@ -577,16 +577,16 @@ void Sender::InitIqFromFile(const std::string& filename) {
     }
     if (kUse12BitIQ) {
       // Adapt 32-bit IQ samples to 24-bit to reduce network throughput
-      ConvertFloatTo12bitIq(iq_data_float[i],
+      ConvertShortTo12bitIq(iq_data_temp[i],
                             reinterpret_cast<uint8_t*>(iq_data_short_[i]),
                             expected_count);
     } else {
-      SimdConvertFloatToShort(iq_data_float[i], iq_data_short_[i],
-                              expected_count);
+      std::memcpy((void*)iq_data_short_[i], (void*)iq_data_temp[i],
+                  expected_count * sizeof(short));
     }
   }
   std::fclose(fp);
-  iq_data_float.Free();
+  iq_data_temp.Free();
 }
 
 void Sender::CreateWorkerThreads(size_t num_workers) {
@@ -618,7 +618,7 @@ void Sender::RunFft(Packet* pkt, complex_float* fft_inout,
 
   DftiComputeForward(mkl_handle, reinterpret_cast<float*>(fft_inout));
 
-  SimdConvertFloat32ToFloat16(reinterpret_cast<float*>(pkt->data_),
-                              reinterpret_cast<float*>(fft_inout),
-                              cfg_->OfdmCaNum() * 2);
+  SimdConvertFloatToShort(reinterpret_cast<float*>(fft_inout),
+                          reinterpret_cast<short*>(pkt->data_),
+                          cfg_->OfdmCaNum() * 2);
 }

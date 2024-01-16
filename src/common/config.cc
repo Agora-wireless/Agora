@@ -50,7 +50,7 @@ Config::Config(std::string jsonfilename)
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_bcast_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       frame_(""),
-      pilot_ifft_(nullptr),
+
       config_filename_(std::move(jsonfilename)) {
   auto time = std::time(nullptr);
   auto local_time = *std::localtime(&time);
@@ -71,15 +71,16 @@ Config::Config(std::string jsonfilename)
 
   // Initialize the compute configuration
   // Default exclude 1 core with id = 0
-  std::vector<size_t> excluded(1, 0);
+  excluded_.emplace_back(0);
   if (tdd_conf.contains("exclude_cores")) {
     auto exclude_cores = tdd_conf.at("exclude_cores");
-    excluded.resize(exclude_cores.size());
+    excluded_.resize(exclude_cores.size());
     for (size_t i = 0; i < exclude_cores.size(); i++) {
-      excluded.at(i) = exclude_cores.at(i);
+      excluded_.at(i) = exclude_cores.at(i);
     }
   }
-  SetCpuLayoutOnNumaNodes(true, excluded);
+  SetCpuLayoutOnNumaNodes(true, excluded_);
+  dynamic_core_allocation_ = tdd_conf.value("dynamic_core", false);
 
   num_cells_ = tdd_conf.value("cells", 1);
   num_radios_ = 0;
@@ -267,6 +268,10 @@ Config::Config(std::string jsonfilename)
   beamforming_str_ = tdd_conf.value("beamforming", "ZF");
   beamforming_algo_ = kBeamformingStr.at(beamforming_str_);
   num_spatial_streams_ = tdd_conf.value("spatial_streams", ue_ant_num_);
+
+  rp_remote_host_name_ = tdd_conf.value("rp_remote_host_name", "127.0.0.1");
+  rp_tx_port_ = tdd_conf.value("rp_tx_port", 3000);
+  rp_rx_port_ = tdd_conf.value("rp_rx_port", 4000);
 
   bs_server_addr_ = tdd_conf.value("bs_server_addr", "127.0.0.1");
   bs_rru_addr_ = tdd_conf.value("bs_rru_addr", "127.0.0.1");
@@ -531,7 +536,7 @@ Config::Config(std::string jsonfilename)
     convert a subframe formated frame into the symbol formated frame that Agora
     is designed to handle.
     */
-    if (frame.find(",") != std::string::npos) {
+    if (frame.find(',') != std::string::npos) {
       std::vector<std::string> flex_formats =
           tdd_conf.value("flex_formats", json::array());
       FiveGConfig fivegconfig = FiveGConfig(tdd_conf, ue_ant_num_);
@@ -634,8 +639,17 @@ Config::Config(std::string jsonfilename)
 
   // Agora configurations
   frames_to_test_ = tdd_conf.value("max_frame", 9600);
+  frame_to_profile_ =
+      tdd_conf.value("profiling_frame", -1);  // Profiling disabled by default
   core_offset_ = tdd_conf.value("core_offset", 0);
-  worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
+  // use all available cores
+  if (dynamic_core_allocation_) {
+    worker_thread_num_ = sysconf(_SC_NPROCESSORS_ONLN) -
+                         (core_offset_ + socket_thread_num_ +
+                          (dynamic_core_allocation_ ? 1 : 0) + 1);
+  } else {
+    worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
+  }
   socket_thread_num_ = tdd_conf.value("socket_thread_num", 4);
   ue_core_offset_ = tdd_conf.value("ue_core_offset", 0);
   ue_worker_thread_num_ = tdd_conf.value("ue_worker_thread_num", 25);
@@ -697,7 +711,8 @@ Config::Config(std::string jsonfilename)
   this->DumpMcsInfo();
   this->UpdateCtrlMCS();
 
-  fft_in_rru_ = tdd_conf.value("fft_in_rru", false);
+  freq_domain_channel_ = tdd_conf.value("freq_domain_channel", false);
+  scheduler_type_ = tdd_conf.value("scheduler_type", "round_robbin");
 
   samps_per_symbol_ =
       ofdm_tx_zero_prefix_ + ofdm_ca_num_ + cp_len_ + ofdm_tx_zero_postfix_;
@@ -839,7 +854,7 @@ Config::Config(std::string jsonfilename)
       "Basestation Network Traffic Avg  (Mbps): %.3f\n"
       "UE Network Traffic Peak (Mbps): %.3f\n"
       "UE Network Traffic Avg  (Mbps): %.3f\n"
-      "All UEs Network Traffic Avg (Mbps): %.3f\n"
+      "All UEs Network Traffic Peak (Mbps): %.3f\n"
       "All UEs Network Traffic Avg (Mbps): %.3f\n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, ul_modulation_.c_str(),
@@ -935,7 +950,8 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
           ul_code_rate_);
     }
   } else {
-    ul_mcs_index_ = ul_mcs.value("mcs_index", 10);  // 16QAM, 340/1024
+    // 16QAM, 340/1024
+    ul_mcs_index_ = ul_mcs.value("mcs_index", kDefaultMcsIndex);
     ul_mod_order_bits_ = GetModOrderBits(ul_mcs_index_);
     ul_modulation_ = MapModToStr(ul_mod_order_bits_);
     ul_code_rate_ = GetCodeRate(ul_mcs_index_);
@@ -987,7 +1003,8 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
           dl_code_rate_);
     }
   } else {
-    dl_mcs_index_ = dl_mcs.value("mcs_index", 10);  // 16QAM, 340/1024
+    // 16QAM, 340/1024
+    dl_mcs_index_ = dl_mcs.value("mcs_index", kDefaultMcsIndex);
     dl_mod_order_bits_ = GetModOrderBits(dl_mcs_index_);
     dl_modulation_ = MapModToStr(dl_mod_order_bits_);
     dl_code_rate_ = GetCodeRate(dl_mcs_index_);
@@ -1196,14 +1213,21 @@ void Config::GenPilots() {
   AllocBuffer1d(&pilot_ifft_, this->ofdm_ca_num_,
                 Agora_memory::Alignment_t::kAlign64, 1);
 
-  for (size_t j = 0; j < ofdm_data_num_; j++) {
-    // FFT Shift
-    const size_t k = j + ofdm_data_start_ >= ofdm_ca_num_ / 2
-                         ? j + ofdm_data_start_ - ofdm_ca_num_ / 2
-                         : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
-    pilot_ifft_[k] = this->pilots_[j];
+  RtAssert(pilot_pre_ifft_ == nullptr, "pilot_pre_ifft_ should be null");
+  AllocBuffer1d(&pilot_pre_ifft_, this->ofdm_ca_num_,
+                Agora_memory::Alignment_t::kAlign64, 1);
+
+  std::memcpy(pilot_pre_ifft_ + ofdm_data_start_, this->pilots_,
+              ofdm_data_num_ * sizeof(complex_float));
+
+  //pilot_pre_ifft_ == pilot_ifft_;
+  std::memcpy(pilot_ifft_, pilot_pre_ifft_,
+              ofdm_ca_num_ * sizeof(complex_float));
+
+  if (this->freq_domain_channel_ == false) {
+    CommsLib::FFTShift(pilot_ifft_, ofdm_ca_num_);
+    CommsLib::IFFT(pilot_ifft_, ofdm_ca_num_, false);
   }
-  CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
 
   // Generate UE-specific pilots based on Zadoff-Chu sequence for phase tracking
   this->ue_specific_pilot_.Malloc(this->ue_ant_num_, this->ofdm_data_num_,
@@ -1213,19 +1237,27 @@ void Config::GenPilots() {
 
   ue_pilot_ifft_.Calloc(this->ue_ant_num_, this->ofdm_ca_num_,
                         Agora_memory::Alignment_t::kAlign64);
+  ue_pilot_pre_ifft_.Calloc(this->ue_ant_num_, this->ofdm_ca_num_,
+                            Agora_memory::Alignment_t::kAlign64);
   for (size_t i = 0; i < ue_ant_num_; i++) {
     auto zc_ue_pilot_i = CommsLib::SeqCyclicShift(
         zc_seq,
         (i + this->ue_ant_offset_) * (float)M_PI / 6);  // LTE DMRS
+
     for (size_t j = 0; j < this->ofdm_data_num_; j++) {
       this->ue_specific_pilot_[i][j] = {zc_ue_pilot_i[j].real(),
                                         zc_ue_pilot_i[j].imag()};
-      // FFT Shift
-      const size_t k = j + ofdm_data_start_ >= ofdm_ca_num_ / 2
-                           ? j + ofdm_data_start_ - ofdm_ca_num_ / 2
-                           : j + ofdm_data_start_ + ofdm_ca_num_ / 2;
-      ue_pilot_ifft_[i][k] = this->ue_specific_pilot_[i][j];
     }
+
+    std::memcpy(ue_pilot_ifft_[i] + ofdm_data_start_,
+                this->ue_specific_pilot_[i],
+                ofdm_data_num_ * sizeof(complex_float));
+    //Save a copy of the frequency domain info
+    std::memcpy(ue_pilot_pre_ifft_[i] + ofdm_data_start_,
+                ue_pilot_ifft_[i] + ofdm_data_start_,
+                ofdm_data_num_ * sizeof(complex_float));
+
+    CommsLib::FFTShift(ue_pilot_ifft_[i], ofdm_ca_num_);
     CommsLib::IFFT(ue_pilot_ifft_[i], ofdm_ca_num_, false);
   }
 }
@@ -1500,7 +1532,10 @@ void Config::LoadTestVectors() {
 
   // Generate time domain ue-specific pilot symbols
   for (size_t i = 0; i < this->ue_ant_num_; i++) {
-    CommsLib::Ifft2tx(ue_pilot_ifft_[i], this->ue_specific_pilot_t_[i],
+    complex_float* ue_pilot = (this->freq_domain_channel_)
+                                  ? ue_pilot_pre_ifft_[i]
+                                  : ue_pilot_ifft_[i];
+    CommsLib::Ifft2tx(ue_pilot, this->ue_specific_pilot_t_[i],
                       this->ofdm_ca_num_, this->ofdm_tx_zero_prefix_,
                       this->cp_len_, kDebugDownlink ? 1 : this->scale_);
   }
@@ -1545,25 +1580,29 @@ void Config::LoadTestVectors() {
       this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).resize(samps_per_symbol_, 0);
       if (this->freq_orthogonal_pilot_ || ue_id == pilot_idx) {
         std::vector<arma::uword> pilot_sc_list;
+
         for (size_t sc_id = 0; sc_id < ofdm_data_num_; sc_id++) {
           const size_t org_sc = sc_id + ofdm_data_start_;
-          const size_t center_sc = ofdm_ca_num_ / 2;
-          // FFT Shift
-          const size_t shifted_sc = (org_sc >= center_sc)
-                                        ? (org_sc - center_sc)
-                                        : (org_sc + center_sc);
           if (this->freq_orthogonal_pilot_ == false ||
               sc_id % this->pilot_sc_group_size_ == ue_id) {
-            pilot_ifft_[shifted_sc] = this->pilots_[sc_id];
+            pilot_ifft_[org_sc] = this->pilots_[sc_id];
             pilot_sc_list.push_back(org_sc);
           } else {
-            pilot_ifft_[shifted_sc].re = 0.0f;
-            pilot_ifft_[shifted_sc].im = 0.0f;
+            pilot_ifft_[org_sc].re = 0.0f;
+            pilot_ifft_[org_sc].im = 0.0f;
           }
         }
+
         pilot_ue_sc_.at(ue_id) = arma::uvec(pilot_sc_list);
+
+        std::memcpy(pilot_pre_ifft_, pilot_ifft_,
+                    ofdm_ca_num_ * sizeof(complex_float));
+        CommsLib::FFTShift(pilot_ifft_, this->ofdm_ca_num_);
         CommsLib::IFFT(pilot_ifft_, this->ofdm_ca_num_, false);
-        CommsLib::Ifft2tx(pilot_ifft_,
+
+        const complex_float* pilot_to_tx =
+            (this->freq_domain_channel_) ? pilot_pre_ifft_ : pilot_ifft_;
+        CommsLib::Ifft2tx(pilot_to_tx,
                           this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).data(),
                           ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
       }
@@ -1597,6 +1636,9 @@ void Config::LoadTestVectors() {
   if (pilot_ifft_ != nullptr) {
     FreeBuffer1d(&pilot_ifft_);
   }
+  if (pilot_pre_ifft_ != nullptr) {
+    FreeBuffer1d(&pilot_pre_ifft_);
+  }
   ul_iq_ifft.Free();
   dl_iq_ifft.Free();
 }
@@ -1613,6 +1655,7 @@ Config::~Config() {
   ue_specific_pilot_t_.Free();
   ue_specific_pilot_.Free();
   ue_pilot_ifft_.Free();
+  ue_pilot_pre_ifft_.Free();
 
   ul_mod_table_.Free();
   dl_mod_table_.Free();
@@ -1674,12 +1717,13 @@ void Config::Print() const {
               << "Noise Level: " << noise_level_ << std::endl
               << "UL Bytes per CB: " << ul_num_bytes_per_cb_ << std::endl
               << "DL Bytes per CB: " << dl_num_bytes_per_cb_ << std::endl
-              << "FFT in rru: " << fft_in_rru_ << std::endl;
+              << "Frequency domain channel: " << freq_domain_channel_
+              << "Scheduler type: " << scheduler_type_ << std::endl;
   }
 }
 
 extern "C" {
-__attribute__((visibility("default"))) Config* ConfigNew(char* filename) {
+__attribute__((visibility("default"))) Config* ConfigNew(const char* filename) {
   auto* cfg = new Config(filename);
   cfg->LoadTestVectors();
   return cfg;

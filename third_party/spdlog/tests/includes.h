@@ -4,7 +4,7 @@
 #    pragma GCC diagnostic push
 #    pragma GCC diagnostic ignored "-Wmaybe-uninitialized" // Workaround for GCC 12
 #endif
-#include "catch.hpp"
+#include <catch2/catch_all.hpp>
 #if defined(__GNUC__) && __GNUC__ == 12
 #    pragma GCC diagnostic pop
 #endif
@@ -32,4 +32,5 @@
 #include "spdlog/sinks/ostream_sink.h"
 #include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
+#include "spdlog/sinks/msvc_sink.h"
 #include "spdlog/pattern_formatter.h"

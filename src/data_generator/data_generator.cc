@@ -110,7 +110,7 @@ Table<complex_float> DataGenerator::GetUeSpecificPilotFreqDomain() const {
 
 void DataGenerator::GetNoisySymbol(
     const std::vector<complex_float>& modulated_symbol,
-    std::vector<complex_float>& noisy_symbol, float noise_level) {
+    std::vector<complex_float>& noisy_symbol, float noise_level) const {
   std::default_random_engine generator(seed_);
   std::normal_distribution<double> distribution(0.0, 1.0);
   for (size_t j = 0; j < modulated_symbol.size(); j++) {
@@ -124,7 +124,7 @@ void DataGenerator::GetNoisySymbol(
 
 void DataGenerator::GetNoisySymbol(const complex_float* modulated_symbol,
                                    complex_float* noisy_symbol, size_t length,
-                                   float noise_level) {
+                                   float noise_level) const {
   std::default_random_engine generator(seed_);
   std::normal_distribution<double> distribution(0.0, 1.0);
   for (size_t j = 0; j < length; j++) {

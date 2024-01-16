@@ -364,12 +364,6 @@ void RecorderWorkerHDF5::Init() {
                     : &cfg_->UlIqF[sym][ant * (tx_data_size / 2)];
             hdf5_->WriteDataset(dataset_name, start, tx_data_dims,
                                 reinterpret_cast<const float*>(write_data));
-
-            /*hdf5_->WriteDataset(
-                dataset_name, start, tx_data_dims,
-                reinterpret_cast<const float*>(
-                    &const_cast<Config*>(cfg_)
-                         ->UlIqF()[sym][ant * (tx_data_size / 2)]));*/
           }
         }
         hdf5_->FinalizeDataset(dataset_name);

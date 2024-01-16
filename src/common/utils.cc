@@ -119,7 +119,6 @@ void SetCpuLayoutOnNumaNodes(bool verbose,
       }
     }
     std::printf("Usable Cpu count %zu\n", cpu_layout.size());
-
     numa_bitmask_free(bm);
     cpu_layout_initialized = true;
   }
@@ -202,6 +201,23 @@ void PinToCoreWithOffset(ThreadType thread_type, size_t core_offset,
       }
     }  // EnableThreadPinning == true
   }
+}
+
+void RemoveCoreFromList(int core_id, int core_offset) {
+  if (core_list.back().requested_core_ == (size_t)(core_id + core_offset)) {
+    core_list.pop_back();
+  }
+}
+
+size_t GetAvailableCores() {
+  std::ifstream file("/sys/fs/cgroup/cpuset/cpuset.cpus");
+  std::string s;
+  std::getline(file, s);
+
+  size_t start_core = (size_t)stoi(s.substr(0, s.find('-')));
+  size_t end_core = (size_t)stoi(s.substr(s.find('-') + 1));
+  // remove master core, tx/rx core
+  return end_core - start_core;
 }
 
 std::vector<size_t> Utils::StrToChannels(const std::string& channel) {

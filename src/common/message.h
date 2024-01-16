@@ -168,6 +168,14 @@ struct EventData {
     tags_.at(0) = tag;
   }
 
+  // Create an event with two tags
+  EventData(EventType event_type, size_t tag1, size_t tag2)
+      : event_type_(event_type), num_tags_(2) {
+    tags_.fill(0);
+    tags_.at(0) = tag1;
+    tags_.at(1) = tag2;
+  }
+
   EventData() = default;
 };
 static_assert(sizeof(EventData) == 64);

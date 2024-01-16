@@ -14,7 +14,7 @@
 ///Factory function
 std::unique_ptr<ChannelModel> ChannelModel::CreateChannelModel(
     const Config* const config, std::string& channel_type,
-    std::string& dataset_path) {
+    [[maybe_unused]] std::string& dataset_path) {
   if (channel_type == "AWGN") {
     return std::make_unique<AwgnModel>(config->BsAntNum(), config->UeAntNum(),
                                        config->SampsPerSymbol());
@@ -41,8 +41,7 @@ ChannelModel::ChannelModel(size_t bs_ant_num, size_t ue_ant_num,
     : bss_num_(bs_ant_num),
       ues_num_(ue_ant_num),
       n_samps_(samples_per_sym),
-      h_flat_(),
-      h_selective_(),
+
       fading_type_(fading_type) {}
 
 /*

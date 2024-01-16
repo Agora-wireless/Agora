@@ -103,6 +103,7 @@ EventData DoFFT::Launch(size_t tag) {
 
   const bool calib_5g = cfg_->FiveGFrame() && (sym_type == SymbolType::kCalDL ||
                                                sym_type == SymbolType::kCalUL);
+  const bool bypass_fft = cfg_->FreqDomainChannel();
 
   if (calib_5g) {
     size_t sample_offset = 0;  // offset to start reading in received symbol
@@ -161,10 +162,8 @@ EventData DoFFT::Launch(size_t tag) {
       ss << "];" << std::endl;
       std::cout << ss.str();
     }
-  }
-
-  if (!calib_5g) {
-    if (cfg_->FftInRru() == true) {
+  } else {
+    if (bypass_fft == true) {
       SimdConvertFloat16ToFloat32(
           reinterpret_cast<float*>(fft_inout_),
           reinterpret_cast<float*>(&pkt->data_[2 * cfg_->OfdmRxZeroPrefixBs()]),
@@ -253,18 +252,18 @@ EventData DoFFT::Launch(size_t tag) {
   size_t start_tsc1 = GetTime::WorkerRdtsc();
   duration_stat->task_duration_.at(1) += start_tsc1 - start_tsc;
 
-  if (!cfg_->FftInRru() == true) {
+  if (bypass_fft == false) {
     DftiComputeForward(
         mkl_handle_,
         reinterpret_cast<float*>(fft_inout_));  // Compute FFT in-place
-  }
 
-  //// FFT shift the buffer
-  std::memcpy(fft_shift_tmp_, fft_inout_, sizeof(float) * cfg_->OfdmCaNum());
-  std::memcpy(fft_inout_, fft_inout_ + cfg_->OfdmCaNum() / 2,
-              sizeof(float) * cfg_->OfdmCaNum());
-  std::memcpy(fft_inout_ + cfg_->OfdmCaNum() / 2, fft_shift_tmp_,
-              sizeof(float) * cfg_->OfdmCaNum());
+    //// FFT shift the buffer
+    std::memcpy(fft_shift_tmp_, fft_inout_, sizeof(float) * cfg_->OfdmCaNum());
+    std::memcpy(fft_inout_, fft_inout_ + cfg_->OfdmCaNum() / 2,
+                sizeof(float) * cfg_->OfdmCaNum());
+    std::memcpy(fft_inout_ + cfg_->OfdmCaNum() / 2, fft_shift_tmp_,
+                sizeof(float) * cfg_->OfdmCaNum());
+  }
 
   size_t start_tsc2 = GetTime::WorkerRdtsc();
   duration_stat->task_duration_.at(2) += start_tsc2 - start_tsc1;
@@ -364,8 +363,8 @@ EventData DoFFT::Launch(size_t tag) {
   fft_req_tag_t(tag).rx_packet_->Free();
   duration_stat->task_count_++;
   duration_stat->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
-  return EventData(EventType::kFFT,
-                   gen_tag_t::FrmSym(pkt->frame_id_, pkt->symbol_id_).tag_);
+  return {EventType::kFFT,
+          gen_tag_t::FrmSym(pkt->frame_id_, pkt->symbol_id_).tag_};
 }
 
 void DoFFT::PartialTranspose(complex_float* out_buf, size_t ant_id,

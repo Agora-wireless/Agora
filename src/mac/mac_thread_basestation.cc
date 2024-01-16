@@ -23,6 +23,8 @@ MacThreadBaseStation::MacThreadBaseStation(
       decoded_buffer_(decoded_buffer),
       rx_queue_(rx_queue),
       tx_queue_(tx_queue) {
+  valid_mac_packets_.fill(0);
+  error_mac_packets_.fill(0);
   // Set up MAC log file
   if (log_filename.empty() == false) {
     log_filename_ = log_filename;  // Use a non-default log filename
@@ -47,7 +49,7 @@ MacThreadBaseStation::MacThreadBaseStation(
         std::vector<size_t>(cfg->Frame().NumUlDataSyms()));
   }
 
-  // The frame data will hold the data comming from the Phy (Received)
+  // The frame data will hold the data coming from the Phy (Received)
   for (auto& v : server_.frame_data_) {
     v.resize(cfg_->MacDataBytesNumPerframe(Direction::kUplink));
   }
@@ -137,13 +139,14 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
       cfg_->MacPacketsPerframe(Direction::kUplink);
   const size_t mac_payload_max_length =
       cfg_->MacPayloadMaxLength(Direction::kUplink);
-  const int8_t* src_data =
-      decoded_buffer_[(frame_id % kFrameWnd)][symbol_array_index][ue_id];
 
   std::stringstream ss;  // Debug formatting
 
   // Only non-pilot data symbols have application data.
   if (symbol_array_index >= num_pilot_symbols) {
+    const int8_t* src_data =
+        decoded_buffer_[(frame_id % kFrameWnd)]
+                       [symbol_array_index - num_pilot_symbols][ue_id];
     // The decoded symbol knows nothing about the padding / storage of the data
     const auto* pkt = reinterpret_cast<const MacPacketPacked*>(src_data);
     // Destination only contains "payload"
@@ -188,6 +191,11 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
     }
 
     if (data_valid) {
+      if (pkt->Ue() < kMaxUEs) {
+        valid_mac_packets_.at(pkt->Ue())++;
+      } else {
+        throw std::runtime_error("Ue ID out of range " + pkt->Ue());
+      }
       AGORA_LOG_FRAME("%s", ss.str().c_str());
       /// Spot to be optimized #1
       std::memcpy(&server_.frame_data_.at(ue_id).at(frame_data_offset),
@@ -197,6 +205,9 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
           pkt->PayloadLength();
 
     } else {
+      if (pkt->Ue() < kMaxUEs) {
+        error_mac_packets_.at(pkt->Ue())++;
+      }
       ss << "  *****Failed Data integrity check - invalid parameters"
          << std::endl;
 
@@ -478,8 +489,9 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
 
     pkt->LoadData(src_packet->Data());
     // Insert CRC
-    pkt->Crc((uint16_t)(
-        crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) & 0xFFFF));
+    pkt->Crc(
+        (uint16_t)(crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) &
+                   0xFFFF));
 
     if (kLogMacPackets) {
       std::stringstream ss;
@@ -545,5 +557,19 @@ void MacThreadBaseStation::RunEventLoop() {
     if (next_tx_frame_id_ != cfg_->FramesToTest()) {
       ProcessUdpPacketsFromApps();
     }
+  }
+}
+
+void MacThreadBaseStation::PrintUplinkMacErrors() {
+  std::string tx_type = "Uplink";
+
+  for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
+    const size_t total_mac_packets =
+        error_mac_packets_.at(ue_id) + valid_mac_packets_.at(ue_id);
+    AGORA_LOG_INFO("UE %zu: %s mac packet errors %zu/%zu (%f)\n", ue_id,
+                   tx_type.c_str(), error_mac_packets_.at(ue_id),
+                   total_mac_packets,
+                   static_cast<float>(error_mac_packets_.at(ue_id)) /
+                       static_cast<float>(total_mac_packets));
   }
 }

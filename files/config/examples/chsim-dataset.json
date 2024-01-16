@@ -1,5 +1,5 @@
 {
-    "max_frame": 10, 
+    "freq_domain_channel": true,
     "fft_size": 512,
     "ofdm_data_num": 304,
     "demul_block_size": 48,
@@ -10,7 +10,7 @@
       "mcs_index": 15 /*16QAM, 616/1024*/
     },
     "sample_rate" : 1e6,
-    "spatial_streams" : 2,
+    "spatial_streams" : 4,
     "ue_radio_num": 4,
     "bs_radio_num": 32,
     "symbol_num_perframe": 24,
@@ -30,4 +30,3 @@
     "ue_worker_thread_num": 2,
     "ue_socket_thread_num": 1
 }
-  

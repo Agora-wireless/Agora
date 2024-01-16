@@ -32,6 +32,7 @@ class Channel {
   std::string sim_chan_model_;
   double channel_snr_db_;
   double noise_samp_std_;
+
   std::unique_ptr<ChannelModel> channel_model_;
 };
 

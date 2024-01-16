@@ -76,5 +76,5 @@ EventData DoBroadcast::Launch(size_t tag) {
 
   duration_stat_->task_count_++;
   duration_stat_->task_duration_[0u] += GetTime::WorkerRdtsc() - start_tsc;
-  return EventData(EventType::kBroadcast, tag);
+  return {EventType::kBroadcast, tag};
 }
