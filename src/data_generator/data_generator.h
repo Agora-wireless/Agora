@@ -15,6 +15,22 @@
 #include "memory_manage.h"
 #include "message.h"
 
+///Output files
+
+static const std::string kExperimentFilepath =
+    TOSTRING(PROJECT_DIRECTORY) "/files/experiment/";
+static const std::string kUlLdpcDataPrefix = "ul_ldpc_data_";
+static const std::string kDlLdpcDataPrefix = "dl_ldpc_data_";
+static const std::string kUlModDataPrefix = "ul_mod_data_";
+static const std::string kDlModDataPrefix = "dl_mod_data_";
+static const std::string kUlIfftPrefix = "ul_ifft_data_";
+static const std::string kDlIfftPrefix = "dl_ifft_data_";
+static const std::string kUlRxPrefix = "ul_rx_data_";
+static const std::string kDlTxPrefix = "dl_tx_data_";
+
+typedef std::independent_bits_engine<std::mt19937, 8, std::uint_fast8_t>
+    rand_byte_generator;
+
 /**
  * @brief Building blocks for generating end-to-end or unit test workloads for
  * Agora
@@ -33,8 +49,6 @@ class DataGenerator {
   explicit DataGenerator(Config* cfg, uint64_t seed = 0,
                          Profile profile = Profile::kRandom);
 
-  void DoDataGeneration(const std::string& directory);
-
   /**
    * @brief                        Generate random Mac payload bit
    * sequence
@@ -43,6 +57,7 @@ class DataGenerator {
    * @param  ue_id                 ID of the UE that this codeblock belongs to
    */
   void GenMacData(MacPacketPacked* mac, size_t ue_id);
+  static void GenMacRandomBits(MacPacketPacked* mac);
 
   /**
    * @brief                        Generate one raw information bit sequence
@@ -75,9 +90,14 @@ class DataGenerator {
       const size_t num_bits, const size_t num_subcarriers,
       const size_t mod_order_bits);
 
+  static std::vector<complex_float> GetModulation(
+      const int8_t* encoded_codeword, uint8_t* moduldation_data,
+      Table<complex_float> mod_table, const size_t num_bits,
+      const size_t num_subcarriers, const size_t mod_order_bits);
+
   static std::vector<complex_float> MapOFDMSymbol(
       Config* cfg, const std::vector<complex_float>& modulated_codeword,
-      complex_float* pilot_seq, SymbolType symbol_type);
+      const complex_float* pilot_seq, SymbolType symbol_type);
 
   /**
    * @param modulated_codeword The modulated codeword with OfdmDataNum()
@@ -116,6 +136,14 @@ class DataGenerator {
                                   size_t num_codeblocks,
                                   size_t num_decoded_bytes,
                                   bool scramble_enabled = false);
+  static size_t DecodeBroadcastSlots(Config* cfg,
+                                     const int16_t* const bcast_iq_samps);
+  static void GenBroadcastSlots(
+      Config* cfg, std::vector<std::complex<int16_t>*>& bcast_iq_samps,
+      std::vector<size_t> ctrl_msg);
+  static void GenerateUlTxTestVectors(Config* const cfg);
+  static void GenerateDlTxTestVectors(Config* const cfg,
+                                      Table<complex_float>& dmrs);
 
  private:
   FastRand fast_rand_;  // A fast random number generator

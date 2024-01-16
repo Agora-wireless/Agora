@@ -5,12 +5,10 @@
         "BPUUUUUGGDDDDD"
     ],
     "ul_mcs": {
-        "modulation": "64QAM",
-        "code_rate": 0.333
+        "mcs_index": 17
     },
     "dl_mcs": {
-        "modulation": "64QAM",
-        "code_rate": 0.333
+        "mcs_index": 17
     },
     "bs_server_addr": "127.0.0.1",
     "bs_rru_addr": "127.0.0.1",

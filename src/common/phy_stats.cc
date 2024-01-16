@@ -36,7 +36,7 @@ PhyStats::PhyStats(Config* const cfg, Direction dir)
     num_rx_symbols_ = cfg->Frame().NumULSyms();
     num_rxdata_symbols_ = cfg->Frame().NumUlDataSyms();
   }
-  const size_t task_buffer_symbol_num = num_rx_symbols_ * kFrameWnd;
+  const size_t task_buffer_symbol_num = num_rxdata_symbols_ * kFrameWnd;
 
   decoded_bits_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                              Agora_memory::Alignment_t::kAlign64);
@@ -66,19 +66,6 @@ PhyStats::PhyStats(Config* const cfg, Direction dir)
   evm_sc_buffer_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->OfdmDataNum(),
                         Agora_memory::Alignment_t::kAlign64);
 
-  if (num_rxdata_symbols_ > 0) {
-    gt_cube_ = arma::cx_fcube(cfg->UeAntNum(), cfg->OfdmDataNum(),
-                              num_rxdata_symbols_);
-    for (size_t i = 0; i < num_rxdata_symbols_; i++) {
-      auto* iq_f_ptr = reinterpret_cast<arma::cx_float*>(
-          (dir_ == Direction::kDownlink)
-              ? cfg->DlIqF()[cfg->Frame().ClientDlPilotSymbols() + i]
-              : cfg->UlIqF()[cfg->Frame().ClientUlPilotSymbols() + i]);
-      arma::cx_fmat iq_f_mat(iq_f_ptr, cfg->OfdmDataNum(), cfg->UeAntNum(),
-                             false);
-      gt_cube_.slice(i) = iq_f_mat.st();
-    }
-  }
   dl_pilot_snr_.Calloc(kFrameWnd,
                        cfg->UeAntNum() * cfg->Frame().ClientDlPilotSymbols(),
                        Agora_memory::Alignment_t::kAlign64);
@@ -98,6 +85,8 @@ PhyStats::PhyStats(Config* const cfg, Direction dir)
                           Agora_memory::Alignment_t::kAlign64);
   csi_cond_.Calloc(kFrameWnd, cfg->OfdmDataNum(),
                    Agora_memory::Alignment_t::kAlign64);
+  gt_cube_ = arma::cx_fcube(this->config_->UeAntNum(),
+                            this->config_->OfdmDataNum(), num_rxdata_symbols_);
 }
 
 PhyStats::~PhyStats() {
@@ -129,8 +118,21 @@ PhyStats::~PhyStats() {
   dl_pilot_noise_.Free();
 }
 
+void PhyStats::LoadGroundTruthIq() {
+  if (num_rxdata_symbols_ > 0) {
+    for (size_t i = 0; i < num_rxdata_symbols_; i++) {
+      auto* iq_f_ptr = reinterpret_cast<arma::cx_float*>(
+          (dir_ == Direction::kDownlink) ? config_->DlIqF()[i]
+                                         : config_->UlIqF()[i]);
+      arma::cx_fmat iq_f_mat(iq_f_ptr, this->config_->OfdmDataNum(),
+                             this->config_->UeAntNum(), false);
+      gt_cube_.slice(i) = iq_f_mat.st();
+    }
+  }
+}
+
 void PhyStats::PrintPhyStats() {
-  const size_t task_buffer_symbol_num = num_rx_symbols_ * kFrameWnd;
+  const size_t task_buffer_symbol_num = num_rxdata_symbols_ * kFrameWnd;
   std::string tx_type;
   if (dir_ == Direction::kDownlink) {
     tx_type = "Downlink";
@@ -138,7 +140,7 @@ void PhyStats::PrintPhyStats() {
     tx_type = "Uplink";
   }
 
-  if (num_rx_symbols_ > 0) {
+  if (num_rxdata_symbols_ > 0) {
     for (size_t ue_id = 0; ue_id < this->config_->UeAntNum(); ue_id++) {
       size_t total_decoded_bits(0);
       size_t total_bit_errors(0);

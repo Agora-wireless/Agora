@@ -303,6 +303,7 @@ enum class SymbolType {
   kGuard,
   kUnknown
 };
+
 static const std::map<char, SymbolType> kSymbolMap = {
     {'B', SymbolType::kBeacon}, {'C', SymbolType::kCalDL},
     {'D', SymbolType::kDL},     {'G', SymbolType::kGuard},
@@ -408,4 +409,5 @@ static constexpr size_t kOfdmSymbolPerSlot = 1;
 static constexpr size_t kOutputFrameNum = 1;
 
 static constexpr bool kDebugTxData = false;
+static constexpr bool kDebugBypassEncode = false;
 #endif  // SYMBOLS_H_

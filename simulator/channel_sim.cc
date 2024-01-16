@@ -176,7 +176,7 @@ void ChannelSim::Run() {
         case EventType::kPacketRX: {
           const size_t frame_id = gen_tag_t(event.tags_[0u]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0u]).symbol_id_;
-          auto symbol_type = cfg_->GetSymbolType(symbol_id);
+          auto symbol_type = cfg_->Frame().GetSymbolType(symbol_id);
           AGORA_LOG_TRACE("(Frame %zu, Symbol %zu, Ant %d): Rx Data\n",
                           frame_id, symbol_id,
                           gen_tag_t(event.tags_[0u]).ant_id_);
@@ -253,7 +253,7 @@ void ChannelSim::Run() {
         case EventType::kPacketTX: {
           const size_t frame_id = gen_tag_t(event.tags_[0u]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0u]).symbol_id_;
-          auto symbol_type = cfg_->GetSymbolType(symbol_id);
+          auto symbol_type = cfg_->Frame().GetSymbolType(symbol_id);
           AGORA_LOG_TRACE(
               "(Frame %zu, Symbol %zu, Ant %d): Tx Data all antennas\n",
               frame_id, symbol_id, gen_tag_t(event.tags_[0u]).ant_id_);

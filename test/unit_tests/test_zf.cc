@@ -10,7 +10,7 @@
 TEST(TestZF, Perf) {
   static constexpr size_t kNumIters = 10000;
   auto cfg = std::make_unique<Config>("files/config/ci/tddconfig-sim-ul.json");
-  cfg->GenData();
+  cfg->GenPilots();
 
   int tid = 0;
 

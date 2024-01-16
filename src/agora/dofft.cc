@@ -95,7 +95,7 @@ EventData DoFFT::Launch(size_t tag) {
   const size_t ant_id = pkt->ant_id_;
   const size_t radio_id = ant_id / cfg_->NumChannels();
   const size_t cell_id = pkt->cell_id_;
-  const SymbolType sym_type = cfg_->GetSymbolType(symbol_id);
+  const SymbolType sym_type = cfg_->Frame().GetSymbolType(symbol_id);
   const bool bypass_fft = cfg_->FreqDomainChannel();
 
   if (kUse12BitIQ) {

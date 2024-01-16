@@ -8,6 +8,7 @@
 #include <csignal>
 #include <thread>
 
+#include "data_generator.h"
 #include "datatype_conversion.h"
 #include "gettime.h"
 #include "logger.h"
@@ -74,8 +75,7 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     i = new size_t[cfg->Frame().NumTotalSyms()]();
   }
 
-  InitIqFromFile(std::string(TOSTRING(PROJECT_DIRECTORY)) +
-                 "/files/experiment/LDPC_rx_data_" +
+  InitIqFromFile(kExperimentFilepath + kUlRxPrefix +
                  std::to_string(cfg->OfdmCaNum()) + "_ant" +
                  std::to_string(cfg->BsAntNum()) + ".bin");
 
@@ -196,7 +196,7 @@ size_t Sender::FindNextSymbol(size_t start_symbol) {
   size_t next_symbol_id;
   for (next_symbol_id = start_symbol;
        (next_symbol_id < cfg_->Frame().NumTotalSyms()); next_symbol_id++) {
-    SymbolType symbol_type = cfg_->GetSymbolType(next_symbol_id);
+    SymbolType symbol_type = cfg_->Frame().GetSymbolType(next_symbol_id);
     if ((symbol_type == SymbolType::kPilot) ||
         (symbol_type == SymbolType::kUL)) {
       break;
@@ -412,8 +412,10 @@ void* Sender::WorkerThread(int tid) {
       for (size_t tag_id = 0; (tag_id < num_tags); tag_id++) {
         const size_t start_tsc_send = GetTime::Rdtsc();
         const auto tag = gen_tag_t(tags[tag_id]);
-        assert((cfg_->GetSymbolType(tag.symbol_id_) == SymbolType::kPilot) ||
-               (cfg_->GetSymbolType(tag.symbol_id_) == SymbolType::kUL));
+        assert(
+            (cfg_->Frame().GetSymbolType(tag.symbol_id_) ==
+             SymbolType::kPilot) ||
+            (cfg_->Frame().GetSymbolType(tag.symbol_id_) == SymbolType::kUL));
 
         // Send a message to the server. We assume that the server is running.
         Packet* pkt = nullptr;
@@ -434,7 +436,7 @@ void* Sender::WorkerThread(int tid) {
           AGORA_LOG_INFO(
               "Sender worker [%d]: processing frame %d symbol %d, type %d\n",
               tid, tag.frame_id_, tag.symbol_id_,
-              static_cast<int>(cfg_->GetSymbolType(tag.symbol_id_)));
+              static_cast<int>(cfg_->Frame().GetSymbolType(tag.symbol_id_)));
         }
 
         // Update the TX buffer
@@ -554,9 +556,9 @@ void Sender::InitIqFromFile(const std::string& filename) {
   iq_data_short_.Calloc(packets_per_frame, (cfg_->SampsPerSymbol()) * 2,
                         Agora_memory::Alignment_t::kAlign64);
 
-  Table<float> iq_data_float;
-  iq_data_float.Calloc(packets_per_frame, (cfg_->SampsPerSymbol()) * 2,
-                       Agora_memory::Alignment_t::kAlign64);
+  Table<short> iq_data_temp;
+  iq_data_temp.Calloc(packets_per_frame, (cfg_->SampsPerSymbol()) * 2,
+                      Agora_memory::Alignment_t::kAlign64);
 
   FILE* fp = std::fopen(filename.c_str(), "rb");
   RtAssert(fp != nullptr, "Failed to open IQ data file");
@@ -564,7 +566,7 @@ void Sender::InitIqFromFile(const std::string& filename) {
   for (size_t i = 0; i < packets_per_frame; i++) {
     const size_t expected_count = (cfg_->SampsPerSymbol()) * 2;
     const size_t actual_count =
-        std::fread(iq_data_float[i], sizeof(float), expected_count, fp);
+        std::fread(iq_data_temp[i], sizeof(short), expected_count, fp);
     if (expected_count != actual_count) {
       std::fprintf(
           stderr,
@@ -575,16 +577,16 @@ void Sender::InitIqFromFile(const std::string& filename) {
     }
     if (kUse12BitIQ) {
       // Adapt 32-bit IQ samples to 24-bit to reduce network throughput
-      ConvertFloatTo12bitIq(iq_data_float[i],
+      ConvertShortTo12bitIq(iq_data_temp[i],
                             reinterpret_cast<uint8_t*>(iq_data_short_[i]),
                             expected_count);
     } else {
-      SimdConvertFloatToShort(iq_data_float[i], iq_data_short_[i],
-                              expected_count);
+      std::memcpy((void*)iq_data_short_[i], (void*)iq_data_temp[i],
+                  expected_count * sizeof(short));
     }
   }
   std::fclose(fp);
-  iq_data_float.Free();
+  iq_data_temp.Free();
 }
 
 void Sender::CreateWorkerThreads(size_t num_workers) {

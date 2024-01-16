@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
   }
 
   std::unique_ptr<Config> cfg = std::make_unique<Config>(conf_file.c_str());
-  cfg->GenData();
+  cfg->GenPilots();
   std::unique_ptr<RadioSetCalibrate> calib =
       std::make_unique<RadioSetCalibrate>(cfg.get(), calibration_type);
   if (calibration_type == "digital") {

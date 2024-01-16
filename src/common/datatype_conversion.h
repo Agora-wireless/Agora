@@ -324,6 +324,33 @@ static inline void ConvertFloatTo12bitIq(const float* in_buf, uint8_t* out_buf,
   }
 }
 
+static inline void ConvertShortTo12bitIq(const short* in_buf, uint8_t* out_buf,
+                                         size_t n_elems) {
+#if defined(DATATYPE_MEMORY_CHECK)
+  RtAssert((n_elems % 2) == 0,
+           "ConvertShortTo12bitIq n_elems not multiple of 2");
+#endif
+  size_t index_short = 0;
+  for (size_t i = 0; i < n_elems; i = i + 2) {
+    const auto temp_i = static_cast<unsigned short>(in_buf[i]);
+    const auto temp_q = static_cast<unsigned short>(in_buf[i + 1]);
+    // Take the higher 12 bits and ignore the lower 4 bits
+    out_buf[index_short] = (uint8_t)(temp_i >> 4);
+    out_buf[index_short + 1] =
+        ((uint8_t)(temp_i >> 12)) | ((uint8_t)(temp_q & 0xf0));
+    out_buf[index_short + 2] = (uint8_t)(temp_q >> 8);
+    if (kDebug12BitIQ) {
+      std::cout << "i: " << i << " " << std::bitset<16>(temp_i) << " "
+                << std::bitset<16>(temp_q) << " => "
+                << std::bitset<8>(out_buf[index_short]) << " "
+                << std::bitset<8>(out_buf[index_short + 1]) << " "
+                << std::bitset<8>(out_buf[index_short + 2]) << std::endl;
+      std::printf("Original: %d+%di \n", in_buf[i], in_buf[i + 1]);
+    }
+    index_short += 3;
+  }
+}
+
 #ifdef __AVX512F__
 static inline void SimdConvert16bitIqToFloat(__m256i val, float* out_buf,
                                              __m512 magic, __m512i magic_i) {

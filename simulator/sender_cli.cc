@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
 
   {
     auto cfg = std::make_unique<Config>(filename.c_str());
-    cfg->GenData();
+    cfg->LoadTestVectors();
     {
       auto sender = std::make_unique<Sender>(
           cfg.get(), FLAGS_num_threads, FLAGS_core_offset, FLAGS_frame_duration,

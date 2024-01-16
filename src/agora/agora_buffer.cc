@@ -14,9 +14,9 @@ AgoraBuffer::AgoraBuffer(Config* const cfg)
                       cfg->BsAntNum() * cfg->SpatialStreamsNum()),
       dl_beam_matrix_(kFrameWnd, cfg->OfdmDataNum(),
                       cfg->SpatialStreamsNum() * cfg->BsAntNum()),
-      demod_buffer_(kFrameWnd, cfg->Frame().NumULSyms(),
+      demod_buffer_(kFrameWnd, cfg->Frame().NumUlDataSyms(),
                     cfg->SpatialStreamsNum(), kMaxModType * cfg->OfdmDataNum()),
-      decoded_buffer_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),
+      decoded_buffer_(kFrameWnd, cfg->Frame().NumUlDataSyms(), cfg->UeAntNum(),
                       cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
                           Roundup<64>(cfg->NumBytesPerCb(Direction::kUplink))) {
   AllocateTables();
@@ -63,6 +63,8 @@ void AgoraBuffer::AllocateTables() {
   if (config_->Frame().NumDLSyms() > 0) {
     const size_t task_buffer_symbol_num =
         kFrameWnd * config_->Frame().NumDLSyms();
+    const size_t task_buffer_data_symbol_num =
+        kFrameWnd * config_->Frame().NumDlDataSyms();
 
     size_t dl_bits_buffer_size =
         kFrameWnd * config_->MacBytesNumPerframe(Direction::kDownlink);
@@ -103,7 +105,7 @@ void AgoraBuffer::AllocateTables() {
       }
     }
     dl_mod_bits_buffer_.Calloc(
-        task_buffer_symbol_num,
+        task_buffer_data_symbol_num,
         Roundup<64>(config_->GetOFDMDataNum()) * config_->SpatialStreamsNum(),
         Agora_memory::Alignment_t::kAlign64);
   }

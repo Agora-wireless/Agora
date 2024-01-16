@@ -55,7 +55,7 @@ int main(int argc, char* argv[]) {
   int ret = EXIT_FAILURE;
   {
     auto cfg = std::make_unique<Config>(filename.c_str());
-    cfg->GenData();
+    cfg->LoadTestVectors();
 
     // Generate pattern file for testing
     if (data_filename.empty()) {
