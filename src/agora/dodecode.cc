@@ -39,8 +39,7 @@ EventData DoDecode::Launch(size_t tag) {
   const size_t symbol_idx_ul = cfg_->Frame().GetULSymbolIdx(symbol_id);
   const size_t symbol_offset =
       cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
-  size_t cur_cb_id, sched_ue_id;
-  const size_t ue_id = mac_sched_->ScheduledUeIndex(frame_id, 0, sched_ue_id);
+  size_t cur_cb_id, sched_ue_id, ue_id;
   const size_t frame_slot = (frame_id % kFrameWnd);
   const size_t num_bytes_per_cb = cfg_->NumBytesPerCb(Direction::kUplink);
 
@@ -71,12 +70,13 @@ EventData DoDecode::Launch(size_t tag) {
   if (cfg_->SlotScheduling() == false) {
     cur_cb_id = (cb_id % ldpc_config.NumBlocksInSymbol());
     sched_ue_id = (cb_id / ldpc_config.NumBlocksInSymbol());
+    ue_id = mac_sched_->ScheduledUeIndex(frame_id, 0, sched_ue_id);
 
     if (kDebugPrintInTask == true) {
       std::printf(
        "In doDecode thread %d: frame: %zu, symbol: %zu, code block: "
-        "%zu, ue: %zu offset %zu\n",
-        tid_, frame_id, symbol_id, cur_cb_id, ue_id, symbol_offset);
+        "%zu, sched ue: %zu, ue: %zu, offset %zu\n",
+        tid_, frame_id, symbol_id, cur_cb_id, sched_ue_id, ue_id, symbol_offset);
     }
 
     int8_t* llr_buffer_ptr =
@@ -100,14 +100,15 @@ EventData DoDecode::Launch(size_t tag) {
   }
   else {
     size_t NumUlScPerCB = this->cfg_->NumPrbPerCb(Direction::kUplink) * kNumScPerPRB;
-    sched_ue_id = cb_id / this->cfg_->NumCbPerSlot(Direction::kUplink);
     cur_cb_id = cb_id % cfg_->NumCbPerSlot(Direction::kUplink);
+    sched_ue_id = cb_id / this->cfg_->NumCbPerSlot(Direction::kUplink);
+    ue_id = mac_sched_->ScheduledUeIndex(frame_id, 0, sched_ue_id);
 
     if (kDebugPrintInTask == true) {
       std::printf(
         "In doDecode thread %d: frame: %zu, symbol: %zu, code block: "
-        "%zu, ue: %zu offset %zu\n",
-        tid_, frame_id, symbol_id, cur_cb_id, ue_id, symbol_offset);
+        "%zu, sched ue: %zu, ue: %zu offset %zu\n",
+        tid_, frame_id, symbol_id, cur_cb_id, sched_ue_id, ue_id, symbol_offset);
     }
 
     std::vector<int8_t> llr_buffer_cb(NumUlScPerCB *

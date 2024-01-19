@@ -74,6 +74,18 @@ EventData DoIFFT::Launch(size_t tag) {
   auto* ifft_out_ptr =
       (kUseOutOfPlaceIFFT || kMemcpyBeforeIFFT) ? ifft_out_ : ifft_in_ptr;
 
+  if (false) {
+    std::stringstream ss;
+    ss << "IFFT_input" << ant_id << "=[";
+    for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
+      ss << std::fixed << std::setw(5) << std::setprecision(3)
+         << dl_ifft_buffer_[in_offset][i].re << "+1j*"
+         << dl_ifft_buffer_[in_offset][i].im << " ";
+    }
+    ss << "];" << std::endl;
+    std::cout << ss.str();
+  }
+
   std::memset(ifft_in_ptr, 0, sizeof(float) * cfg_->OfdmDataStart() * 2);
   std::memset(ifft_in_ptr + (cfg_->OfdmDataStop()) * 2, 0,
               sizeof(float) * cfg_->OfdmDataStart() * 2);
@@ -122,7 +134,7 @@ EventData DoIFFT::Launch(size_t tag) {
     std::printf("%2.3f\n", max_abs);
   }
 
-  if (kPrintIFFTOutput) {
+  if (false) {
     std::stringstream ss;
     ss << "IFFT_output" << ant_id << "=[";
     for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {

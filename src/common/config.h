@@ -598,8 +598,15 @@ class Config {
       ofdm_data_num = this->ofdm_data_num_;
     }
 
-    return &mod_bits_buffer[total_data_symbol_id]
-                           [Roundup<64>(ofdm_data_num) * ue_id + sc_id];
+    if (this->slot_scheduling_ == false) {
+      return &mod_bits_buffer[total_data_symbol_id]
+                             [Roundup<64>(ofdm_data_num) * ue_id + sc_id];
+    } else {
+      size_t NumDlScPerCb = this->NumPrbPerCb(Direction::kDownlink) * kNumScPerPRB;
+      size_t NumDlScPerCbPerSlot = NumDlScPerCb * this->frame_.NumDlDataSyms();
+      return &mod_bits_buffer[frame_id]
+                             [(Roundup<64>(NumDlScPerCbPerSlot) * this->NumCbPerSlot(Direction::kDownlink) * ue_id) + (Roundup<64>(NumDlScPerCbPerSlot) * sc_id)];
+    }
   }
 
   // Returns the number of pilot subcarriers in downlink symbols used for

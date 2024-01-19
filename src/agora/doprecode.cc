@@ -94,8 +94,8 @@ EventData DoPrecode::Launch(size_t tag) {
 
   if (kDebugPrintInTask) {
     std::printf(
-        "In doPrecode thread %d: frame %zu, symbol %zu, subcarrier %zu\n", tid_,
-        frame_id, symbol_id, base_sc_id);
+        "In doPrecode thread %d: frame %zu, symbol %zu, subcarrier %zu, symbol_idx_dl %zu, total_data_symbol_idx %zu\n", tid_,
+        frame_id, symbol_id, base_sc_id, symbol_idx_dl, total_data_symbol_idx);
   }
 
   size_t max_sc_ite =
@@ -183,6 +183,10 @@ void DoPrecode::LoadInputData(size_t symbol_idx_dl,
                       Roundup<64>(cfg_->GetOFDMDataNum()) * sp_id];
     data_ptr[sp_id] = ModSingleUint8((uint8_t)(*raw_data_ptr),
                                      cfg_->ModTable(Direction::kDownlink));
+
+    // std::printf(
+    //     "In doPrecode: sc_id: %zu, sc_id_in_block: %zu, raw_data_ptr: %d, data_ptr: %.3f+%.3fi\n",
+    //     sc_id, sc_id_in_block, (uint8_t)(*raw_data_ptr), data_ptr[sp_id].re, data_ptr[sp_id].im);
   }
 }
 

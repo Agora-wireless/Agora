@@ -967,9 +967,16 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
   uint16_t base_graph = ul_mcs.value("base_graph", 1);
   bool early_term = ul_mcs.value("earlyTermination", true);
   int16_t max_decoder_iter = ul_mcs.value("decoderIter", 5);
+  size_t zc;
 
-  size_t zc = SelectZc(base_graph, ul_code_rate_, ul_mod_order_bits_,
-                       ofdm_data_num_, kCbPerSymbol, "uplink");
+  if (slot_scheduling_ == false) {
+    zc = SelectZc(base_graph, ul_code_rate_, ul_mod_order_bits_,
+                  ofdm_data_num_, kCbPerSymbol, "uplink");
+  } else {
+    zc = SelectZc(base_graph, ul_code_rate_, ul_mod_order_bits_,
+                  (ul_num_prb_per_cb_ * kNumScPerPRB * kMaxNumDataSymbPerSlot),
+                  kCbPerSymbol, "uplink");
+  }
 
   // Always positive since ul_code_rate is smaller than 1024
   size_t num_rows =
@@ -982,8 +989,14 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
   ul_ldpc_config_ = LDPCconfig(base_graph, zc, max_decoder_iter, early_term,
                                num_cb_len, num_cb_codew_len, num_rows, 0);
 
-  ul_ldpc_config_.NumBlocksInSymbol((ofdm_data_num_ * ul_mod_order_bits_) /
-                                    ul_ldpc_config_.NumCbCodewLen());
+  if (slot_scheduling_ == false) {
+    ul_ldpc_config_.NumBlocksInSymbol((ofdm_data_num_ * ul_mod_order_bits_) /
+                                       ul_ldpc_config_.NumCbCodewLen());
+  } else {
+    ul_ldpc_config_.NumBlocksInSymbol((ul_num_prb_per_cb_ * kNumScPerPRB *
+                                       kMaxNumDataSymbPerSlot * ul_mod_order_bits_) /
+                                       ul_ldpc_config_.NumCbCodewLen());
+  }
   RtAssert(
       (frame_.NumULSyms() == 0) || (ul_ldpc_config_.NumBlocksInSymbol() > 0),
       "Uplink LDPC expansion factor is too large for number of OFDM data "
@@ -1019,9 +1032,16 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
   uint16_t base_graph = dl_mcs.value("base_graph", 1);
   bool early_term = dl_mcs.value("earlyTermination", true);
   int16_t max_decoder_iter = dl_mcs.value("decoderIter", 5);
+  size_t zc;
 
-  size_t zc = SelectZc(base_graph, dl_code_rate_, dl_mod_order_bits_,
-                       GetOFDMDataNum(), kCbPerSymbol, "downlink");
+if (slot_scheduling_ == false) {
+  zc = SelectZc(base_graph, dl_code_rate_, dl_mod_order_bits_,
+                GetOFDMDataNum(), kCbPerSymbol, "downlink");
+} else {
+  zc = SelectZc(base_graph, dl_code_rate_, dl_mod_order_bits_,
+                (dl_num_prb_per_cb_ * kNumScPerPRB * kMaxNumDataSymbPerSlot),
+                kCbPerSymbol, "downlink");
+}
 
   // Always positive since dl_code_rate is smaller than 1024
   size_t num_rows =
@@ -1034,8 +1054,14 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
   dl_ldpc_config_ = LDPCconfig(base_graph, zc, max_decoder_iter, early_term,
                                num_cb_len, num_cb_codew_len, num_rows, 0);
 
-  dl_ldpc_config_.NumBlocksInSymbol((GetOFDMDataNum() * dl_mod_order_bits_) /
-                                    dl_ldpc_config_.NumCbCodewLen());
+  if (slot_scheduling_ == false) {
+    dl_ldpc_config_.NumBlocksInSymbol((GetOFDMDataNum() * dl_mod_order_bits_) /
+                                       dl_ldpc_config_.NumCbCodewLen());
+  } else {
+    dl_ldpc_config_.NumBlocksInSymbol((dl_num_prb_per_cb_ * kNumScPerPRB *
++                                      kMaxNumDataSymbPerSlot * dl_mod_order_bits_) /
+                                       dl_ldpc_config_.NumCbCodewLen());
+  }
   RtAssert(
       this->frame_.NumDLSyms() == 0 || dl_ldpc_config_.NumBlocksInSymbol() > 0,
       "Downlink LDPC expansion factor is too large for number of OFDM data "
@@ -1241,10 +1267,17 @@ void Config::GenData() {
   const size_t dl_num_bytes_per_ue_pad =
       Roundup<64>(this->dl_num_bytes_per_cb_) *
       this->dl_ldpc_config_.NumBlocksInSymbol();
-  dl_bits_.Calloc(this->frame_.NumDLSyms(),
-                  dl_num_bytes_per_ue_pad * this->ue_ant_num_,
-                  Agora_memory::Alignment_t::kAlign64);
-  dl_iq_f_.Calloc(this->frame_.NumDLSyms(), ofdm_data_num_ * ue_ant_num_,
+  if (slot_scheduling_ == false) {
+    dl_bits_.Calloc(this->frame_.NumDLSyms(),
+                    dl_num_bytes_per_ue_pad * this->ue_ant_num_,
+                    Agora_memory::Alignment_t::kAlign64);
+  } else {
+    dl_bits_.Calloc(this->ue_ant_num_,
+                    dl_num_bytes_per_ue_pad * dl_num_cb_per_slot_,
+                    Agora_memory::Alignment_t::kAlign64);
+  }
+  dl_iq_f_.Calloc(this->frame_.NumDLSyms(),
+                  ofdm_data_num_ * this->ue_ant_num_,
                   Agora_memory::Alignment_t::kAlign64);
   dl_iq_t_.Calloc(this->frame_.NumDLSyms(),
                   this->samps_per_symbol_ * this->ue_ant_num_,
@@ -1286,7 +1319,7 @@ void Config::GenData() {
     const std::string ul_data_file =
         kUlDataFilePrefix + std::to_string(this->ofdm_ca_num_) + "_ant" +
         std::to_string(this->ue_ant_total_) + ".bin";
-    AGORA_LOG_SYMBOL("Config: Reading raw ul data from %s\n",
+    AGORA_LOG_INFO("Config: Reading raw ul data from %s\n",
                      ul_data_file.c_str());
     FILE* fd = std::fopen(ul_data_file.c_str(), "rb");
     if (fd == nullptr) {
@@ -1336,7 +1369,7 @@ void Config::GenData() {
             " *** Error: failed to seek propertly (pre) into %s file\n",
             ul_data_file.c_str());
           RtAssert(false,
-                 "Failed to seek propertly into " + ul_data_file + "file\n");
+            "Failed to seek propertly into " + ul_data_file + "file\n");
         }
         for (size_t j = 0; j < ul_num_cb_per_slot_; j++) {
           size_t r = std::fread(&this->ul_bits_[i][j * ul_num_bytes_per_ue_pad],
@@ -1357,7 +1390,7 @@ void Config::GenData() {
             " *** Error: failed to seek propertly (post) into %s file\n",
             ul_data_file.c_str());
           RtAssert(false,
-                   "Failed to seek propertly into " + ul_data_file + "file\n");
+            "Failed to seek propertly into " + ul_data_file + "file\n");
         }
       }
     }
@@ -1366,11 +1399,11 @@ void Config::GenData() {
 
   if (this->frame_.NumDlDataSyms() > 0) {
     const std::string dl_data_file =
-        kDlDataFilePrefix + std::to_string(this->ofdm_ca_num_) + "_ant" +
-        std::to_string(this->ue_ant_total_) + ".bin";
+      kDlDataFilePrefix + std::to_string(this->ofdm_ca_num_) + "_ant" +
+      std::to_string(this->ue_ant_total_) + ".bin";
 
-    AGORA_LOG_SYMBOL("Config: Reading raw dl data from %s\n",
-                     dl_data_file.c_str());
+    AGORA_LOG_INFO("Config: Reading raw dl data from %s\n",
+                   dl_data_file.c_str());
     FILE* fd = std::fopen(dl_data_file.c_str(), "rb");
     if (fd == nullptr) {
       AGORA_LOG_ERROR("Failed to open antenna file %s. Error %s.\n",
@@ -1378,16 +1411,31 @@ void Config::GenData() {
       throw std::runtime_error("Config: Failed to open dl antenna file");
     }
 
-    for (size_t i = this->frame_.ClientDlPilotSymbols();
-         i < this->frame_.NumDLSyms(); i++) {
-      for (size_t j = 0; j < this->ue_ant_num_; j++) {
-        size_t r = std::fread(this->dl_bits_[i] + j * dl_num_bytes_per_ue_pad,
-                              sizeof(int8_t), dl_data_bytes_num_persymbol_, fd);
-        if (r < dl_data_bytes_num_persymbol_) {
-          AGORA_LOG_ERROR(
+    if (slot_scheduling_ == false) {
+      for (size_t i = this->frame_.ClientDlPilotSymbols();
+        i < this->frame_.NumDLSyms(); i++) {
+        for (size_t j = 0; j < this->ue_ant_num_; j++) {
+          size_t r = std::fread(this->dl_bits_[i] + j * dl_num_bytes_per_ue_pad,
+                                sizeof(int8_t), dl_data_bytes_num_persymbol_, fd);
+          if (r < dl_data_bytes_num_persymbol_) {
+            AGORA_LOG_ERROR(
               "***Error: Downlink bad read from file %s (batch %zu : %zu) "
               "\n",
               dl_data_file.c_str(), i, j);
+          }
+        }
+      }
+    } else {
+      for (size_t i = 0; i < this->ue_ant_num_; i++) {
+        for (size_t j = 0; j < dl_num_cb_per_slot_; j++) {
+          size_t r = std::fread(&this->dl_bits_[i][j * dl_num_bytes_per_ue_pad],
+                                sizeof(int8_t), dl_data_bytes_num_persymbol_, fd);
+          if (r < dl_data_bytes_num_persymbol_) {
+            AGORA_LOG_ERROR(
+              " *** Error: Downlink bad read from file %s (batch %zu : %zu) "
+              "%zu : %zu\n",
+              dl_data_file.c_str(), i, j, r, dl_data_bytes_num_persymbol_);
+          }
         }
       }
     }
@@ -1396,61 +1444,114 @@ void Config::GenData() {
 #endif
 
   auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
-
-  const size_t ul_encoded_bytes_per_block =
-      BitsToBytes(this->ul_ldpc_config_.NumCbCodewLen());
-  const size_t ul_num_blocks_per_symbol =
-      this->ul_ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
-
-  SimdAlignByteVector ul_scramble_buffer(
-      ul_num_bytes_per_cb_ + ul_num_padding_bytes_per_cb_, std::byte(0));
-
   int8_t* ldpc_input = nullptr;
-  // Encode uplink bits
   Table<int8_t> ul_encoded_bits;
-  ul_encoded_bits.Malloc(this->frame_.NumULSyms() * ul_num_blocks_per_symbol,
-                         ul_encoded_bytes_per_block,
-                         Agora_memory::Alignment_t::kAlign64);
-  ul_mod_bits_.Calloc(this->frame_.NumULSyms(),
-                      Roundup<64>(this->ofdm_data_num_) * this->ue_ant_num_,
-                      Agora_memory::Alignment_t::kAlign32);
   auto* ul_temp_parity_buffer = new int8_t[LdpcEncodingParityBufSize(
-      this->ul_ldpc_config_.BaseGraph(),
-      this->ul_ldpc_config_.ExpansionFactor())];
+        this->ul_ldpc_config_.BaseGraph(),
+        this->ul_ldpc_config_.ExpansionFactor())];
 
-  for (size_t i = 0; i < frame_.NumULSyms(); i++) {
-    for (size_t j = 0; j < ue_ant_num_; j++) {
-      for (size_t k = 0; k < ul_ldpc_config_.NumBlocksInSymbol(); k++) {
-        int8_t* coded_bits_ptr =
-            ul_encoded_bits[i * ul_num_blocks_per_symbol +
-                            j * ul_ldpc_config_.NumBlocksInSymbol() + k];
+  // Encode uplink bits
+  if (slot_scheduling_ == false) {
+    const size_t ul_encoded_bytes_per_block =
+          BitsToBytes(this->ul_ldpc_config_.NumCbCodewLen());
+    const size_t ul_num_blocks_per_symbol =
+          this->ul_ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
 
-        if (scramble_enabled_) {
-          scrambler->Scramble(
+    SimdAlignByteVector ul_scramble_buffer(
+          ul_num_bytes_per_cb_ + ul_num_padding_bytes_per_cb_, std::byte(0));
+
+    ul_encoded_bits.Malloc(this->frame_.NumULSyms() * ul_num_blocks_per_symbol,
+                           ul_encoded_bytes_per_block,
+                           Agora_memory::Alignment_t::kAlign64);
+    ul_mod_bits_.Calloc(this->frame_.NumULSyms(),
+                        Roundup<64>(this->ofdm_data_num_) * this->ue_ant_num_,
+                        Agora_memory::Alignment_t::kAlign32);
+
+    for (size_t i = 0; i < frame_.NumULSyms(); i++) {
+      for (size_t j = 0; j < ue_ant_num_; j++) {
+        for (size_t k = 0; k < ul_ldpc_config_.NumBlocksInSymbol(); k++) {
+          int8_t* coded_bits_ptr =
+                  ul_encoded_bits[i * ul_num_blocks_per_symbol +
+                                  j * ul_ldpc_config_.NumBlocksInSymbol() + k];
+
+          if (scramble_enabled_) {
+            scrambler->Scramble(
               ul_scramble_buffer.data(),
               GetInfoBits(ul_bits_, Direction::kUplink, i, j, k),
               ul_num_bytes_per_cb_);
-          ldpc_input = reinterpret_cast<int8_t*>(ul_scramble_buffer.data());
-        } else {
-          ldpc_input = GetInfoBits(ul_bits_, Direction::kUplink, i, j, k);
+            ldpc_input = reinterpret_cast<int8_t*>(ul_scramble_buffer.data());
+          } else {
+            ldpc_input = GetInfoBits(ul_bits_, Direction::kUplink, i, j, k);
+          }
+          //Clean padding
+          if (ul_num_bytes_per_cb_ > 0) {
+            std::memset(&ldpc_input[ul_num_bytes_per_cb_], 0u,
+                        ul_num_padding_bytes_per_cb_);
+          }
+          LdpcEncodeHelper(ul_ldpc_config_.BaseGraph(),
+                           ul_ldpc_config_.ExpansionFactor(),
+                           ul_ldpc_config_.NumRows(), coded_bits_ptr,
+                           ul_temp_parity_buffer, ldpc_input);
+          int8_t* mod_input_ptr =
+                  GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, j, k);
+          AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
+                          reinterpret_cast<uint8_t*>(mod_input_ptr),
+                          ul_encoded_bytes_per_block, ul_mod_order_bits_);
         }
-        //Clean padding
-        if (ul_num_bytes_per_cb_ > 0) {
-          std::memset(&ldpc_input[ul_num_bytes_per_cb_], 0u,
-                      ul_num_padding_bytes_per_cb_);
+      }
+    }
+  } else {
+    const size_t ul_encoded_bytes_per_block =
+          BitsToBytes(this->ul_ldpc_config_.NumCbCodewLen());
+
+    SimdAlignByteVector ul_scramble_buffer(
+          ul_num_bytes_per_cb_ + ul_num_padding_bytes_per_cb_, std::byte(0));
+
+    ul_encoded_bits.Malloc(this->ue_ant_num_,
+                           ul_encoded_bytes_per_block * ul_num_cb_per_slot_,
+                           Agora_memory::Alignment_t::kAlign64);
+    size_t NumUlScPerCb = this->NumPrbPerCb(Direction::kUplink) * kNumScPerPRB;
+    size_t NumUlScPerCbPerSlot = NumUlScPerCb * kMaxNumDataSymbPerSlot;                           
+    ul_mod_bits_.Calloc(kFrameWnd,
+                        Roundup<64>(NumUlScPerCbPerSlot) *
+                        ul_num_cb_per_slot_ * this->ue_ant_num_,
+                        Agora_memory::Alignment_t::kAlign32);
+
+    if (this->frame_.NumUlDataSyms() > 0) {
+      for (size_t i = 0; i < this->ue_ant_num_; i++) {
+        for (size_t j = 0; j < ul_num_cb_per_slot_; j++) {
+          // AGORA_LOG_INFO("DEBUG: I AM HERE 00 i %zu j %zu\n", i, j);
+          int8_t* coded_bits_ptr =
+            &ul_encoded_bits[i][ul_encoded_bytes_per_block * j];
+
+          if (scramble_enabled_) {
+            scrambler->Scramble(
+              ul_scramble_buffer.data(),
+              GetInfoBits(ul_bits_, Direction::kUplink, 0, i, j),
+              ul_num_bytes_per_cb_);
+            ldpc_input = reinterpret_cast<int8_t*>(ul_scramble_buffer.data());
+          } else {
+            ldpc_input = GetInfoBits(ul_bits_, Direction::kUplink, 0, i, j);
+          }
+          //Clean padding
+          if (ul_num_bytes_per_cb_ > 0) {
+            std::memset(&ldpc_input[ul_num_bytes_per_cb_], 0u,
+                        ul_num_padding_bytes_per_cb_);
+          }
+          LdpcEncodeHelper(ul_ldpc_config_.BaseGraph(),
+                           ul_ldpc_config_.ExpansionFactor(),
+                           ul_ldpc_config_.NumRows(), coded_bits_ptr,
+                           ul_temp_parity_buffer, ldpc_input);
+          int8_t* mod_input_ptr =
+            GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, 0, i, j);
+          AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
+                          reinterpret_cast<uint8_t*>(mod_input_ptr),
+                          ul_encoded_bytes_per_block, ul_mod_order_bits_);
         }
-        LdpcEncodeHelper(ul_ldpc_config_.BaseGraph(),
-                         ul_ldpc_config_.ExpansionFactor(),
-                         ul_ldpc_config_.NumRows(), coded_bits_ptr,
-                         ul_temp_parity_buffer, ldpc_input);
-        int8_t* mod_input_ptr =
-            GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, j, k);
-        AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
-                        reinterpret_cast<uint8_t*>(mod_input_ptr),
-                        ul_encoded_bytes_per_block, ul_mod_order_bits_);
       }
     }
   }
+  // AGORA_LOG_INFO("DEBUG: I AM HERE 0\n");
 
   // Generate freq-domain uplink symbols
   Table<complex_float> ul_iq_ifft;
@@ -1478,33 +1579,59 @@ void Config::GenData() {
       vec_fp_tx.push_back(fp_tx_f);
     }
   }
-  for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
-    for (size_t u = 0; u < this->ue_ant_num_; u++) {
-      const size_t q = u * ofdm_data_num_;
+  if (slot_scheduling_ == false) {
+    for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
+      for (size_t u = 0; u < this->ue_ant_num_; u++) {
+        const size_t q = u * ofdm_data_num_;
 
-      for (size_t j = 0; j < ofdm_data_num_; j++) {
-        const size_t sc = j + ofdm_data_start_;
-        if (i >= this->frame_.ClientUlPilotSymbols()) {
-          int8_t* mod_input_ptr =
-              GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, u, j);
-          ul_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, ul_mod_table_);
-        } else {
-          ul_iq_f_[i][q + j] = ue_specific_pilot_[u][j];
+        for (size_t j = 0; j < ofdm_data_num_; j++) {
+          const size_t sc = j + ofdm_data_start_;
+          if (i >= this->frame_.ClientUlPilotSymbols()) {
+            int8_t* mod_input_ptr =
+                    GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, u, j);
+            ul_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, ul_mod_table_);
+          } else {
+            ul_iq_f_[i][q + j] = ue_specific_pilot_[u][j];
+          }
+          // FFT Shift
+          const size_t k = sc >= ofdm_ca_num_ / 2 ? sc - ofdm_ca_num_ / 2
+                                                  : sc + ofdm_ca_num_ / 2;
+          ul_iq_ifft[i][u * ofdm_ca_num_ + k] = ul_iq_f_[i][q + j];
         }
-        // FFT Shift
-        const size_t k = sc >= ofdm_ca_num_ / 2 ? sc - ofdm_ca_num_ / 2
-                                                : sc + ofdm_ca_num_ / 2;
-        ul_iq_ifft[i][u * ofdm_ca_num_ + k] = ul_iq_f_[i][q + j];
-      }
-      if (kOutputUlScData) {
-        const auto write_status =
+        if (kOutputUlScData) {
+          const auto write_status =
             std::fwrite(&ul_iq_ifft[i][u * ofdm_ca_num_], sizeof(complex_float),
-                        ofdm_ca_num_, vec_fp_tx.at(u / num_ue_channels_));
-        if (write_status != ofdm_ca_num_) {
-          AGORA_LOG_ERROR("Config: Failed to write ul sc data file\n");
+                         ofdm_ca_num_, vec_fp_tx.at(u / num_ue_channels_));
+          if (write_status != ofdm_ca_num_) {
+            AGORA_LOG_ERROR("Config: Failed to write ul sc data file\n");
+          }
+        }
+        CommsLib::IFFT(&ul_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
+      }
+    }
+  } else {
+    size_t NumUlScPerCb = ul_num_prb_per_cb_ * kNumScPerPRB;
+    size_t NumUlScPerCbPerSlot = NumUlScPerCb * kMaxNumDataSymbPerSlot;
+    if (this->frame_.NumUlDataSyms() > 0) {
+      for (size_t ue = 0; ue < this->ue_ant_num_; ue++) {
+        size_t OfdmDataOffset = ofdm_data_start_;
+        for (size_t ue_cb = 0; ue_cb < ul_num_cb_per_slot_; ue_cb++) {
+          // AGORA_LOG_INFO("DEBUG: cb: %zu, ue: %zu, ue_cb: %zu, OfdmDataOffset: %zu\n", (ue * ul_num_cb_per_slot_ + ue_cb), ue, ue_cb, OfdmDataOffset);
+          size_t CbDataIndex = 0;
+          for (size_t symb = 0; symb < this->frame_.NumUlDataSyms(); symb++) {
+            // AGORA_LOG_INFO("DEBUG: cb: %zu, ue: %zu, ue_cb: %zu, symb: %zu, OfdmDataOffset: %zu, CbDataIndex: %zu\n", (ue * ul_num_cb_per_slot_ + ue_cb), ue, ue_cb, symb, OfdmDataOffset, CbDataIndex);
+            for (size_t OfdmDataIndex = 0; OfdmDataIndex < NumUlScPerCb; OfdmDataIndex++) {
+              // AGORA_LOG_INFO("DEBUG: cb: %zu, ue: %zu, ue_cb: %zu, symb: %zu, OfdmDataOffset: %zu, CbDataIndex: %zu\n", (ue * ul_num_cb_per_slot_ + ue_cb), ue, ue_cb, symb, OfdmDataOffset, CbDataIndex);
+              int8_t* mod_input_ptr =
+                GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, symb, ue,
+                              ((NumUlScPerCbPerSlot * ue_cb) + OfdmDataIndex++));
+              ul_iq_f_[symb][ue * ofdm_data_num_ + OfdmDataOffset + CbDataIndex] = ModSingleUint8(*mod_input_ptr, ul_mod_table_);
+              ul_iq_ifft[symb][ue * ofdm_ca_num_ + OfdmDataOffset + CbDataIndex] = ul_iq_f_[symb][ue * ofdm_data_num_ + OfdmDataOffset + CbDataIndex];
+            }
+          }
+          OfdmDataOffset += NumUlScPerCb;
         }
       }
-      CommsLib::IFFT(&ul_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
     }
   }
   if (kOutputUlScData) {
@@ -1515,87 +1642,170 @@ void Config::GenData() {
       }
     }
   }
-
-  // Encode downlink bits
-  const size_t dl_encoded_bytes_per_block =
-      BitsToBytes(this->dl_ldpc_config_.NumCbCodewLen());
-  const size_t dl_num_blocks_per_symbol =
-      this->dl_ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
-
-  SimdAlignByteVector dl_scramble_buffer(
-      dl_num_bytes_per_cb_ + dl_num_padding_bytes_per_cb_, std::byte(0));
+  // AGORA_LOG_INFO("DEBUG: I AM HERE 1\n");
 
   Table<int8_t> dl_encoded_bits;
-  dl_encoded_bits.Malloc(this->frame_.NumDLSyms() * dl_num_blocks_per_symbol,
-                         dl_encoded_bytes_per_block,
-                         Agora_memory::Alignment_t::kAlign64);
-  dl_mod_bits_.Calloc(this->frame_.NumDLSyms(),
-                      Roundup<64>(this->GetOFDMDataNum()) * ue_ant_num_,
-                      Agora_memory::Alignment_t::kAlign32);
   auto* dl_temp_parity_buffer = new int8_t[LdpcEncodingParityBufSize(
-      this->dl_ldpc_config_.BaseGraph(),
-      this->dl_ldpc_config_.ExpansionFactor())];
+    this->dl_ldpc_config_.BaseGraph(),
+    this->dl_ldpc_config_.ExpansionFactor())];
 
-  for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
-    for (size_t j = 0; j < this->ue_ant_num_; j++) {
-      for (size_t k = 0; k < dl_ldpc_config_.NumBlocksInSymbol(); k++) {
-        int8_t* coded_bits_ptr =
-            dl_encoded_bits[i * dl_num_blocks_per_symbol +
-                            j * dl_ldpc_config_.NumBlocksInSymbol() + k];
+  // Encode downlink bits
+  if (slot_scheduling_ == false) {
+    const size_t dl_encoded_bytes_per_block =
+      BitsToBytes(this->dl_ldpc_config_.NumCbCodewLen());
+    const size_t dl_num_blocks_per_symbol =
+      this->dl_ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
 
-        if (scramble_enabled_) {
-          scrambler->Scramble(
+    SimdAlignByteVector dl_scramble_buffer(
+      dl_num_bytes_per_cb_ + dl_num_padding_bytes_per_cb_, std::byte(0));
+
+    Table<int8_t> dl_encoded_bits;
+    dl_encoded_bits.Malloc(this->frame_.NumDLSyms() * dl_num_blocks_per_symbol,
+                           dl_encoded_bytes_per_block,
+                           Agora_memory::Alignment_t::kAlign64);
+    dl_mod_bits_.Calloc(this->frame_.NumDLSyms(),
+                        Roundup<64>(this->GetOFDMDataNum()) * ue_ant_num_,
+                        Agora_memory::Alignment_t::kAlign32);
+
+    for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
+      for (size_t j = 0; j < this->ue_ant_num_; j++) {
+        for (size_t k = 0; k < dl_ldpc_config_.NumBlocksInSymbol(); k++) {
+          int8_t* coded_bits_ptr =
+          dl_encoded_bits[i * dl_num_blocks_per_symbol +
+                          j * dl_ldpc_config_.NumBlocksInSymbol() + k];
+
+          if (scramble_enabled_) {
+            scrambler->Scramble(
               dl_scramble_buffer.data(),
               GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k),
               dl_num_bytes_per_cb_);
-          ldpc_input = reinterpret_cast<int8_t*>(dl_scramble_buffer.data());
-        } else {
-          ldpc_input = GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k);
-        }
-        if (dl_num_padding_bytes_per_cb_ > 0) {
-          std::memset(&ldpc_input[dl_num_bytes_per_cb_], 0u,
-                      dl_num_padding_bytes_per_cb_);
-        }
+            ldpc_input = reinterpret_cast<int8_t*>(dl_scramble_buffer.data());
+          } else {
+            ldpc_input = GetInfoBits(dl_bits_, Direction::kDownlink, i, j, k);
+          }
+          if (dl_num_padding_bytes_per_cb_ > 0) {
+            std::memset(&ldpc_input[dl_num_bytes_per_cb_], 0u,
+                        dl_num_padding_bytes_per_cb_);
+          }
 
-        LdpcEncodeHelper(dl_ldpc_config_.BaseGraph(),
-                         dl_ldpc_config_.ExpansionFactor(),
-                         dl_ldpc_config_.NumRows(), coded_bits_ptr,
-                         dl_temp_parity_buffer, ldpc_input);
-        int8_t* mod_input_ptr =
+          LdpcEncodeHelper(dl_ldpc_config_.BaseGraph(),
+                           dl_ldpc_config_.ExpansionFactor(),
+                           dl_ldpc_config_.NumRows(), coded_bits_ptr,
+                           dl_temp_parity_buffer, ldpc_input);
+          int8_t* mod_input_ptr =
             GetModBitsBuf(dl_mod_bits_, Direction::kDownlink, 0, i, j, k);
-        AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
-                        reinterpret_cast<uint8_t*>(mod_input_ptr),
-                        dl_encoded_bytes_per_block, dl_mod_order_bits_);
+          AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
+                          reinterpret_cast<uint8_t*>(mod_input_ptr),
+                          dl_encoded_bytes_per_block, dl_mod_order_bits_);
+        }
+      }
+    }
+  } else {
+    const size_t dl_encoded_bytes_per_block =
+      BitsToBytes(this->dl_ldpc_config_.NumCbCodewLen());
+
+    SimdAlignByteVector dl_scramble_buffer(
+      dl_num_bytes_per_cb_ + dl_num_padding_bytes_per_cb_, std::byte(0));
+
+    dl_encoded_bits.Malloc(this->ue_ant_num_,
+                           dl_encoded_bytes_per_block * dl_num_cb_per_slot_,
+                           Agora_memory::Alignment_t::kAlign64);
+    size_t NumDlScPerCb = this->NumPrbPerCb(Direction::kDownlink) * kNumScPerPRB;
+    size_t NumDlScPerCbPerSlot = NumDlScPerCb * kMaxNumDataSymbPerSlot;
+    dl_mod_bits_.Calloc(kFrameWnd,
+                        Roundup<64>(NumDlScPerCbPerSlot) *
+                        dl_num_cb_per_slot_ * this->ue_ant_num_,
+                        Agora_memory::Alignment_t::kAlign32);
+
+    if (this->frame_.NumDlDataSyms() > 0) {
+      for (size_t i = 0; i < this->ue_ant_num_; i++) {
+        for (size_t j = 0; j < dl_num_cb_per_slot_; j++) {
+          int8_t* coded_bits_ptr =
+            &dl_encoded_bits[i][dl_encoded_bytes_per_block * j];
+
+          if (scramble_enabled_) {
+            scrambler->Scramble(
+              dl_scramble_buffer.data(),
+              GetInfoBits(dl_bits_, Direction::kDownlink, 0, i, j),
+              dl_num_bytes_per_cb_);
+            ldpc_input = reinterpret_cast<int8_t*>(dl_scramble_buffer.data());
+          } else {
+            ldpc_input = GetInfoBits(dl_bits_, Direction::kDownlink, 0, i, j);
+          }
+          if (dl_num_padding_bytes_per_cb_ > 0) {
+            std::memset(&ldpc_input[dl_num_bytes_per_cb_], 0u,
+                        dl_num_padding_bytes_per_cb_);
+          }
+
+          LdpcEncodeHelper(dl_ldpc_config_.BaseGraph(),
+                           dl_ldpc_config_.ExpansionFactor(),
+                           dl_ldpc_config_.NumRows(), coded_bits_ptr,
+                           dl_temp_parity_buffer, ldpc_input);
+          int8_t* mod_input_ptr =
+            GetModBitsBuf(dl_mod_bits_, Direction::kDownlink, 0, 0, i, j);
+          AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
+                          reinterpret_cast<uint8_t*>(mod_input_ptr),
+                          dl_encoded_bytes_per_block, dl_mod_order_bits_);
+        }
       }
     }
   }
+  // AGORA_LOG_INFO("DEBUG: I AM HERE 2\n");
 
   // Generate freq-domain downlink symbols
   Table<complex_float> dl_iq_ifft;
-  dl_iq_ifft.Calloc(this->frame_.NumDLSyms(), ofdm_ca_num_ * ue_ant_num_,
+  dl_iq_ifft.Calloc(this->frame_.NumDLSyms(),
+                    this->ofdm_ca_num_ * this->ue_ant_num_,
                     Agora_memory::Alignment_t::kAlign64);
-  for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
-    for (size_t u = 0; u < ue_ant_num_; u++) {
-      size_t q = u * ofdm_data_num_;
+  if (slot_scheduling_ == false) {
+    for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
+      for (size_t u = 0; u < ue_ant_num_; u++) {
+        size_t q = u * ofdm_data_num_;
 
-      for (size_t j = 0; j < ofdm_data_num_; j++) {
-        size_t sc = j + ofdm_data_start_;
-        if (IsDataSubcarrier(j) == true) {
-          int8_t* mod_input_ptr =
+        for (size_t j = 0; j < ofdm_data_num_; j++) {
+          size_t sc = j + ofdm_data_start_;
+          if (IsDataSubcarrier(j) == true) {
+            int8_t* mod_input_ptr =
               GetModBitsBuf(dl_mod_bits_, Direction::kDownlink, 0, i, u,
                             this->GetOFDMDataIndex(j));
-          dl_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, dl_mod_table_);
-        } else {
-          dl_iq_f_[i][q + j] = ue_specific_pilot_[u][j];
+            dl_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, dl_mod_table_);
+          } else {
+            dl_iq_f_[i][q + j] = ue_specific_pilot_[u][j];
+          }
+          // FFT Shift
+          const size_t k = sc >= ofdm_ca_num_ / 2 ? sc - ofdm_ca_num_ / 2
+                                                  : sc + ofdm_ca_num_ / 2;
+          dl_iq_ifft[i][u * ofdm_ca_num_ + k] = dl_iq_f_[i][q + j];
         }
-        // FFT Shift
-        const size_t k = sc >= ofdm_ca_num_ / 2 ? sc - ofdm_ca_num_ / 2
-                                                : sc + ofdm_ca_num_ / 2;
-        dl_iq_ifft[i][u * ofdm_ca_num_ + k] = dl_iq_f_[i][q + j];
+        CommsLib::IFFT(&dl_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
       }
-      CommsLib::IFFT(&dl_iq_ifft[i][u * ofdm_ca_num_], ofdm_ca_num_, false);
+    }
+  } else {
+    size_t NumDlScPerCb = dl_num_prb_per_cb_ * kNumScPerPRB;
+    size_t NumDlScPerCbPerSlot = NumDlScPerCb * kMaxNumDataSymbPerSlot;
+    if (this->frame_.NumDlDataSyms() > 0) {
+      for (size_t ue = 0; ue < this->ue_ant_num_; ue++) {
+        size_t OfdmDataOffset = ofdm_data_start_;
+        for (size_t ue_cb = 0; ue_cb < dl_num_cb_per_slot_; ue_cb++){
+          // AGORA_LOG_INFO("DEBUG: cb: %zu, ue: %zu, ue_cb: %zu, OfdmDataOffset: %zu\n", (ue * dl_num_cb_per_slot_ + ue_cb), ue, ue_cb, OfdmDataOffset);
+          size_t CbDataIndex = 0;
+          for (size_t symb = 0; symb < this->frame_.NumDlDataSyms(); symb++){
+            // AGORA_LOG_INFO("DEBUG: cb: %zu, ue: %zu, ue_cb: %zu, symb: %zu, OfdmDataOffset: %zu, CbDataIndex: %zu\n", (ue * dl_num_cb_per_slot_ + ue_cb), ue, ue_cb, symb, OfdmDataOffset, CbDataIndex);
+            for (size_t OfdmDataIndex = 0; OfdmDataIndex < NumDlScPerCb; OfdmDataIndex++) {
+              // AGORA_LOG_INFO("DEBUG: cb: %zu, ue: %zu, ue_cb: %zu, symb: %zu, OfdmDataOffset: %zu, CbDataIndex: %zu, OfdmDataIndex: %zu\n", (ue * dl_num_cb_per_slot_ + ue_cb), ue, ue_cb, symb, OfdmDataOffset, CbDataIndex, OfdmDataIndex);
+              int8_t* mod_input_ptr =
+                GetModBitsBuf(dl_mod_bits_, Direction::kDownlink, 0, symb, ue,
+                              ((NumDlScPerCbPerSlot * ue_cb) + OfdmDataIndex++));
+              dl_iq_f_[symb][ue * ofdm_data_num_ + OfdmDataOffset + CbDataIndex] = ModSingleUint8(*mod_input_ptr, dl_mod_table_);
+              dl_iq_ifft[symb][ue * ofdm_ca_num_ + OfdmDataOffset + CbDataIndex] = dl_iq_f_[symb][ue * ofdm_data_num_ + OfdmDataOffset + CbDataIndex];
+            }
+          }
+          OfdmDataOffset += NumDlScPerCb;
+        }
+      }
     }
   }
+  // AGORA_LOG_INFO("DEBUG: I AM HERE 3\n");
 
   // Find normalization factor through searching for max value in IFFT results
   float ul_max_mag =

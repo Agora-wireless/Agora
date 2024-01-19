@@ -289,6 +289,9 @@ enum class SubcarrierType { kNull, kDMRS, kPTRS, kData };
 // Number of subcarriers in a PRB
 static constexpr size_t kNumScPerPRB = 12;
 
+// Maximum number of data symbols in a slot
+static constexpr size_t kMaxNumDataSymbPerSlot = 12;
+
 // Maximum number of symbols per frame allowed by Agora
 // Symbol dimension is used for code blocks for now
 // TBD: Update symbol dimension to store code blocks

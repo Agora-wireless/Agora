@@ -57,8 +57,15 @@ EventData DoEncode::Launch(size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t cb_id = gen_tag_t(tag).cb_id_;
-  const size_t cur_cb_id = cb_id % ldpc_config.NumBlocksInSymbol();
-  const size_t sched_ue_id = cb_id / ldpc_config.NumBlocksInSymbol();
+  size_t cur_cb_id, sched_ue_id;
+
+  if (cfg_->SlotScheduling() == false) {
+    cur_cb_id = cb_id % ldpc_config.NumBlocksInSymbol();
+    sched_ue_id = cb_id / ldpc_config.NumBlocksInSymbol();
+  } else {
+    cur_cb_id = cb_id % this->cfg_->NumCbPerSlot(dir_);
+    sched_ue_id = cb_id / this->cfg_->NumCbPerSlot(dir_);
+  }
 
   size_t start_tsc = GetTime::WorkerRdtsc();
 
@@ -76,13 +83,15 @@ EventData DoEncode::Launch(size_t tag) {
     symbol_idx_data = symbol_idx - cfg_->Frame().ClientUlPilotSymbols();
     ue_id = sched_ue_id;
   }
-
-  if (kDebugPrintInTask) {
+  // for (size_t i = 0; i < cfg_->Frame().NumDLSyms(); i++) {
+  //   std::printf("DEBUG: i: %zu, DL symbols: %zu\n", i, cfg_->Frame().GetDLSymbolIdx(i));
+  // }
+  if (false) {
     std::printf(
         "In doEncode thread %d: frame: %zu, symbol: %zu:%zu:%zu, code block "
-        "%zu, ue_id: %zu\n",
+        "%zu, sched_ue_id: %zu, ue_id: %zu\n",
         tid_, frame_id, symbol_id, symbol_idx, symbol_idx_data, cur_cb_id,
-        ue_id);
+        sched_ue_id, ue_id);
   }
 
   int8_t* tx_data_ptr = nullptr;
@@ -113,6 +122,21 @@ EventData DoEncode::Launch(size_t tag) {
         cfg_->GetInfoBits(raw_data_buffer_, dir_, symbol_idx, ue_id, cur_cb_id);
   }
 
+    if (kPrintRawMacData) {
+      auto* pkt = reinterpret_cast<MacPacketPacked*>(tx_data_ptr);
+      std::printf(
+          "In doEncode [%d] mac packet frame: %d, symbol: %zu:%d, ue_id: %d, "
+          "data length %d, crc %d size %zu:%zu\n",
+          tid_, pkt->Frame(), symbol_idx_data, pkt->Symbol(), pkt->Ue(),
+          pkt->PayloadLength(), pkt->Crc(), cfg_->MacPacketLength(dir_),
+          cfg_->NumBytesPerCb(dir_));
+      std::printf("Data: ");
+      for (size_t i = 0; i < cfg_->MacPayloadMaxLength(dir_); i++) {
+        std::printf(" %02x", (uint8_t)(pkt->Data()[i]));
+      }
+      std::printf("\n");
+    }
+
   int8_t* ldpc_input = tx_data_ptr;
   const size_t num_bytes_per_cb = cfg_->NumBytesPerCb(dir_);
 
@@ -133,8 +157,8 @@ EventData DoEncode::Launch(size_t tag) {
                 << std::to_integer<int>(
                        reinterpret_cast<std::byte*>(ldpc_input)[i]);
     }
-    AGORA_LOG_INFO("ldpc input (%zu %zu %zu): %s\n", frame_id, symbol_idx,
-                   ue_id, dataprint.str().c_str());
+    AGORA_LOG_INFO("ldpc input (%zu %zu %zu): cb: %zu, %s\n", frame_id, symbol_idx,
+                   ue_id, cur_cb_id, dataprint.str().c_str());
   }
 
   LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
@@ -164,11 +188,11 @@ EventData DoEncode::Launch(size_t tag) {
                   BitsToBytes(ldpc_config.NumCbCodewLen()),
                   cfg_->ModOrderBits(dir_));
 
-  if (kPrintEncodedData) {
-    std::printf("Encoded data\n");
-    const size_t num_mod = cfg_->SubcarrierPerCodeBlock(dir_);
-    for (size_t i = 0; i < num_mod; i++) {
-      std::printf("%u ", *(mod_buffer_ptr + i));
+  if (false) {
+    std::printf("Adapted encoded bits\n");
+    std::printf("frame_id: %zu, symbol_idx: %zu, sched_ue_id: %zu, cur_cb_id: %zu\n", frame_id, symbol_idx, sched_ue_id, cur_cb_id);
+    for (size_t i = 0; i < cfg_->OfdmDataNum(); i++) {
+      std::printf("%u ", (uint8_t)mod_buffer_ptr[i]);
     }
     std::printf("\n");
   }

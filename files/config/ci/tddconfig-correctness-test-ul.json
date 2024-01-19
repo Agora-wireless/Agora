@@ -6,8 +6,8 @@
   "ul_num_prb_per_cb": 8,
   "bs_radio_num": 8,
   "ue_radio_num": 8,
-  "ul_mcs" : {
-    "mcs_index" : 17 /*64QAM, 438/1024*/
+  "ul_mcs": {
+    "mcs_index": 17 /*64QAM, 438/1024*/
   },
   "symbol_num_perframe": 14,
   "client_ul_pilot_syms": 0,

@@ -141,6 +141,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     std::vector<std::vector<int8_t>> ul_information(num_ul_codeblocks);
     std::vector<std::vector<int8_t>> ul_encoded_codewords(num_ul_codeblocks);
     size_t ue_id, ue_cb_id, ue_cb_cnt;
+
     for (size_t cb = 0; cb < num_ul_codeblocks; cb++) {
       if (cfg_->SlotScheduling() == false) {
         // i : symbol -> ue -> cb (repeat)
@@ -170,7 +171,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
           ul_ldpc_config, &ul_information.at(cb).at(0), ul_cb_bytes,
           this->cfg_->ScrambleEnabled());
     }
-
+    // AGORA_LOG_INFO("DEBUG: I AM HERE 0\n");
     {
       const std::string filename_input =
           directory + kUlLdpcDataPrefix +
@@ -199,6 +200,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
           throw std::runtime_error("Failed to close file" + filename_input);
         }
       }
+      // AGORA_LOG_INFO("DEBUG: I AM HERE 1\n");
 
       if (kPrintUplinkInformationBytes) {
         std::printf("Uplink information bytes\n");
@@ -218,6 +220,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         }
       }
     }
+    // AGORA_LOG_INFO("DEBUG: I AM HERE 2\n");
 
     if (kOutputUlScData) {
       std::vector<std::vector<std::vector<std::vector<std::vector<uint8_t>>>>>
@@ -282,6 +285,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         }
       }
     }
+    // AGORA_LOG_INFO("DEBUG: I AM HERE 3\n");
 
     // Modulate the encoded codewords
     std::vector<std::vector<complex_float>> ul_modulated_codewords(
@@ -305,7 +309,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       }
       if (kDebugPrintPreIfftData) {
         std::printf("pre ifft data: num ul data sym: %zu\n", this->cfg_->Frame().NumUlDataSyms());
-        for (size_t symb = 0; symb < 12; symb++) {
+        for (size_t symb = 0; symb < this->cfg_->Frame().NumUlDataSyms(); symb++) {
           for (size_t sc = 0; sc < this->cfg_->OfdmCaNum(); sc++) {
             if (sc % this->cfg_->OfdmCaNum() == 0) {
               std::printf("\nsymbol %zu ant %zu\n", symb, sc / this->cfg_->OfdmCaNum());
@@ -322,27 +326,28 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
                                 std::vector<complex_float> (this->cfg_->UeAntNum() *
                                 this->cfg_->OfdmCaNum()));
 
-      size_t NumUlScPerCB = this->cfg_->NumPrbPerCb(Direction::kUplink) * kNumScPerPRB;
+      size_t NumUlScPerCb = this->cfg_->NumPrbPerCb(Direction::kUplink) * kNumScPerPRB;
       for (size_t ue = 0; ue < this->cfg_->UeAntNum(); ue++) {
         size_t OfdmDataOffset = cfg_->OfdmDataStart();
         for (size_t ue_cb = 0; ue_cb < cfg_->NumCbPerSlot(Direction::kUplink); ue_cb++){
           size_t CbDataIndex = 0;
           // for (size_t symb = 0; symb < this->cfg_->Frame().NumUlDataSyms(); symb++){
-          for (size_t symb = 0; symb < 12; symb++){
+          for (size_t symb = 0; symb < this->cfg_->Frame().NumUlDataSyms(); symb++){
             // std::printf("DEBUG: cb: %zu, ue: %zu, ue_cb: %zu, symb: %zu, OfdmDataOffset: %zu, CbDataIndex: %zu\n", (ue * cfg_->NumCbPerSlot(Direction::kUplink) + ue_cb), ue, ue_cb, symb, OfdmDataOffset, CbDataIndex);
-            for (size_t OfdmDataIndex = 0; OfdmDataIndex < NumUlScPerCB; OfdmDataIndex++) {
+            for (size_t OfdmDataIndex = 0; OfdmDataIndex < NumUlScPerCb; OfdmDataIndex++) {
               pre_ifft_data_syms.at(symb).at(ue * this->cfg_->OfdmCaNum() + OfdmDataOffset + OfdmDataIndex) = ul_modulated_codewords.at(ue * cfg_->NumCbPerSlot(Direction::kUplink) + ue_cb).at(CbDataIndex++);
             }
           }
-          OfdmDataOffset += NumUlScPerCB;
+          OfdmDataOffset += NumUlScPerCb;
         }
       }
+      // AGORA_LOG_INFO("DEBUG: I AM HERE 4\n");
       if (kDebugPrintPreIfftData) {
         size_t OfdmDataOffset = cfg_->OfdmDataStart();
         std::printf("pre ifft data: num ue: %zu, num ul data sym: %zu\n", this->cfg_->UeAntNum(), this->cfg_->Frame().NumUlDataSyms());
         for (size_t ue = 0; ue < this->cfg_->UeAntNum(); ue++) {
-          for (size_t symb = 0; symb < 12; symb++){
-            for (size_t sc = OfdmDataOffset; sc < (OfdmDataOffset + NumUlScPerCB * cfg_->NumCbPerSlot(Direction::kUplink)); sc++) {
+          for (size_t symb = 0; symb < this->cfg_->Frame().NumUlDataSyms(); symb++){
+            for (size_t sc = OfdmDataOffset; sc < (OfdmDataOffset + NumUlScPerCb * cfg_->NumCbPerSlot(Direction::kUplink)); sc++) {
               if (sc % this->cfg_->OfdmDataNum() == 0) {
                 std::printf("\nsymbol %zu ue %zu\n", symb, ue);
               }
@@ -589,28 +594,61 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
     const size_t symbol_blocks =
         dl_ldpc_config.NumBlocksInSymbol() * this->cfg_->UeAntNum();
-    const size_t num_dl_codeblocks =
+    size_t num_dl_codeblocks;
+
+    if (cfg_->SlotScheduling() == false) {
+      num_dl_codeblocks =
         this->cfg_->Frame().NumDlDataSyms() * symbol_blocks;
+    } else {
+      num_dl_codeblocks =
+        cfg_->NumCbPerSlot(Direction::kDownlink) * this->cfg_->UeAntNum();
+    }
+
     AGORA_LOG_SYMBOL("Total number of dl data blocks: %zu\n",
                      num_dl_codeblocks);
 
     std::vector<std::vector<int8_t>> dl_information(num_dl_codeblocks);
     std::vector<std::vector<int8_t>> dl_encoded_codewords(num_dl_codeblocks);
+    size_t ue_id, ue_cb_id, ue_cb_cnt;
+
     for (size_t cb = 0; cb < num_dl_codeblocks; cb++) {
-      // i : symbol -> ue -> cb (repeat)
-      const size_t sym_id = cb / (symbol_blocks);
-      // ue antenna for code block
-      const size_t sym_offset = cb % (symbol_blocks);
-      const size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
-      const size_t ue_cb_id = sym_offset % dl_ldpc_config.NumBlocksInSymbol();
-      const size_t ue_cb_cnt =
+      if (cfg_->SlotScheduling() == false) {
+        // i : symbol -> ue -> cb (repeat)
+        size_t sym_id = cb / (symbol_blocks);
+        // ue antenna for code block
+        size_t sym_offset = cb % (symbol_blocks);
+        ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
+        ue_cb_id = sym_offset % dl_ldpc_config.NumBlocksInSymbol();
+        ue_cb_cnt =
           (sym_id * dl_ldpc_config.NumBlocksInSymbol()) + ue_cb_id;
+      } else {
+        ue_id = cb / cfg_->NumCbPerSlot(Direction::kDownlink);
+        ue_cb_id = cb % cfg_->NumCbPerSlot(Direction::kDownlink);
+        ue_cb_cnt = ue_cb_id;
+      }
+
+      AGORA_LOG_TRACE(
+          "cb %zu -- user %zu -- user block %zu -- user cb id %zu -- input "
+          "size %zu, index %zu, total size %zu\n",
+          cb, ue_id, ue_cb_id, ue_cb_cnt, dl_cb_bytes, ue_cb_cnt * dl_cb_bytes,
+          dl_mac_info.at(ue_id).size());
+
       int8_t* cb_start = &dl_mac_info.at(ue_id).at(ue_cb_cnt * dl_cb_bytes);
       dl_information.at(cb) =
           std::vector<int8_t>(cb_start, cb_start + dl_cb_bytes);
+
       dl_encoded_codewords.at(cb) = DataGenerator::GenCodeblock(
           dl_ldpc_config, &dl_information.at(cb).at(0), dl_cb_bytes,
           this->cfg_->ScrambleEnabled());
+
+      if (false) {
+        std::printf("Downlink encoded bytes\n");
+        std::printf("cb %zu\n", cb);
+        for (size_t i = 0; i < BitsToBytes(cfg_->LdpcConfig(Direction::kDownlink).NumCbCodewLen()); i++) {
+          std::printf("%u ", static_cast<uint8_t>(dl_encoded_codewords.at(cb).at(i)));
+        }
+        std::printf("\n");
+      }
     }
 
     // Modulate the encoded codewords
@@ -625,6 +663,15 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
           cfg_->OfdmDataNum(), cfg_->ModOrderBits(Direction::kDownlink));
       dl_modulated_codewords.at(i) = DataGenerator::MapOFDMSymbol(
           cfg_, ofdm_symbol, ue_specific_pilot[ue_id], SymbolType::kDL);
+
+      if (false) {
+        std::printf("Modulated codewords\n");
+        std::printf("cb %zu\n", i);
+        for (size_t j = 0; j < cfg_->OfdmDataNum(); j++) {
+          std::printf("%.3f+%.3fi ", dl_modulated_codewords.at(i).at(j).re, dl_modulated_codewords.at(i).at(j).im);
+        }
+        std::printf("\n");
+      }
     }
 
     {
@@ -656,18 +703,23 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
           throw std::runtime_error("Failed to close file" + filename_input);
         }
       }
+    }
 
-      if (kPrintDownlinkInformationBytes == true) {
-        std::printf("Downlink information bytes\n");
-        for (size_t n = 0; n < num_dl_codeblocks; n++) {
+    if (false) {
+      std::printf("Downlink information bytes\n");
+      for (size_t n = 0; n < num_dl_codeblocks; n++) {
+        if (cfg_->SlotScheduling() == false) {
           std::printf("Symbol %zu, UE %zu\n", n / this->cfg_->UeAntNum(),
                       n % this->cfg_->UeAntNum());
-          for (size_t i = 0; i < dl_cb_bytes; i++) {
-            std::printf("%u ",
-                        static_cast<unsigned>(dl_information.at(n).at(i)));
-          }
-          std::printf("\n");
+        } else {
+          std::printf("UE %zu, CB %zu\n", n / cfg_->NumCbPerSlot(Direction::kDownlink),
+                      n % cfg_->NumCbPerSlot(Direction::kDownlink));
         }
+        for (size_t i = 0; i < dl_cb_bytes; i++) {
+          std::printf("%u ",
+                      static_cast<uint8_t>(dl_information.at(n).at(i)));
+        }
+        std::printf("\n");
       }
     }
 
@@ -710,32 +762,61 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     dl_mod_data.Calloc(this->cfg_->Frame().NumDLSyms(),
                        this->cfg_->OfdmCaNum() * this->cfg_->UeAntNum(),
                        Agora_memory::Alignment_t::kAlign64);
-    for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {
-      for (size_t j = 0; j < this->cfg_->UeAntNum(); j++) {
-        for (size_t sc_id = 0; sc_id < this->cfg_->OfdmDataNum(); sc_id++) {
-          complex_float sc_data;
-          if ((i < this->cfg_->Frame().ClientDlPilotSymbols()) ||
-              (sc_id % this->cfg_->OfdmPilotSpacing() == 0)) {
-            sc_data = ue_specific_pilot[j][sc_id];
-          } else {
-            sc_data =
+    if (cfg_->SlotScheduling() == false) {
+      for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {
+        for (size_t j = 0; j < this->cfg_->UeAntNum(); j++) {
+          for (size_t sc_id = 0; sc_id < this->cfg_->OfdmDataNum(); sc_id++) {
+            complex_float sc_data;
+            if ((i < this->cfg_->Frame().ClientDlPilotSymbols()) ||
+                (sc_id % this->cfg_->OfdmPilotSpacing() == 0)) {
+              sc_data = ue_specific_pilot[j][sc_id];
+            } else {
+              sc_data =
                 dl_modulated_codewords
-                    .at(((i - this->cfg_->Frame().ClientDlPilotSymbols()) *
-                         this->cfg_->UeAntNum()) +
-                        j)
-                    .at(sc_id);
+                .at(((i - this->cfg_->Frame().ClientDlPilotSymbols()) * this->cfg_->UeAntNum()) + j)
+                .at(sc_id);
+            }
+            dl_mod_data[i][j * this->cfg_->OfdmCaNum() + sc_id +
+                           this->cfg_->OfdmDataStart()] = sc_data;
           }
-          dl_mod_data[i][j * this->cfg_->OfdmCaNum() + sc_id +
-                         this->cfg_->OfdmDataStart()] = sc_data;
+        }
+      }
+    } else {
+      for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {
+        for (size_t j = 0; j < this->cfg_->UeAntNum(); j++) {
+          for (size_t sc_id = 0; sc_id < this->cfg_->OfdmDataNum(); sc_id++) {
+            complex_float sc_data;
+            if ((i < this->cfg_->Frame().ClientDlPilotSymbols()) ||
+                (sc_id % this->cfg_->OfdmPilotSpacing() == 0)) {
+              sc_data = ue_specific_pilot[j][sc_id];
+              dl_mod_data[i][j * this->cfg_->OfdmCaNum() + sc_id +
+                             this->cfg_->OfdmDataStart()] = sc_data;
+            }
+          }
+        }
+      }
+      size_t NumDlScPerCB = this->cfg_->NumPrbPerCb(Direction::kDownlink) * kNumScPerPRB;
+      for (size_t ue = 0; ue < this->cfg_->UeAntNum(); ue++) {
+        size_t OfdmDataOffset = cfg_->OfdmDataStart();
+        for (size_t ue_cb = 0; ue_cb < cfg_->NumCbPerSlot(Direction::kDownlink); ue_cb++) {
+          size_t CbDataIndex = 0;
+          // for (size_t symb = 0; symb < this->cfg_->Frame().NumDlDataSyms(); symb++){
+          for (size_t symb = 0; symb < this->cfg_->Frame().NumDlDataSyms(); symb++) {
+            // std::printf("DEBUG: cb: %zu, ue: %zu, ue_cb: %zu, symb: %zu, OfdmDataOffset: %zu, CbDataIndex: %zu\n", (ue * cfg_->NumCbPerSlot(Direction::kDownlink) + ue_cb), ue, ue_cb, symb, OfdmDataOffset, CbDataIndex);
+            for (size_t OfdmDataIndex = 0; OfdmDataIndex < NumDlScPerCB; OfdmDataIndex++) {
+              dl_mod_data[(symb - this->cfg_->Frame().ClientDlPilotSymbols())][ue * this->cfg_->OfdmCaNum() + OfdmDataOffset + OfdmDataIndex] = dl_modulated_codewords.at(ue * cfg_->NumCbPerSlot(Direction::kDownlink) + ue_cb).at(CbDataIndex++);
+            }
+          }
+          OfdmDataOffset += NumDlScPerCB;
         }
       }
     }
 
-    if (kPrintDlModData) {
+    if (false) {
       std::printf("dl mod data \n");
       for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {
         for (size_t k = this->cfg_->OfdmDataStart();
-             k < this->cfg_->OfdmDataStart() + this->cfg_->OfdmDataNum(); k++) {
+             k < this->cfg_->OfdmDataStart() + 10; k++) {
           std::printf("symbol %zu, subcarrier %zu\n", i, k);
           for (size_t j = 0; j < this->cfg_->UeAntNum(); j++) {
             // for (int k = this->cfg_->OfdmDataStart(); k <
@@ -845,16 +926,16 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       }
     }
 
-    if (kPrintDlTxData) {
+    if (false) {
       std::printf("rx data\n");
-      for (size_t i = 0; i < 10; i++) {
+      for (size_t i = 0; i < 2; i++) {
         for (size_t j = 0; j < this->cfg_->OfdmCaNum() * this->cfg_->BsAntNum();
              j++) {
           if (j % this->cfg_->OfdmCaNum() == 0) {
-            std::printf("symbol %zu ant %zu\n", i, j / this->cfg_->OfdmCaNum());
+            std::printf("\nsymbol %zu ant %zu\n", i, j / this->cfg_->OfdmCaNum());
           }
           // TODO keep and fix or remove
-          // std::printf("%d+%di ", dl_tx_data[i][j], dl_tx_data[i][j]);
+          std::printf("%d+%di ", dl_tx_data[i][j], dl_tx_data[i][j]);
         }
       }
       std::printf("\n");
@@ -1021,6 +1102,14 @@ std::vector<complex_float> DataGenerator::GetModulation(
 
   AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
                   &mod_input[0], BitsToBytes(num_bits), mod_order_bits);
+
+  if (false) {
+    std::printf("Adapted encoded bits\n");
+    for (size_t i = 0; i < num_subcarriers; i++) {
+      std::printf("%u ", mod_input.at(i));
+    }
+    std::printf("\n");
+  }
 
   for (size_t i = 0; i < num_subcarriers; i++) {
     modulated_codeword[i] = ModSingleUint8(mod_input[i], mod_table);
