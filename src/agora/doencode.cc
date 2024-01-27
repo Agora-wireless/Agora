@@ -11,8 +11,9 @@
 #include "logger.h"
 #include "phy_ldpc_decoder_5gnr.h"
 
-static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintRawMacData = false;
+static constexpr bool kPrintEncodedData = false;
+static constexpr bool kPrintModulatedData = false;
 
 DoEncode::DoEncode(Config* in_config, int in_tid, Direction dir,
                    Table<int8_t>& in_raw_data_buffer, size_t in_buffer_rollover,
@@ -109,8 +110,9 @@ EventData DoEncode::Launch(size_t tag) {
       std::printf("\n");
     }
   } else {
-    tx_data_ptr = cfg_->GetInfoBits(raw_data_buffer_, dir_, data_symbol_idx,
-                                    ue_id, cur_cb_id);
+    tx_data_ptr =
+        cfg_->GetInfoBits(raw_data_buffer_, dir_, data_symbol_idx, ue_id,
+                          cfg_->SpatialStreamsNum(), cur_cb_id);
   }
 
   int8_t* ldpc_input = tx_data_ptr;
@@ -140,7 +142,8 @@ EventData DoEncode::Launch(size_t tag) {
   LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
                    ldpc_config.NumRows(), encoded_buffer_temp_, parity_buffer_,
                    ldpc_input);
-  if (kDebugTxData) {
+
+  if (kPrintEncodedData) {
     std::stringstream dataprint;
     dataprint << std::setfill('0') << std::hex;
     for (size_t i = 0; i < BitsToBytes(ldpc_config.NumCbCodewLen()); i++) {
@@ -165,8 +168,8 @@ EventData DoEncode::Launch(size_t tag) {
                   BitsToBytes(ldpc_config.NumCbCodewLen()),
                   cfg_->ModOrderBits(dir_));
 
-  if (kPrintEncodedData) {
-    std::printf("Encoded data\n");
+  if (kPrintModulatedData) {
+    std::printf("Modulated data\n");
     const size_t num_mod = cfg_->SubcarrierPerCodeBlock(dir_);
     for (size_t i = 0; i < num_mod; i++) {
       std::printf("%u ", *(mod_buffer_ptr + i));

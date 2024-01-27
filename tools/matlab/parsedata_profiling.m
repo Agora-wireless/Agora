@@ -257,6 +257,7 @@ if PLOT_PROFILING
     set(gca,'FontSize', 12);
     xlabel('Time (us)');
     ylabel('Thread Id');
+    title(['Profiling Frame Number - ', num2str(profiling_frame)]);
     grid on;
     % xlim([x_axis_start x_axis_end]);
     ylim([y_axis_start y_axis_end]);

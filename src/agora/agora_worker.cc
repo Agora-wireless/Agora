@@ -65,15 +65,15 @@ void AgoraWorker::UpdateCores(RPControlMsg rcm) {
 
   // Target core numbers
   const size_t start_core_id = workers_.size();
-  size_t updated_core_num = workers_.size() + rcm.add_core_ - rcm.remove_core_;
+  size_t updated_core_num = workers_.size() + rcm.msg_arg_1_ - rcm.msg_arg_2_;
   // TODO: (size_t)sysconf(_SC_NPROCESSORS_ONLN) gives all available core # in the machine
   const size_t max_core_num =
       sysconf(_SC_NPROCESSORS_ONLN) - base_worker_core_offset_;
 
   AGORA_LOG_INFO(
-      "[ALERTTTTTT]: CPU Layout Update!!! start_core_: %zu, updated_core_num_: "
-      "%zu \n",
-      start_core_id, updated_core_num);
+      "[ALERTTTTTT]: CPU Layout Update!!! start_core_id: %zu, updated_core_num: "
+      "%zu, base_worker_core_offset: %zu, max_core_num: %zu\n",
+      start_core_id, updated_core_num, base_worker_core_offset_, max_core_num);
 
   // Update workers
   if (workers_.size() < updated_core_num) {
@@ -89,13 +89,13 @@ void AgoraWorker::UpdateCores(RPControlMsg rcm) {
   } else {
     // Remove workers
     // minimum core number?
-    updated_core_num = std::max(updated_core_num, (size_t)2);
+    updated_core_num = std::max(updated_core_num, (size_t) kMinWorkers);
     for (size_t core_i = start_core_id; core_i > updated_core_num; core_i--) {
       // Update info
       active_core_[core_i - 1] = false;
-      RemoveCoreFromList(core_i - 1, base_worker_core_offset_);
+      RemoveCoreFromList((core_i - 1), base_worker_core_offset_);
       workers_.at(core_i - 1).join();
-      AGORA_LOG_INFO("Agora: removed core # %ld\n", core_i);
+      AGORA_LOG_INFO("Agora: removed core # %ld\n", (core_i - 1));
     }
     workers_.resize(updated_core_num);
   }
@@ -187,9 +187,9 @@ void AgoraWorker::WorkerThread(int tid) {
   while (config_->Running() == true && active_core_.at(tid) == true) {
     for (size_t i = 0; i < computers_vec.size(); i++) {
       if (computers_vec.at(i)->TryLaunch(
-              *message_->GetConq(events_vec.at(i), cur_qid),
-              message_->GetCompQueue(cur_qid),
-              message_->GetWorkerPtok(cur_qid, tid))) {
+            *message_->GetConq(events_vec.at(i), cur_qid),
+            message_->GetCompQueue(cur_qid),
+            message_->GetWorkerPtok(cur_qid, tid))) {
         empty_queue = false;
 
         if (((computers_vec.at(i)->enq_deq_tsc_worker_.frame_id_ ==

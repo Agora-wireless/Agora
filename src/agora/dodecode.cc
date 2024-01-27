@@ -50,9 +50,9 @@ EventData DoDecode::Launch(size_t tag) {
       cfg_->GetTotalDataSymbolIdxUl(frame_id, data_symbol_idx_ul);
   if (kDebugPrintInTask == true) {
     std::printf(
-        "In doDecode thread %d: frame: %zu, symbol: %zu, code block: "
-        "%zu, ue: %zu offset %zu\n",
-        tid_, frame_id, symbol_id, cur_cb_id, ue_id, symbol_offset);
+        "In doDecode thread %d: frame: %zu, symbol: %zu, cur cb: "
+        "%zu, cb: %zu, ue: %zu symbol offset %zu\n",
+        tid_, frame_id, symbol_id, cur_cb_id, cb_id, ue_id, symbol_offset);
   }
 
   size_t start_tsc = GetTime::WorkerRdtsc();
@@ -126,9 +126,9 @@ EventData DoDecode::Launch(size_t tag) {
       size_t block_error(0);
       for (size_t i = 0; i < num_bytes_per_cb; i++) {
         uint8_t rx_byte = decoded_buffer_ptr[i];
-        auto tx_byte = static_cast<uint8_t>(
-            cfg_->GetInfoBits(cfg_->UlBits(), Direction::kUplink,
-                              data_symbol_idx_ul, ue_id, cur_cb_id)[i]);
+        auto tx_byte = static_cast<uint8_t>(cfg_->GetInfoBits(
+            cfg_->UlBits(), Direction::kUplink, data_symbol_idx_ul, ue_id,
+            cfg_->SpatialStreamsNum(), cur_cb_id)[i]);
         phy_stats_->UpdateBitErrors(ue_id, symbol_offset, frame_slot, tx_byte,
                                     rx_byte);
         if (rx_byte != tx_byte) {

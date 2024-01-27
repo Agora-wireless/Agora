@@ -26,6 +26,15 @@ static constexpr bool kPrintUplinkInformationBytes = false;
 static constexpr bool kPrintDownlinkInformationBytes = false;
 static constexpr bool kPrintFreqDomainSamples = false;
 
+static constexpr bool kPrintUlRxData = false;
+static constexpr bool kPrintUplinkMacBytes = false;
+static constexpr bool kPrintDownlinkMacBytes = false;
+static constexpr bool kPrintUplinkEncodedBytes = false;
+static constexpr bool kPrintDownlinkEncodedBytes = false;
+
+static constexpr bool kPrintAdaptUes = false;
+static const std::string kAdaptUesPrefix = "adapt";
+
 DEFINE_string(profile, "random",
               "The profile of the input user bytes (e.g., 'random', '123')");
 DEFINE_string(
@@ -65,6 +74,53 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
   const size_t ul_cb_bytes = cfg_->NumBytesPerCb(Direction::kUplink);
   LDPCconfig ul_ldpc_config = cfg_->LdpcConfig(Direction::kUplink);
 
+  // Generating an array of this->cfg_->FramesToTest() elements containing
+  // number of UEs varying from 1 to this->cfg_->UeAntNum() for adapting
+  // UEs across frames
+  {
+    // Set seed for the random number generator
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    // Define the range for adapting the number of UEs
+    std::uniform_int_distribution<> distribution(1, cfg_->UeAntNum());
+
+    uint8_t adaptUesArray[cfg_->FramesToTest()];
+
+    for (size_t i = 0; i < cfg_->FramesToTest(); ++i) {
+      adaptUesArray[i] =
+          cfg_->AdaptUes() ? distribution(gen) : cfg_->UeAntNum();
+    }
+    const std::string filename_input = directory + kAdaptUesPrefix + "_ueant" +
+                                       std::to_string(cfg_->UeAntNum()) +
+                                       ".bin";
+    AGORA_LOG_INFO("Saving adaptable number of UEs across frames to %s\n",
+                   filename_input.c_str());
+    auto* fp_input = std::fopen(filename_input.c_str(), "wb");
+    if (fp_input == nullptr) {
+      AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
+      throw std::runtime_error("Failed to create file" + filename_input);
+    } else {
+      const auto write_status = std::fwrite(adaptUesArray, sizeof(uint8_t),
+                                            cfg_->FramesToTest(), fp_input);
+      if (write_status != cfg_->FramesToTest()) {
+        throw std::runtime_error("Failed to write to file" + filename_input);
+      }
+      const auto close_status = std::fclose(fp_input);
+      if (close_status != 0) {
+        throw std::runtime_error("Failed to close file" + filename_input);
+      }
+    }
+    if (kPrintAdaptUes) {
+      std::printf("Adapted number of UEs across %zu frames\n",
+                  cfg_->FramesToTest());
+      for (size_t n = 0; n < cfg_->FramesToTest(); n++) {
+        std::printf("%u ", adaptUesArray[n]);
+      }
+      std::printf("\n");
+    }
+  }
+
   // Step 1: Generate the information buffers (MAC Packets) and LDPC-encoded
   // buffers for uplink
   const size_t num_ul_mac_bytes = cfg_->MacBytesNumPerframe(Direction::kUplink);
@@ -91,16 +147,45 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
       }
     }
 
-    {
-      if (kPrintUplinkInformationBytes) {
-        std::printf("Uplink information bytes\n");
-        for (size_t n = 0; n < cfg_->UeAntNum(); n++) {
-          std::printf("UE %zu\n", n % cfg_->UeAntNum());
-          for (size_t i = 0; i < num_ul_mac_bytes; i++) {
-            std::printf("%u ", static_cast<uint8_t>(ul_mac_info.at(n).at(i)));
+    size_t ue_ant_id_start = cfg_->AdaptUes() ? 1 : cfg_->UeAntNum();
+    for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= cfg_->UeAntNum();
+         ue_ant_id++) {
+      const std::string filename_input =
+          directory + kUlRxPrefix + std::to_string(cfg_->OfdmCaNum()) +
+          "_ueant" + std::to_string(ue_ant_id) + ".bin";
+      AGORA_LOG_INFO("Saving uplink MAC data for %zu UE(s) to %s\n", ue_ant_id,
+                     filename_input.c_str());
+      auto* fp_input = std::fopen(filename_input.c_str(), "wb");
+      if (fp_input == nullptr) {
+        AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
+        throw std::runtime_error("Failed to create file" + filename_input);
+      } else {
+        for (size_t i = 0; i < ue_ant_id; i++) {
+          AGORA_LOG_TRACE("Writing UE %zu MAC data\n", i);
+          const auto write_status =
+              std::fwrite(reinterpret_cast<uint8_t*>(ul_mac_info.at(i).data()),
+                          sizeof(uint8_t), num_ul_mac_bytes, fp_input);
+          if (write_status != num_ul_mac_bytes) {
+            AGORA_LOG_ERROR("Wrote %zu out of %zu to file %s\n", write_status,
+                            num_ul_mac_bytes, filename_input.c_str());
+            throw std::runtime_error("Failed to write to file" +
+                                     filename_input);
           }
-          std::printf("\n");
         }
+        const auto close_status = std::fclose(fp_input);
+        if (close_status != 0) {
+          throw std::runtime_error("Failed to close file" + filename_input);
+        }
+      }
+    }
+    if (kPrintUplinkInformationBytes) {
+      std::printf("Uplink information bytes\n");
+      for (size_t n = 0; n < cfg_->UeAntNum(); n++) {
+        std::printf("UE %zu\n", n % cfg_->UeAntNum());
+        for (size_t i = 0; i < num_ul_mac_bytes; i++) {
+          std::printf("%u ", static_cast<uint8_t>(ul_mac_info.at(n).at(i)));
+        }
+        std::printf("\n");
       }
     }
 
@@ -146,6 +231,116 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
                         static_cast<uint8_t>(ul_information.at(n).at(i)));
           }
           std::printf("\n");
+        }
+      }
+    }
+
+    for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= cfg_->UeAntNum();
+         ue_ant_id++) {
+      const std::string filename_input =
+          directory + kUlLdpcDataPrefix + std::to_string(cfg_->OfdmCaNum()) +
+          "_ueant" + std::to_string(ue_ant_id) + ".bin";
+      AGORA_LOG_INFO(
+          "Saving raw uplink data (using LDPC) for %zu UE(s) to %s\n",
+          ue_ant_id, filename_input.c_str());
+      auto* fp_input = std::fopen(filename_input.c_str(), "wb");
+      if (fp_input == nullptr) {
+        AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
+        throw std::runtime_error("Failed to create file" + filename_input);
+      } else {
+        for (size_t i = 0; i < num_ul_codeblocks / cfg_->UeAntNum(); i++) {
+          for (size_t j = 0; j < ue_ant_id; j++) {
+            AGORA_LOG_TRACE("Writing cb index %zu - UE %zu\n",
+                            ((i * cfg_->UeAntNum()) + j), j);
+            const auto write_status = std::fwrite(
+                reinterpret_cast<uint8_t*>(
+                    &ul_information.at((i * cfg_->UeAntNum()) + j).at(0)),
+                sizeof(uint8_t), ul_cb_bytes, fp_input);
+            if (write_status != ul_cb_bytes) {
+              AGORA_LOG_ERROR("Wrote %zu out of %zu to file %s\n", write_status,
+                              ul_cb_bytes, filename_input.c_str());
+              throw std::runtime_error("Failed to write to file" +
+                                       filename_input);
+            }
+          }
+        }
+        const auto close_status = std::fclose(fp_input);
+        if (close_status != 0) {
+          throw std::runtime_error("Failed to close file" + filename_input);
+        }
+      }
+    }
+    if (kPrintUplinkInformationBytes) {
+      std::printf("Uplink Information Bytes\n");
+      for (size_t n = 0; n < num_ul_codeblocks; n++) {
+        std::printf("Symbol %zu, UE %zu\n", n / cfg_->UeAntNum(),
+                    n % cfg_->UeAntNum());
+        for (size_t i = 0; i < ul_cb_bytes; i++) {
+          std::printf("%u ", static_cast<uint8_t>(ul_information.at(n).at(i)));
+        }
+        std::printf("\n");
+      }
+    }
+
+    if (kOutputUlScData) {
+      std::vector<std::vector<std::vector<std::vector<std::vector<uint8_t>>>>>
+          ul_ofdm_data(
+              cfg_->UeNum(),
+              std::vector<std::vector<std::vector<std::vector<uint8_t>>>>(
+                  kOutputFrameNum,
+                  std::vector<std::vector<std::vector<uint8_t>>>(
+                      cfg_->Frame().NumULSyms(),
+                      std::vector<std::vector<uint8_t>>(
+                          cfg_->NumUeChannels(),
+                          std::vector<uint8_t>(cfg_->OfdmDataNum())))));
+      for (size_t n = 0; n < num_ul_codeblocks; n++) {
+        const size_t cl_sdr = (n % cfg_->UeNum());
+        const size_t ul_slot =
+            (n / cfg_->UeAntNum()) + cfg_->Frame().ClientUlPilotSymbols();
+        const size_t cl_sdr_ch = (n % cfg_->UeAntNum()) % cfg_->NumUeChannels();
+        std::vector<uint8_t> odfm_symbol(cfg_->OfdmDataNum());
+        AdaptBitsForMod(
+            reinterpret_cast<const uint8_t*>(ul_encoded_codewords.at(n).data()),
+            odfm_symbol.data(),
+            cfg_->LdpcConfig(Direction::kUplink).NumEncodedBytes(),
+            cfg_->ModOrderBits(Direction::kUplink));
+        for (size_t f = 0; f < kOutputFrameNum; f++) {
+          ul_ofdm_data.at(cl_sdr).at(f).at(ul_slot).at(cl_sdr_ch) = odfm_symbol;
+        }
+      }
+      for (size_t i = 0; i < cfg_->UeNum(); i++) {
+        const std::string filename_input =
+            directory + kUlModDataPrefix +
+            cfg_->Modulation(Direction::kUplink) + "_" +
+            std::to_string(cfg_->OfdmDataNum()) + "_" +
+            std::to_string(cfg_->OfdmCaNum()) + "_" +
+            std::to_string(kOfdmSymbolPerSlot) + "_" +
+            std::to_string(cfg_->Frame().NumULSyms()) + "_" +
+            std::to_string(kOutputFrameNum) + "_" + cfg_->UeChannel() + "_" +
+            std::to_string(i) + ".bin";
+        AGORA_LOG_INFO("Saving uplink sc bits to %s\n", filename_input.c_str());
+        auto* fp_tx_b = std::fopen(filename_input.c_str(), "wb");
+        if (fp_tx_b == nullptr) {
+          throw std::runtime_error(
+              "DataGenerator: Failed to create ul sc bits file");
+        }
+        for (size_t f = 0; f < kOutputFrameNum; f++) {
+          for (size_t u = 0; u < cfg_->Frame().NumULSyms(); u++) {
+            for (size_t h = 0; h < cfg_->NumUeChannels(); h++) {
+              const auto write_status =
+                  std::fwrite(ul_ofdm_data.at(i).at(f).at(u).at(h).data(),
+                              sizeof(uint8_t), cfg_->OfdmDataNum(), fp_tx_b);
+              if (write_status != cfg_->OfdmDataNum()) {
+                throw std::runtime_error(
+                    "DataGenerator: Failed to write ul sc bits file");
+              }
+            }
+          }
+        }
+        const auto close_status = std::fclose(fp_tx_b);
+        if (close_status != 0) {
+          throw std::runtime_error(
+              "DataGenerator: Failed to close ul sc bits file");
         }
       }
     }
@@ -302,363 +497,464 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
   rx_data_all_symbols.Calloc(cfg_->Frame().NumTotalSyms(),
                              cfg_->OfdmCaNum() * cfg_->BsAntNum(),
                              Agora_memory::Alignment_t::kAlign64);
-  for (size_t i = 0; i < cfg_->Frame().NumTotalSyms(); i++) {
-    arma::cx_fmat mat_input_data(
-        reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
-        cfg_->OfdmCaNum(), cfg_->UeAntNum(), false);
-    arma::cx_fmat mat_output(
-        reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
-        cfg_->OfdmCaNum(), cfg_->BsAntNum(), false);
+  size_t ue_ant_id_start = cfg_->AdaptUes() ? 1 : cfg_->UeAntNum();
+  for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= cfg_->UeAntNum();
+       ue_ant_id++) {
+    for (size_t i = 0; i < cfg_->Frame().NumTotalSyms(); i++) {
+      arma::cx_fmat mat_input_data(
+          reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
+          cfg_->OfdmCaNum(), ue_ant_id, false);
+      arma::cx_fmat mat_output(
+          reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
+          cfg_->OfdmCaNum(), cfg_->BsAntNum(), false);
 
-    for (size_t j = 0; j < cfg_->OfdmCaNum(); j++) {
-      arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_matrices[j]),
-                            cfg_->BsAntNum(), cfg_->UeAntNum(), false);
-      mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
-    }
-    arma::cx_fmat noise_mat(size(mat_output));
-    noise_mat.set_real(arma::randn<arma::fmat>(size(real(mat_output))));
-    noise_mat.set_imag(arma::randn<arma::fmat>(size(real(mat_output))));
-    mat_output += (noise_mat * cfg_->NoiseLevel() * sqrt2_norm);
-    for (size_t j = 0; j < cfg_->BsAntNum(); j++) {
-      auto* this_ofdm_symbol = rx_data_all_symbols[i] + j * cfg_->OfdmCaNum();
-      CommsLib::FFTShift(this_ofdm_symbol, cfg_->OfdmCaNum());
-      CommsLib::IFFT(this_ofdm_symbol, cfg_->OfdmCaNum(), false);
-    }
-  }
-
-  const std::string filename_rx = directory + kUlRxPrefix +
-                                  std::to_string(cfg_->OfdmCaNum()) + "_ant" +
-                                  std::to_string(cfg_->BsAntNum()) + ".bin";
-  std::complex<short>* rx_data_temp;
-  rx_data_temp =
-      static_cast<std::complex<short>*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::kAlign64,
-          cfg_->OfdmCaNum() * cfg_->BsAntNum() * sizeof(short) * 2));
-  AGORA_LOG_INFO("Saving uplink rx samples to %s\n", filename_rx.c_str());
-  for (size_t i = 0; i < cfg_->Frame().NumTotalSyms(); i++) {
-    SimdConvertFloatToShort(reinterpret_cast<float*>(rx_data_all_symbols[i]),
-                            reinterpret_cast<short*>(rx_data_temp),
-                            2 * cfg_->OfdmCaNum() * cfg_->BsAntNum());
-    Utils::WriteBinaryFile(filename_rx, sizeof(short),
-                           cfg_->OfdmCaNum() * cfg_->BsAntNum() * 2,
-                           rx_data_temp,
-                           i != 0);  //Do not append in the first write
-  }
-
-  if (kDebugPrintRxData) {
-    std::printf("rx data\n");
-    for (size_t i = 0; i < 10; i++) {
-      for (size_t j = 0; j < cfg_->OfdmCaNum() * cfg_->BsAntNum(); j++) {
-        if (j % cfg_->OfdmCaNum() == 0) {
-          std::printf("\nsymbol %zu ant %zu\n", i, j / cfg_->OfdmCaNum());
-        }
-        std::printf("%.4f+%.4fi ", rx_data_all_symbols[i][j].re,
-                    rx_data_all_symbols[i][j].im);
+      for (size_t j = 0; j < cfg_->OfdmCaNum(); j++) {
+        arma::cx_fmat mat_csi(
+            reinterpret_cast<arma::cx_float*>(csi_matrices[j]),
+            cfg_->BsAntNum(), ue_ant_id, false);
+        mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
       }
-      std::printf("\n");
-    }
-  }
-
-  /* ------------------------------------------------
-   * Generate data for downlink test
-   * ------------------------------------------------ */
-  const LDPCconfig dl_ldpc_config = cfg_->LdpcConfig(Direction::kDownlink);
-  const size_t dl_cb_bytes = cfg_->NumBytesPerCb(Direction::kDownlink);
-  const size_t num_dl_mac_bytes =
-      cfg_->MacBytesNumPerframe(Direction::kDownlink);
-  if (num_dl_mac_bytes > 0) {
-    std::vector<std::vector<int8_t>> dl_mac_info(cfg_->UeAntNum());
-    AGORA_LOG_FRAME("Total number of downlink MAC bytes: %zu\n",
-                    num_dl_mac_bytes);
-    for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
-      dl_mac_info[ue_id].resize(num_dl_mac_bytes);
-      for (size_t pkt_id = 0;
-           pkt_id < cfg_->MacPacketsPerframe(Direction::kDownlink); pkt_id++) {
-        size_t pkt_offset =
-            pkt_id * cfg_->MacPacketLength(Direction::kDownlink);
-        auto* pkt = reinterpret_cast<MacPacketPacked*>(
-            &dl_mac_info.at(ue_id).at(pkt_offset));
-
-        pkt->Set(0, pkt_id, ue_id,
-                 cfg_->MacPayloadMaxLength(Direction::kDownlink));
-        data_generator->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(pkt->Data(),
-                                                    cfg_->MacPayloadMaxLength(
-                                                        Direction::kDownlink)) &
-                            0xFFFF));
+      arma::cx_fmat noise_mat(size(mat_output));
+      noise_mat.set_real(arma::randn<arma::fmat>(size(real(mat_output))));
+      noise_mat.set_imag(arma::randn<arma::fmat>(size(real(mat_output))));
+      mat_output += (noise_mat * cfg_->NoiseLevel() * sqrt2_norm);
+      for (size_t j = 0; j < cfg_->BsAntNum(); j++) {
+        auto* this_ofdm_symbol = rx_data_all_symbols[i] + j * cfg_->OfdmCaNum();
+        CommsLib::FFTShift(this_ofdm_symbol, cfg_->OfdmCaNum());
+        CommsLib::IFFT(this_ofdm_symbol, cfg_->OfdmCaNum(), false);
       }
     }
 
-    {
-      if (kPrintDownlinkInformationBytes) {
-        std::printf("Downlink information bytes\n");
-        for (size_t n = 0; n < cfg_->UeAntNum(); n++) {
-          std::printf("UE %zu\n", n % cfg_->UeAntNum());
-          for (size_t i = 0; i < num_dl_mac_bytes; i++) {
-            std::printf("%u ", static_cast<uint8_t>(dl_mac_info.at(n).at(i)));
+    const std::string filename_rx =
+        directory + kUlRxPrefix + std::to_string(cfg_->OfdmCaNum()) + "_bsant" +
+        std::to_string(cfg_->BsAntNum()) + "_ueant" +
+        std::to_string(ue_ant_id) + ".bin";
+    std::complex<short>* rx_data_temp;
+    rx_data_temp =
+        static_cast<std::complex<short>*>(Agora_memory::PaddedAlignedAlloc(
+            Agora_memory::Alignment_t::kAlign64,
+            cfg_->OfdmCaNum() * cfg_->BsAntNum() * sizeof(short) * 2));
+    AGORA_LOG_INFO("Saving uplink rx samples to %s\n", filename_rx.c_str());
+    for (size_t i = 0; i < cfg_->Frame().NumTotalSyms(); i++) {
+      SimdConvertFloatToShort(reinterpret_cast<float*>(rx_data_all_symbols[i]),
+                              reinterpret_cast<short*>(rx_data_temp),
+                              2 * cfg_->OfdmCaNum() * cfg_->BsAntNum());
+      Utils::WriteBinaryFile(filename_rx, sizeof(short),
+                             cfg_->OfdmCaNum() * cfg_->BsAntNum() * 2,
+                             rx_data_temp,
+                             i != 0);  //Do not append in the first write
+    }
+
+    if (kDebugPrintRxData) {
+      std::printf("For %zu ue(s), rx data\n", ue_ant_id);
+      for (size_t i = 0; i < 10; i++) {
+        for (size_t j = 0; j < cfg_->OfdmCaNum() * cfg_->BsAntNum(); j++) {
+          if (j % cfg_->OfdmCaNum() == 0) {
+            std::printf("\nsymbol %zu ant %zu\n", i, j / cfg_->OfdmCaNum());
           }
-          std::printf("\n");
-        }
-      }
-    }
-
-    const size_t symbol_blocks =
-        dl_ldpc_config.NumBlocksInSymbol() * cfg_->UeAntNum();
-    const size_t num_dl_codeblocks =
-        cfg_->Frame().NumDlDataSyms() * symbol_blocks;
-    AGORA_LOG_FRAME("Total number of dl data blocks: %zu\n", num_dl_codeblocks);
-
-    std::vector<std::vector<int8_t>> dl_information(num_dl_codeblocks);
-    std::vector<std::vector<int8_t>> dl_encoded_codewords(num_dl_codeblocks);
-    for (size_t cb = 0; cb < num_dl_codeblocks; cb++) {
-      // i : symbol -> ue -> cb (repeat)
-      const size_t sym_id = cb / (symbol_blocks);
-      // ue antenna for code block
-      const size_t sym_offset = cb % (symbol_blocks);
-      const size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
-      const size_t ue_cb_id = sym_offset % dl_ldpc_config.NumBlocksInSymbol();
-      const size_t ue_cb_cnt =
-          (sym_id * dl_ldpc_config.NumBlocksInSymbol()) + ue_cb_id;
-      int8_t* cb_start = &dl_mac_info.at(ue_id).at(ue_cb_cnt * dl_cb_bytes);
-      dl_information.at(cb) =
-          std::vector<int8_t>(cb_start, cb_start + dl_cb_bytes);
-      dl_encoded_codewords.at(cb) = DataGenerator::GenCodeblock(
-          dl_ldpc_config, &dl_information.at(cb).at(0), dl_cb_bytes,
-          cfg_->ScrambleEnabled());
-    }
-
-    if (kPrintDownlinkInformationBytes == true) {
-      std::printf("Downlink information bytes\n");
-      for (size_t n = 0; n < num_dl_codeblocks; n++) {
-        std::printf("Symbol %zu, UE %zu\n", n / cfg_->UeAntNum(),
-                    n % cfg_->UeAntNum());
-        for (size_t i = 0; i < dl_cb_bytes; i++) {
-          std::printf("%u ", static_cast<unsigned>(dl_information.at(n).at(i)));
+          std::printf("%.4f+%.4fi ", rx_data_all_symbols[i][j].re,
+                      rx_data_all_symbols[i][j].im);
         }
         std::printf("\n");
       }
     }
 
-    // Modulate the encoded codewords
-    std::vector<std::vector<uint8_t>> dl_modulated_codewords(num_dl_codeblocks);
-    std::vector<std::vector<complex_float>> dl_modulated_symbols(
-        num_dl_codeblocks);
-    for (size_t i = 0; i < num_dl_codeblocks; i++) {
-      const size_t sym_offset = i % (symbol_blocks);
-      const size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
-      dl_modulated_codewords.at(i).resize(cfg_->GetOFDMDataNum());
-      auto ofdm_symbol = DataGenerator::GetModulation(
-          &dl_encoded_codewords.at(i)[0], &dl_modulated_codewords.at(i)[0],
-          cfg_->ModTable(Direction::kDownlink),
-          cfg_->LdpcConfig(Direction::kDownlink).NumCbCodewLen(),
-          cfg_->OfdmDataNum(), cfg_->ModOrderBits(Direction::kDownlink));
-      dl_modulated_symbols.at(i) = DataGenerator::MapOFDMSymbol(
-          cfg_, ofdm_symbol, ue_specific_pilot[ue_id], SymbolType::kDL);
-    }
+    /* ------------------------------------------------
+   * Generate data for downlink test
+   * ------------------------------------------------ */
+    const LDPCconfig dl_ldpc_config = cfg_->LdpcConfig(Direction::kDownlink);
+    const size_t dl_cb_bytes = cfg_->NumBytesPerCb(Direction::kDownlink);
+    const size_t num_dl_mac_bytes =
+        cfg_->MacBytesNumPerframe(Direction::kDownlink);
+    if (num_dl_mac_bytes > 0) {
+      std::vector<std::vector<int8_t>> dl_mac_info(cfg_->UeAntNum());
+      AGORA_LOG_FRAME("Total number of downlink MAC bytes: %zu\n",
+                      num_dl_mac_bytes);
+      for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
+        dl_mac_info[ue_id].resize(num_dl_mac_bytes);
+        for (size_t pkt_id = 0;
+             pkt_id < cfg_->MacPacketsPerframe(Direction::kDownlink);
+             pkt_id++) {
+          size_t pkt_offset =
+              pkt_id * cfg_->MacPacketLength(Direction::kDownlink);
+          auto* pkt = reinterpret_cast<MacPacketPacked*>(
+              &dl_mac_info.at(ue_id).at(pkt_offset));
 
-    // Non-beamformed version of downlink data
-    std::vector<std::vector<complex_float>> pre_ifft_dl_data_syms(
-        cfg_->UeAntNum() * cfg_->Frame().NumDlDataSyms());
-    for (size_t i = 0; i < pre_ifft_dl_data_syms.size(); i++) {
-      pre_ifft_dl_data_syms.at(i) =
-          DataGenerator::BinForIfft(cfg_, dl_modulated_symbols.at(i));
-    }
-
-    {
-      // Save downlink information bytes to file
-      const std::string filename_ldpc =
-          directory + kDlLdpcDataPrefix + std::to_string(cfg_->OfdmCaNum()) +
-          "_ue" + std::to_string(cfg_->UeAntNum()) + ".bin";
-      AGORA_LOG_INFO("Saving downlink data bits (encoder input) to %s\n",
-                     filename_ldpc.c_str());
-      for (size_t i = 0; i < num_dl_codeblocks; i++) {
-        Utils::WriteBinaryFile(filename_ldpc, sizeof(uint8_t), dl_cb_bytes,
-                               dl_information.at(i).data(),
-                               i != 0);  //Do not append in the first write
-      }
-
-      const std::string filename_modul =
-          directory + kDlModDataPrefix + std::to_string(cfg_->OfdmCaNum()) +
-          "_ue" + std::to_string(cfg_->UeAntNum()) + ".bin";
-      AGORA_LOG_INFO("Saving downlink encoded data bits to %s\n",
-                     filename_modul.c_str());
-      for (size_t i = 0; i < num_dl_codeblocks; i++) {
-        Utils::WriteBinaryFile(filename_modul, sizeof(uint8_t),
-                               cfg_->GetOFDMDataNum(),
-                               dl_modulated_codewords.at(i).data(),
-                               i != 0);  //Do not append in the first write
-      }
-
-      const std::string filename_tx =
-          directory + kDlIfftPrefix + std::to_string(cfg_->OfdmCaNum()) +
-          "_ue" + std::to_string(cfg_->UeAntNum()) + ".bin";
-      AGORA_LOG_INFO("Saving downlink mapped ofdm data to %s\n",
-                     filename_tx.c_str());
-      for (size_t i = 0; i < cfg_->UeAntNum() * cfg_->Frame().NumDlDataSyms();
-           i++) {
-        Utils::WriteBinaryFile(filename_tx, sizeof(complex_float),
-                               cfg_->OfdmCaNum(),
-                               pre_ifft_dl_data_syms[i].data(),
-                               i != 0);  //Do not append in the first write
-      }
-    }
-
-    // Compute precoder
-    Table<complex_float> precoder;
-    precoder.Calloc(cfg_->OfdmCaNum(), cfg_->UeAntNum() * cfg_->BsAntNum(),
-                    Agora_memory::Alignment_t::kAlign32);
-    for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
-      arma::cx_fmat mat_input(
-          reinterpret_cast<arma::cx_float*>(csi_matrices[i]), cfg_->BsAntNum(),
-          cfg_->UeAntNum(), false);
-      arma::cx_fmat mat_output(reinterpret_cast<arma::cx_float*>(precoder[i]),
-                               cfg_->UeAntNum(), cfg_->BsAntNum(), false);
-      pinv(mat_output, mat_input, 1e-2, "dc");
-    }
-
-    if (kPrintDebugCSI) {
-      std::printf("CSI \n");
-      for (size_t j = 0; j < cfg_->UeAntNum() * cfg_->BsAntNum(); j++) {
-        std::printf("%.3f+%.3fi ", csi_matrices[cfg_->OfdmDataStart()][j].re,
-                    csi_matrices[cfg_->OfdmDataStart()][j].im);
-      }
-      std::printf("\nprecoder \n");
-      for (size_t j = 0; j < cfg_->UeAntNum() * cfg_->BsAntNum(); j++) {
-        std::printf("%.3f+%.3fi ", precoder[cfg_->OfdmDataStart()][j].re,
-                    precoder[cfg_->OfdmDataStart()][j].im);
-      }
-      std::printf("\n");
-    }
-
-    // Prepare downlink data from mod_output
-    Table<complex_float> dl_mod_data;
-    dl_mod_data.Calloc(cfg_->Frame().NumDLSyms(),
-                       cfg_->OfdmCaNum() * cfg_->UeAntNum(),
-                       Agora_memory::Alignment_t::kAlign64);
-    for (size_t i = 0; i < cfg_->Frame().NumDLSyms(); i++) {
-      for (size_t j = 0; j < cfg_->UeAntNum(); j++) {
-        void* dst_ptr =
-            &dl_mod_data[i][j * cfg_->OfdmCaNum() + cfg_->OfdmDataStart()];
-        if (i < cfg_->Frame().ClientDlPilotSymbols()) {
-          std::memcpy(dst_ptr, ue_specific_pilot[j],
-                      cfg_->OfdmDataNum() * sizeof(complex_float));
-        } else {
-          size_t data_sym_id = i - cfg_->Frame().ClientDlPilotSymbols();
-          std::memcpy(
-              dst_ptr,
-              dl_modulated_symbols.at(data_sym_id * cfg_->UeAntNum() + j)
-                  .data(),
-              cfg_->OfdmDataNum() * sizeof(complex_float));
+          pkt->Set(0, pkt_id, ue_id,
+                   cfg_->MacPayloadMaxLength(Direction::kDownlink));
+          data_generator->GenMacData(pkt, ue_id);
+          pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
+                                  pkt->Data(), cfg_->MacPayloadMaxLength(
+                                                   Direction::kDownlink)) &
+                              0xFFFF));
         }
       }
-    }
 
-    if (kPrintDlModData) {
-      std::printf("dl mod data \n");
-      for (size_t i = 0; i < cfg_->Frame().NumDLSyms(); i++) {
-        for (size_t k = cfg_->OfdmDataStart();
-             k < cfg_->OfdmDataStart() + cfg_->OfdmDataNum(); k++) {
-          std::printf("symbol %zu, subcarrier %zu\n", i, k);
-          for (size_t j = 0; j < cfg_->UeAntNum(); j++) {
-            std::printf("%.3f+%.3fi ",
-                        dl_mod_data[i][j * cfg_->OfdmCaNum() + k].re,
-                        dl_mod_data[i][j * cfg_->OfdmCaNum() + k].im);
+      size_t ue_ant_id_start = cfg_->AdaptUes() ? 1 : cfg_->UeAntNum();
+      for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= cfg_->UeAntNum();
+           ue_ant_id++) {
+        const std::string filename_input =
+            directory + kDlTxPrefix + std::to_string(cfg_->OfdmCaNum()) +
+            "_ueant" + std::to_string(ue_ant_id) + ".bin";
+        AGORA_LOG_INFO("Saving downlink MAC data for %zu UE(s) to %s\n",
+                       ue_ant_id, filename_input.c_str());
+        auto* fp_input = std::fopen(filename_input.c_str(), "wb");
+        if (fp_input == nullptr) {
+          AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
+          throw std::runtime_error("Failed to create file" + filename_input);
+        } else {
+          for (size_t i = 0; i < ue_ant_id; i++) {
+            AGORA_LOG_TRACE("Writing UE %zu MAC data\n", i);
+            const auto write_status = std::fwrite(
+                reinterpret_cast<uint8_t*>(dl_mac_info.at(i).data()),
+                sizeof(uint8_t), num_dl_mac_bytes, fp_input);
+            if (write_status != num_dl_mac_bytes) {
+              AGORA_LOG_ERROR("Wrote %zu out of %zu to file %s\n", write_status,
+                              num_dl_mac_bytes, filename_input.c_str());
+              throw std::runtime_error("Failed to write to file" +
+                                       filename_input);
+            }
+          }
+          const auto close_status = std::fclose(fp_input);
+          if (close_status != 0) {
+            throw std::runtime_error("Failed to close file" + filename_input);
+          }
+        }
+      }
+
+      {
+        if (kPrintDownlinkInformationBytes) {
+          std::printf("Downlink information bytes\n");
+          for (size_t n = 0; n < cfg_->UeAntNum(); n++) {
+            std::printf("UE %zu\n", n % cfg_->UeAntNum());
+            for (size_t i = 0; i < num_dl_mac_bytes; i++) {
+              std::printf("%u ", static_cast<uint8_t>(dl_mac_info.at(n).at(i)));
+            }
+            std::printf("\n");
+          }
+        }
+      }
+
+      const size_t symbol_blocks =
+          dl_ldpc_config.NumBlocksInSymbol() * cfg_->UeAntNum();
+      const size_t num_dl_codeblocks =
+          cfg_->Frame().NumDlDataSyms() * symbol_blocks;
+      AGORA_LOG_FRAME("Total number of dl data blocks: %zu\n",
+                      num_dl_codeblocks);
+
+      std::vector<std::vector<int8_t>> dl_information(num_dl_codeblocks);
+      std::vector<std::vector<int8_t>> dl_encoded_codewords(num_dl_codeblocks);
+      for (size_t cb = 0; cb < num_dl_codeblocks; cb++) {
+        // i : symbol -> ue -> cb (repeat)
+        const size_t sym_id = cb / (symbol_blocks);
+        // ue antenna for code block
+        const size_t sym_offset = cb % (symbol_blocks);
+        const size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
+        const size_t ue_cb_id = sym_offset % dl_ldpc_config.NumBlocksInSymbol();
+        const size_t ue_cb_cnt =
+            (sym_id * dl_ldpc_config.NumBlocksInSymbol()) + ue_cb_id;
+        int8_t* cb_start = &dl_mac_info.at(ue_id).at(ue_cb_cnt * dl_cb_bytes);
+        dl_information.at(cb) =
+            std::vector<int8_t>(cb_start, cb_start + dl_cb_bytes);
+        dl_encoded_codewords.at(cb) = DataGenerator::GenCodeblock(
+            dl_ldpc_config, &dl_information.at(cb).at(0), dl_cb_bytes,
+            cfg_->ScrambleEnabled());
+      }
+
+      if (kPrintDownlinkInformationBytes == true) {
+        std::printf("Downlink information bytes\n");
+        for (size_t n = 0; n < num_dl_codeblocks; n++) {
+          std::printf("Symbol %zu, UE %zu\n", n / cfg_->UeAntNum(),
+                      n % cfg_->UeAntNum());
+          for (size_t i = 0; i < dl_cb_bytes; i++) {
+            std::printf("%u ",
+                        static_cast<unsigned>(dl_information.at(n).at(i)));
           }
           std::printf("\n");
         }
       }
-    }
 
-    // Perform precoding and IFFT
-    Table<complex_float> dl_ifft_data;
-    dl_ifft_data.Calloc(cfg_->Frame().NumDLSyms(),
-                        cfg_->OfdmCaNum() * cfg_->BsAntNum(),
-                        Agora_memory::Alignment_t::kAlign64);
-    Table<short> dl_tx_data;
-    dl_tx_data.Calloc(cfg_->Frame().NumDLSyms(),
-                      2 * cfg_->SampsPerSymbol() * cfg_->BsAntNum(),
-                      Agora_memory::Alignment_t::kAlign64);
-
-    for (size_t i = 0; i < cfg_->Frame().NumDLSyms(); i++) {
-      arma::cx_fmat mat_input_data(
-          reinterpret_cast<arma::cx_float*>(dl_mod_data[i]), cfg_->OfdmCaNum(),
-          cfg_->UeAntNum(), false);
-
-      arma::cx_fmat mat_output(
-          reinterpret_cast<arma::cx_float*>(dl_ifft_data[i]), cfg_->OfdmCaNum(),
-          cfg_->BsAntNum(), false);
-
-      for (size_t j = cfg_->OfdmDataStart();
-           j < cfg_->OfdmDataNum() + cfg_->OfdmDataStart(); j++) {
-        arma::cx_fmat mat_precoder(
-            reinterpret_cast<arma::cx_float*>(precoder[j]), cfg_->UeAntNum(),
-            cfg_->BsAntNum(), false);
-        mat_precoder /= abs(mat_precoder).max();
-        mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
-
-        // std::printf("symbol %d, sc: %d\n", i, j -
-        // cfg_->ofdm_data_start()); cout << "Precoder: \n" <<
-        // mat_precoder
-        // << endl; cout << "Data: \n" << mat_input_data.row(j) << endl; cout <<
-        // "Precoded data: \n" << mat_output.row(j) << endl;
+      // Modulate the encoded codewords
+      std::vector<std::vector<uint8_t>> dl_modulated_codewords(
+          num_dl_codeblocks);
+      std::vector<std::vector<complex_float>> dl_modulated_symbols(
+          num_dl_codeblocks);
+      for (size_t i = 0; i < num_dl_codeblocks; i++) {
+        const size_t sym_offset = i % (symbol_blocks);
+        const size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
+        dl_modulated_codewords.at(i).resize(cfg_->GetOFDMDataNum());
+        auto ofdm_symbol = DataGenerator::GetModulation(
+            &dl_encoded_codewords.at(i)[0], &dl_modulated_codewords.at(i)[0],
+            cfg_->ModTable(Direction::kDownlink),
+            cfg_->LdpcConfig(Direction::kDownlink).NumCbCodewLen(),
+            cfg_->OfdmDataNum(), cfg_->ModOrderBits(Direction::kDownlink));
+        dl_modulated_symbols.at(i) = DataGenerator::MapOFDMSymbol(
+            cfg_, ofdm_symbol, ue_specific_pilot[ue_id], SymbolType::kDL);
       }
-      for (size_t j = 0; j < cfg_->BsAntNum(); j++) {
-        complex_float* ptr_ifft = dl_ifft_data[i] + j * cfg_->OfdmCaNum();
-        CommsLib::FFTShift(ptr_ifft, cfg_->OfdmCaNum());
-        CommsLib::IFFT(ptr_ifft, cfg_->OfdmCaNum(), false);
 
-        short* tx_symbol = dl_tx_data[i] + j * cfg_->SampsPerSymbol() * 2;
-        std::memset(tx_symbol, 0, sizeof(short) * 2 * cfg_->OfdmTxZeroPrefix());
-        for (size_t k = 0; k < cfg_->OfdmCaNum(); k++) {
-          tx_symbol[2 * (k + cfg_->CpLen() + cfg_->OfdmTxZeroPrefix())] =
-              static_cast<short>(kShrtFltConvFactor * ptr_ifft[k].re);
-          tx_symbol[2 * (k + cfg_->CpLen() + cfg_->OfdmTxZeroPrefix()) + 1] =
-              static_cast<short>(kShrtFltConvFactor * ptr_ifft[k].im);
+      // Save downlink information bytes to file
+      for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= cfg_->UeAntNum();
+           ue_ant_id++) {
+        const std::string filename_input =
+            directory + kDlLdpcDataPrefix + std::to_string(cfg_->OfdmCaNum()) +
+            "_ueant" + std::to_string(ue_ant_id) + ".bin";
+        AGORA_LOG_INFO(
+            "Saving raw downlink data (using LDPC) for %zu UE(s) to %s\n",
+            ue_ant_id, filename_input.c_str());
+        auto* fp_input = std::fopen(filename_input.c_str(), "wb");
+        if (fp_input == nullptr) {
+          AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
+          throw std::runtime_error("Failed to create file" + filename_input);
+        } else {
+          for (size_t i = 0; i < num_dl_codeblocks / cfg_->UeAntNum(); i++) {
+            for (size_t j = 0; j < ue_ant_id; j++) {
+              AGORA_LOG_TRACE("writing cb index %zu - UE %zu\n",
+                              ((i * cfg_->UeAntNum()) + j), j);
+              const auto write_status = std::fwrite(
+                  reinterpret_cast<uint8_t*>(
+                      &dl_information.at((i * cfg_->UeAntNum()) + j).at(0)),
+                  sizeof(uint8_t), dl_cb_bytes, fp_input);
+              if (write_status != dl_cb_bytes) {
+                AGORA_LOG_ERROR("Wrote %zu out of %zu to file %s\n",
+                                write_status, dl_cb_bytes,
+                                filename_input.c_str());
+                throw std::runtime_error("Failed to write to file" +
+                                         filename_input);
+              }
+            }
+          }
+          const auto close_status = std::fclose(fp_input);
+          if (close_status != 0) {
+            throw std::runtime_error("Failed to close file" + filename_input);
+          }
         }
-        for (size_t k = 0; k < (2 * cfg_->CpLen()); k++) {
-          tx_symbol[2 * cfg_->OfdmTxZeroPrefix() + k] =
-              tx_symbol[2 * (cfg_->OfdmTxZeroPrefix() + cfg_->OfdmCaNum()) + k];
-        }
-
-        const size_t tx_zero_postfix_offset =
-            2 * (cfg_->OfdmTxZeroPrefix() + cfg_->CpLen() + cfg_->OfdmCaNum());
-        std::memset(tx_symbol + tx_zero_postfix_offset, 0,
-                    sizeof(short) * 2 * cfg_->OfdmTxZeroPostfix());
       }
-    }
 
-    {
-      std::string filename_dl_tx = directory + kDlTxPrefix +
-                                   std::to_string(cfg_->OfdmCaNum()) + "_ant" +
-                                   std::to_string(cfg_->BsAntNum()) + ".bin";
-      AGORA_LOG_INFO("Saving downlink tx samples to %s\n",
-                     filename_dl_tx.c_str());
+      if (kPrintDownlinkInformationBytes) {
+        std::printf("Downlink information bytes\n");
+        for (size_t n = 0; n < num_dl_codeblocks; n++) {
+          std::printf("Symbol %zu, UE %zu\n", n / cfg_->UeAntNum(),
+                      n % cfg_->UeAntNum());
+          for (size_t i = 0; i < dl_cb_bytes; i++) {
+            std::printf("%u ",
+                        static_cast<uint8_t>(dl_information.at(n).at(i)));
+          }
+          std::printf("\n");
+        }
+      }
+
+      // Non-beamformed version of downlink data
+      std::vector<std::vector<complex_float>> pre_ifft_dl_data_syms(
+          cfg_->UeAntNum() * cfg_->Frame().NumDlDataSyms());
+      for (size_t i = 0; i < pre_ifft_dl_data_syms.size(); i++) {
+        pre_ifft_dl_data_syms.at(i) =
+            DataGenerator::BinForIfft(cfg_, dl_modulated_symbols.at(i));
+      }
+
+      {
+        // Save downlink information bytes to file
+        const std::string filename_ldpc =
+            directory + kDlLdpcDataPrefix + std::to_string(cfg_->OfdmCaNum()) +
+            "_ue" + std::to_string(cfg_->UeAntNum()) + ".bin";
+        AGORA_LOG_INFO("Saving downlink data bits (encoder input) to %s\n",
+                       filename_ldpc.c_str());
+        for (size_t i = 0; i < num_dl_codeblocks; i++) {
+          Utils::WriteBinaryFile(filename_ldpc, sizeof(uint8_t), dl_cb_bytes,
+                                 dl_information.at(i).data(),
+                                 i != 0);  //Do not append in the first write
+        }
+
+        const std::string filename_modul =
+            directory + kDlModDataPrefix + std::to_string(cfg_->OfdmCaNum()) +
+            "_ue" + std::to_string(cfg_->UeAntNum()) + ".bin";
+        AGORA_LOG_INFO("Saving downlink encoded data bits to %s\n",
+                       filename_modul.c_str());
+        for (size_t i = 0; i < num_dl_codeblocks; i++) {
+          Utils::WriteBinaryFile(filename_modul, sizeof(uint8_t),
+                                 cfg_->GetOFDMDataNum(),
+                                 dl_modulated_codewords.at(i).data(),
+                                 i != 0);  //Do not append in the first write
+        }
+
+        const std::string filename_tx =
+            directory + kDlIfftPrefix + std::to_string(cfg_->OfdmCaNum()) +
+            "_ue" + std::to_string(cfg_->UeAntNum()) + ".bin";
+        AGORA_LOG_INFO("Saving downlink mapped ofdm data to %s\n",
+                       filename_tx.c_str());
+        for (size_t i = 0; i < cfg_->UeAntNum() * cfg_->Frame().NumDlDataSyms();
+             i++) {
+          Utils::WriteBinaryFile(filename_tx, sizeof(complex_float),
+                                 cfg_->OfdmCaNum(),
+                                 pre_ifft_dl_data_syms[i].data(),
+                                 i != 0);  //Do not append in the first write
+        }
+      }
+
+      // Compute precoder
+      Table<complex_float> precoder;
+      precoder.Calloc(cfg_->OfdmCaNum(), cfg_->UeAntNum() * cfg_->BsAntNum(),
+                      Agora_memory::Alignment_t::kAlign32);
+      for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
+        arma::cx_fmat mat_input(
+            reinterpret_cast<arma::cx_float*>(csi_matrices[i]),
+            cfg_->BsAntNum(), cfg_->UeAntNum(), false);
+        arma::cx_fmat mat_output(reinterpret_cast<arma::cx_float*>(precoder[i]),
+                                 cfg_->UeAntNum(), cfg_->BsAntNum(), false);
+        pinv(mat_output, mat_input, 1e-2, "dc");
+      }
+
+      if (kPrintDebugCSI) {
+        std::printf("CSI \n");
+        for (size_t j = 0; j < cfg_->UeAntNum() * cfg_->BsAntNum(); j++) {
+          std::printf("%.3f+%.3fi ", csi_matrices[cfg_->OfdmDataStart()][j].re,
+                      csi_matrices[cfg_->OfdmDataStart()][j].im);
+        }
+        std::printf("\nprecoder \n");
+        for (size_t j = 0; j < cfg_->UeAntNum() * cfg_->BsAntNum(); j++) {
+          std::printf("%.3f+%.3fi ", precoder[cfg_->OfdmDataStart()][j].re,
+                      precoder[cfg_->OfdmDataStart()][j].im);
+        }
+        std::printf("\n");
+      }
+
+      // Prepare downlink data from mod_output
+      Table<complex_float> dl_mod_data;
+      dl_mod_data.Calloc(cfg_->Frame().NumDLSyms(),
+                         cfg_->OfdmCaNum() * cfg_->UeAntNum(),
+                         Agora_memory::Alignment_t::kAlign64);
       for (size_t i = 0; i < cfg_->Frame().NumDLSyms(); i++) {
-        Utils::WriteBinaryFile(filename_dl_tx, sizeof(short),
-                               cfg_->SampsPerSymbol() * cfg_->BsAntNum() * 2,
-                               reinterpret_cast<void*>(dl_tx_data[i]),
-                               i != 0);  //Do not append in the first write
+        for (size_t j = 0; j < cfg_->UeAntNum(); j++) {
+          void* dst_ptr =
+              &dl_mod_data[i][j * cfg_->OfdmCaNum() + cfg_->OfdmDataStart()];
+          if (i < cfg_->Frame().ClientDlPilotSymbols()) {
+            std::memcpy(dst_ptr, ue_specific_pilot[j],
+                        cfg_->OfdmDataNum() * sizeof(complex_float));
+          } else {
+            size_t data_sym_id = i - cfg_->Frame().ClientDlPilotSymbols();
+            std::memcpy(
+                dst_ptr,
+                dl_modulated_symbols.at(data_sym_id * cfg_->UeAntNum() + j)
+                    .data(),
+                cfg_->OfdmDataNum() * sizeof(complex_float));
+          }
+        }
       }
 
+      if (kPrintDlModData) {
+        std::printf("dl mod data \n");
+        for (size_t i = 0; i < cfg_->Frame().NumDLSyms(); i++) {
+          for (size_t k = cfg_->OfdmDataStart();
+               k < cfg_->OfdmDataStart() + cfg_->OfdmDataNum(); k++) {
+            std::printf("symbol %zu, subcarrier %zu\n", i, k);
+            for (size_t j = 0; j < cfg_->UeAntNum(); j++) {
+              std::printf("%.3f+%.3fi ",
+                          dl_mod_data[i][j * cfg_->OfdmCaNum() + k].re,
+                          dl_mod_data[i][j * cfg_->OfdmCaNum() + k].im);
+            }
+            std::printf("\n");
+          }
+        }
+      }
+
+      // Perform precoding and IFFT
+      Table<complex_float> dl_ifft_data;
+      dl_ifft_data.Calloc(cfg_->Frame().NumDLSyms(),
+                          cfg_->OfdmCaNum() * cfg_->BsAntNum(),
+                          Agora_memory::Alignment_t::kAlign64);
+      Table<short> dl_tx_data;
+      dl_tx_data.Calloc(cfg_->Frame().NumDLSyms(),
+                        2 * cfg_->SampsPerSymbol() * cfg_->BsAntNum(),
+                        Agora_memory::Alignment_t::kAlign64);
+
+      for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= cfg_->UeAntNum();
+           ue_ant_id++) {
+        for (size_t i = 0; i < cfg_->Frame().NumDLSyms(); i++) {
+          arma::cx_fmat mat_input_data(
+              reinterpret_cast<arma::cx_float*>(dl_mod_data[i]),
+              cfg_->OfdmCaNum(), ue_ant_id, false);
+
+          arma::cx_fmat mat_output(
+              reinterpret_cast<arma::cx_float*>(dl_ifft_data[i]),
+              cfg_->OfdmCaNum(), cfg_->BsAntNum(), false);
+
+          for (size_t j = cfg_->OfdmDataStart();
+               j < cfg_->OfdmDataNum() + cfg_->OfdmDataStart(); j++) {
+            arma::cx_fmat mat_precoder(
+                reinterpret_cast<arma::cx_float*>(precoder[j]), ue_ant_id,
+                cfg_->BsAntNum(), false);
+            mat_precoder /= abs(mat_precoder).max();
+            mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
+
+            // std::printf("symbol %d, sc: %d\n", i, j -
+            // cfg_->ofdm_data_start()); cout << "Precoder: \n" <<
+            // mat_precoder
+            // << endl; cout << "Data: \n" << mat_input_data.row(j) << endl; cout <<
+            // "Precoded data: \n" << mat_output.row(j) << endl;
+          }
+          for (size_t j = 0; j < cfg_->BsAntNum(); j++) {
+            complex_float* ptr_ifft = dl_ifft_data[i] + j * cfg_->OfdmCaNum();
+            CommsLib::FFTShift(ptr_ifft, cfg_->OfdmCaNum());
+            CommsLib::IFFT(ptr_ifft, cfg_->OfdmCaNum(), false);
+
+            short* tx_symbol = dl_tx_data[i] + j * cfg_->SampsPerSymbol() * 2;
+            std::memset(tx_symbol, 0,
+                        sizeof(short) * 2 * cfg_->OfdmTxZeroPrefix());
+            for (size_t k = 0; k < cfg_->OfdmCaNum(); k++) {
+              tx_symbol[2 * (k + cfg_->CpLen() + cfg_->OfdmTxZeroPrefix())] =
+                  static_cast<short>(kShrtFltConvFactor * ptr_ifft[k].re);
+              tx_symbol[2 * (k + cfg_->CpLen() + cfg_->OfdmTxZeroPrefix()) +
+                        1] =
+                  static_cast<short>(kShrtFltConvFactor * ptr_ifft[k].im);
+            }
+            for (size_t k = 0; k < (2 * cfg_->CpLen()); k++) {
+              tx_symbol[2 * cfg_->OfdmTxZeroPrefix() + k] =
+                  tx_symbol[2 * (cfg_->OfdmTxZeroPrefix() + cfg_->OfdmCaNum()) +
+                            k];
+            }
+
+            const size_t tx_zero_postfix_offset =
+                2 *
+                (cfg_->OfdmTxZeroPrefix() + cfg_->CpLen() + cfg_->OfdmCaNum());
+            std::memset(tx_symbol + tx_zero_postfix_offset, 0,
+                        sizeof(short) * 2 * cfg_->OfdmTxZeroPostfix());
+          }
+        }
+
+        {
+          std::string filename_dl_tx =
+              directory + kDlTxPrefix + std::to_string(cfg_->OfdmCaNum()) +
+              "_bsant" + std::to_string(cfg_->BsAntNum()) + "_ueant" +
+              std::to_string(ue_ant_id) + ".bin";
+          AGORA_LOG_INFO("Saving downlink tx data for %zu UE(s) to %s\n",
+                         ue_ant_id, filename_dl_tx.c_str());
+          for (size_t i = 0; i < cfg_->Frame().NumDLSyms(); i++) {
+            Utils::WriteBinaryFile(
+                filename_dl_tx, sizeof(short),
+                cfg_->SampsPerSymbol() * cfg_->BsAntNum() * 2,
+                reinterpret_cast<void*>(dl_tx_data[i]),
+                i != 0);  //Do not append in the first write
+          }
+        }
+        /* Clean Up memory */
+        dl_ifft_data.Free();
+        dl_tx_data.Free();
+        dl_mod_data.Free();
+        precoder.Free();
+      }
       if (kPrintDlTxData) {
-        std::printf("rx data\n");
-        for (size_t i = 0; i < 10; i++) {
+        std::printf("dl tx data\n");
+        for (size_t i = 0; i < 1; i++) {
           for (size_t j = 0; j < cfg_->OfdmCaNum() * cfg_->BsAntNum(); j++) {
             if (j % cfg_->OfdmCaNum() == 0) {
               std::printf("symbol %zu ant %zu\n", i, j / cfg_->OfdmCaNum());
             }
             // TODO keep and fix or remove
-            // std::printf("%d+%di ", dl_tx_data[i][j], dl_tx_data[i][j]);
+            std::printf("%d+%di ", dl_tx_data[i][j], dl_tx_data[i][j]);
           }
         }
         std::printf("\n");
       }
     }
-    /* Clean Up memory */
-    dl_ifft_data.Free();
-    dl_tx_data.Free();
-    dl_mod_data.Free();
-    precoder.Free();
   }
 
   csi_matrices.Free();
@@ -667,7 +963,6 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
   ue_specific_pilot.Free();
   AGORA_LOG_SHUTDOWN();
 }
-
 int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   gflags::SetVersionString(GetAgoraProjectVersion());
