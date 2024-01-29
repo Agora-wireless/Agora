@@ -49,7 +49,7 @@ DoDemul::DoDemul(
   arma::cx_float* ue_pilot_ptr =
       reinterpret_cast<arma::cx_float*>(cfg_->UeSpecificPilot()[0]);
   arma::cx_fmat mat_pilot_data(ue_pilot_ptr, cfg_->OfdmDataNum(),
-                               cfg_->SpatialStreamsNum(), false);
+                               cfg_->UeAntNum(), false);
   ue_pilot_data_ = mat_pilot_data.st();
 }
 
