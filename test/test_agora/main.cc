@@ -61,9 +61,9 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg) {
   int ofdm_data_num = cfg->OfdmDataNum();
   int ul_pilot_syms = cfg->Frame().ClientUlPilotSymbols();
 
-  const std::string raw_data_filename =
-      kUlCheckFilePrefix + std::to_string(cfg->OfdmCaNum()) + "_ueant" +
-      std::to_string(spatial_streams_num) + ".bin";
+  const std::string raw_data_filename = kUlCheckFilePrefix +
+                                        std::to_string(cfg->OfdmCaNum()) +
+                                        "_ue" + std::to_string(ue_num) + ".bin";
 
   Table<uint8_t> raw_data;
   Table<uint8_t> output_data;

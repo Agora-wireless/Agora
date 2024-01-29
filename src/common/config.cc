@@ -1247,66 +1247,60 @@ void Config::LoadUplinkData() {
         Roundup<64>(this->ul_num_bytes_per_cb_) *
         this->ul_ldpc_config_.NumBlocksInSymbol();
     // Uplink LDPC input bits
-    ul_bits_.Calloc(
-        this->frame_.NumUlDataSyms(),
-        ul_num_bytes_per_ue_pad * this->ue_ant_num_ * this->ue_ant_num_,
-        Agora_memory::Alignment_t::kAlign64);
-    size_t ue_ant_id_start = this->AdaptUes() ? 1 : this->UeAntNum();
-    for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= this->ue_ant_num_;
-         ue_ant_id++) {
-      const std::string ul_data_file = kExperimentFilepath + kUlLdpcDataPrefix +
-                                       std::to_string(this->ofdm_ca_num_) +
-                                       "_ue" + std::to_string(ue_ant_id) +
-                                       ".bin";
-      AGORA_LOG_FRAME("Config: Reading uplink data bits from %s\n",
-                      ul_data_file.c_str());
+    ul_bits_.Calloc(this->frame_.NumUlDataSyms(),
+                    ul_num_bytes_per_ue_pad * this->ue_ant_num_,
+                    Agora_memory::Alignment_t::kAlign64);
+    const std::string ul_data_file =
+        kExperimentFilepath + kUlLdpcDataPrefix +
+        std::to_string(this->ofdm_ca_num_) + "_ue" +
+        std::to_string(this->ue_ant_total_) + ".bin";
+    AGORA_LOG_FRAME("Config: Reading uplink data bits from %s\n",
+                    ul_data_file.c_str());
 
-      // \todo assumes one code block per symbol
-      const size_t code_block_in_symbol_i = 0u;
-      size_t seek_offset = 0u;
-      for (size_t i = 0; i < this->frame_.NumUlDataSyms(); i++) {
-        seek_offset += ul_data_bytes_num_persymbol_ * this->ue_ant_offset_ *
-                       sizeof(int8_t);
-        for (size_t j = 0; j < this->ue_ant_num_; j++) {
-          int8_t* ul_bits_ptr =
-              this->GetInfoBits(this->ul_bits_, Direction::kUplink, i, j,
-                                ue_ant_id, code_block_in_symbol_i);
-          Utils::ReadBinaryFile(ul_data_file, sizeof(int8_t),
-                                ul_data_bytes_num_persymbol_, seek_offset,
-                                ul_bits_ptr);
-          seek_offset += ul_data_bytes_num_persymbol_ * sizeof(int8_t);
-        }
-        seek_offset +=
-            ul_data_bytes_num_persymbol_ *
-            (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
-            sizeof(int8_t);
+    // \todo assumes one code block per symbol
+    const size_t code_block_in_symbol_i = 0u;
+    size_t seek_offset = 0u;
+    for (size_t i = 0; i < this->frame_.NumUlDataSyms(); i++) {
+      seek_offset +=
+          ul_data_bytes_num_persymbol_ * this->ue_ant_offset_ * sizeof(int8_t);
+      for (size_t j = 0; j < this->ue_ant_num_; j++) {
+        int8_t* ul_bits_ptr = this->GetInfoBits(
+            this->ul_bits_, Direction::kUplink, i, j, code_block_in_symbol_i);
+        Utils::ReadBinaryFile(ul_data_file, sizeof(int8_t),
+                              ul_data_bytes_num_persymbol_, seek_offset,
+                              ul_bits_ptr);
+        seek_offset += ul_data_bytes_num_persymbol_ * sizeof(int8_t);
       }
+      seek_offset +=
+          ul_data_bytes_num_persymbol_ *
+          (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
+          sizeof(int8_t);
+    }
 
-      // Uplink modulation input bits
-      ul_mod_bits_.Calloc(this->frame_.NumUlDataSyms(),
-                          Roundup<64>(this->ofdm_data_num_) * this->ue_ant_num_,
-                          Agora_memory::Alignment_t::kAlign32);
-      const std::string ul_mod_data_file =
-          kExperimentFilepath + kUlModDataPrefix +
-          std::to_string(this->ofdm_ca_num_) + "_ue" +
-          std::to_string(this->ue_ant_total_) + ".bin";
-      // reset seek offset for new file read
-      seek_offset = 0;
-      const size_t subcarr_i = 0u;
-      for (size_t i = 0; i < this->frame_.NumUlDataSyms(); i++) {
-        seek_offset += ofdm_data_num_ * this->ue_ant_offset_ * sizeof(int8_t);
-        for (size_t j = 0; j < this->ue_ant_num_; j++) {
-          int8_t* ul_mod_data_ptr = this->GetModBitsBuf(
-              ul_mod_bits_, Direction::kUplink, 0u, i, j, subcarr_i);
-          Utils::ReadBinaryFile(ul_mod_data_file, sizeof(int8_t),
-                                ofdm_data_num_, seek_offset, ul_mod_data_ptr);
-          seek_offset += ofdm_data_num_ * sizeof(int8_t);
-        }
-        seek_offset +=
-            ofdm_data_num_ *
-            (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
-            sizeof(int8_t);
+    // Uplink modulation input bits
+    ul_mod_bits_.Calloc(this->frame_.NumUlDataSyms(),
+                        Roundup<64>(this->ofdm_data_num_) * this->ue_ant_num_,
+                        Agora_memory::Alignment_t::kAlign32);
+    const std::string ul_mod_data_file =
+        kExperimentFilepath + kUlModDataPrefix +
+        std::to_string(this->ofdm_ca_num_) + "_ue" +
+        std::to_string(this->ue_ant_total_) + ".bin";
+    // reset seek offset for new file read
+    seek_offset = 0;
+    const size_t subcarr_i = 0u;
+    for (size_t i = 0; i < this->frame_.NumUlDataSyms(); i++) {
+      seek_offset += ofdm_data_num_ * this->ue_ant_offset_ * sizeof(int8_t);
+      for (size_t j = 0; j < this->ue_ant_num_; j++) {
+        int8_t* ul_mod_data_ptr = this->GetModBitsBuf(
+            ul_mod_bits_, Direction::kUplink, 0u, i, j, subcarr_i);
+        Utils::ReadBinaryFile(ul_mod_data_file, sizeof(int8_t), ofdm_data_num_,
+                              seek_offset, ul_mod_data_ptr);
+        seek_offset += ofdm_data_num_ * sizeof(int8_t);
       }
+      seek_offset +=
+          ofdm_data_num_ *
+          (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
+          sizeof(int8_t);
     }
   }
 }
@@ -1317,69 +1311,63 @@ void Config::LoadDownlinkData() {
         Roundup<64>(this->dl_num_bytes_per_cb_) *
         this->dl_ldpc_config_.NumBlocksInSymbol();
     // Downlink LDPC input bits
-    dl_bits_.Calloc(
-        this->frame_.NumDlDataSyms(),
-        dl_num_bytes_per_ue_pad * this->ue_ant_num_ * this->ue_ant_num_,
-        Agora_memory::Alignment_t::kAlign64);
-    size_t ue_ant_id_start = this->AdaptUes() ? 1 : this->UeAntNum();
-    for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= this->ue_ant_num_;
-         ue_ant_id++) {
-      const std::string dl_data_file =
-          kExperimentFilepath + kDlLdpcDataPrefix +
-          std::to_string(this->ofdm_ca_num_) + "_ueant" +
-          std::to_string(this->ue_ant_total_) + ".bin";
-      AGORA_LOG_FRAME("Config: Reading downlink data bits from %s\n",
-                      dl_data_file.c_str());
+    dl_bits_.Calloc(this->frame_.NumDlDataSyms(),
+                    dl_num_bytes_per_ue_pad * this->ue_ant_num_,
+                    Agora_memory::Alignment_t::kAlign64);
+    const std::string dl_data_file =
+        kExperimentFilepath + kDlLdpcDataPrefix +
+        std::to_string(this->ofdm_ca_num_) + "_ue" +
+        std::to_string(this->ue_ant_total_) + ".bin";
+    AGORA_LOG_FRAME("Config: Reading downlink data bits from %s\n",
+                    dl_data_file.c_str());
 
-      // \todo assumes one code block per symbol
-      const size_t code_block_in_symbol_i = 0;
-      size_t seek_offset = 0;
-      for (size_t i = 0; i < this->frame_.NumDlDataSyms(); i++) {
-        seek_offset += dl_data_bytes_num_persymbol_ * this->ue_ant_offset_ *
-                       sizeof(int8_t);
-        for (size_t j = 0; j < this->ue_ant_num_; j++) {
-          int8_t* dl_bits_ptr =
-              this->GetInfoBits(this->dl_bits_, Direction::kDownlink, i, j,
-                                ue_ant_id, code_block_in_symbol_i);
-          Utils::ReadBinaryFile(
-              dl_data_file, sizeof(int8_t), dl_data_bytes_num_persymbol_,
-              seek_offset,
-              dl_bits_ptr);  //this->dl_bits_[i] + (j * dl_num_bytes_per_ue_pad));
-          seek_offset += dl_data_bytes_num_persymbol_ * sizeof(int8_t);
-        }
-        seek_offset +=
-            dl_data_bytes_num_persymbol_ *
-            (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
-            sizeof(int8_t);
+    // \todo assumes one code block per symbol
+    const size_t code_block_in_symbol_i = 0;
+    size_t seek_offset = 0;
+    for (size_t i = 0; i < this->frame_.NumDlDataSyms(); i++) {
+      seek_offset +=
+          dl_data_bytes_num_persymbol_ * this->ue_ant_offset_ * sizeof(int8_t);
+      for (size_t j = 0; j < this->ue_ant_num_; j++) {
+        int8_t* dl_bits_ptr = this->GetInfoBits(
+            this->dl_bits_, Direction::kDownlink, i, j, code_block_in_symbol_i);
+        Utils::ReadBinaryFile(
+            dl_data_file, sizeof(int8_t), dl_data_bytes_num_persymbol_,
+            seek_offset,
+            dl_bits_ptr);  //this->dl_bits_[i] + (j * dl_num_bytes_per_ue_pad));
+        seek_offset += dl_data_bytes_num_persymbol_ * sizeof(int8_t);
       }
+      seek_offset +=
+          dl_data_bytes_num_persymbol_ *
+          (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
+          sizeof(int8_t);
+    }
 
-      // Downlink modulation input bits
-      dl_mod_bits_.Calloc(this->frame_.NumDlDataSyms(),
-                          Roundup<64>(this->GetOFDMDataNum()) * ue_ant_num_,
-                          Agora_memory::Alignment_t::kAlign32);
-      const std::string dl_mod_data_file =
-          kExperimentFilepath + kDlModDataPrefix +
-          std::to_string(this->ofdm_ca_num_) + "_ue" +
-          std::to_string(ue_ant_id) + ".bin";
-      // reset seek offset for new file read
-      seek_offset = 0;
-      const size_t subcarr_i = 0u;
-      for (size_t i = 0; i < this->frame_.NumDlDataSyms(); i++) {
-        seek_offset +=
-            this->GetOFDMDataNum() * this->ue_ant_offset_ * sizeof(int8_t);
-        for (size_t j = 0; j < this->ue_ant_num_; j++) {
-          int8_t* dl_mod_data_ptr = this->GetModBitsBuf(
-              dl_mod_bits_, Direction::kDownlink, 0, i, j, subcarr_i);
-          Utils::ReadBinaryFile(dl_mod_data_file, sizeof(int8_t),
-                                this->GetOFDMDataNum(), seek_offset,
-                                dl_mod_data_ptr);
-          seek_offset += this->GetOFDMDataNum() * sizeof(int8_t);
-        }
-        seek_offset +=
-            this->GetOFDMDataNum() *
-            (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
-            sizeof(int8_t);
+    // Downlink modulation input bits
+    dl_mod_bits_.Calloc(this->frame_.NumDlDataSyms(),
+                        Roundup<64>(this->GetOFDMDataNum()) * ue_ant_num_,
+                        Agora_memory::Alignment_t::kAlign32);
+    const std::string dl_mod_data_file =
+        kExperimentFilepath + kDlModDataPrefix +
+        std::to_string(this->ofdm_ca_num_) + "_ue" +
+        std::to_string(this->ue_ant_total_) + ".bin";
+    // reset seek offset for new file read
+    seek_offset = 0;
+    const size_t subcarr_i = 0u;
+    for (size_t i = 0; i < this->frame_.NumDlDataSyms(); i++) {
+      seek_offset +=
+          this->GetOFDMDataNum() * this->ue_ant_offset_ * sizeof(int8_t);
+      for (size_t j = 0; j < this->ue_ant_num_; j++) {
+        int8_t* dl_mod_data_ptr = this->GetModBitsBuf(
+            dl_mod_bits_, Direction::kDownlink, 0, i, j, subcarr_i);
+        Utils::ReadBinaryFile(dl_mod_data_file, sizeof(int8_t),
+                              this->GetOFDMDataNum(), seek_offset,
+                              dl_mod_data_ptr);
+        seek_offset += this->GetOFDMDataNum() * sizeof(int8_t);
       }
+      seek_offset +=
+          this->GetOFDMDataNum() *
+          (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
+          sizeof(int8_t);
     }
   }
 }

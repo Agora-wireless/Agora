@@ -549,7 +549,7 @@ class Config {
 
   /// Get info bits for this symbol, user and code block ID
   inline int8_t* GetInfoBits(Table<int8_t>& info_bits, Direction dir,
-                             size_t symbol_id, size_t ue_id, size_t sp_num,
+                             size_t symbol_id, size_t ue_id,
                              size_t cb_id) const {
     size_t num_bytes_per_cb;
     size_t num_blocks_in_symbol;
@@ -560,11 +560,8 @@ class Config {
       num_bytes_per_cb = this->ul_num_bytes_per_cb_;
       num_blocks_in_symbol = this->ul_ldpc_config_.NumBlocksInSymbol();
     }
-    return &info_bits[symbol_id]
-                     [(Roundup<64>(num_bytes_per_cb) * num_blocks_in_symbol *
-                       this->ue_ant_num_ * (sp_num - 1)) +
-                      (Roundup<64>(num_bytes_per_cb) * num_blocks_in_symbol *
-                       ue_id)];
+    return &info_bits[symbol_id][Roundup<64>(num_bytes_per_cb) *
+                                 (num_blocks_in_symbol * ue_id + cb_id)];
   }
 
   /// Get encoded_buffer for this frame, symbol, user and code block ID

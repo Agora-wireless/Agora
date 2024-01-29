@@ -110,9 +110,8 @@ EventData DoEncode::Launch(size_t tag) {
       std::printf("\n");
     }
   } else {
-    tx_data_ptr =
-        cfg_->GetInfoBits(raw_data_buffer_, dir_, data_symbol_idx, ue_id,
-                          cfg_->SpatialStreamsNum(), cur_cb_id);
+    tx_data_ptr = cfg_->GetInfoBits(raw_data_buffer_, dir_, data_symbol_idx,
+                                    ue_id, cur_cb_id);
   }
 
   int8_t* ldpc_input = tx_data_ptr;
