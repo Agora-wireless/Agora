@@ -42,9 +42,10 @@ static void ReadFromFile(const std::string& filename, Table<TableType>& data,
 }
 
 static void ReadFromFileUl(const std::string& filename, Table<uint8_t>& data,
-                           int num_bytes_per_ue, Config const* const cfg) {
+                           int ue_num, int num_bytes_per_ue,
+                           Config const* const cfg) {
   ReadFromFile(filename, data, cfg->Frame().NumULSyms(),
-               (num_bytes_per_ue * cfg->SpatialStreamsNum()), sizeof(uint8_t));
+               (num_bytes_per_ue * ue_num), sizeof(uint8_t));
 }
 
 static void ReadFromFileDl(const std::string& filename, Table<short>& data,
@@ -67,7 +68,7 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg) {
 
   Table<uint8_t> raw_data;
   Table<uint8_t> output_data;
-  raw_data.Calloc(num_uplink_syms, (ofdm_data_num * spatial_streams_num),
+  raw_data.Calloc(num_uplink_syms, (ofdm_data_num * ue_num),
                   Agora_memory::Alignment_t::kAlign64);
   output_data.Calloc(num_uplink_syms, (ofdm_data_num * spatial_streams_num),
                      Agora_memory::Alignment_t::kAlign64);
@@ -75,8 +76,9 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg) {
   int num_bytes_per_ue =
       (cfg->LdpcConfig(Direction::kUplink).NumCbLen() + 7) >>
       3 * cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
-  ReadFromFileUl(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
-  ReadFromFileUl(kDecodedFilename, output_data, num_bytes_per_ue, cfg);
+  ReadFromFileUl(raw_data_filename, raw_data, ue_num, num_bytes_per_ue, cfg);
+  ReadFromFileUl(kDecodedFilename, output_data, spatial_streams_num,
+                 num_bytes_per_ue, cfg);
   std::printf(
       "check_correctness_ul: bs ant %d, ues %d, spatial streams (last frame) "
       "%d, "
