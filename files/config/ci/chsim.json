@@ -12,7 +12,7 @@
   /* set sample rate to 1Ms
   to make sure tests pass*/
   "sample_rate" : 1e6,
-  "spatial_streams" : 2, // same as ue_radio_num
+  "spatial_streams" : 2, /*same as ue_radio_num*/
   "ue_radio_num": 2,
   "bs_radio_num": 32,
   "symbol_num_perframe": 24,
