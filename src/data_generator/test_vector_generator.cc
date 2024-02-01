@@ -623,33 +623,6 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
       }
     }
 
-    // Compute precoder
-    Table<complex_float> precoder;
-    precoder.Calloc(cfg_->OfdmCaNum(), cfg_->UeAntNum() * cfg_->BsAntNum(),
-                    Agora_memory::Alignment_t::kAlign32);
-    for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
-      arma::cx_fmat mat_input(
-          reinterpret_cast<arma::cx_float*>(csi_matrices[i]), cfg_->BsAntNum(),
-          cfg_->UeAntNum(), false);
-      arma::cx_fmat mat_output(reinterpret_cast<arma::cx_float*>(precoder[i]),
-                               cfg_->UeAntNum(), cfg_->BsAntNum(), false);
-      pinv(mat_output, mat_input, 1e-2, "dc");
-    }
-
-    if (kPrintDebugCSI) {
-      std::printf("CSI \n");
-      for (size_t j = 0; j < cfg_->UeAntNum() * cfg_->BsAntNum(); j++) {
-        std::printf("%.3f+%.3fi ", csi_matrices[cfg_->OfdmDataStart()][j].re,
-                    csi_matrices[cfg_->OfdmDataStart()][j].im);
-      }
-      std::printf("\nprecoder \n");
-      for (size_t j = 0; j < cfg_->UeAntNum() * cfg_->BsAntNum(); j++) {
-        std::printf("%.3f+%.3fi ", precoder[cfg_->OfdmDataStart()][j].re,
-                    precoder[cfg_->OfdmDataStart()][j].im);
-      }
-      std::printf("\n");
-    }
-
     // Prepare downlink data from mod_output
     Table<complex_float> dl_mod_data;
     dl_mod_data.Calloc(cfg_->Frame().NumDLSyms(),
@@ -699,6 +672,11 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
                       2 * cfg_->SampsPerSymbol() * cfg_->BsAntNum(),
                       Agora_memory::Alignment_t::kAlign64);
 
+    // Compute precoder
+    Table<complex_float> precoder;
+    precoder.Calloc(cfg_->OfdmCaNum(), cfg_->UeAntNum() * cfg_->BsAntNum(),
+                    Agora_memory::Alignment_t::kAlign32);
+
     for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= cfg_->UeAntNum();
          ue_ant_id++) {
       for (size_t i = 0; i < cfg_->Frame().NumDLSyms(); i++) {
@@ -712,17 +690,30 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
 
         for (size_t j = cfg_->OfdmDataStart();
              j < cfg_->OfdmDataNum() + cfg_->OfdmDataStart(); j++) {
+          arma::cx_fmat mat_csi(
+              reinterpret_cast<arma::cx_float*>(csi_matrices[j]),
+              cfg_->BsAntNum(), ue_ant_id, false);
           arma::cx_fmat mat_precoder(
               reinterpret_cast<arma::cx_float*>(precoder[j]), ue_ant_id,
               cfg_->BsAntNum(), false);
+          pinv(mat_precoder, mat_csi, 1e-2, "dc");
           mat_precoder /= abs(mat_precoder).max();
           mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
 
-          // std::printf("symbol %d, sc: %d\n", i, j -
-          // cfg_->ofdm_data_start()); cout << "Precoder: \n" <<
-          // mat_precoder
-          // << endl; cout << "Data: \n" << mat_input_data.row(j) << endl; cout <<
-          // "Precoded data: \n" << mat_output.row(j) << endl;
+          if (kPrintDebugCSI) {
+            std::printf("CSI \n");
+            for (size_t j = 0; j < ue_ant_id * cfg_->BsAntNum(); j++) {
+              std::printf("%.3f+%.3fi ",
+                          csi_matrices[cfg_->OfdmDataStart()][j].re,
+                          csi_matrices[cfg_->OfdmDataStart()][j].im);
+            }
+            std::printf("\nprecoder \n");
+            for (size_t j = 0; j < ue_ant_id * cfg_->BsAntNum(); j++) {
+              std::printf("%.3f+%.3fi ", precoder[cfg_->OfdmDataStart()][j].re,
+                          precoder[cfg_->OfdmDataStart()][j].im);
+            }
+            std::printf("\n");
+          }
         }
         for (size_t j = 0; j < cfg_->BsAntNum(); j++) {
           complex_float* ptr_ifft = dl_ifft_data[i] + j * cfg_->OfdmCaNum();
