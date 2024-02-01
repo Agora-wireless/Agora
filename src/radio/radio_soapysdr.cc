@@ -33,10 +33,7 @@ static constexpr int kIrisDriverRelMinAPI = 0;
 static constexpr size_t kUhdInitTimeSec = 3;
 
 RadioSoapySdr::RadioSoapySdr(RadioDataPlane::DataPlaneType rx_dp_type)
-    : dev_(nullptr),
-      rxp_(RadioDataPlane::Create(rx_dp_type)),
-      txs_(nullptr),
-      correlator_enabled_(false) {
+    : rxp_(RadioDataPlane::Create(rx_dp_type)) {
   const auto soapy_version = SoapySDR::getLibVersion();
   const auto soapy_api = SoapySDR::getAPIVersion();
   AGORA_LOG_FRAME(

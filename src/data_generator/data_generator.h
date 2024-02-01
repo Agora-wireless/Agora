@@ -28,8 +28,8 @@ static const std::string kDlIfftPrefix = "dl_ifft_data_";
 static const std::string kUlRxPrefix = "ul_rx_data_";
 static const std::string kDlTxPrefix = "dl_tx_data_";
 
-typedef std::independent_bits_engine<std::mt19937, 8, std::uint_fast8_t>
-    rand_byte_generator;
+using rand_byte_generator =
+    std::independent_bits_engine<std::mt19937, 8, std::uint_fast8_t>;
 
 /**
  * @brief Building blocks for generating end-to-end or unit test workloads for

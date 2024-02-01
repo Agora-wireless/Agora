@@ -24,7 +24,7 @@ std::unique_ptr<RadioDataPlane> RadioDataPlane::Create(
     }
     default: {
       AGORA_LOG_ERROR("Unknown or unsupported radio type\n");
-      return std::unique_ptr<RadioDataPlane>();
+      return {};
     }
   }
 }
