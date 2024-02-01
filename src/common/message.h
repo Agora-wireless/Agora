@@ -176,6 +176,15 @@ struct EventData {
     tags_.at(1) = tag2;
   }
 
+  // Create an event with three tags
+  EventData(EventType event_type, size_t tag1, size_t tag2, size_t tag3)
+      : event_type_(event_type), num_tags_(3) {
+    tags_.fill(0);
+    tags_.at(0) = tag1;
+    tags_.at(1) = tag2;
+    tags_.at(2) = tag3;
+  }
+
   EventData() = default;
 };
 static_assert(sizeof(EventData) == 64);
@@ -461,7 +470,7 @@ class FrameCounters {
       // This should never happen
       is_last = true;
       std::printf(
-          "Unexpected result in IsLastTask: Task Count %zu,  Max Count %zu, "
+          "Unexpected result in IsLastTask: Task Count %zu, Max Count %zu, "
           "Frame %zu, Symbol %zu\n",
           task_count, this->max_task_count_, frame_id, symbol_id);
       assert(false);

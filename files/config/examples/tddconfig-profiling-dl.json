@@ -4,11 +4,11 @@
   "demul_block_size": 80,
   "bs_radio_num": 8,
   "ue_radio_num": 8,
-  "ul_mcs": {
-    "mcs_index" : 17 /*64QAM, 438/1024*/
+  "ul_mcs" : {
+    "mcs_index" : 17 /* 64QAM, 466/1024 from Table 6.1.4.1-1 of 3GPP TS 38.214 */
   },
-  "dl_mcs": {
-    "mcs_index" : 29 /*256QAM, 754/1024*/
+  "dl_mcs" : {
+    "mcs_index" : 25 /* 256QAM, 885/1024 from Table 5.1.3.1-2 of 3GPP TS 38.214 */
   },
   "symbol_num_perframe": 14,
   "client_ul_pilot_syms": 0,

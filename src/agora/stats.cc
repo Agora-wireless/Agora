@@ -276,7 +276,7 @@ void Stats::SaveToFile() {
   }
   std::fclose(fp_debug);
 
-  if (config_->FrameToProfile() >= 0) {
+  if (config_->FrameToProfile() != SIZE_MAX) {
     AGORA_LOG_INFO("Stats: Printing Agora configurations to %s\n",
                    kAgoraConfigFilename.c_str());
 
@@ -427,7 +427,7 @@ void Stats::SaveToFile() {
     std::fclose(fp_debug_detailed);
   }
 
-  if (config_->FrameToProfile() >= 0) {
+  if (config_->FrameToProfile() != SIZE_MAX) {
     FILE* fp_master = std::fopen(kMasterFilename.c_str(), "w");
 
     RtAssert(fp_master != nullptr,
@@ -474,7 +474,7 @@ void Stats::SaveToFile() {
     std::fclose(fp_master);
   }
 
-  if (config_->FrameToProfile() >= 0) {
+  if (config_->FrameToProfile() != SIZE_MAX) {
     FILE* fp_worker = std::fopen(kWorkerFilename.c_str(), "w");
 
     RtAssert(fp_worker != nullptr,

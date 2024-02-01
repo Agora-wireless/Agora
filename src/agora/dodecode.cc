@@ -50,9 +50,9 @@ EventData DoDecode::Launch(size_t tag) {
       cfg_->GetTotalDataSymbolIdxUl(frame_id, data_symbol_idx_ul);
   if (kDebugPrintInTask == true) {
     std::printf(
-        "In doDecode thread %d: frame: %zu, symbol: %zu, code block: "
-        "%zu, ue: %zu offset %zu\n",
-        tid_, frame_id, symbol_id, cur_cb_id, ue_id, symbol_offset);
+        "In doDecode thread %d: frame: %zu, symbol: %zu, cur cb: "
+        "%zu, cb: %zu, ue: %zu symbol offset %zu\n",
+        tid_, frame_id, symbol_id, cur_cb_id, cb_id, ue_id, symbol_offset);
   }
 
   size_t start_tsc = GetTime::WorkerRdtsc();
