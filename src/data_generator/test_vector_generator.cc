@@ -85,10 +85,10 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
     // Define the range for adapting the number of UEs
     std::uniform_int_distribution<> distribution(1, cfg_->UeAntNum());
 
-    uint8_t adaptUesArray[cfg_->FramesToTest()];
+    uint8_t adapt_ues_array[cfg_->FramesToTest()];
 
     for (size_t i = 0; i < cfg_->FramesToTest(); ++i) {
-      adaptUesArray[i] =
+      adapt_ues_array[i] =
           cfg_->AdaptUes() ? distribution(gen) : cfg_->UeAntNum();
     }
     const std::string filename_input = directory + kAdaptUesPrefix + "_ueant" +
@@ -101,7 +101,7 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
       AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
       throw std::runtime_error("Failed to create file" + filename_input);
     } else {
-      const auto write_status = std::fwrite(adaptUesArray, sizeof(uint8_t),
+      const auto write_status = std::fwrite(adapt_ues_array, sizeof(uint8_t),
                                             cfg_->FramesToTest(), fp_input);
       if (write_status != cfg_->FramesToTest()) {
         throw std::runtime_error("Failed to write to file" + filename_input);
@@ -115,7 +115,7 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
       std::printf("Adapted number of UEs across %zu frames\n",
                   cfg_->FramesToTest());
       for (size_t n = 0; n < cfg_->FramesToTest(); n++) {
-        std::printf("%u ", adaptUesArray[n]);
+        std::printf("%u ", adapt_ues_array[n]);
       }
       std::printf("\n");
     }
@@ -788,7 +788,7 @@ static void GenerateTestVectors(Config* cfg_, std::string profile_flag) {
 int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   gflags::SetVersionString(GetAgoraProjectVersion());
-  auto cfg_ = std::make_unique<Config>(FLAGS_conf_file.c_str());
-  GenerateTestVectors(cfg_.get(), FLAGS_profile);
+  auto cfg = std::make_unique<Config>(FLAGS_conf_file.c_str());
+  GenerateTestVectors(cfg.get(), FLAGS_profile);
   return 0;
 }

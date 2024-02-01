@@ -91,7 +91,7 @@ class DataGenerator {
       const size_t mod_order_bits);
 
   static std::vector<complex_float> GetModulation(
-      const int8_t* encoded_codeword, uint8_t* moduldation_data,
+      const int8_t* encoded_codeword, uint8_t* modulation_data,
       Table<complex_float> mod_table, const size_t num_bits,
       const size_t num_subcarriers, const size_t mod_order_bits);
 

@@ -57,9 +57,8 @@ class DoPrecode : public Doer {
   EventData Launch(size_t tag) override;
 
   // Load input data for a single UE and a single subcarrier
-  void LoadInputData(size_t symbol_idx_dl, size_t total_data_symbol_idx,
-                     size_t sp_id, size_t user_id, size_t sc_id,
-                     size_t sc_id_in_block);
+  void LoadInputData(size_t frame_id, size_t symbol_idx_dl, size_t sp_id,
+                     size_t user_id, size_t sc_id, size_t sc_id_in_block);
   void PrecodingPerSc(size_t frame_slot, size_t sc_id, size_t sc_id_in_block);
 
  private:

@@ -414,8 +414,9 @@ EventData DoDemul::Launch(size_t tag) {
               "Demul input: frame: %zu, symbol: %zu, ss id: %zu, "
               "base sc id: %zu, max sc ite: %zu\n",
               frame_id, symbol_idx_ul, ss_id, base_sc_id, max_sc_ite);
-          for (size_t k = 0; k < max_sc_ite; k++)
+          for (size_t k = 0; k < max_sc_ite; k++) {
             std::printf("%f ", equal_ptr[k]);
+          }
           std::printf("\n");
         }
       }
@@ -429,8 +430,9 @@ EventData DoDemul::Launch(size_t tag) {
               frame_id, symbol_idx_ul, ss_id, base_sc_id,
               max_sc_ite * cfg_->ModOrderBits(Direction::kUplink));
           for (size_t k = 0;
-               k < max_sc_ite * cfg_->ModOrderBits(Direction::kUplink); k++)
+               k < max_sc_ite * cfg_->ModOrderBits(Direction::kUplink); k++) {
             std::printf("%i ", demod_ptr[k]);
+          }
           std::printf("\n");
         }
       }

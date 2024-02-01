@@ -1343,15 +1343,15 @@ void Agora::InitializeThreads() {
 void Agora::InitializeUesFromFile() {
   adapt_ues_array_.resize(config_->FramesToTest());
 
-  static const std::string filename = kOutputFilepath + "adapt_ueant" +
-                                      std::to_string(config_->UeAntNum()) +
-                                      ".bin";
+  static const std::string kFilename = kOutputFilepath + "adapt_ueant" +
+                                       std::to_string(config_->UeAntNum()) +
+                                       ".bin";
 
   AGORA_LOG_INFO(
       "Agora: Reading adaptable number of UEs across frames from %s\n",
-      filename.c_str());
+      kFilename.c_str());
 
-  FILE* fp = std::fopen(filename.c_str(), "rb");
+  FILE* fp = std::fopen(kFilename.c_str(), "rb");
   RtAssert(fp != nullptr, "Failed to open adapt UEs file");
 
   const size_t expected_count = config_->FramesToTest();
@@ -1362,7 +1362,7 @@ void Agora::InitializeUesFromFile() {
     std::fprintf(stderr,
                  "Agora: Failed to read adapt UEs file %s. expected "
                  "%zu number of UE entries but read %zu. Errno %s\n",
-                 filename.c_str(), expected_count, actual_count,
+                 kFilename.c_str(), expected_count, actual_count,
                  strerror(errno));
     throw std::runtime_error("Agora: Failed to read adapt UEs file");
   }

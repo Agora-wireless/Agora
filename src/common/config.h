@@ -383,7 +383,7 @@ class Config {
 
   inline const std::vector<uint32_t>& Pilot() const { return this->pilot_; };
   inline const std::vector<uint32_t>& Beacon() const { return this->beacon_; };
-  inline const complex_float* pilots(void) const { return this->pilots_; };
+  inline const complex_float* Pilots(void) const { return this->pilots_; };
   inline const complex_float* PilotsSgn() const { return this->pilots_sgn_; };
   inline const std::vector<std::complex<float>>& CommonPilot() const {
     return this->common_pilot_;
@@ -621,18 +621,18 @@ class Config {
       moodycamel::ConcurrentQueue<EventData>* mc_queue,
       moodycamel::ProducerToken* producer_token, const EventData& event,
       size_t frame_id, size_t symbol_id) {
-    size_t enqueue_start_tsc_ = 0;
-    size_t enqueue_end_tsc_ = 0;
+    size_t enqueue_start_tsc = 0;
+    size_t enqueue_end_tsc = 0;
     if (frame_id == this->frame_to_profile_) {
-      enqueue_start_tsc_ = GetTime::WorkerRdtsc();
+      enqueue_start_tsc = GetTime::WorkerRdtsc();
     }
     TryEnqueueFallback(mc_queue, producer_token, event);
     if (frame_id == this->frame_to_profile_) {
-      enqueue_end_tsc_ = GetTime::WorkerRdtsc();
+      enqueue_end_tsc = GetTime::WorkerRdtsc();
       enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_start_ =
-          enqueue_start_tsc_;
+          enqueue_start_tsc;
       enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_end_ =
-          enqueue_end_tsc_;
+          enqueue_end_tsc;
       enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].event_type_ =
           event.event_type_;
       enqueue_stats_id_.at(symbol_id)++;
@@ -642,18 +642,18 @@ class Config {
   inline void TryEnqueueLogStatsMaster(
       moodycamel::ConcurrentQueue<EventData>* mc_queue, const EventData& event,
       size_t frame_id, size_t symbol_id) {
-    size_t enqueue_start_tsc_ = 0;
-    size_t enqueue_end_tsc_ = 0;
+    size_t enqueue_start_tsc = 0;
+    size_t enqueue_end_tsc = 0;
     if (frame_id == this->frame_to_profile_) {
-      enqueue_start_tsc_ = GetTime::WorkerRdtsc();
+      enqueue_start_tsc = GetTime::WorkerRdtsc();
     }
     TryEnqueueFallback(mc_queue, event);
     if (frame_id == this->frame_to_profile_) {
-      enqueue_end_tsc_ = GetTime::WorkerRdtsc();
+      enqueue_end_tsc = GetTime::WorkerRdtsc();
       enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_start_ =
-          enqueue_start_tsc_;
+          enqueue_start_tsc;
       enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_end_ =
-          enqueue_end_tsc_;
+          enqueue_end_tsc;
       enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].event_type_ =
           event.event_type_;
       enqueue_stats_id_.at(symbol_id)++;

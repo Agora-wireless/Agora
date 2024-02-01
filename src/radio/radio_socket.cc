@@ -125,7 +125,7 @@ static inline size_t ValidateSamples(long long& stream_rx_time,
 // 3 bytes == 1 Sample (8 bit + 4 bit) Real (8 bit + 4 bit) Img = 24 bits = 3 Bytes
 RadioSocket::RadioSocket()
     : rx_buffer_(kRxBufferSize, std::byte(0)),
-      rx_pkt_byte_count_(),
+
       sample_buffer_(kRxSampleRemBufSize, std::complex<int16_t>(0, 0)) {
   rx_buffer_.reserve(kRxBufferSize);
   sample_buffer_.reserve(kRxSampleRemBufSize);
