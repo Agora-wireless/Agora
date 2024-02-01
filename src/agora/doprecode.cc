@@ -163,11 +163,11 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
   MKL_Complex8 alpha = {1, 0};
   MKL_Complex8 beta = {0, 0};
 
-  cblas_cgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
-              cfg_->BsAntNum(), 1, cfg_->SpatialStreamsNum(),
-              &alpha, (MKL_Complex8*)precoder_ptr, cfg_->BsAntNum(),
-              (MKL_Complex8*)data_ptr, cfg_->SpatialStreamsNum(),
-              &beta, (MKL_Complex8*)precoded_ptr, cfg_->BsAntNum());
+  cblas_cgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, cfg_->BsAntNum(), 1,
+              cfg_->SpatialStreamsNum(), &alpha, (MKL_Complex8*)precoder_ptr,
+              cfg_->BsAntNum(), (MKL_Complex8*)data_ptr,
+              cfg_->SpatialStreamsNum(), &beta, (MKL_Complex8*)precoded_ptr,
+              cfg_->BsAntNum());
 #else
   arma::cx_fmat mat_precoder(precoder_ptr, cfg_->BsAntNum(),
                              cfg_->SpatialStreamsNum(), false);

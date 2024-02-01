@@ -66,20 +66,25 @@ void ResourceProvisionerThread::SendEventToAgora(const char* payload) {
 
   if (pkt->msg_type_ == 0) {
     // request cores data
-    AGORA_LOG_INFO("ResourceProvisionerThread: Requesting initial cores allocation details from Agora\n");
+    AGORA_LOG_INFO(
+        "ResourceProvisionerThread: Requesting initial cores allocation "
+        "details from Agora\n");
     RequestEventFromAgora(pkt->msg_type_);
   } else if (pkt->msg_type_ == 1) {
     if (pkt->msg_arg_1_ == 0 && pkt->msg_arg_2_ == 0) {
       // request traffic data
-      AGORA_LOG_INFO("ResourceProvisionerThread: Requesting current latency and cores status from Agora\n");
+      AGORA_LOG_INFO(
+          "ResourceProvisionerThread: Requesting current latency and cores "
+          "status from Agora\n");
       RequestEventFromAgora(pkt->msg_type_);
     } else {
       // create event from pkt
       AGORA_LOG_INFO(
-        "ResourceProvisionerThread: Sending core update data to Agora of "
-        "msg type %zu, add_cores %zu, remove_cores %zu\n",
-        pkt->msg_type_, pkt->msg_arg_1_, pkt->msg_arg_2_);
-      EventData msg(EventType::kPacketFromRp, pkt->msg_type_, pkt->msg_arg_1_, pkt->msg_arg_2_);
+          "ResourceProvisionerThread: Sending core update data to Agora of "
+          "msg type %zu, add_cores %zu, remove_cores %zu\n",
+          pkt->msg_type_, pkt->msg_arg_1_, pkt->msg_arg_2_);
+      EventData msg(EventType::kPacketFromRp, pkt->msg_type_, pkt->msg_arg_1_,
+                    pkt->msg_arg_2_);
       RtAssert(tx_queue_->enqueue(msg),
                "ResourceProvisionerThread: Failed to enqueue control packet");
     }

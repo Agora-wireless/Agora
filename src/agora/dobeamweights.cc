@@ -223,11 +223,17 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
   }
   if (kPrintUlBeamWeights) {
     if (cur_sc_id == 0) {
-      std::printf("UL Beam Weights: frame_id %zu, cur_sc_id %zu, n_rows %lld, n_cols %lld\n",
-        frame_id, cur_sc_id, mat_ul_beam.n_rows, mat_ul_beam.n_cols);
+      std::printf(
+          "UL Beam Weights: frame_id %zu, cur_sc_id %zu, n_rows %lld, n_cols "
+          "%lld\n",
+          frame_id, cur_sc_id, mat_ul_beam.n_rows, mat_ul_beam.n_cols);
       for (arma::uword i = 0; i < mat_ul_beam.n_rows; ++i) {
         for (arma::uword j = 0; j < mat_ul_beam.n_cols; ++j) {
-          std::printf("(%.3f" "+1j*" "%.3f) ", mat_ul_beam(i, j).real(), mat_ul_beam(i, j).imag());
+          std::printf(
+              "(%.3f"
+              "+1j*"
+              "%.3f) ",
+              mat_ul_beam(i, j).real(), mat_ul_beam(i, j).imag());
         }
         std::printf("\n");
       }

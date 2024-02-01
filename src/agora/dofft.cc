@@ -116,8 +116,10 @@ EventData DoFFT::Launch(size_t tag) {
                             cfg_->OfdmCaNum() * 2);
   }
   if (kDebugPrintInTask) {
-    std::printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu, symbol type: %zu\n", tid_,
-                frame_id, symbol_id, ant_id, static_cast<size_t>(sym_type));
+    std::printf(
+        "In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu, symbol type: "
+        "%zu\n",
+        tid_, frame_id, symbol_id, ant_id, static_cast<size_t>(sym_type));
   }
 
   if ((kPrintPilotCorrStats == true) &&
@@ -281,9 +283,10 @@ EventData DoFFT::Launch(size_t tag) {
     RtAssert(false, error_message);
   }
 
-  if (kPrintFFTOutputFloat) { // FFT is computed in-place
+  if (kPrintFFTOutputFloat) {  // FFT is computed in-place
     std::stringstream ss;
-    ss << "FFT_output_" << frame_id << "_" << symbol_id << "_" << ant_id << "=[";
+    ss << "FFT_output_" << frame_id << "_" << symbol_id << "_" << ant_id
+       << "=[";
     for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
       ss << std::fixed << std::setw(5) << std::setprecision(3)
          << fft_inout_[i].re << "+1j*" << fft_inout_[i].im << " ";

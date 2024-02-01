@@ -71,7 +71,8 @@ void AgoraWorker::UpdateCores(RPControlMsg rcm) {
       sysconf(_SC_NPROCESSORS_ONLN) - base_worker_core_offset_;
 
   AGORA_LOG_INFO(
-      "[ALERTTTTTT]: CPU Layout Update!!! start_core_id: %zu, updated_core_num: "
+      "[ALERTTTTTT]: CPU Layout Update!!! start_core_id: %zu, "
+      "updated_core_num: "
       "%zu, base_worker_core_offset: %zu, max_core_num: %zu\n",
       start_core_id, updated_core_num, base_worker_core_offset_, max_core_num);
 
@@ -89,7 +90,7 @@ void AgoraWorker::UpdateCores(RPControlMsg rcm) {
   } else {
     // Remove workers
     // minimum core number?
-    updated_core_num = std::max(updated_core_num, (size_t) kMinWorkers);
+    updated_core_num = std::max(updated_core_num, (size_t)kMinWorkers);
     for (size_t core_i = start_core_id; core_i > updated_core_num; core_i--) {
       // Update info
       active_core_[core_i - 1] = false;
@@ -187,9 +188,9 @@ void AgoraWorker::WorkerThread(int tid) {
   while (config_->Running() == true && active_core_.at(tid) == true) {
     for (size_t i = 0; i < computers_vec.size(); i++) {
       if (computers_vec.at(i)->TryLaunch(
-            *message_->GetConq(events_vec.at(i), cur_qid),
-            message_->GetCompQueue(cur_qid),
-            message_->GetWorkerPtok(cur_qid, tid))) {
+              *message_->GetConq(events_vec.at(i), cur_qid),
+              message_->GetCompQueue(cur_qid),
+              message_->GetWorkerPtok(cur_qid, tid))) {
         empty_queue = false;
 
         if (((computers_vec.at(i)->enq_deq_tsc_worker_.frame_id_ ==

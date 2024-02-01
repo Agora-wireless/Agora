@@ -405,25 +405,26 @@ void Agora::Start() {
           Packet* pkt = rx->RawPacket();
 
           if ((config_->AdaptUes() == true) and
-              (config_->SpatialStreamsNum() != adapt_ues_array_.at(pkt->frame_id_))) {
-            AGORA_LOG_INFO("[ALERTTTTTT]: Spatial Streams Update!!! "
-              "configured/previous number of spatial streams: %zu, "
-              "updated number of spatial streams: %zu, frame id: %zu \n",
-              config_->SpatialStreamsNum(),
-              adapt_ues_array_.at(pkt->frame_id_),
-              frame_tracking_.cur_proc_frame_id_);
-              config_->UpdateSpatialStreamsNum(adapt_ues_array_.at(pkt->frame_id_));
-              ReInitializeCounters();
+              (config_->SpatialStreamsNum() !=
+               adapt_ues_array_.at(pkt->frame_id_))) {
+            AGORA_LOG_INFO(
+                "[ALERTTTTTT]: Spatial Streams Update!!! "
+                "configured/previous number of spatial streams: %zu, "
+                "updated number of spatial streams: %zu, frame id: %zu \n",
+                config_->SpatialStreamsNum(),
+                adapt_ues_array_.at(pkt->frame_id_),
+                frame_tracking_.cur_proc_frame_id_);
+            config_->UpdateSpatialStreamsNum(
+                adapt_ues_array_.at(pkt->frame_id_));
+            ReInitializeCounters();
           }
 
-          AGORA_LOG_TRACE("Agora: event_type_ %s, cur_sche_frame_id_ %zu, "
-            "frame_id_ %zu, symbol_id_ %zu, ant_id_ %zu, adapt ue(s) %zu\n",
-            "kPacketRX",
-            frame_tracking_.cur_sche_frame_id_,
-            pkt->frame_id_,
-            pkt->symbol_id_,
-            pkt->ant_id_,
-            adapt_ues_array_.at(pkt->frame_id_));
+          AGORA_LOG_TRACE(
+              "Agora: event_type_ %s, cur_sche_frame_id_ %zu, "
+              "frame_id_ %zu, symbol_id_ %zu, ant_id_ %zu, adapt ue(s) %zu\n",
+              "kPacketRX", frame_tracking_.cur_sche_frame_id_, pkt->frame_id_,
+              pkt->symbol_id_, pkt->ant_id_,
+              adapt_ues_array_.at(pkt->frame_id_));
 
           if (recorder_ != nullptr) {
             rx->Use();
@@ -604,8 +605,9 @@ void Agora::Start() {
 
           if (rcm.msg_type_ == 1) {
             AGORA_LOG_INFO(
-              "Agora: Received cores update data from RP of add cores %zu,"
-              "remove cores %zu\n", rcm.msg_arg_1_, rcm.msg_arg_2_);
+                "Agora: Received cores update data from RP of add cores %zu,"
+                "remove cores %zu\n",
+                rcm.msg_arg_1_, rcm.msg_arg_2_);
             worker_set_->UpdateCores(rcm);
           } else {
             RtAssert(false, "Invalid msg type from RP\n");
@@ -620,16 +622,20 @@ void Agora::Start() {
           if (rcm.msg_type_ == 0) {
             // Initial cores info to RP
             RPStatusMsg rsm;
-            rsm.status_msg_0_ = cfg->CoreOffset() + 1 + cfg->SocketThreadNum() +
-                                (cfg->DynamicCoreAlloc() ? 1 : 0); // Cores allocated for rest
-            rsm.status_msg_1_ = sysconf(_SC_NPROCESSORS_ONLN); // Total cores available
+            rsm.status_msg_0_ =
+                cfg->CoreOffset() + 1 + cfg->SocketThreadNum() +
+                (cfg->DynamicCoreAlloc() ? 1 : 0);  // Cores allocated for rest
+            rsm.status_msg_1_ =
+                sysconf(_SC_NPROCESSORS_ONLN);  // Total cores available
             rsm.status_msg_2_ = kMinWorkers;
             AGORA_LOG_INFO(
-              "Agora: Sending cores details to RP of rest of alloc %zu, max cores %zu, min workers %zu\n",
-              rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_);
+                "Agora: Sending cores details to RP of rest of alloc %zu, max "
+                "cores %zu, min workers %zu\n",
+                rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_);
             TryEnqueueFallback(
-              &rp_request_queue_,
-              EventData(EventType::kPacketToRp, rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_));
+                &rp_request_queue_,
+                EventData(EventType::kPacketToRp, rsm.status_msg_0_,
+                          rsm.status_msg_1_, rsm.status_msg_2_));
           } else if (rcm.msg_type_ == 1) {
             // Current cores, latency and frame info to RP
             RPStatusMsg rsm;
@@ -637,11 +643,13 @@ void Agora::Start() {
             rsm.status_msg_1_ = worker_set_->GetCoresInfo();
             rsm.status_msg_2_ = this->stats_->LastFrameId();
             AGORA_LOG_INFO(
-              "Agora: Sending status to RP of latency %zu, current workers %zu, last frame id %zu\n",
-              rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_);
+                "Agora: Sending status to RP of latency %zu, current workers "
+                "%zu, last frame id %zu\n",
+                rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_);
             TryEnqueueFallback(
-              &rp_request_queue_,
-              EventData(EventType::kPacketToRp, rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_));
+                &rp_request_queue_,
+                EventData(EventType::kPacketToRp, rsm.status_msg_0_,
+                          rsm.status_msg_1_, rsm.status_msg_2_));
           } else {
             RtAssert(false, "Invalid msg type to RP\n");
           }
@@ -920,7 +928,7 @@ void Agora::Start() {
       // either (a) sufficient packets received for the current frame,
       // or (b) the current frame being updated.
       std::queue<fft_req_tag_t>& cur_fftq =
-        fft_queue_arr_.at(frame_tracking_.cur_sche_frame_id_ % kFrameWnd);
+          fft_queue_arr_.at(frame_tracking_.cur_sche_frame_id_ % kFrameWnd);
       const size_t qid = frame_tracking_.cur_sche_frame_id_ & 0x1;
       if (cur_fftq.size() >= config_->FftBlockSize()) {
         const size_t num_fft_blocks = cur_fftq.size() / config_->FftBlockSize();
@@ -945,7 +953,7 @@ void Agora::Start() {
               this->fft_created_count_ = 0;
               if (cfg->BigstationMode() == true) {
                 this->CheckIncrementScheduleFrame(
-                  frame_tracking_.cur_sche_frame_id_, kUplinkComplete);
+                    frame_tracking_.cur_sche_frame_id_, kUplinkComplete);
               }
             }
           }
@@ -1167,12 +1175,12 @@ void Agora::ReInitializeCounters() {
   const auto& cfg = config_;
 
   AGORA_LOG_INFO("Agora: Re-Initializing counters with %zu spatial stream(s)\n",
-    cfg->SpatialStreamsNum());
+                 cfg->SpatialStreamsNum());
 
   decode_counters_.Init(
       cfg->Frame().NumULSyms(),
       cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
-        cfg->SpatialStreamsNum());
+          cfg->SpatialStreamsNum());
 
   tomac_counters_.Init(cfg->Frame().NumULSyms(), cfg->SpatialStreamsNum());
 
@@ -1335,30 +1343,32 @@ void Agora::InitializeThreads() {
 void Agora::InitializeUesFromFile() {
   adapt_ues_array_.resize(config_->FramesToTest());
 
-  static const std::string filename =
-    kOutputFilepath + "adapt_ueant" + std::to_string(config_->UeAntNum()) + ".bin";
+  static const std::string filename = kOutputFilepath + "adapt_ueant" +
+                                      std::to_string(config_->UeAntNum()) +
+                                      ".bin";
 
-  AGORA_LOG_INFO("Agora: Reading adaptable number of UEs across frames from %s\n",
-                  filename.c_str());
+  AGORA_LOG_INFO(
+      "Agora: Reading adaptable number of UEs across frames from %s\n",
+      filename.c_str());
 
   FILE* fp = std::fopen(filename.c_str(), "rb");
   RtAssert(fp != nullptr, "Failed to open adapt UEs file");
 
   const size_t expected_count = config_->FramesToTest();
   const size_t actual_count =
-    std::fread(&adapt_ues_array_.at(0), sizeof(uint8_t), expected_count, fp);
+      std::fread(&adapt_ues_array_.at(0), sizeof(uint8_t), expected_count, fp);
 
   if (expected_count != actual_count) {
-      std::fprintf(
-          stderr,
-          "Agora: Failed to read adapt UEs file %s. expected "
-          "%zu number of UE entries but read %zu. Errno %s\n",
-          filename.c_str(), expected_count, actual_count, strerror(errno));
-      throw std::runtime_error("Agora: Failed to read adapt UEs file");
+    std::fprintf(stderr,
+                 "Agora: Failed to read adapt UEs file %s. expected "
+                 "%zu number of UE entries but read %zu. Errno %s\n",
+                 filename.c_str(), expected_count, actual_count,
+                 strerror(errno));
+    throw std::runtime_error("Agora: Failed to read adapt UEs file");
   }
   if (kPrintAdaptUes) {
     std::printf("Agora: Adapted number of UEs across %zu frames\n",
-      config_->FramesToTest());
+                config_->FramesToTest());
     for (size_t n = 0; n < config_->FramesToTest(); n++) {
       std::printf("%u ", adapt_ues_array_.at(n));
     }

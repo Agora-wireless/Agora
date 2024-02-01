@@ -10,7 +10,6 @@
 
 #include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"
-#include "gettime.h"
 #include "config.h"
 #include "gettime.h"
 #include "message.h"
