@@ -34,7 +34,6 @@ ResourceProvisionerThread::ResourceProvisionerThread(
       cfg_->GetFrameDurationSec() * 1000, tsc_delta_);
 
   // RP sends control message of size defined by RPControlMsg
-  //sizeof(RPControlMsg);
   const size_t udp_pkt_len = 32;
   udp_pkt_buf_.resize(udp_pkt_len + kUdpRxBufferPadding);
 
@@ -52,9 +51,9 @@ ResourceProvisionerThread::~ResourceProvisionerThread() {
   AGORA_LOG_INFO("ResourceProvisionerThread: Thread destroyed\n");
 }
 
-void ResourceProvisionerThread::RequestEventFromAgora() {
+void ResourceProvisionerThread::RequestEventFromAgora(size_t msg_type) {
   // create event from pkt
-  EventData msg(EventType::kPacketToRp, 0);
+  EventData msg(EventType::kPacketToRp, msg_type);
   RtAssert(tx_queue_->enqueue(msg),
            "ResourceProvisionerThread: Failed to enqueue control packet");
 }
@@ -65,19 +64,32 @@ void ResourceProvisionerThread::RequestEventFromAgora() {
 void ResourceProvisionerThread::SendEventToAgora(const char* payload) {
   const auto* pkt = reinterpret_cast<const RPControlMsg*>(&payload[0]);
 
-  if (pkt->add_core_ == 0 && pkt->remove_core_ == 0) {
-    // request traffic data
-    AGORA_LOG_INFO("ResourceProvisionerThread: Requesting status from Agora\n");
-    RequestEventFromAgora();
-  } else {
-    // create event from pkt
-    EventData msg(EventType::kPacketFromRp, pkt->add_core_, pkt->remove_core_);
+  if (pkt->msg_type_ == 0) {
+    // request cores data
     AGORA_LOG_INFO(
-        "ResourceProvisionerThread: Sending core update data to Agora of "
-        "add_cores %zu, remove_cores %zu\n",
-        pkt->add_core_, pkt->remove_core_);
-    RtAssert(tx_queue_->enqueue(msg),
-             "ResourceProvisionerThread: Failed to enqueue control packet");
+        "ResourceProvisionerThread: Requesting initial cores allocation "
+        "details from Agora\n");
+    RequestEventFromAgora(pkt->msg_type_);
+  } else if (pkt->msg_type_ == 1) {
+    if (pkt->msg_arg_1_ == 0 && pkt->msg_arg_2_ == 0) {
+      // request traffic data
+      AGORA_LOG_INFO(
+          "ResourceProvisionerThread: Requesting current latency and cores "
+          "status from Agora\n");
+      RequestEventFromAgora(pkt->msg_type_);
+    } else {
+      // create event from pkt
+      AGORA_LOG_INFO(
+          "ResourceProvisionerThread: Sending core update data to Agora of "
+          "msg type %zu, add_cores %zu, remove_cores %zu\n",
+          pkt->msg_type_, pkt->msg_arg_1_, pkt->msg_arg_2_);
+      EventData msg(EventType::kPacketFromRp, pkt->msg_type_, pkt->msg_arg_1_,
+                    pkt->msg_arg_2_);
+      RtAssert(tx_queue_->enqueue(msg),
+               "ResourceProvisionerThread: Failed to enqueue control packet");
+    }
+  } else {
+    // Handle other message types
   }
 }
 
@@ -108,8 +120,8 @@ void ResourceProvisionerThread::ReceiveEventFromAgora() {
   if (event.event_type_ == EventType::kPacketToRp) {
     AGORA_LOG_INFO(
         "ResourceProvisionerThread: Received status from Agora of latency %zu, "
-        "core_num %zu\n",
-        event.tags_[0], event.tags_[1]);
+        "core_num %zu, frame %zu\n",
+        event.tags_[0], event.tags_[1], event.tags_[2]);
     SendUdpPacketsToRp(event);
   }
 }
@@ -117,8 +129,9 @@ void ResourceProvisionerThread::ReceiveEventFromAgora() {
 void ResourceProvisionerThread::SendUdpPacketsToRp(EventData event) {
   // Create traffic data packet
   RPStatusMsg msg;
-  msg.latency_ = event.tags_[0];
-  msg.core_num_ = event.tags_[1];
+  msg.status_msg_0_ = event.tags_[0];
+  msg.status_msg_1_ = event.tags_[1];
+  msg.status_msg_2_ = event.tags_[2];
   udp_comm_->Send(cfg_->RpRemoteHostName(), cfg_->RpTxPort(), (std::byte*)&msg,
                   sizeof(RPStatusMsg));
 }

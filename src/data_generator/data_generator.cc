@@ -361,7 +361,7 @@ size_t DataGenerator::DecodeBroadcastSlots(
   float phase_shift = 0;
   for (size_t j = 0; j < cfg->OfdmDataNum(); j++) {
     size_t sc_id = j + cfg->OfdmDataStart();
-    complex_float p = cfg->pilots()[j];
+    complex_float p = cfg->Pilots()[j];
     if (j % cfg->OfdmPilotSpacing() == 0) {
       csi_buff.at(j) = (bcast_buff_complex[sc_id] / arma::cx_float(p.re, p.im));
     } else {
@@ -430,7 +430,7 @@ void DataGenerator::GenBroadcastSlots(
                                      cfg->BcLdpcConfig().NumCbCodewLen(),
                                      cfg->OfdmDataNum(), cfg->BcModOrderBits());
     auto mapped_symbol = DataGenerator::MapOFDMSymbol(
-        cfg, modulated_vector, cfg->pilots(), SymbolType::kControl);
+        cfg, modulated_vector, cfg->Pilots(), SymbolType::kControl);
     auto ofdm_symbol = DataGenerator::BinForIfft(cfg, mapped_symbol, true);
     CommsLib::IFFT(&ofdm_symbol[0], cfg->OfdmCaNum(), false);
     // additional 2^2 (6dB) power backoff

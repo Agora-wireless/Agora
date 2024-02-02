@@ -10,8 +10,7 @@
 #ifndef FRAMESTATS_H_
 #define FRAMESTATS_H_
 
-#include <assert.h>
-
+#include <cassert>
 #include <stdexcept>
 #include <string>
 #include <vector>

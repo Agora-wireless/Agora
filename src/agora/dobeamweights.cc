@@ -15,6 +15,7 @@ static constexpr bool kUseSIMDGather = true;
 // This is faster but less accurate than using an SVD-based pseudoinverse.
 static constexpr bool kUseInverseForZF = true;
 static constexpr bool kUseUlZfForDownlink = true;
+static constexpr bool kPrintUlBeamWeights = false;
 
 DoBeamWeights::DoBeamWeights(
     Config* config, int tid,
@@ -220,8 +221,26 @@ void DoBeamWeights::ComputePrecoder(size_t frame_id, size_t cur_sc_id,
     const float rcond = arma::rcond(mat_csi.t() * mat_csi);
     phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
   }
+  if (kPrintUlBeamWeights) {
+    if (cur_sc_id == 0) {
+      std::printf(
+          "UL Beam Weights: frame_id %zu, cur_sc_id %zu, n_rows %lld, n_cols "
+          "%lld\n",
+          frame_id, cur_sc_id, mat_ul_beam.n_rows, mat_ul_beam.n_cols);
+      for (arma::uword i = 0; i < mat_ul_beam.n_rows; ++i) {
+        for (arma::uword j = 0; j < mat_ul_beam.n_cols; ++j) {
+          std::printf(
+              "(%.3f"
+              "+1j*"
+              "%.3f) ",
+              mat_ul_beam(i, j).real(), mat_ul_beam(i, j).imag());
+        }
+        std::printf("\n");
+      }
+      std::printf("\n");
+    }
+  }
 }
-
 // Called for each frame_id / sc_id
 // Updates calib_sc_vec
 void DoBeamWeights::ComputeCalib(size_t frame_id, size_t sc_id,

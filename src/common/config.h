@@ -42,6 +42,7 @@ class Config {
   inline size_t BfAntNum() const { return this->bf_ant_num_; }
   inline size_t UeNum() const { return this->ue_num_; }
   inline size_t UeAntNum() const { return this->ue_ant_num_; }
+  inline bool AdaptUes() const { return this->adapt_ues_; }
   inline size_t UeAntOffset() const { return this->ue_ant_offset_; }
   inline size_t UeAntTotal() const { return this->ue_ant_total_; }
 
@@ -114,6 +115,9 @@ class Config {
   inline bool ImbalanceCalEn() const { return this->imbalance_cal_en_; }
   inline size_t BeamformingAlgo() const { return this->beamforming_algo_; }
   inline std::string Beamforming() const { return this->beamforming_str_; }
+  inline void UpdateSpatialStreamsNum(size_t num_spatial_streams) {
+    this->num_spatial_streams_ = num_spatial_streams;
+  }
   inline size_t SpatialStreamsNum() const { return this->num_spatial_streams_; }
   inline bool ExternalRefNode(size_t id) const {
     return this->external_ref_node_.at(id);
@@ -380,7 +384,7 @@ class Config {
 
   inline const std::vector<uint32_t>& Pilot() const { return this->pilot_; };
   inline const std::vector<uint32_t>& Beacon() const { return this->beacon_; };
-  inline const complex_float* pilots(void) const { return this->pilots_; };
+  inline const complex_float* Pilots() const { return this->pilots_; };
   inline const complex_float* PilotsSgn() const { return this->pilots_sgn_; };
   inline const std::vector<std::complex<float>>& CommonPilot() const {
     return this->common_pilot_;
@@ -488,6 +492,11 @@ class Config {
     return (frame_id % kFrameWnd) *
                (this->frame_.NumDlControlSyms() + this->frame_.NumDLSyms()) +
            symbol_idx_dl;
+  }
+
+  /// Return the symbol duration in seconds
+  inline double GetSymbolDurationSec() const {
+    return (this->samps_per_symbol_ / this->rate_);
   }
 
   /// Return the frame duration in seconds
@@ -613,6 +622,124 @@ class Config {
   }
   inline bool FiveGFrame() const { return fivegframe_; }
 
+  inline void TryEnqueueLogStatsMaster(
+      moodycamel::ConcurrentQueue<EventData>* mc_queue,
+      moodycamel::ProducerToken* producer_token, const EventData& event,
+      size_t frame_id, size_t symbol_id) {
+    size_t enqueue_start_tsc = 0;
+    size_t enqueue_end_tsc = 0;
+    if (frame_id == this->frame_to_profile_) {
+      enqueue_start_tsc = GetTime::WorkerRdtsc();
+    }
+    TryEnqueueFallback(mc_queue, producer_token, event);
+    if (frame_id == this->frame_to_profile_) {
+      enqueue_end_tsc = GetTime::WorkerRdtsc();
+      enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_start_ =
+          enqueue_start_tsc;
+      enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_end_ =
+          enqueue_end_tsc;
+      enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].event_type_ =
+          event.event_type_;
+      enqueue_stats_id_.at(symbol_id)++;
+    }
+  }
+
+  inline void TryEnqueueLogStatsMaster(
+      moodycamel::ConcurrentQueue<EventData>* mc_queue, const EventData& event,
+      size_t frame_id, size_t symbol_id) {
+    size_t enqueue_start_tsc = 0;
+    size_t enqueue_end_tsc = 0;
+    if (frame_id == this->frame_to_profile_) {
+      enqueue_start_tsc = GetTime::WorkerRdtsc();
+    }
+    TryEnqueueFallback(mc_queue, event);
+    if (frame_id == this->frame_to_profile_) {
+      enqueue_end_tsc = GetTime::WorkerRdtsc();
+      enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_start_ =
+          enqueue_start_tsc;
+      enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].tsc_end_ =
+          enqueue_end_tsc;
+      enqueue_stats_[symbol_id][enqueue_stats_id_.at(symbol_id)].event_type_ =
+          event.event_type_;
+      enqueue_stats_id_.at(symbol_id)++;
+    }
+  }
+
+  inline void LogDequeueStatsMaster(EventType event_type, size_t frame_id,
+                                    size_t tsc_dequeue_start,
+                                    size_t tsc_dequeue_end) {
+    dequeue_stats_[dequeue_stats_id_].tsc_start_ = tsc_dequeue_start;
+    dequeue_stats_[dequeue_stats_id_].tsc_end_ = tsc_dequeue_end;
+    dequeue_stats_[dequeue_stats_id_].event_type_ = event_type;
+    dequeue_stats_id_++;
+  }
+
+  inline void UpdateDequeueTscWorker(int tid, size_t frame_id,
+                                     size_t dequeue_tsc,
+                                     size_t valid_dequeue_tsc) {
+    total_worker_dequeue_tsc_[tid][frame_id] += dequeue_tsc;
+    total_worker_valid_dequeue_tsc_[tid][frame_id] += valid_dequeue_tsc;
+  }
+
+  inline void UpdateEnqueueTscWorker(int tid, size_t frame_id,
+                                     size_t enqueue_tsc) {
+    total_worker_enqueue_tsc_[tid][frame_id] += enqueue_tsc;
+    worker_num_valid_enqueue_[tid][frame_id]++;
+  }
+
+  inline void LogEnqueueStatsWorker(int tid, size_t symbol_id, size_t start_tsc,
+                                    size_t end_tsc, EventType event_type) {
+    size_t id = worker_enqueue_stats_id_[tid][symbol_id];
+    worker_enqueue_stats_[tid][symbol_id][id].tsc_start_ = start_tsc;
+    worker_enqueue_stats_[tid][symbol_id][id].tsc_end_ = end_tsc;
+    worker_enqueue_stats_[tid][symbol_id][id].event_type_ = event_type;
+    worker_enqueue_stats_id_[tid][symbol_id]++;
+  }
+
+  inline void LogDequeueStatsWorker(int tid, size_t symbol_id, size_t start_tsc,
+                                    size_t end_tsc, EventType event_type) {
+    size_t id = worker_dequeue_stats_id_[tid][symbol_id];
+    worker_dequeue_stats_[tid][symbol_id][id].tsc_start_ = start_tsc;
+    worker_dequeue_stats_[tid][symbol_id][id].tsc_end_ = end_tsc;
+    worker_dequeue_stats_[tid][symbol_id][id].event_type_ = event_type;
+    worker_dequeue_stats_id_[tid][symbol_id]++;
+  }
+
+  // Task enqueue/dequeue start and end timestamps and task type
+  struct QueueTsStat {
+    EventType event_type_;
+    size_t tsc_start_ = 0;  // Unit = TSC cycles
+    size_t tsc_end_ = 0;    // Unit = TSC cycles
+  };
+
+  std::array<std::array<QueueTsStat, kMaxLoggingEventsMaster>, kMaxSymbols>
+      enqueue_stats_;
+  std::array<QueueTsStat, kMaxLoggingEventsMaster> dequeue_stats_;
+  std::array<size_t, kMaxSymbols> enqueue_stats_id_ = {};
+  size_t dequeue_stats_id_ = 0;
+
+  std::array<std::array<size_t, kNumStatsFrames>, kMaxThreads>
+      total_worker_dequeue_tsc_ = {};
+  std::array<std::array<size_t, kNumStatsFrames>, kMaxThreads>
+      total_worker_enqueue_tsc_ = {};
+  std::array<std::array<size_t, kNumStatsFrames>, kMaxThreads>
+      total_worker_valid_dequeue_tsc_ = {};
+  std::array<std::array<size_t, kNumStatsFrames>, kMaxThreads>
+      worker_num_valid_enqueue_ = {};
+
+  std::array<
+      std::array<std::array<QueueTsStat, kMaxLoggingEventsWorker>, kMaxSymbols>,
+      kMaxThreads>
+      worker_enqueue_stats_;
+  std::array<
+      std::array<std::array<QueueTsStat, kMaxLoggingEventsWorker>, kMaxSymbols>,
+      kMaxThreads>
+      worker_dequeue_stats_;
+  std::array<std::array<size_t, kMaxSymbols>, kMaxThreads>
+      worker_enqueue_stats_id_ = {};
+  std::array<std::array<size_t, kMaxSymbols>, kMaxThreads>
+      worker_dequeue_stats_id_ = {};
+
  private:
   void Print() const;
   nlohmann::json Parse(const nlohmann::json& in_json,
@@ -642,6 +769,9 @@ class Config {
   size_t ue_num_;
   // The count of ue antennas an instance is responsable for
   size_t ue_ant_num_;
+  // Feature to adapt the number of ues from 1 to ue_ant_num_
+  // across frames_to_test_ frames
+  bool adapt_ues_;
 
   // Total number of us antennas in this experiment including the ones
   // instantiated on other runs/machines.

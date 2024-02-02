@@ -9,8 +9,9 @@
 #include "datatype_conversion.h"
 #include "logger.h"
 
-static constexpr bool kPrintFFTInput = false;
-static constexpr bool kPrintInputPilot = false;
+static constexpr bool kPrintFFTInputFixed = false;
+static constexpr bool kPrintFFTInputFloat = false;
+static constexpr bool kPrintFFTOutputFloat = false;
 static constexpr bool kPrintPilotCorrStats = false;
 
 DoFFT::DoFFT(Config* config, size_t tid, Table<complex_float>& data_buffer,
@@ -217,7 +218,7 @@ EventData DoFFT::Launch(size_t tag) {
             "sig_offset %zu, peak %2.4f\n",
             tid_, frame_id, symbol_id, ant_id, sig_offset, peak);
       }
-      if (kPrintInputPilot && sym_type == SymbolType::kPilot) {
+      if (kPrintFFTInputFixed) {
         std::stringstream ss;
         ss << "FFT_input_" << symbol_id << "_" << ant_id << "=[";
         for (size_t i = 0; i < cfg_->SampsPerSymbol(); i++) {
@@ -226,7 +227,7 @@ EventData DoFFT::Launch(size_t tag) {
         ss << "];" << std::endl;
         std::cout << ss.str();
       }
-      if (kPrintFFTInput) {
+      if (kPrintFFTInputFloat) {
         std::stringstream ss;
         ss << "FFT_input_" << symbol_id << "_" << ant_id << "=[";
         for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
@@ -356,6 +357,18 @@ EventData DoFFT::Launch(size_t tag) {
         std::to_string(symbol_id) + std::string(" antenna ") +
         std::to_string(ant_id) + "\n";
     RtAssert(false, error_message);
+  }
+
+  if (kPrintFFTOutputFloat) {  // FFT is computed in-place
+    std::stringstream ss;
+    ss << "FFT_output_" << frame_id << "_" << symbol_id << "_" << ant_id
+       << "=[";
+    for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
+      ss << std::fixed << std::setw(5) << std::setprecision(3)
+         << fft_inout_[i].re << "+1j*" << fft_inout_[i].im << " ";
+    }
+    ss << "];" << std::endl;
+    std::cout << ss.str();
   }
 
   duration_stat->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc2;
