@@ -444,6 +444,7 @@ set(COMMON_SOURCES
   src/common/scrambler.cc
   src/mac/mac_scheduler.cc
   src/mac/schedulers/scheduler_model.cc
+  src/mac/schedulers/custom_schedule.cc
   src/mac/schedulers/round_robbin.cc
   src/mac/schedulers/proportional_fairness.cc
   src/common/ipc/udp_comm.cc

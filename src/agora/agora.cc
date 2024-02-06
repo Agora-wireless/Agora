@@ -258,8 +258,9 @@ void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
 void Agora::ScheduleCodeblocks(EventType event_type, Direction dir,
                                size_t frame_id, size_t symbol_idx) {
   auto base_tag = gen_tag_t::FrmSymCb(frame_id, symbol_idx, 0);
-  const size_t num_tasks = config_->SpatialStreamsNum() *
-                           config_->LdpcConfig(dir).NumBlocksInSymbol();
+  auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0);
+  const size_t num_tasks =
+      ue_list.n_elem * config_->LdpcConfig(dir).NumBlocksInSymbol();
   size_t num_blocks = num_tasks / config_->EncodeBlockSize();
   const size_t num_remainder = num_tasks % config_->EncodeBlockSize();
   if (num_remainder > 0) {
@@ -288,7 +289,8 @@ void Agora::ScheduleUsers(EventType event_type, size_t frame_id,
   assert(event_type == EventType::kPacketToMac);
   auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
 
-  for (size_t i = 0; i < config_->SpatialStreamsNum(); i++) {
+  auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0);
+  for (size_t i = 0; i < ue_list.n_elem; i++) {
     TryEnqueueFallback(&mac_request_queue_,
                        EventData(EventType::kPacketToMac, base_tag.tag_));
     base_tag.ue_id_++;
@@ -404,19 +406,8 @@ void Agora::Start() {
           RxPacket* rx = rx_tag_t(event.tags_[0u]).rx_packet_;
           Packet* pkt = rx->RawPacket();
 
-          if ((config_->AdaptUes() == true) and
-              (config_->SpatialStreamsNum() !=
-               adapt_ues_array_.at(pkt->frame_id_))) {
-            AGORA_LOG_INFO(
-                "[ALERTTTTTT]: Spatial Streams Update!!! "
-                "configured/previous number of spatial streams: %zu, "
-                "updated number of spatial streams: %zu, frame id: %zu \n",
-                config_->SpatialStreamsNum(),
-                adapt_ues_array_.at(pkt->frame_id_),
-                frame_tracking_.cur_proc_frame_id_);
-            config_->UpdateSpatialStreamsNum(
-                adapt_ues_array_.at(pkt->frame_id_));
-            ReInitializeCounters();
+          if (config_->AdaptUes() == true && pkt->frame_id_ > 0) {
+            ReInitializeCounters(pkt->frame_id_);
           }
 
           AGORA_LOG_TRACE(
@@ -1171,26 +1162,36 @@ void Agora::FreeQueues() {
   }
 }
 
-void Agora::ReInitializeCounters() {
+void Agora::ReInitializeCounters(size_t frame_id) {
   const auto& cfg = config_;
+  RtAssert(frame_id > 0, "Counters cannot be re-initialized at frame 0");
+  auto ue_list0 = mac_sched_->ScheduledUeList(frame_id - 1, 0u);
+  auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+  if (ue_list.n_elem != ue_list0.n_elem) {
+    AGORA_LOG_INFO(
+        "[ALERTTTTTT]: Spatial Streams Update!!! "
+        "configured/previous number of spatial streams: %zu, "
+        "updated number of spatial streams: %zu, frame id: %zu \n",
+        ue_list0.n_elem, ue_list.n_elem, frame_tracking_.cur_proc_frame_id_);
+    AGORA_LOG_INFO(
+        "Agora: Re-Initializing counters with %zu spatial stream(s)\n",
+        ue_list.n_elem);
 
-  AGORA_LOG_INFO("Agora: Re-Initializing counters with %zu spatial stream(s)\n",
-                 cfg->SpatialStreamsNum());
+    decode_counters_.Init(
+        cfg->Frame().NumULSyms(),
+        cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
+            ue_list.n_elem);
 
-  decode_counters_.Init(
-      cfg->Frame().NumULSyms(),
-      cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
-          cfg->SpatialStreamsNum());
+    tomac_counters_.Init(cfg->Frame().NumULSyms(), cfg->SpatialStreamsNum());
 
-  tomac_counters_.Init(cfg->Frame().NumULSyms(), cfg->SpatialStreamsNum());
-
-  if (config_->Frame().NumDLSyms() > 0) {
-    encode_counters_.Init(
-        config_->Frame().NumDlDataSyms(),
-        config_->LdpcConfig(Direction::kDownlink).NumBlocksInSymbol() *
-            config_->SpatialStreamsNum());
-    // mac data is sent per frame, so we set max symbol to 1
-    mac_to_phy_counters_.Init(1, config_->SpatialStreamsNum());
+    if (config_->Frame().NumDLSyms() > 0) {
+      encode_counters_.Init(
+          config_->Frame().NumDlDataSyms(),
+          config_->LdpcConfig(Direction::kDownlink).NumBlocksInSymbol() *
+              ue_list.n_elem);
+      // mac data is sent per frame, so we set max symbol to 1
+      mac_to_phy_counters_.Init(1, ue_list.n_elem);
+    }
   }
 }
 
@@ -1381,14 +1382,14 @@ void Agora::SaveDecodeDataToFile(int frame_id) {
   const size_t num_decoded_bytes =
       cfg->NumBytesPerCb(Direction::kUplink) *
       cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
-
+  auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0 /*sc_id*/);
   AGORA_LOG_INFO("Saving decode data to %s\n", kDecodeDataFilename.c_str());
   auto* fp = std::fopen(kDecodeDataFilename.c_str(), "wb");
   if (fp == nullptr) {
     AGORA_LOG_ERROR("SaveDecodeDataToFile error creating file pointer\n");
   } else {
     for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
-      for (size_t j = 0; j < cfg->SpatialStreamsNum(); j++) {
+      for (const auto& j : ue_list) {
         const int8_t* ptr =
             agora_memory_->GetDecod()[(frame_id % kFrameWnd)][i][j];
         const auto write_status =
@@ -1495,7 +1496,8 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
     this->ifft_counters_.Reset(frame_id);
     this->tx_counters_.Reset(frame_id);
     if (config_->Frame().NumDLSyms() > 0) {
-      for (size_t ue_id = 0; ue_id < config_->SpatialStreamsNum(); ue_id++) {
+      auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0 /*sc_id*/);
+      for (const auto& ue_id : ue_list) {
         this->agora_memory_->GetDlBitsStatus()[ue_id][frame_id % kFrameWnd] = 0;
       }
     }

@@ -115,9 +115,6 @@ class Config {
   inline bool ImbalanceCalEn() const { return this->imbalance_cal_en_; }
   inline size_t BeamformingAlgo() const { return this->beamforming_algo_; }
   inline std::string Beamforming() const { return this->beamforming_str_; }
-  inline void UpdateSpatialStreamsNum(size_t num_spatial_streams) {
-    this->num_spatial_streams_ = num_spatial_streams;
-  }
   inline size_t SpatialStreamsNum() const { return this->num_spatial_streams_; }
   inline bool ExternalRefNode(size_t id) const {
     return this->external_ref_node_.at(id);
