@@ -54,13 +54,13 @@ static void ReadFromFileDl(const std::string& filename, Table<short>& data,
                (ofdm_size * 2), sizeof(short));
 }
 
-static unsigned int CheckCorrectnessUl(Config const* const cfg) {
-  int bs_ant_num = cfg->BsAntNum();
-  int ue_num = cfg->UeAntNum();
-  int spatial_streams_num = cfg->SpatialStreamsNum();
-  int num_uplink_syms = cfg->Frame().NumULSyms();
-  int ofdm_data_num = cfg->OfdmDataNum();
-  int ul_pilot_syms = cfg->Frame().ClientUlPilotSymbols();
+static unsigned int CheckCorrectnessUl(Config const* const cfg,
+                                       size_t spatial_streams_num) {
+  size_t bs_ant_num = cfg->BsAntNum();
+  size_t ue_num = cfg->UeAntNum();
+  size_t num_uplink_syms = cfg->Frame().NumULSyms();
+  size_t ofdm_data_num = cfg->OfdmDataNum();
+  size_t ul_pilot_syms = cfg->Frame().ClientUlPilotSymbols();
 
   const std::string raw_data_filename = kUlCheckFilePrefix +
                                         std::to_string(cfg->OfdmCaNum()) +
@@ -73,32 +73,32 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg) {
   output_data.Calloc(num_uplink_syms, (ofdm_data_num * spatial_streams_num),
                      Agora_memory::Alignment_t::kAlign64);
 
-  int num_bytes_per_ue =
+  size_t num_bytes_per_ue =
       (cfg->LdpcConfig(Direction::kUplink).NumCbLen() + 7) >>
       3 * cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
   ReadFromFileUl(raw_data_filename, raw_data, ue_num, num_bytes_per_ue, cfg);
   ReadFromFileUl(kDecodedFilename, output_data, spatial_streams_num,
                  num_bytes_per_ue, cfg);
   std::printf(
-      "check_correctness_ul: bs ant %d, ues %d, spatial streams (last frame) "
-      "%d, "
-      "ul syms %d, ofdm %d, ul pilots %d, bytes per UE %d.\n",
+      "check_correctness_ul: bs ant %zu, ues %zu, spatial streams (last frame) "
+      "%zu, "
+      "ul syms %zu, ofdm %zu, ul pilots %zu, bytes per UE %zu.\n",
       bs_ant_num, ue_num, spatial_streams_num, num_uplink_syms, ofdm_data_num,
       ul_pilot_syms, num_bytes_per_ue);
 
   unsigned int error_cnt = 0;
   unsigned int total_count = 0;
-  for (int i = 0; i < num_uplink_syms; i++) {
+  for (size_t i = 0; i < num_uplink_syms; i++) {
     if (i >= ul_pilot_syms) {
-      for (int ue = 0; ue < spatial_streams_num; ue++) {
-        for (int j = 0; j < num_bytes_per_ue; j++) {
+      for (size_t ue = 0; ue < spatial_streams_num; ue++) {
+        for (size_t j = 0; j < num_bytes_per_ue; j++) {
           total_count++;
-          int offset_in_raw = num_bytes_per_ue * ue + j;
-          int offset_in_output = num_bytes_per_ue * ue + j;
+          size_t offset_in_raw = num_bytes_per_ue * ue + j;
+          size_t offset_in_output = num_bytes_per_ue * ue + j;
           if (raw_data[i][offset_in_raw] != output_data[i][offset_in_output]) {
             error_cnt++;
             if (kDebugPrintUlCorr) {
-              std::printf("(%d, %d, %d, %u, %u)\n", i, ue, j,
+              std::printf("(%zu, %zu, %zu, %u, %u)\n", i, ue, j,
                           raw_data[i][offset_in_raw],
                           output_data[i][offset_in_output]);
             }
@@ -114,10 +114,10 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg) {
   return error_cnt;
 }
 
-unsigned int CheckCorrectnessDl(Config const* const cfg) {
+unsigned int CheckCorrectnessDl(Config const* const cfg,
+                                size_t spatial_streams_num) {
   const size_t bs_ant_num = cfg->BsAntNum();
   const size_t ue_num = cfg->UeAntNum();
-  const size_t spatial_streams_num = cfg->SpatialStreamsNum();
   const size_t num_data_syms = cfg->Frame().NumDLSyms();
   const size_t ofdm_ca_num = cfg->OfdmCaNum();
   const size_t samps_per_symbol = cfg->SampsPerSymbol();
@@ -175,12 +175,13 @@ unsigned int CheckCorrectnessDl(Config const* const cfg) {
   return error_cnt;
 }
 
-static unsigned int CheckCorrectness(Config const* const cfg) {
+static unsigned int CheckCorrectness(Config const* const cfg,
+                                     size_t spatial_streams_num) {
   unsigned int ul_error_count = 0;
   unsigned int dl_error_count = 0;
-  ul_error_count = CheckCorrectnessUl(cfg);
+  ul_error_count = CheckCorrectnessUl(cfg, spatial_streams_num);
   std::printf("Uplink error count: %d\n", ul_error_count);
-  dl_error_count = CheckCorrectnessDl(cfg);
+  dl_error_count = CheckCorrectnessDl(cfg, spatial_streams_num);
   std::printf("Downlink error count: %d\n", dl_error_count);
   return ul_error_count + dl_error_count;
 }
@@ -207,6 +208,7 @@ int main(int argc, char* argv[]) {
 
   auto cfg = std::make_unique<Config>(conf_file.c_str());
   cfg->LoadTestVectors();
+  auto mac_sched = std::make_unique<MacScheduler>(cfg.get());
 
   int ret;
   try {
@@ -221,15 +223,16 @@ int main(int argc, char* argv[]) {
     unsigned int error_count = 0;
     std::string test_name;
 
+    auto ue_list = mac_sched->ScheduledUeList(cfg->FramesToTest() - 1, 0);
     if ((cfg->Frame().NumDLSyms() > 0) && (cfg->Frame().NumULSyms() > 0)) {
       test_name = "combined";
-      error_count = CheckCorrectness(cfg.get());
+      error_count = CheckCorrectness(cfg.get(), ue_list.n_elem);
     } else if (cfg->Frame().NumDLSyms() > 0) {
       test_name = "downlink";
-      error_count = CheckCorrectnessDl(cfg.get());
+      error_count = CheckCorrectnessDl(cfg.get(), ue_list.n_elem);
     } else if (cfg->Frame().NumULSyms() > 0) {
       test_name = "uplink";
-      error_count = CheckCorrectnessUl(cfg.get());
+      error_count = CheckCorrectnessUl(cfg.get(), ue_list.n_elem);
     } else {
       // Should never happen
       assert(false);

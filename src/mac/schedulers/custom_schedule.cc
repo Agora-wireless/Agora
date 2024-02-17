@@ -10,7 +10,8 @@ CustomSchedule::CustomSchedule(Config* const cfg) : SchedulerModel(cfg) {
   static const std::string kFilename =
       directory + "adapt_ueant" + std::to_string(cfg_->UeAntNum()) + ".bin";
   AGORA_LOG_INFO(
-      "Agora: Reading adaptable number of UEs across frames from %s\n",
+      "Custom MAC Scheduler: Reading adaptable number of UEs across frames "
+      "from %s\n",
       kFilename.c_str());
 
   FILE* fp = std::fopen(kFilename.c_str(), "rb");
@@ -21,11 +22,11 @@ CustomSchedule::CustomSchedule(Config* const cfg) : SchedulerModel(cfg) {
       std::fread(&adapt_ues_array_.at(0), sizeof(uint8_t), expected_count, fp);
 
   if (expected_count != actual_count) {
-    std::fprintf(stderr,
-                 "Agora: Failed to read adapt UEs file %s. expected "
-                 "%zu number of UE entries but read %zu. Errno %s\n",
-                 kFilename.c_str(), expected_count, actual_count,
-                 strerror(errno));
+    std::fprintf(
+        stderr,
+        "Custom MAC Scheduler: Failed to read adapt UEs file %s. expected "
+        "%zu number of UE entries but read %zu. Errno %s\n",
+        kFilename.c_str(), expected_count, actual_count, strerror(errno));
     throw std::runtime_error("Agora: Failed to read adapt UEs file");
   }
   schedule_buffer_.Calloc(num_groups_, cfg_->UeAntNum() * cfg_->OfdmDataNum(),

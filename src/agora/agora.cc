@@ -406,10 +406,6 @@ void Agora::Start() {
           RxPacket* rx = rx_tag_t(event.tags_[0u]).rx_packet_;
           Packet* pkt = rx->RawPacket();
 
-          if (config_->AdaptUes() == true && pkt->frame_id_ > 0) {
-            ReInitializeCounters(pkt->frame_id_);
-          }
-
           AGORA_LOG_TRACE(
               "Agora: event_type_ %s, cur_sche_frame_id_ %zu, "
               "frame_id_ %zu, symbol_id_ %zu, ant_id_ %zu, adapt ue(s) %zu\n",
@@ -559,8 +555,9 @@ void Agora::Start() {
           const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
 
-          const bool last_decode_task =
-              this->decode_counters_.CompleteTask(frame_id, symbol_id);
+          auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+          const bool last_decode_task = this->decode_counters_.CompleteTask(
+              frame_id, symbol_id, ue_list.n_elem);
           if (last_decode_task == true) {
             if constexpr (kEnableMac) {
               ScheduleUsers(EventType::kPacketToMac, frame_id, symbol_id);
@@ -658,8 +655,9 @@ void Agora::Start() {
           const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
 
-          const bool last_tomac_task =
-              this->tomac_counters_.CompleteTask(frame_id, symbol_id);
+          auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+          const bool last_tomac_task = this->tomac_counters_.CompleteTask(
+              frame_id, symbol_id, ue_list.n_elem);
           if (last_tomac_task == true) {
             stats_->PrintPerSymbolDone(
                 PrintType::kPacketToMac, frame_id, symbol_id,
@@ -712,9 +710,10 @@ void Agora::Start() {
             AGORA_LOG_INFO("%s\n", ss.str().c_str());
           }
 
+          auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
           const size_t frame_id = pkt->Frame();
-          const bool last_ue =
-              this->mac_to_phy_counters_.CompleteTask(frame_id, 0);
+          const bool last_ue = this->mac_to_phy_counters_.CompleteTask(
+              frame_id, 0, ue_list.n_elem);
           if (last_ue == true) {
             // schedule this frame's encoding
             // Defer the schedule.  If frames are already deferred or the
@@ -740,8 +739,9 @@ void Agora::Start() {
             const size_t frame_id = gen_tag_t(event.tags_[i]).frame_id_;
             const size_t symbol_id = gen_tag_t(event.tags_[i]).symbol_id_;
 
-            const bool last_encode_task =
-                encode_counters_.CompleteTask(frame_id, symbol_id);
+            auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+            const bool last_encode_task = encode_counters_.CompleteTask(
+                frame_id, symbol_id, ue_list.n_elem);
             if (last_encode_task == true) {
               this->encode_cur_frame_for_symbol_.at(
                   cfg->Frame().GetDLSymbolIdx(symbol_id)) = frame_id;
@@ -1159,39 +1159,6 @@ void Agora::FreeQueues() {
     delete tx_ptoks_ptr_[i];
     rx_ptoks_ptr_[i] = nullptr;
     tx_ptoks_ptr_[i] = nullptr;
-  }
-}
-
-void Agora::ReInitializeCounters(size_t frame_id) {
-  const auto& cfg = config_;
-  RtAssert(frame_id > 0, "Counters cannot be re-initialized at frame 0");
-  auto ue_list0 = mac_sched_->ScheduledUeList(frame_id - 1, 0u);
-  auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
-  if (ue_list.n_elem != ue_list0.n_elem) {
-    AGORA_LOG_INFO(
-        "[ALERTTTTTT]: Spatial Streams Update!!! "
-        "configured/previous number of spatial streams: %zu, "
-        "updated number of spatial streams: %zu, frame id: %zu \n",
-        ue_list0.n_elem, ue_list.n_elem, frame_tracking_.cur_proc_frame_id_);
-    AGORA_LOG_INFO(
-        "Agora: Re-Initializing counters with %zu spatial stream(s)\n",
-        ue_list.n_elem);
-
-    decode_counters_.Init(
-        cfg->Frame().NumULSyms(),
-        cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
-            ue_list.n_elem);
-
-    tomac_counters_.Init(cfg->Frame().NumULSyms(), cfg->SpatialStreamsNum());
-
-    if (config_->Frame().NumDLSyms() > 0) {
-      encode_counters_.Init(
-          config_->Frame().NumDlDataSyms(),
-          config_->LdpcConfig(Direction::kDownlink).NumBlocksInSymbol() *
-              ue_list.n_elem);
-      // mac data is sent per frame, so we set max symbol to 1
-      mac_to_phy_counters_.Init(1, ue_list.n_elem);
-    }
   }
 }
 
