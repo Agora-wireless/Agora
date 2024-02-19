@@ -153,9 +153,8 @@ EventData DoEncode::Launch(size_t tag) {
     AGORA_LOG_INFO("ldpc output (%zu %zu %zu): %s\n", frame_id, symbol_idx,
                    ue_id, dataprint.str().c_str());
   }
-  int8_t* mod_buffer_ptr =
-      cfg_->GetModBitsBuf(mod_bits_buffer_, dir_, frame_id, data_symbol_idx,
-                          sched_ue_id, cur_cb_id);
+  int8_t* mod_buffer_ptr = cfg_->GetModBitsBuf(
+      mod_bits_buffer_, dir_, frame_id, data_symbol_idx, ue_id, cur_cb_id);
 
   if (kPrintRawMacData && dir_ == Direction::kUplink) {
     std::printf("Encoded data - placed at location (%zu %zu %zu) %zu\n",
