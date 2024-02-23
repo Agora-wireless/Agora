@@ -65,6 +65,15 @@ FrameStats::FrameStats(std::string new_d)
       }
     }
   }
+  #if 0
+  AGORA_LOG_INFO("DEBUG: FR: %zu, DL NUM: %zu, UL NUM: %zu\n", frame_identifier_.length(), dl_symbols_.size(), ul_symbols_.size());
+  for (size_t i = 0; i < dl_symbols_.size(); i++) {
+    AGORA_LOG_INFO("DEBUG: i: %zu, DL: %zu\n", i, dl_symbols_.at(i));
+  }
+  for (size_t i = 0; i < ul_symbols_.size(); i++) {
+    AGORA_LOG_INFO("DEBUG: i: %zu, UL: %zu\n", i, ul_symbols_.at(i));
+  }
+  #endif
 }
 
 FrameStats::FrameStats(std::string new_d, size_t ul, size_t dl)
@@ -116,12 +125,20 @@ size_t FrameStats::NumDataSyms() const {
           (this->pilot_symbols_.size() + this->beacon_symbols_.size()));
 }
 
+size_t FrameStats::GetDLDataSymbolStart() const {
+  return this->dl_symbols_.size();
+}
+
 size_t FrameStats::GetDLSymbol(size_t location) const {
   return this->dl_symbols_.at(location);
 }
 
 size_t FrameStats::GetDLCalSymbol(size_t location) const {
   return this->dl_cal_symbols_.at(location);
+}
+
+size_t FrameStats::GetULDataSymbolStart() const {
+  return this->ul_symbols_.size();
 }
 
 size_t FrameStats::GetULSymbol(size_t location) const {
@@ -152,6 +169,7 @@ size_t FrameStats::GetSymbolIdx(const std::vector<size_t>& search_vector,
   const auto [start, finish] = std::equal_range(
       search_vector.begin(), search_vector.end(), symbol_number);
 
+  // std::printf("DEBUG: symbol_number: %zu, search_vector.begin(): %zu, search_vector.end(): %zu, start: %zu, finish: %zu\n", symbol_number, static_cast<size_t>(*search_vector.begin()), static_cast<size_t>(*(search_vector.end() - 1)), static_cast<size_t>(*start), static_cast<size_t>(*finish));
   if (start == finish) {
     return SIZE_MAX;
   } else if ((start + 1) == finish) {

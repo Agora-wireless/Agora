@@ -208,6 +208,8 @@ static constexpr bool kEnableMatLog = true;
 static constexpr bool kEnableMatLog = false;
 #endif
 
+static constexpr bool kCbSfScheduling = true;
+
 // Use 12-bit IQ sample to reduce network throughput
 static constexpr bool kUse12BitIQ = false;
 static constexpr bool kDebug12BitIQ = false;
@@ -312,13 +314,15 @@ static const std::map<char, SymbolType> kSymbolMap = {
 
 enum class SubcarrierType { kNull, kDMRS, kPTRS, kData };
 
-// Maximum number of events allowed for all threads per symbol in a logging frame
-static constexpr size_t kMaxLoggingEventsMaster = 100000;
+// Number of subcarriers in a PRB
+static constexpr size_t kNumScPerPRB = 12;
 
-// Maximum number of events allowed per thread per symbol in a logging frame
-static constexpr size_t kMaxLoggingEventsWorker = 1024;
+// Maximum number of data symbols in a slot
+static constexpr size_t kMaxNumDataSymbPerSlot = 12;
 
 // Maximum number of symbols per frame allowed by Agora
+// Symbol dimension is used for code blocks for now
+// TBD: Update symbol dimension to store code blocks
 static constexpr size_t kMaxSymbols = 140;
 
 // Maximum number of OFDM data subcarriers in the 5G spec

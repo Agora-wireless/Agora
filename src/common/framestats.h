@@ -37,6 +37,7 @@ class FrameStats {
 
   /* Returns SIZE_MAX if symbol number is not a beacon */
   size_t GetBeaconSymbolIdx(size_t symbol_number) const;
+  size_t GetDLDataSymbolStart() const;
   size_t GetDLControlSymbolIdx(size_t symbol_number) const;
   size_t GetDLSymbol(size_t location) const;
   inline size_t GetDLDataSymbol(size_t location) const {
@@ -48,6 +49,7 @@ class FrameStats {
   /* Returns SIZE_MAX if there are no DL symbols */
   size_t GetDLSymbolIdx(size_t symbol_number) const;
 
+  size_t GetULDataSymbolStart() const;
   size_t GetULSymbol(size_t location) const;
   inline size_t GetULDataSymbol(size_t location) const {
     return GetULSymbol(location + client_ul_pilot_symbols_);
