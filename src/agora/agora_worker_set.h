@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "agora_buffer.h"
+#include "agora_worker.h"
 #include "config.h"
 #include "csv_logger.h"
 #include "mac_scheduler.h"
@@ -29,16 +30,16 @@ class AgoraWorkerSet {
   size_t GetCoresInfo();
 
  private:
-  void WorkerThread(int tid);
-  void CreateThreads();
+  void CreateWorkers();
 
   const size_t base_worker_core_offset_;
-
   Config* const config_;
 
-  std::vector<std::thread> workers_;
+  //std::vector<std::thread> workers_;
+  std::vector<std::unique_ptr<AgoraWorker>> workers_;
   std::vector<bool> active_core_;
 
+  //Pass through classes
   MacScheduler* mac_sched_;
   Stats* stats_;
   PhyStats* phy_stats_;

@@ -1315,8 +1315,7 @@ void Agora::InitializeThreads() {
   }
 
   // Create workers
-  ///\todo convert unique ptr to shared
-  worker_set_ = std::make_unique<AgoraWorker>(
+  worker_set_ = std::make_unique<AgoraWorkerSet>(
       config_, mac_sched_.get(), stats_.get(), phy_stats_.get(), message_.get(),
       agora_memory_.get(), &frame_tracking_);
 
