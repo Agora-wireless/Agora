@@ -74,13 +74,21 @@ class Sender {
   void* WorkerThread(int tid);
 
   /**
-   * @brief Read time-domain 32-bit floating-point IQ samples from [filename]
+   * @brief Read adapting UEs across frames and populate adapt_ues_array_
+   *
+   * [filepath] must contain the path to the adapted number of UEs files
+   * in every frame for cfg_->FramesToTest() frames.
+  */
+  void InitUesFromFile(const std::string& filepath);
+
+  /**
+   * @brief Read time-domain 32-bit floating-point IQ samples from [filepath]
    * and populate iq_data_short_ by converting to 16-bit fixed-point samples
    *
-   * [filename] must contain data for one frame. For every symbol and antenna,
-   * the file must provide (CP_LEN + OFDM_CA_NUM) IQ samples.
+   * [filepath] must contain path to the data file for one frame. For every
+   * symbol and antenna, the file must provide (CP_LEN + OFDM_CA_NUM) IQ samples.
    */
-  void InitIqFromFile(const std::string& filename);
+  void InitIqFromFilePath(const std::string& filepath);
 
   // Get number of CPU ticks for a symbol given a frame index
   uint64_t GetTicksForFrame(size_t frame_id) const;
@@ -132,6 +140,8 @@ class Sender {
   moodycamel::ConcurrentQueue<size_t> completion_queue_ =
       moodycamel::ConcurrentQueue<size_t>(1024);
   moodycamel::ProducerToken** task_ptok_;
+
+  std::vector<uint8_t> adapt_ues_array_;
 
   // First dimension: symbol_num_perframe * BS_ANT_NUM
   // Second dimension: (CP_LEN + OFDM_CA_NUM) * 2

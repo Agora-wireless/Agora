@@ -51,11 +51,11 @@ class TxRxWorkerHw : public TxRxWorker {
   void ScheduleTxInit(size_t frames_to_schedule, long long time0);
   void TxDownlinkZeros(size_t frame_id, size_t radio_id, long long time0);
 
-  void TxBcastSymbolsHw(size_t frame_id, size_t interface_id, long long time0);
+  void TxBcastSymbolsHw(size_t frame_id, size_t radio_id, long long time0);
   void TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
                                 long long time0);
 
-  void TxBeaconHw(size_t frame_id, size_t interface_id, long long time0);
+  void TxBeaconHw(size_t frame_id, size_t radio_id, long long time0);
   bool IsTxSymbolNext(size_t radio_id, size_t current_symbol);
   Radio::TxFlags GetTxFlags(size_t radio_id, size_t tx_symbol_id);
   long long int GetHwTime();

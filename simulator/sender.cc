@@ -20,6 +20,7 @@
 #include <arpa/inet.h>
 #endif
 
+static constexpr bool kPrintAdaptUes = false;
 static constexpr bool kDebugPrintSender = false;
 
 static std::atomic<bool> keep_running = true;
@@ -75,9 +76,9 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     i = new size_t[cfg->Frame().NumTotalSyms()]();
   }
 
-  InitIqFromFile(kExperimentFilepath + kUlRxPrefix +
-                 std::to_string(cfg->OfdmCaNum()) + "_ant" +
-                 std::to_string(cfg->BsAntNum()) + ".bin");
+  InitUesFromFile(std::string(TOSTRING(PROJECT_DIRECTORY)));
+
+  InitIqFromFilePath(std::string(TOSTRING(PROJECT_DIRECTORY)));
 
   task_ptok_ =
       static_cast<moodycamel::ProducerToken**>(Agora_memory::PaddedAlignedAlloc(
@@ -434,9 +435,11 @@ void* Sender::WorkerThread(int tid) {
 
         if (kDebugPrintSender) {
           AGORA_LOG_INFO(
-              "Sender worker [%d]: processing frame %d symbol %d, type %d\n",
-              tid, tag.frame_id_, tag.symbol_id_,
-              static_cast<int>(cfg_->Frame().GetSymbolType(tag.symbol_id_)));
+              "Sender worker [%d]: processing frame %d, symbol %d, ant_id %d, "
+              "symbol type %d, adapt ue(s) %zu\n",
+              tid, tag.frame_id_, tag.symbol_id_, tag.ant_id_,
+              static_cast<int>(cfg_->Frame().GetSymbolType(tag.symbol_id_)),
+              adapt_ues_array_.at(tag.frame_id_));
         }
 
         // Update the TX buffer
@@ -446,7 +449,9 @@ void* Sender::WorkerThread(int tid) {
         pkt->ant_id_ = tag.ant_id_ - ant_num_per_cell * (pkt->cell_id_);
         std::memcpy(
             pkt->data_,
-            iq_data_short_[(pkt->symbol_id_ * cfg_->BsAntNum()) + tag.ant_id_],
+            iq_data_short_[((adapt_ues_array_.at(pkt->frame_id_) - 1) *
+                            cfg_->Frame().NumTotalSyms() * cfg_->BsAntNum()) +
+                           (pkt->symbol_id_ * cfg_->BsAntNum()) + tag.ant_id_],
             (cfg_->SampsPerSymbol()) * (kUse12BitIQ ? 3 : 4));
         if (cfg_->FreqDomainChannel()) {
           RunFft(pkt, fft_inout, mkl_handle);
@@ -476,10 +481,14 @@ void* Sender::WorkerThread(int tid) {
 
         if (kDebugSenderReceiver) {
           AGORA_LOG_INFO(
-              "Thread %d (tag = %s) transmit frame %d, symbol %d, ant %d, size "
-              "%zu, dest port %zu, TX time: %.3f us\n",
+              "Thread %d (tag = %s) transmit frame %d, symbol %d, bs ant id "
+              "%d, "
+              "adapt ue(s) %zu, pkt size %zu, dest port %zu, TX time: %.3f "
+              "us\n",
               tid, gen_tag_t(tag).ToString().c_str(), pkt->frame_id_,
-              pkt->symbol_id_, pkt->ant_id_, cfg_->PacketLength(), dest_port,
+              pkt->symbol_id_, pkt->ant_id_,
+              adapt_ues_array_.at(pkt->frame_id_), cfg_->PacketLength(),
+              dest_port,
               GetTime::CyclesToUs(GetTime::Rdtsc() - start_tsc_send,
                                   freq_ghz_));
         }
@@ -550,42 +559,92 @@ uint64_t Sender::GetTicksForFrame(size_t frame_id) const {
   }
 }
 
-void Sender::InitIqFromFile(const std::string& filename) {
+void Sender::InitUesFromFile(const std::string& filepath) {
+  adapt_ues_array_.resize(cfg_->FramesToTest());
+
+  const std::string filename = filepath + "/files/experiment/adapt" + "_ueant" +
+                               std::to_string(cfg_->UeAntNum()) + ".bin";
+
+  AGORA_LOG_INFO(
+      "Sender: Reading adaptable number of UEs across frames from %s\n",
+      filename.c_str());
+
+  FILE* fp = std::fopen(filename.c_str(), "rb");
+  RtAssert(fp != nullptr, "Failed to open adapt UEs file");
+
+  const size_t expected_count = cfg_->FramesToTest();
+  const size_t actual_count =
+      std::fread(&adapt_ues_array_.at(0), sizeof(uint8_t), expected_count, fp);
+  if (expected_count != actual_count) {
+    std::fprintf(stderr,
+                 "Sender: Failed to read adapt UEs file %s. expected "
+                 "%zu number of UE entries but read %zu. Errno %s\n",
+                 filename.c_str(), expected_count, actual_count,
+                 strerror(errno));
+    throw std::runtime_error("Sender: Failed to read adapt UEs file");
+  }
+  if (kPrintAdaptUes == true) {
+    std::printf("Sender: Adapted number of UEs across %zu frames\n",
+                cfg_->FramesToTest());
+    for (size_t n = 0; n < cfg_->FramesToTest(); n++) {
+      std::printf("%u ", adapt_ues_array_.at(n));
+    }
+    std::printf("\n");
+  }
+}
+
+void Sender::InitIqFromFilePath(const std::string& filepath) {
   const size_t packets_per_frame =
       cfg_->Frame().NumTotalSyms() * cfg_->BsAntNum();
-  iq_data_short_.Calloc(packets_per_frame, (cfg_->SampsPerSymbol()) * 2,
+  iq_data_short_.Calloc(packets_per_frame * cfg_->UeAntNum(),
+                        cfg_->SampsPerSymbol() * 2,
                         Agora_memory::Alignment_t::kAlign64);
 
   Table<short> iq_data_temp;
-  iq_data_temp.Calloc(packets_per_frame, (cfg_->SampsPerSymbol()) * 2,
+  iq_data_temp.Calloc(packets_per_frame * cfg_->UeAntNum(),
+                      (cfg_->SampsPerSymbol()) * 2,
                       Agora_memory::Alignment_t::kAlign64);
 
-  FILE* fp = std::fopen(filename.c_str(), "rb");
-  RtAssert(fp != nullptr, "Failed to open IQ data file");
+  size_t ue_ant_id_start = cfg_->AdaptUes() ? 1 : cfg_->UeAntNum();
+  for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= cfg_->UeAntNum();
+       ue_ant_id++) {
+    const std::string filename = kExperimentFilepath + kUlRxPrefix +
+                                 std::to_string(cfg_->OfdmCaNum()) + "_bsant" +
+                                 std::to_string(cfg_->BsAntNum()) + "_ueant" +
+                                 std::to_string(ue_ant_id) + ".bin";
 
-  for (size_t i = 0; i < packets_per_frame; i++) {
-    const size_t expected_count = (cfg_->SampsPerSymbol()) * 2;
-    const size_t actual_count =
-        std::fread(iq_data_temp[i], sizeof(short), expected_count, fp);
-    if (expected_count != actual_count) {
-      std::fprintf(
-          stderr,
-          "Sender: Failed to read IQ data file %s. Packet %zu: expected "
-          "%zu I/Q samples but read %zu. Errno %s\n",
-          filename.c_str(), i, expected_count, actual_count, strerror(errno));
-      throw std::runtime_error("Sender: Failed to read IQ data file");
+    FILE* fp = std::fopen(filename.c_str(), "rb");
+    AGORA_LOG_INFO("Sender: Reading ul rx data for %zu UE(s) from %s\n",
+                   ue_ant_id, filename.c_str());
+    RtAssert(fp != nullptr, "Failed to open IQ data file");
+    for (size_t i = 0; i < packets_per_frame; i++) {
+      const size_t expected_count = (cfg_->SampsPerSymbol()) * 2;
+      const size_t actual_count =
+          std::fread(iq_data_temp[packets_per_frame * (ue_ant_id - 1) + i],
+                     sizeof(short), expected_count, fp);
+      if (expected_count != actual_count) {
+        std::fprintf(
+            stderr,
+            "Sender: Failed to read IQ data file %s. Packet %zu: expected "
+            "%zu I/Q samples but read %zu. Errno %s\n",
+            filename.c_str(), i, expected_count, actual_count, strerror(errno));
+        throw std::runtime_error("Sender: Failed to read IQ data file");
+      }
+      if (kUse12BitIQ) {
+        // Adapt 32-bit IQ samples to 24-bit to reduce network throughput
+        ConvertShortTo12bitIq(
+            iq_data_temp[packets_per_frame * (ue_ant_id - 1) + i],
+            reinterpret_cast<uint8_t*>(
+                iq_data_short_[packets_per_frame * (ue_ant_id - 1) + i]),
+            expected_count);
+      } else {
+        std::memcpy(iq_data_short_[packets_per_frame * (ue_ant_id - 1) + i],
+                    iq_data_temp[packets_per_frame * (ue_ant_id - 1) + i],
+                    expected_count * sizeof(short));
+      }
     }
-    if (kUse12BitIQ) {
-      // Adapt 32-bit IQ samples to 24-bit to reduce network throughput
-      ConvertShortTo12bitIq(iq_data_temp[i],
-                            reinterpret_cast<uint8_t*>(iq_data_short_[i]),
-                            expected_count);
-    } else {
-      std::memcpy((void*)iq_data_short_[i], (void*)iq_data_temp[i],
-                  expected_count * sizeof(short));
-    }
+    std::fclose(fp);
   }
-  std::fclose(fp);
   iq_data_temp.Free();
 }
 

@@ -80,11 +80,11 @@ class RadioSoapySdr : public Radio {
  private:
   void Correlator(bool enable);
 
-  SoapySDR::Device* dev_;
+  SoapySDR::Device* dev_{nullptr};
   std::string ip_address_;
   std::unique_ptr<RadioDataPlane> rxp_;
-  SoapySDR::Stream* txs_;
-  bool correlator_enabled_;
+  SoapySDR::Stream* txs_{nullptr};
+  bool correlator_enabled_{false};
 };
 
 #endif  // RADIO_SOAPYSDR_H_

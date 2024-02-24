@@ -355,6 +355,9 @@ static constexpr bool kIsWorkerTimingEnabled = true;
 // Maximum breakdown of a statistic (e.g., timing)
 static constexpr size_t kMaxStatsBreakdown = 4;
 
+// Minimum number of workers
+static constexpr size_t kMinWorkers = 2;
+
 // Maximum number of hardware threads on one machine
 static constexpr size_t kMaxThreads = 128;
 

@@ -192,6 +192,7 @@ Config::Config(std::string jsonfilename)
   num_ue_channels_ = std::min(ue_channel_.size(), kMaxChannels);
   bs_ant_num_ = num_channels_ * num_radios_;
   ue_ant_num_ = ue_num_ * num_ue_channels_;
+  adapt_ues_ = tdd_conf.value("adapt_ues", false);
 
   bf_ant_num_ = bs_ant_num_;
   for (size_t i = 0; i < num_cells_; i++) {
@@ -631,8 +632,8 @@ Config::Config(std::string jsonfilename)
 
   // Agora configurations
   frames_to_test_ = tdd_conf.value("max_frame", 9600);
-  frame_to_profile_ =
-      tdd_conf.value("profiling_frame", -1);  // Profiling disabled by default
+  frame_to_profile_ = tdd_conf.value(
+      "profiling_frame", SIZE_MAX);  // Profiling disabled by default
   core_offset_ = tdd_conf.value("core_offset", 0);
   // use all available cores
   if (dynamic_core_allocation_) {
@@ -642,6 +643,7 @@ Config::Config(std::string jsonfilename)
   } else {
     worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
   }
+  worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
   socket_thread_num_ = tdd_conf.value("socket_thread_num", 4);
   ue_core_offset_ = tdd_conf.value("ue_core_offset", 0);
   ue_worker_thread_num_ = tdd_conf.value("ue_worker_thread_num", 25);
@@ -854,6 +856,7 @@ Config::Config(std::string jsonfilename)
       "\t%zu DL codeblocks per symbol, %zu DL bytes per code block,\n"
       "\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame,\n"
       "\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame,\n"
+      "\tSymbol time %.3f usec\n"
       "\tFrame time %.3f usec\n"
       "Uplink Max Mac data per-user tp (Mbps) %.3f\n"
       "Downlink Max Mac data per-user tp (Mbps) %.3f\n"
@@ -875,7 +878,7 @@ Config::Config(std::string jsonfilename)
       dl_ldpc_config_.NumBlocksInSymbol(), dl_num_bytes_per_cb_,
       ul_mac_data_bytes_num_perframe_, ul_mac_bytes_num_perframe_,
       dl_mac_data_bytes_num_perframe_, dl_mac_bytes_num_perframe_,
-      this->GetFrameDurationSec() * 1e6,
+      this->GetSymbolDurationSec() * 1e6, this->GetFrameDurationSec() * 1e6,
       (ul_mac_data_bytes_num_perframe_ * 8.0f) /
           (this->GetFrameDurationSec() * 1e6),
       (dl_mac_data_bytes_num_perframe_ * 8.0f) /

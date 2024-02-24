@@ -76,8 +76,10 @@ class Agora {
   void UpdateCores(RPControlMsg rcm);
 
   void InitializeQueues();
+  void ReInitializeCounters();
   void InitializeCounters();
   void InitializeThreads();
+  void InitializeUesFromFile();
   void FreeQueues();
 
   void SaveDecodeDataToFile(int frame_id);
@@ -169,6 +171,8 @@ class Agora {
   std::vector<size_t> encode_cur_frame_for_symbol_;
   // The frame index for a symbol whose IFFT is done
   std::vector<size_t> ifft_cur_frame_for_symbol_;
+  // An array that contains the adaptable number of UEs per every frame
+  std::vector<uint8_t> adapt_ues_array_;
 
   // The frame index for a symbol whose precode is done
   std::vector<size_t> precode_cur_frame_for_symbol_;
