@@ -322,6 +322,52 @@ std::vector<uint32_t> Utils::Cfloat32ToUint32(
   return out;
 }
 
+size_t Utils::Bits2Int(std::vector<uint8_t> in) {
+  size_t out = 0;
+  for (size_t i = 0; i < in.size(); i++) {
+    out += static_cast<size_t>(in.at(i) * std::pow(2, i));
+  }
+  return out;
+}
+
+size_t Utils::Bits2Int(arma::uvec in) {
+  size_t out = 0;
+  for (size_t i = 0; i < in.n_elem; i++) {
+    out += static_cast<size_t>(in(i)*std::pow(2, i));
+  }
+  return out;
+}
+
+size_t Utils::BitIndices2Int(arma::uvec in) {
+  size_t out = 0;
+  for (size_t i = 0; i < in.n_elem; i++) {
+    out += static_cast<size_t>(std::pow(2, in(i)));
+  }
+  return out;
+}
+
+arma::cx_frowvec Utils::Int2Bits(size_t in, size_t num_bits) {
+  arma::cx_frowvec out(num_bits, arma::fill::zeros);
+  for (size_t i = 0; i < num_bits; i++) {
+    if (in & 1) {
+      out(i) = arma::cx_float(1, 0);
+    }
+    in >>= 1;
+  }
+  return out;
+}
+
+arma::uvec Utils::BitOneIndices(size_t in, size_t num_bits) {
+  arma::uvec out;
+  for (size_t i = 0; i < num_bits; i++) {
+    if (in & 1) {
+      out = arma::join_cols(out, arma::uvec({i}));
+    }
+    in >>= 1;
+  }
+  return out;
+}
+
 // Returns index locations of sym for each frame in frames
 std::vector<std::vector<size_t>> Utils::LoadSymbols(
     std::vector<std::string> const& frames, char sym) {

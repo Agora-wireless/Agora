@@ -22,7 +22,8 @@ class CustomSchedule : public SchedulerModel {
   arma::uvec ScheduledUeMap(size_t frame_id, size_t sc_id) final;
 
  private:
-  std::vector<uint8_t> adapt_ues_array_;
+  std::vector<uint8_t> ue_map_array_;
+  std::vector<uint8_t> ue_num_array_;
 };
 
 #endif  //CUSTOM_SCHEDULE_H_

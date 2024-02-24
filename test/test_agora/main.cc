@@ -19,8 +19,8 @@ static const std::string kDecodedFilename =
 
 template <class TableType>
 static void ReadFromFile(const std::string& filename, Table<TableType>& data,
-                         size_t num_reads, size_t read_elements,
-                         size_t element_size) {
+                         size_t seek_size, size_t num_reads,
+                         size_t read_elements, size_t element_size) {
   FILE* fp = std::fopen(filename.c_str(), "rb");
   if (fp == nullptr) {
     AGORA_LOG_ERROR("Open file failed: %s, error %s\n", filename.c_str(),
@@ -28,7 +28,9 @@ static void ReadFromFile(const std::string& filename, Table<TableType>& data,
   } else {
     AGORA_LOG_INFO("Opening file %s\n", filename.c_str());
   }
-
+  if (seek_size != 0) {
+    std::fseek(fp, seek_size, SEEK_SET);
+  }
   for (size_t i = 0; i < num_reads; i++) {
     size_t elements = std::fread(data[i], element_size, read_elements, fp);
     if (read_elements != elements) {
@@ -44,23 +46,26 @@ static void ReadFromFile(const std::string& filename, Table<TableType>& data,
 static void ReadFromFileUl(const std::string& filename, Table<uint8_t>& data,
                            int ue_num, int num_bytes_per_ue,
                            Config const* const cfg) {
-  ReadFromFile(filename, data, cfg->Frame().NumULSyms(),
+  ReadFromFile(filename, data, 0, cfg->Frame().NumULSyms(),
                (num_bytes_per_ue * ue_num), sizeof(uint8_t));
 }
 
 static void ReadFromFileDl(const std::string& filename, Table<short>& data,
-                           int ofdm_size, Config const* const cfg) {
-  ReadFromFile(filename, data, cfg->Frame().NumDLSyms() * cfg->BsAntNum(),
-               (ofdm_size * 2), sizeof(short));
+                           size_t seek_size, int ofdm_size,
+                           Config const* const cfg) {
+  ReadFromFile(filename, data, seek_size,
+               cfg->Frame().NumDLSyms() * cfg->BsAntNum(), (ofdm_size * 2),
+               sizeof(short));
 }
 
 static unsigned int CheckCorrectnessUl(Config const* const cfg,
-                                       size_t spatial_streams_num) {
+                                       arma::uvec spatial_streams) {
   size_t bs_ant_num = cfg->BsAntNum();
   size_t ue_num = cfg->UeAntNum();
-  size_t num_uplink_syms = cfg->Frame().NumULSyms();
+  size_t num_uplink_syms = cfg->Frame().NumUlDataSyms();
   size_t ofdm_data_num = cfg->OfdmDataNum();
   size_t ul_pilot_syms = cfg->Frame().ClientUlPilotSymbols();
+  size_t spatial_streams_num = spatial_streams.n_elem;
 
   const std::string raw_data_filename = kUlCheckFilePrefix +
                                         std::to_string(cfg->OfdmCaNum()) +
@@ -89,24 +94,22 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg,
   unsigned int error_cnt = 0;
   unsigned int total_count = 0;
   for (size_t i = 0; i < num_uplink_syms; i++) {
-    if (i >= ul_pilot_syms) {
-      for (size_t ue = 0; ue < spatial_streams_num; ue++) {
-        for (size_t j = 0; j < num_bytes_per_ue; j++) {
-          total_count++;
-          size_t offset_in_raw = num_bytes_per_ue * ue + j;
-          size_t offset_in_output = num_bytes_per_ue * ue + j;
-          if (raw_data[i][offset_in_raw] != output_data[i][offset_in_output]) {
-            error_cnt++;
-            if (kDebugPrintUlCorr) {
-              std::printf("(%zu, %zu, %zu, %u, %u)\n", i, ue, j,
-                          raw_data[i][offset_in_raw],
-                          output_data[i][offset_in_output]);
-            }
+    for (size_t ue = 0; ue < spatial_streams_num; ue++) {
+      for (size_t j = 0; j < num_bytes_per_ue; j++) {
+        total_count++;
+        size_t offset_in_raw = num_bytes_per_ue * spatial_streams(ue) + j;
+        size_t offset_in_output = num_bytes_per_ue * ue + j;
+        if (raw_data[i][offset_in_raw] != output_data[i][offset_in_output]) {
+          error_cnt++;
+          if (kDebugPrintUlCorr) {
+            std::printf("(%zu, %zu, %zu, %u, %u)\n", i, ue, j,
+                        raw_data[i][offset_in_raw],
+                        output_data[i][offset_in_output]);
           }
         }
-      }  //  for (int ue = 0; ue < ue_num; ue++)
-    }    // if (i >= ul_pilot_syms)
-  }      // for (int i = 0; i < num_uplink_syms; i++)
+      }
+    }  //  for (int ue = 0; ue < ue_num; ue++)
+  }    // for (int i = 0; i < num_uplink_syms; i++)
 
   raw_data.Free();
   output_data.Free();
@@ -115,17 +118,18 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg,
 }
 
 unsigned int CheckCorrectnessDl(Config const* const cfg,
-                                size_t spatial_streams_num) {
+                                arma::uvec spatial_streams) {
   const size_t bs_ant_num = cfg->BsAntNum();
   const size_t ue_num = cfg->UeAntNum();
   const size_t num_data_syms = cfg->Frame().NumDLSyms();
   const size_t ofdm_ca_num = cfg->OfdmCaNum();
   const size_t samps_per_symbol = cfg->SampsPerSymbol();
+  size_t spatial_streams_num = spatial_streams.n_elem;
+  size_t sched_id = Utils::BitIndices2Int(spatial_streams);
 
-  std::string raw_data_filename = kDlCheckFilePrefix +
-                                  std::to_string(ofdm_ca_num) + "_bsant" +
-                                  std::to_string(bs_ant_num) + "_ueant" +
-                                  std::to_string(spatial_streams_num) + ".bin";
+  std::string raw_data_filename =
+      kDlCheckFilePrefix + std::to_string(ofdm_ca_num) + "_bsant" +
+      std::to_string(bs_ant_num) + "_ueant" + std::to_string(ue_num) + ".bin";
 
   Table<short> raw_data;
   Table<short> tx_data;
@@ -134,8 +138,11 @@ unsigned int CheckCorrectnessDl(Config const* const cfg,
   tx_data.Calloc(num_data_syms * bs_ant_num, samps_per_symbol * 2,
                  Agora_memory::Alignment_t::kAlign64);
 
-  ReadFromFileDl(raw_data_filename, raw_data, samps_per_symbol, cfg);
-  ReadFromFileDl(kTxFilename, tx_data, samps_per_symbol, cfg);
+  size_t seek_size = cfg->AdaptUes() ? (sched_id - 1) * num_data_syms *
+                                           bs_ant_num * samps_per_symbol * 2 * 2
+                                     : 0;
+  ReadFromFileDl(raw_data_filename, raw_data, seek_size, samps_per_symbol, cfg);
+  ReadFromFileDl(kTxFilename, tx_data, 0, samps_per_symbol, cfg);
   std::printf(
       "check_correctness_dl: bs ant %zu, ues %zu, spatial streams (last frame) "
       "%zu, "
@@ -176,12 +183,12 @@ unsigned int CheckCorrectnessDl(Config const* const cfg,
 }
 
 static unsigned int CheckCorrectness(Config const* const cfg,
-                                     size_t spatial_streams_num) {
+                                     arma::uvec spatial_streams) {
   unsigned int ul_error_count = 0;
   unsigned int dl_error_count = 0;
-  ul_error_count = CheckCorrectnessUl(cfg, spatial_streams_num);
+  ul_error_count = CheckCorrectnessUl(cfg, spatial_streams);
   std::printf("Uplink error count: %d\n", ul_error_count);
-  dl_error_count = CheckCorrectnessDl(cfg, spatial_streams_num);
+  dl_error_count = CheckCorrectnessDl(cfg, spatial_streams);
   std::printf("Downlink error count: %d\n", dl_error_count);
   return ul_error_count + dl_error_count;
 }
@@ -226,13 +233,13 @@ int main(int argc, char* argv[]) {
     auto ue_list = mac_sched->ScheduledUeList(cfg->FramesToTest() - 1, 0);
     if ((cfg->Frame().NumDLSyms() > 0) && (cfg->Frame().NumULSyms() > 0)) {
       test_name = "combined";
-      error_count = CheckCorrectness(cfg.get(), ue_list.n_elem);
+      error_count = CheckCorrectness(cfg.get(), ue_list);
     } else if (cfg->Frame().NumDLSyms() > 0) {
       test_name = "downlink";
-      error_count = CheckCorrectnessDl(cfg.get(), ue_list.n_elem);
+      error_count = CheckCorrectnessDl(cfg.get(), ue_list);
     } else if (cfg->Frame().NumULSyms() > 0) {
       test_name = "uplink";
-      error_count = CheckCorrectnessUl(cfg.get(), ue_list.n_elem);
+      error_count = CheckCorrectnessUl(cfg.get(), ue_list);
     } else {
       // Should never happen
       assert(false);
