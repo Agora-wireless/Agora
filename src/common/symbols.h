@@ -314,6 +314,10 @@ static const std::map<char, SymbolType> kSymbolMap = {
 
 enum class SubcarrierType { kNull, kDMRS, kPTRS, kData };
 
+static constexpr size_t kMaxLoggingEventsMaster = 100000;
+
+static constexpr size_t kMaxLoggingEventsWorker = 1024;
+
 // Number of subcarriers in a PRB
 static constexpr size_t kNumScPerPRB = 12;
 

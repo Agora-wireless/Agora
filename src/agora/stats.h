@@ -220,6 +220,18 @@ class Stats {
 
   std::array<TimeDurationsStats, kMaxThreads> worker_durations_;
   std::array<TimeDurationsStats, kMaxThreads> worker_durations_old_;
+  std::array<
+      std::array<std::array<QueueTsStat, kMaxLoggingEventsWorker>, kMaxSymbols>,
+      kMaxThreads>
+      worker_dequeue_stats_;
+  std::array<std::array<size_t, kMaxSymbols>, kMaxThreads>
+      worker_dequeue_stats_id_ = {};
+  std::array<std::array<size_t, kNumStatsFrames>, kMaxThreads>
+      total_worker_dequeue_tsc_ = {};
+  std::array<std::array<size_t, kNumStatsFrames>, kMaxThreads>
+      total_worker_enqueue_tsc_ = {};
+  std::array<std::array<size_t, kNumStatsFrames>, kMaxThreads>
+      total_worker_valid_dequeue_tsc_ = {};
 
   std::array<std::array<double, kNumStatsFrames>, kNumDoerTypes> doer_us_;
   std::array<std::array<std::array<double, kNumStatsFrames>, kMaxStatBreakdown>,
@@ -227,6 +239,19 @@ class Stats {
       doer_breakdown_us_;
 
   size_t last_frame_id_;
+
+  inline void LogDequeueStatsWorker(int tid, size_t frame_id, size_t symbol_id,
+                                    size_t start_tsc, size_t end_tsc,
+                                    size_t diff_tsc, size_t valid_diff_tsc,
+                                    EventType event_type) {
+    size_t id = worker_dequeue_stats_id_[tid][symbol_id];
+    worker_dequeue_stats_[tid][symbol_id][id].tsc_start_ = start_tsc;
+    worker_dequeue_stats_[tid][symbol_id][id].tsc_end_ = end_tsc;
+    worker_dequeue_stats_[tid][symbol_id][id].event_type_ = event_type;
+    worker_dequeue_stats_id_[tid][symbol_id]++;
+    total_worker_dequeue_tsc_[tid][frame_id] += diff_tsc;
+    total_worker_valid_dequeue_tsc_[tid][frame_id] += valid_diff_tsc;
+  }
 
   /// Dimensions = number of packet RX threads x kNumStatsFrames.
   /// frame_start[i][j] is the RDTSC timestamp taken by thread i when it

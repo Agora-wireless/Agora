@@ -17,8 +17,7 @@
 #include "phy_ldpc_decoder_5gnr.h"
 #include "scrambler.h"
 
-<<<<<<< HEAD
-=======
+
 static constexpr bool kPrintDebugCSI = false;
 static constexpr bool kDebugPrintPreIfftData = false;
 static constexpr bool kDebugPrintRxData = false;
@@ -44,7 +43,7 @@ static float RandFloatFromShort(float min, float max) {
   return rand_val;
 }
 
->>>>>>> slot_scheduling_dl
+
 DataGenerator::DataGenerator(Config* cfg, uint64_t seed, Profile profile)
     : cfg_(cfg), seed_(seed), profile_(profile) {
   if (seed != 0) {
@@ -52,8 +51,7 @@ DataGenerator::DataGenerator(Config* cfg, uint64_t seed, Profile profile)
   }
 }
 
-<<<<<<< HEAD
-=======
+
 void DataGenerator::DoDataGeneration(const std::string& directory) {
   //Make sure the directory exists
   if (std::filesystem::is_directory(directory) == false) {
@@ -959,7 +957,6 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   ue_specific_pilot.Free();
 }
 
->>>>>>> slot_scheduling_dl
 /**
    * @brief                        Generate random Mac payload bit
    * sequence

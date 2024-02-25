@@ -103,14 +103,9 @@ void AgoraBuffer::AllocateTables() {
         calib_buffer_[frame][i] = complex_init;
       }
     }
-<<<<<<< HEAD
-    dl_mod_bits_buffer_.Calloc(
-        task_buffer_data_symbol_num,
-=======
     if (config_->SlotScheduling() == false) {
       dl_mod_bits_buffer_.Calloc(
         task_buffer_symbol_num,
->>>>>>> slot_scheduling_dl
         Roundup<64>(config_->GetOFDMDataNum()) * config_->UeAntNum(),
         Agora_memory::Alignment_t::kAlign64);
     } else {
