@@ -4,15 +4,8 @@
  */
 #include "sender.h"
 
-#include <algorithm>
-#include <csignal>
-#include <thread>
-
 #include "data_generator.h"
-#include "datatype_conversion.h"
-#include "gettime.h"
 #include "logger.h"
-#include "message.h"
 #include "udp_client.h"
 
 #if defined(USE_DPDK)
@@ -76,8 +69,13 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     i = new size_t[cfg->Frame().NumTotalSyms()]();
   }
 
-  sched_map_array_.resize(cfg->FramesToTest(), 1);
+  // 2-element vector for schedule in each frame
+  // First element is schedule bit mat
+  // Second element is index of data to read
+  std::vector<size_t> init_vec(2, 0);
+  sched_map_array_.resize(cfg->FramesToTest(), init_vec);
   adapt_ues_array_.resize(cfg->FramesToTest(), cfg->UeAntNum());
+  max_ue_sched_num_ = 1;
   if (cfg->AdaptUes()) {
     InitUesFromFile();
   }
@@ -453,7 +451,7 @@ void* Sender::WorkerThread(int tid) {
         pkt->ant_id_ = tag.ant_id_ - ant_num_per_cell * (pkt->cell_id_);
         std::memcpy(
             pkt->data_,
-            iq_data_short_[((sched_map_array_.at(pkt->frame_id_) - 1) *
+            iq_data_short_[(sched_map_array_.at(pkt->frame_id_).at(1) *
                             cfg_->Frame().NumTotalSyms() * cfg_->BsAntNum()) +
                            (pkt->symbol_id_ * cfg_->BsAntNum()) + tag.ant_id_],
             (cfg_->SampsPerSymbol()) * (kUse12BitIQ ? 3 : 4));
@@ -566,6 +564,7 @@ uint64_t Sender::GetTicksForFrame(size_t frame_id) const {
 void Sender::InitUesFromFile() {
   size_t n_items = cfg_->UeAntNum();
   std::vector<uint8_t> ue_map_array(n_items);
+  std::vector<size_t> sched_ue_set;
 
   const std::string directory =
       TOSTRING(PROJECT_DIRECTORY) "/files/experiment/";
@@ -607,17 +606,45 @@ void Sender::InitUesFromFile() {
       std::printf("\n");
     }
     // convert the binary map of scheduled UE to a schedule index
-    sched_map_array_.at(i) = Utils::Bits2Int(ue_map_array);
+    size_t ue_sched_id = Utils::Bits2Int(ue_map_array);
+    sched_map_array_.at(i).at(0) = ue_sched_id;
+    if (sched_ue_set.size() == 0)
+      sched_ue_set.push_back(ue_sched_id);
+    else {
+      std::vector<size_t>::iterator it;
+      for (it = sched_ue_set.begin(); it < sched_ue_set.end(); it++) {
+        if (ue_sched_id == *it) {  // dont's push this to keep vector unique
+          break;
+        } else if (ue_sched_id > *it && (it + 1) == sched_ue_set.end()) {
+          sched_ue_set.push_back(ue_sched_id);
+          break;
+        } else if (ue_sched_id < *it && it == sched_ue_set.begin()) {
+          sched_ue_set.insert(it, ue_sched_id);
+          break;
+        } else if (ue_sched_id > *it && ue_sched_id < *(it + 1)) {
+          sched_ue_set.insert(it + 1, ue_sched_id);
+          break;
+        }
+      }
+    }
   }
+  max_ue_sched_num_ = sched_ue_set.size();
   std::fclose(fp);
+
+  for (size_t i = 0; i < cfg_->FramesToTest(); i++) {
+    auto sched_id = std::find(sched_ue_set.begin(), sched_ue_set.end(),
+                              sched_map_array_.at(i).at(0));
+    RtAssert(sched_id != sched_ue_set.end(),
+             "schedule index was calculated correctly!");
+    sched_map_array_.at(i).at(1) =
+        sched_id - sched_ue_set.begin();  // index of data in iq_data_short
+  }
 }
 
 void Sender::InitIqFromFilePath(const std::string& filepath) {
   const size_t packets_per_frame =
       cfg_->Frame().NumTotalSyms() * cfg_->BsAntNum();
-  size_t max_ue_sched = static_cast<size_t>(std::pow(2, cfg_->UeAntNum())) - 1;
-  size_t n_ue_sched = cfg_->AdaptUes() ? max_ue_sched : 1;
-  iq_data_short_.Calloc(packets_per_frame * n_ue_sched,
+  iq_data_short_.Calloc(packets_per_frame * max_ue_sched_num_,
                         cfg_->SampsPerSymbol() * 2,
                         Agora_memory::Alignment_t::kAlign64);
 
@@ -632,7 +659,7 @@ void Sender::InitIqFromFilePath(const std::string& filepath) {
   FILE* fp = std::fopen(filename.c_str(), "rb");
   RtAssert(fp != nullptr, "Failed to open IQ data file");
   AGORA_LOG_INFO("Sender: Reading ul rx data from %s\n", filename.c_str());
-  for (size_t sched_id = 1; sched_id <= n_ue_sched; sched_id++) {
+  for (size_t sched_id = 0; sched_id < max_ue_sched_num_; sched_id++) {
     for (size_t i = 0; i < packets_per_frame; i++) {
       const size_t expected_count = (cfg_->SampsPerSymbol()) * 2;
       const size_t actual_count =
@@ -650,10 +677,10 @@ void Sender::InitIqFromFilePath(const std::string& filepath) {
         ConvertShortTo12bitIq(
             iq_data_temp[i],
             reinterpret_cast<uint8_t*>(
-                iq_data_short_[packets_per_frame * (sched_id - 1) + i]),
+                iq_data_short_[packets_per_frame * sched_id + i]),
             expected_count);
       } else {
-        std::memcpy(iq_data_short_[packets_per_frame * (sched_id - 1) + i],
+        std::memcpy(iq_data_short_[packets_per_frame * sched_id + i],
                     iq_data_temp[i], expected_count * sizeof(short));
       }
     }

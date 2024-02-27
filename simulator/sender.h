@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <csignal>
 #include <iostream>
 #include <numeric>
 #include <thread>
@@ -139,7 +140,8 @@ class Sender {
   moodycamel::ProducerToken** task_ptok_;
 
   std::vector<uint8_t> adapt_ues_array_;
-  std::vector<size_t> sched_map_array_;
+  std::vector<std::vector<size_t>> sched_map_array_;
+  size_t max_ue_sched_num_;
 
   // First dimension: symbol_num_perframe * BS_ANT_NUM
   // Second dimension: (CP_LEN + OFDM_CA_NUM) * 2

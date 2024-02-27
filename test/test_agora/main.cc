@@ -118,14 +118,13 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg,
 }
 
 unsigned int CheckCorrectnessDl(Config const* const cfg,
-                                arma::uvec spatial_streams) {
+                                arma::uvec spatial_streams, size_t sched_id) {
   const size_t bs_ant_num = cfg->BsAntNum();
   const size_t ue_num = cfg->UeAntNum();
   const size_t num_data_syms = cfg->Frame().NumDLSyms();
   const size_t ofdm_ca_num = cfg->OfdmCaNum();
   const size_t samps_per_symbol = cfg->SampsPerSymbol();
   size_t spatial_streams_num = spatial_streams.n_elem;
-  size_t sched_id = Utils::BitIndices2Int(spatial_streams);
 
   std::string raw_data_filename =
       kDlCheckFilePrefix + std::to_string(ofdm_ca_num) + "_bsant" +
@@ -138,9 +137,8 @@ unsigned int CheckCorrectnessDl(Config const* const cfg,
   tx_data.Calloc(num_data_syms * bs_ant_num, samps_per_symbol * 2,
                  Agora_memory::Alignment_t::kAlign64);
 
-  size_t seek_size = cfg->AdaptUes() ? (sched_id - 1) * num_data_syms *
-                                           bs_ant_num * samps_per_symbol * 2 * 2
-                                     : 0;
+  size_t seek_size =
+      sched_id * num_data_syms * bs_ant_num * samps_per_symbol * 2 * 2;
   ReadFromFileDl(raw_data_filename, raw_data, seek_size, samps_per_symbol, cfg);
   ReadFromFileDl(kTxFilename, tx_data, 0, samps_per_symbol, cfg);
   std::printf(
@@ -183,12 +181,13 @@ unsigned int CheckCorrectnessDl(Config const* const cfg,
 }
 
 static unsigned int CheckCorrectness(Config const* const cfg,
-                                     arma::uvec spatial_streams) {
+                                     arma::uvec spatial_streams,
+                                     size_t sched_set_id) {
   unsigned int ul_error_count = 0;
   unsigned int dl_error_count = 0;
   ul_error_count = CheckCorrectnessUl(cfg, spatial_streams);
   std::printf("Uplink error count: %d\n", ul_error_count);
-  dl_error_count = CheckCorrectnessDl(cfg, spatial_streams);
+  dl_error_count = CheckCorrectnessDl(cfg, spatial_streams, sched_set_id);
   std::printf("Downlink error count: %d\n", dl_error_count);
   return ul_error_count + dl_error_count;
 }
@@ -231,12 +230,16 @@ int main(int argc, char* argv[]) {
     std::string test_name;
 
     auto ue_list = mac_sched->ScheduledUeList(cfg->FramesToTest() - 1, 0);
+    size_t sched_set_id = 0;
+    if (cfg->AdaptUes()) {
+      sched_set_id = mac_sched->UeScheduleIndex(Utils::BitIndices2Int(ue_list));
+    }
     if ((cfg->Frame().NumDLSyms() > 0) && (cfg->Frame().NumULSyms() > 0)) {
       test_name = "combined";
-      error_count = CheckCorrectness(cfg.get(), ue_list);
+      error_count = CheckCorrectness(cfg.get(), ue_list, sched_set_id);
     } else if (cfg->Frame().NumDLSyms() > 0) {
       test_name = "downlink";
-      error_count = CheckCorrectnessDl(cfg.get(), ue_list);
+      error_count = CheckCorrectnessDl(cfg.get(), ue_list, sched_set_id);
     } else if (cfg->Frame().NumULSyms() > 0) {
       test_name = "uplink";
       error_count = CheckCorrectnessUl(cfg.get(), ue_list);

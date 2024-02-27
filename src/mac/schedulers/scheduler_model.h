@@ -30,6 +30,7 @@ class SchedulerModel {
   virtual arma::uvec ScheduledUeMap(size_t frame_id, size_t sc_id) {
     return {};
   }
+  virtual size_t UeScheduleIndex(size_t sched_id) { return {}; }
 
   static std::unique_ptr<SchedulerModel> CreateSchedulerModel(
       Config* const cfg);
