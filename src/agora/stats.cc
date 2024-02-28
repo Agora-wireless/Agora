@@ -12,6 +12,8 @@
 static const std::string kProjectDir = TOSTRING(PROJECT_DIRECTORY);
 static const std::string kStatsOutputFilePath =
     kProjectDir + "/files/experiment/";
+static const std::string kStatsSymbolDataFilename =
+kStatsOutputFilePath + "timeresult_symbol.txt";
 static const std::string kStatsDataFilename =
     kStatsOutputFilePath + "timeresult.txt";
 static const std::string kStatsDetailedDataFilename =
@@ -132,6 +134,7 @@ void Stats::UpdateStats(size_t frame_id) {
       this->doer_us_.at(i).at(frame_slot) = us_avg;
       sum_us += us_avg;
     }
+    this->doer_sum_us_.at(frame_slot) = sum_us;
 
     for (size_t i = 0; i < this->break_down_num_; i++) {
       for (size_t doer = 0; doer < work_summary.size(); doer++) {
@@ -154,18 +157,57 @@ void Stats::UpdateStats(size_t frame_id) {
   }
 }
 
+size_t Stats::MeasureLastFrameTsc() {
+  size_t frame_id = this->last_frame_id_;
+  size_t symbol_id = (kNumSymbolsPerFrame - 1);
+
+  // Find tsc of first RX packet and last decode events in every ofdm symbol
+  size_t master_min_tsc_symbolrx = MasterGetTscSymbol(TsType::kSymbolRX, frame_id, symbol_id, 0);
+  size_t master_max_tsc_decode = MasterGetTscSymbol(TsType::kDecodeDone, frame_id, symbol_id, 0);
+  for (size_t l = 1; l < config_->SpatialStreamsNum(); l++) {
+    if (MasterGetTscSymbol(TsType::kSymbolRX, frame_id, symbol_id, l) < master_min_tsc_symbolrx) {
+      master_min_tsc_symbolrx = MasterGetTscSymbol(TsType::kSymbolRX, frame_id, symbol_id, l);
+    }
+    if (MasterGetTscSymbol(TsType::kDecodeDone, frame_id, symbol_id, l) > master_max_tsc_decode) {
+      master_max_tsc_decode = MasterGetTscSymbol(TsType::kDecodeDone, frame_id, symbol_id, l);
+    }
+  }
+
+  return master_max_tsc_decode - master_min_tsc_symbolrx;
+}
+
 double Stats::MeasureLastFrameLatency() {
   size_t frame_id = this->last_frame_id_;
+  size_t symbol_id = 2;
   size_t ref_tsc = SIZE_MAX;
 
   for (size_t j = 0; j < config_->SocketThreadNum(); j++) {
     ref_tsc = std::min(ref_tsc, this->frame_start_[j][frame_id]);
   }
-  double processing_started =
-      MasterGetUsFromRef(TsType::kProcessingStarted, frame_id, ref_tsc);
-  double decoding_done =
-      MasterGetUsFromRef(TsType::kDecodeDone, frame_id, ref_tsc);
+  size_t master_min_tsc_symbolrx = MasterGetTscSymbol(TsType::kSymbolRX, frame_id, symbol_id, 0);
+  size_t master_min_tsc_symbolrx_idx = 0;
+  // AGORA_LOG_INFO("MeasureLastFrameLatency (kSymbolRX): frame_id %zu, symbol_id %zu, l %zu, %zu %zu\n", frame_id, symbol_id, 0, master_min_tsc_symbolrx, MasterGetTscSymbol(TsType::kSymbolRX, frame_id, symbol_id, 0));
+  for (size_t l = 1; l < config_->BsAntNum(); l++) {
+    // AGORA_LOG_INFO("MeasureLastFrameLatency (kSymbolRX): frame_id %zu, symbol_id %zu, l %zu, %zu %zu\n", frame_id, symbol_id, l, master_min_tsc_symbolrx, MasterGetTscSymbol(TsType::kSymbolRX, frame_id, symbol_id, l));
+    if (MasterGetTscSymbol(TsType::kSymbolRX, frame_id, symbol_id, l) < master_min_tsc_symbolrx) {
+      master_min_tsc_symbolrx = MasterGetTscSymbol(TsType::kSymbolRX, frame_id, symbol_id, l);
+      master_min_tsc_symbolrx_idx = l;
+    }
+  }
+  size_t master_max_tsc_decode = MasterGetTscSymbol(TsType::kDecodeDone, frame_id, symbol_id, 0);
+  size_t master_max_tsc_decode_idx = 0;
+  // AGORA_LOG_INFO("MeasureLastFrameLatency (kDecodeDone): frame_id %zu, symbol_id %zu, l %zu, %zu %zu\n", frame_id, symbol_id, 0, master_max_tsc_decode, MasterGetTscSymbol(TsType::kDecodeDone, frame_id, symbol_id, 0));
+  for (size_t l = 1; l < config_->SpatialStreamsNum(); l++) {
+    // AGORA_LOG_INFO("MeasureLastFrameLatency (kDecodeDone): frame_id %zu, symbol_id %zu, l %zu, %zu %zu\n", frame_id, symbol_id, l, master_max_tsc_decode, MasterGetTscSymbol(TsType::kDecodeDone, frame_id, symbol_id, l));
+    if (MasterGetTscSymbol(TsType::kDecodeDone, frame_id, symbol_id, l) > master_max_tsc_decode) {
+      master_max_tsc_decode = MasterGetTscSymbol(TsType::kDecodeDone, frame_id, symbol_id, l);
+      master_max_tsc_decode_idx = l;
+    }
+  }
 
+  double processing_started = MasterGetUsSymbolFromRef(TsType::kSymbolRX, frame_id, symbol_id, master_min_tsc_symbolrx_idx, ref_tsc);
+  double decoding_done = MasterGetUsSymbolFromRef(TsType::kDecodeDone, frame_id, symbol_id, master_max_tsc_decode_idx, ref_tsc);
+  AGORA_LOG_INFO("MeasureLastFrameLatency: frame_id %zu %zu %zu %zu %zu %zu %.3f %.3f\n", frame_id, symbol_id, master_min_tsc_symbolrx_idx, master_min_tsc_symbolrx, master_max_tsc_decode_idx, master_max_tsc_decode, processing_started, decoding_done);  
   return decoding_done - processing_started;
 }
 
@@ -175,6 +217,8 @@ void Stats::SaveToFile() {
   FILE* fp_debug = std::fopen(kStatsDataFilename.c_str(), "w");
   RtAssert(fp_debug != nullptr,
            std::string("Open file failed ") + std::to_string(errno));
+
+  // MeasureLastFrameLatency();
 
   size_t first_frame_idx = 0;
   size_t last_frame_idx = this->last_frame_id_;
@@ -276,6 +320,84 @@ void Stats::SaveToFile() {
   }
   std::fclose(fp_debug);
 
+  AGORA_LOG_INFO("Stats: Saving symbol level master timestamps to %s\n",
+                 kStatsSymbolDataFilename.c_str());
+  FILE* fp_debug_symbol = std::fopen(kStatsSymbolDataFilename.c_str(), "w");
+  RtAssert(fp_debug_symbol != nullptr,
+           std::string("Open file failed ") + std::to_string(errno));
+
+  size_t frame_duration = 
+    (config_->Frame().NumTotalSyms() * config_->SampsPerSymbol() * 1000000ul) /
+    config_->Rate();
+
+  size_t ticks_per_usec = (this->freq_ghz_ * 1e3);
+
+  size_t ticks_per_symbol =
+    ((frame_duration * ticks_per_usec) / config_->Frame().NumTotalSyms());
+
+  size_t ul_data_symbol_start = config_->Frame().NumTotalSyms() - config_->Frame().NumULSyms();
+  // ul_data_symbol_start = 0;
+
+  AGORA_LOG_INFO("this->freq_ghz_: %f, NumTotalSyms: %zu, NumULSyms: %zu, ul_data_symbol_start: %zu, SampsPerSymbol: %zu, ticks_per_usec: %zu, frame_duration: %zu, ticks_per_symbol: %zu\n",
+      this->freq_ghz_, config_->Frame().NumTotalSyms(), config_->Frame().NumULSyms(), ul_data_symbol_start, config_->SampsPerSymbol(), ticks_per_usec, frame_duration, ticks_per_symbol);
+
+  if (config_->Frame().NumULSyms() > 0) {
+    // Print the header
+    std::fprintf(
+        fp_debug_symbol,
+        "Frame, Symbol, "
+        "Pilot RX by socket threads (= reference tsc), "
+        "Pilot RX by socket threads (= reference time), "
+        "kSymbolRX (tsc), kDecodeDone (tsc), (kDecodeDone (tsc) - kSymbolRX (tsc)), "
+        "kSymbolRX (time), kDecodeDone (time), (kDecodeDone (time) - kSymbolRX (time)), doer_sum (time)\n");
+
+    for (size_t frame = 0; frame < total_stat_frames; frame++) {
+      const size_t i = (first_frame_idx + frame) % kNumStatsFrames;
+      size_t ref_tsc = SIZE_MAX;
+      for (size_t j = 0; j < config_->SocketThreadNum(); j++) {
+        ref_tsc = std::min(ref_tsc, this->frame_start_[j][i]);
+      }
+      // Find tsc of first RX packet and last decode events in every ofdm symbol
+      for (size_t k = ul_data_symbol_start; k < 3; k++) {
+        size_t master_min_tsc_symbolrx = MasterGetTscSymbol(TsType::kSymbolRX, i, k, 0);
+        size_t master_min_tsc_symbolrx_idx = 0;
+        for (size_t l = 1; l < config_->BsAntNum(); l++) {
+          if (MasterGetTscSymbol(TsType::kSymbolRX, i, k, l) < master_min_tsc_symbolrx) {
+            master_min_tsc_symbolrx = MasterGetTscSymbol(TsType::kSymbolRX, i, k, l);
+            master_min_tsc_symbolrx_idx = l;
+          }
+        }
+        size_t master_max_tsc_decode = MasterGetTscSymbol(TsType::kDecodeDone, i, k, 0);
+        size_t master_max_tsc_decode_idx = 0;
+        for (size_t l = 1; l < config_->SpatialStreamsNum(); l++) {
+          if (MasterGetTscSymbol(TsType::kDecodeDone, i, k, l) > master_max_tsc_decode) {
+            master_max_tsc_decode = MasterGetTscSymbol(TsType::kDecodeDone, i, k, l);
+            master_max_tsc_decode_idx = l;
+          }
+        }
+        std::fprintf(
+            fp_debug_symbol, "%zu %zu %zu %.3f %zu %zu %zu %.3f %.3f %.3f %.3f\n",
+            i,
+            k,
+            ref_tsc,
+            GetTime::CyclesToUs(ref_tsc - this->creation_tsc_, this->freq_ghz_),
+            master_min_tsc_symbolrx,
+            master_max_tsc_decode,
+            (master_max_tsc_decode - master_min_tsc_symbolrx),
+            MasterGetUsSymbolFromRef(TsType::kSymbolRX, i, k, master_min_tsc_symbolrx_idx, ref_tsc),
+            MasterGetUsSymbolFromRef(TsType::kDecodeDone, i, k, master_max_tsc_decode_idx, ref_tsc),
+            (MasterGetUsSymbolFromRef(TsType::kDecodeDone, i, k, master_max_tsc_decode_idx, ref_tsc) - MasterGetUsSymbolFromRef(TsType::kSymbolRX, i, k, 0, ref_tsc)),
+            this->doer_sum_us_.at(i));
+        ref_tsc += ticks_per_symbol;
+      }
+    }
+  } else {
+    // Shouldn't happen
+    RtAssert(false,
+             std::string("No uplink or downlink symbols in the frame\n"));
+  }
+  std::fclose(fp_debug_symbol);
+  
   if (config_->FrameToProfile() != SIZE_MAX) {
     AGORA_LOG_INFO("Stats: Printing Agora configurations to %s\n",
                    kAgoraConfigFilename.c_str());

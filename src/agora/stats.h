@@ -56,6 +56,7 @@ enum class TsType : size_t {
   kTXDone,             // All packets of a frame transmitted
   kModulDone,          // Completed modulation for this frame
   kFFTDone,            // Completed FFT of data symbols for this frame
+  kSymbolRX,           // RX Symbol received
   kTsTypeEnd
 };
 static constexpr size_t kNumTimestampTypes =
@@ -70,6 +71,10 @@ class Stats {
   /// stats for all uplink and donwlink Doer types. Else return immediately.
   void UpdateStats(size_t frame_id);
 
+  /// Tsc difference between last cb decode and first rx packet received
+  /// in the last ofdm symbol of the frame
+  size_t MeasureLastFrameTsc();
+
   /// Measure the last frame latency
   /// Time taken with decoding - time starting process
   double MeasureLastFrameLatency();
@@ -77,6 +82,24 @@ class Stats {
   /// Save master timestamps to a file. If worker stats collection is enabled,
   /// also save detailed worker timing info to a file.
   void SaveToFile();
+
+  /// From the master, set the RDTSC timestamp for a frame ID, symbol ID and
+  /// timestamp type
+  void MasterSetTscSymbol(TsType timestamp_type, size_t frame_id, size_t symbol_id, size_t block_id) {
+    this->master_timestamps_symbols_.at(static_cast<size_t>(timestamp_type))
+        .at(frame_id % kNumStatsFrames)
+        .at(symbol_id % kNumSymbolsPerFrame)
+        .at(block_id % kMaxAntennas) = GetTime::Rdtsc();
+  }
+
+  /// From the master, get the RDTSC timestamp for a frame ID and timestamp
+  /// type
+  size_t MasterGetTscSymbol(TsType timestamp_type, size_t frame_id, size_t symbol_id, size_t block_id) const {
+    return this->master_timestamps_symbols_.at(static_cast<size_t>(timestamp_type))
+        .at(frame_id % kNumStatsFrames)
+        .at(symbol_id % kNumSymbolsPerFrame)
+        .at(block_id % kMaxAntennas);
+  }
 
   /// If worker stats collection is enabled, prsize_t a summary of stats
   void PrintSummary();
@@ -92,7 +115,7 @@ class Stats {
   /// type
   size_t MasterGetTsc(TsType timestamp_type, size_t frame_id) const {
     return this->master_timestamps_.at(static_cast<size_t>(timestamp_type))
-        .at((frame_id % kNumStatsFrames));
+        .at(frame_id % kNumStatsFrames);
   }
 
   /// From the master, get the millisecond elapsed since the timestamp of
@@ -108,6 +131,16 @@ class Stats {
   double MasterGetUsSince(TsType timestamp_type, size_t frame_id) const {
     return GetTime::CyclesToUs(
         GetTime::Rdtsc() - MasterGetTsc(timestamp_type, frame_id),
+        this->freq_ghz_);
+  }
+
+  /// From the master, get the microseconds between when the timestamp of
+  /// timestamp_type was taken for frame_id, symbol_id and reference_tsc
+  double MasterGetUsSymbolFromRef(TsType timestamp_type, size_t frame_id,
+                                  size_t symbol_id, size_t cb_id,
+                                  size_t reference_tsc) const {
+    return GetTime::CyclesToUs(
+        MasterGetTscSymbol(timestamp_type, frame_id, symbol_id, cb_id) - reference_tsc,
         this->freq_ghz_);
   }
 
@@ -310,6 +343,13 @@ class Stats {
   std::array<std::array<double, kNumStatsFrames>, kNumTimestampTypes>
       master_timestamps_;
 
+  /// Timestamps taken by the master thread at different points in a symbols's
+  /// processing
+  std::array<std::array<std::array<std::array<double, kMaxAntennas>, kNumSymbolsPerFrame>,
+             kNumStatsFrames>,
+             kNumTimestampTypes>
+      master_timestamps_symbols_;
+
   /// Running time duration statistics. Each worker thread has one
   /// DurationStat object for every Doer type. The master thread keeps stale
   /// ("old") copies of all DurationStat objects.
@@ -318,6 +358,7 @@ class Stats {
     std::array<uint8_t, 64> false_sharing_padding_;
   };
 
+  std::array<double, kNumStatsFrames> doer_sum_us_;
   std::array<TimeDurationsStats, kMaxThreads> worker_durations_;
   std::array<TimeDurationsStats, kMaxThreads> worker_durations_old_;
 

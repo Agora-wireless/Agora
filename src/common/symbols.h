@@ -17,6 +17,9 @@
 // is the frame window that we track in Agora.
 static constexpr size_t kFrameWnd = 40;
 
+// Fixed number of 14 symbols per frame from 3GPP
+static constexpr size_t kNumSymbolsPerFrame = 14;
+
 #define TX_FRAME_DELTA (4)
 #define SETTLE_TIME_MS (1)
 
@@ -352,7 +355,7 @@ static constexpr bool kIsWorkerTimingEnabled = true;
 static constexpr size_t kMaxStatsBreakdown = 4;
 
 // Minimum number of workers
-static constexpr size_t kMinWorkers = 2;
+static constexpr size_t kMinWorkers = 1;
 
 // Maximum number of hardware threads on one machine
 static constexpr size_t kMaxThreads = 128;

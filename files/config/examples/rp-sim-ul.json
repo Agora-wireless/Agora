@@ -2,19 +2,19 @@
     "fft_size": 2048,
     "ofdm_data_num": 1200,
     "demul_block_size": 40,
-    "bs_radio_num": 8,
+    "bs_radio_num": 16,
     "ue_radio_num": 8,
-    "adapt_ues": true,
+    "adapt_ues": false,
     "ul_mcs" : {
       "mcs_index" : 17 /* 64QAM, 466/1024 from Table 6.1.4.1-1 of 3GPP TS 38.214 */
     },
     "dl_mcs" : {
       "mcs_index" : 25 /* 256QAM, 885/1024 from Table 5.1.3.1-2 of 3GPP TS 38.214 */
     },
-    "symbol_num_perframe": 14,
+    "symbol_num_perframe": 3,
     "client_ul_pilot_syms": 0,
     "ul_data_symbol_start": 2,
-    "ul_symbol_num_perframe": 12,
+    "ul_symbol_num_perframe": 1,
     "client_dl_pilot_syms": 0,
     "dl_data_symbol_start": 0,
     "dl_symbol_num_perframe": 0,
@@ -26,8 +26,8 @@
     "rp_remote_host_name": "127.0.0.1",
     "rp_tx_port": 3000,
     "rp_rx_port": 4000,
-    "worker_thread_num": 5,
+    "worker_thread_num": 12,
     "socket_thread_num": 1,
-    "max_frame": 100,
+    "max_frame": 100000,
     "noise_level": 0.01
   }

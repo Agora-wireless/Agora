@@ -442,7 +442,7 @@ void Agora::Start() {
             break;
           }
 
-          UpdateRxCounters(pkt->frame_id_, pkt->symbol_id_);
+          UpdateRxCounters(pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
           fft_queue_arr_.at(pkt->frame_id_ % kFrameWnd)
               .push(fft_req_tag_t(event.tags_[0]));
         } break;
@@ -567,7 +567,11 @@ void Agora::Start() {
         case EventType::kDecode: {
           const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+          const size_t cb_id = gen_tag_t(event.tags_[0]).cb_id_;
 
+          this->stats_->MasterSetTscSymbol(TsType::kDecodeDone, frame_id, symbol_id, cb_id);
+          // AGORA_LOG_INFO("Agora:kDecodeDone frame_id %zu, symbol_id %zu, cb_id %zu, tsc %zu\n",
+          //   frame_id, symbol_id, cb_id, this->stats_->MasterGetTscSymbol(TsType::kDecodeDone, frame_id, symbol_id, cb_id));
           const bool last_decode_task =
               this->decode_counters_.CompleteTask(frame_id, symbol_id);
           if (last_decode_task == true) {
@@ -605,7 +609,7 @@ void Agora::Start() {
 
           if (rcm.msg_type_ == 1) {
             AGORA_LOG_INFO(
-                "Agora: Received cores update data from RP of add cores %zu,"
+                "Agora: Received cores update data from RP of add cores %zu, "
                 "remove cores %zu\n",
                 rcm.msg_arg_1_, rcm.msg_arg_2_);
             worker_set_->UpdateCores(rcm);
@@ -1082,9 +1086,12 @@ void Agora::UpdateRanConfig(RanConfig rc) {
   config_->UpdateUlMCS(msc_params);
 }
 
-void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
+void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id, size_t ant_id) {
   const size_t frame_slot = frame_id % kFrameWnd;
   auto symbol_type = config_->Frame().GetSymbolType(symbol_id);
+  this->stats_->MasterSetTscSymbol(TsType::kSymbolRX, frame_id, symbol_id, ant_id);
+  // AGORA_LOG_INFO("Agora:kSymbolRX frame_id %zu, symbol_id %zu, ant_id %zu tsc %zu\n", frame_id, symbol_id, ant_id,
+  //   this->stats_->MasterGetTscSymbol(TsType::kSymbolRX, frame_id, symbol_id, ant_id));
   if (symbol_type == SymbolType::kPilot) {
     rx_counters_.num_pilot_pkts_[frame_slot]++;
     if (rx_counters_.num_pilot_pkts_.at(frame_slot) ==

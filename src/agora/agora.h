@@ -86,7 +86,7 @@ class Agora {
   void SaveTxDataToFile(int frame_id);
 
   void HandleEventFft(size_t tag);
-  void UpdateRxCounters(size_t frame_id, size_t symbol_id);
+  void UpdateRxCounters(size_t frame_id, size_t symbol_id, size_t ant_id);
 
   /// Update Agora's RAN config parameters
   void UpdateRanConfig(RanConfig rc);
