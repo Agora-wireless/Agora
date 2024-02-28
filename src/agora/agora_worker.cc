@@ -19,100 +19,38 @@
 
 AgoraWorker::AgoraWorker(Config* cfg, MacScheduler* mac_sched, Stats* stats,
                          PhyStats* phy_stats, MessageInfo* message,
-                         AgoraBuffer* buffer, FrameInfo* frame)
-    : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum() +
-                               (cfg->DynamicCoreAlloc() ? 1 : 0)),
-      config_(cfg),
+                         AgoraBuffer* buffer, FrameInfo* frame,
+                         size_t worker_id, size_t core_id)
+    : config_(cfg),
+      enabled_(false),
+      worker_id_(worker_id),
+      core_id_(core_id),
       mac_sched_(mac_sched),
       stats_(stats),
       phy_stats_(phy_stats),
       message_(message),
       buffer_(buffer),
       frame_(frame) {
-  CreateThreads();
+  AGORA_LOG_SYMBOL("Worker: Starting worker thread %zu at core %zu\n",
+                   worker_id, core_id_);
+  const auto system_cores = sysconf(_SC_NPROCESSORS_ONLN);
+  if (core_id_ > static_cast<size_t>(system_cores)) {
+    throw std::runtime_error("Worker core exceeds the system core count!!");
+  }
+  enabled_.store(true);
+  thread_ = std::thread(&AgoraWorker::WorkLoop, this);
 }
 
 AgoraWorker::~AgoraWorker() {
-  for (auto& worker_thread : workers_) {
-    AGORA_LOG_SYMBOL("Agora: Joining worker thread\n");
-    if (worker_thread.joinable()) {
-      worker_thread.join();
-    }
+  AGORA_LOG_SYMBOL("Agora: Joining worker thread %zu\n", core_id_);
+  if (thread_.joinable()) {
+    thread_.join();
   }
 }
 
-void AgoraWorker::CreateThreads() {
-  AGORA_LOG_SYMBOL("Worker: Creating %zu workers\n",
-                   config_->WorkerThreadNum());
-  active_core_.resize(sysconf(_SC_NPROCESSORS_ONLN));
-  for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
-    active_core_[i] = true;
-    workers_.emplace_back(&AgoraWorker::WorkerThread, this, i);
-  }
-  for (size_t i = config_->WorkerThreadNum();
-       i < (size_t) sysconf(_SC_NPROCESSORS_ONLN); i++) {
-    active_core_[i] = false;
-  }
-}
-
-void AgoraWorker::UpdateCores(RPControlMsg rcm) {
-  AGORA_LOG_INFO("=================================\n");
-  AGORA_LOG_INFO(
-      "Agora: Updating compute resources for workers thread - currently used: "
-      "%ld, total: %ld\n",
-      workers_.size(),
-      sysconf(_SC_NPROCESSORS_ONLN) - base_worker_core_offset_);
-
-  // Target core numbers
-  const size_t current_core_num = workers_.size();
-  size_t updated_core_num = workers_.size() + rcm.msg_arg_1_ - rcm.msg_arg_2_;
-  // TODO: (size_t)sysconf(_SC_NPROCESSORS_ONLN) gives all available core # in the machine
-  const size_t max_core_num =
-      sysconf(_SC_NPROCESSORS_ONLN) - base_worker_core_offset_;
-
-  AGORA_LOG_INFO(
-      "[ALERTTTTTT]: CPU Layout Update!!! current_core_num: %zu, "
-      "updated_core_num: %zu, base_worker_core_offset: %zu, max_core_num: %zu\n",
-      current_core_num, updated_core_num, base_worker_core_offset_, max_core_num);
-
-  // Update workers
-  if (workers_.size() < updated_core_num) {
-    // Add workers
-    updated_core_num = std::min(updated_core_num, max_core_num);
-
-    for (size_t core_i = current_core_num; core_i < updated_core_num; core_i++) {
-      // Update info
-      active_core_[core_i] = true;
-      workers_.emplace_back(&AgoraWorker::WorkerThread, this, core_i);
-      AGORA_LOG_INFO("Agora: added core id %ld\n", core_i);
-    }
-  } else {
-    // Remove workers
-    // minimum core number?
-    updated_core_num = std::max(updated_core_num, (size_t) kMinWorkers);
-
-    for (size_t core_i = current_core_num; core_i > updated_core_num; core_i--) {
-      // Update info
-      active_core_[core_i - 1] = false;
-      RemoveCoreFromList((core_i - 1), base_worker_core_offset_);
-      workers_.at(core_i - 1).join();
-      AGORA_LOG_INFO("Agora: removed core id %ld\n", (core_i - 1));
-    }
-    workers_.resize(updated_core_num);
-  }
-
-  AGORA_LOG_INFO(
-      "Agora: Compute resource update is complete - currently used: %ld, "
-      "total: %ld\n",
-      workers_.size(),
-      sysconf(_SC_NPROCESSORS_ONLN) - base_worker_core_offset_);
-  AGORA_LOG_INFO("=================================\n");
-}
-
-size_t AgoraWorker::GetCoresInfo() { return workers_.size(); }
-
-void AgoraWorker::WorkerThread(int tid) {
-  PinToCoreWithOffset(ThreadType::kWorker, base_worker_core_offset_, tid);
+void AgoraWorker::WorkLoop() {
+  PinToCoreWithOffset(ThreadType::kWorker, 0, core_id_);
+  const size_t tid = worker_id_;
 
   /* Initialize operators */
   auto compute_beam = std::make_unique<DoBeamWeights>(
@@ -185,7 +123,7 @@ void AgoraWorker::WorkerThread(int tid) {
   size_t cur_qid = 0;
   size_t empty_queue_itrs = 0;
   bool empty_queue = true;
-  while (config_->Running() == true && active_core_.at(tid) == true) {
+  while ((config_->Running() == true) && (enabled_.load() == true)) {
     for (size_t i = 0; i < computers_vec.size(); i++) {
       if (computers_vec.at(i)->TryLaunch(
               *message_->GetConq(events_vec.at(i), cur_qid),
@@ -239,5 +177,8 @@ void AgoraWorker::WorkerThread(int tid) {
       empty_queue = true;
     }
   }
-  AGORA_LOG_SYMBOL("Agora worker %d exit\n", tid);
+
+  //Clean exit??? ptoks? queues empty?
+  enabled_.store(false);
+  AGORA_LOG_INFO("Agora worker %d at core %zu exit\n", worker_id_, core_id_);
 }
