@@ -30,12 +30,10 @@
   "ofdm_rx_zero_prefix_cal_dl": 0,
   /* Modulation and Coding settings */
   "ul_mcs" : {
-    "modulation": "16QAM",
-    "code_rate": 0.333
+    "mcs_index": 10
   },
   "dl_mcs" : {
-    "modulation": "16QAM",
-    "code_rate": 0.333
+    "mcs_index": 10
   },
   /* General settings */
   "beamforming": "ZF",
@@ -45,6 +43,7 @@
   "calibrate_analog": false,
   "init_calib_repeat": 1,
   "correct_phase_shift": false,
+  "freq_domain_channel": false,
   /* Hardware specific information */
   "frequency": 3.6e9,
   /* 0.75*rate */
@@ -97,7 +96,6 @@
   /* */
   "noise_level": 0.03,
   "wlan_scrambler": true,
-  "fft_in_rru": false,
   "zf_batch_size": 1,
   "zf_block_size": 1,
   "fft_block_size": 1,

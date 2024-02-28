@@ -10,15 +10,17 @@
   "tx_gain_a": 75,
   "rx_gain_b": 60,
   "tx_gain_b": 75,
-  /*"sample_rate": 7.68e6,*/
-  "sample_rate": 5e6,
+  "sample_rate": 7.68e6,
   "cp_size": 32,
-  "fft_size": 512,
-  "ofdm_data_num": 304,
+  "fft_size": 1024,
+  "ofdm_data_num": 704,
   "demul_block_size": 48,
   "ue_demul_block_size": 48,
   "ul_mcs": {
-    "mcs_index": 10
+    "mcs_index": 15
+  },
+  "dl_mcs": {
+    "mcs_index": 15
   },
   "ofdm_tx_zero_prefix": 160,
   "ofdm_tx_zero_postfix": 192,
@@ -27,39 +29,45 @@
   "ofdm_rx_zero_prefix_cal_dl": 324,
   "ofdm_rx_zero_prefix_cal_ul": 136,
   "frame_schedule": [
-    "BGGGGGPGGGUUUGGG"
+    "BGPPGUUUUUG"
   ],
+  "freq_orthogonal_pilot": false,
   "client_ul_pilot_syms": 2,
   "beamsweep": false,
-  "beacon_antenna": 0,
+  "beacon_antenna": 1,
   /* UE configuration */
   "ue_resync_period": 200,
   "ue_channel": "A",
   "ue_rx_gain_a": [
+    65,
     65
   ],
   "ue_tx_gain_a": [
+    75,
     75
   ],
   "ue_rx_gain_b": [
+    65,
     65
   ],
   "ue_tx_gain_b": [
+    75,
     75
   ],
   "tx_advance": [
+    140,
     140
   ],
   "ue_hw_framer": false,
   "hw_framer": true,
   /* Compute configuration */
   "exclude_cores": [],
-  "ue_core_offset": 14,
-  "ue_worker_thread_num": 4,
-  "ue_socket_thread_num": 1,
-  /* Vulture radios -- 32 (tested)*/
-  "core_offset": 0,
+  "ue_core_offset": 10,
+  "ue_worker_thread_num": 2,
+  "ue_socket_thread_num": 2,
+  /* Vulture radios -- 32x2 (tested)*/
+  "core_offset": 1,
   "worker_thread_num": 6,
-  "socket_thread_num": 4,
-  "max_frame": 5000
+  "socket_thread_num": 1,
+  "max_frame": 500000
 }

@@ -3,14 +3,15 @@
   "ofdm_data_num": 304,
   "demul_block_size": 48,
   "ul_mcs" : {
-    "mcs_index": 10
+    "mcs_index": 10 /*16QAM, 340/1204*/
   },
   "dl_mcs" : {
-    "mcs_index": 10
+    "mcs_index": 15 /*16QAM, 616/1024*/
   },
-  /* set sample rate to 1Ms
-  to make sure tests pass*/
   "sample_rate" : 1e6,
+  "spatial_streams" : 2,
+  /*Scheduler Types : "round_robbin" , "proportional_fairness"*/
+  "scheduler_type" : "proportional_fairness",
   "ue_radio_num": 4,
   "bs_radio_num": 32,
   "symbol_num_perframe": 24,
@@ -23,14 +24,10 @@
   "beacon_position": 0,
   "bs_server_port": 8100,
   "bs_rru_port": 8200,
-  "exclude_cores": [],
-  "core_offset": 0,
-  "worker_thread_num": 4,
+  "core_offset": 5,
+  "worker_thread_num": 12,
   "socket_thread_num": 1,
-  "ue_core_offset": 7,
+  "ue_core_offset": 1,
   "ue_worker_thread_num": 2,
-  "ue_socket_thread_num": 1,
-  "max_frame": 1000,
-  "freq_orthogonal_pilot": true,
-  "log_listener_addr": "127.0.0.1"
+  "ue_socket_thread_num": 1
 }
