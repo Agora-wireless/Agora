@@ -250,13 +250,16 @@ size_t TxRxWorkerSim::DequeueSend() {
     }
 
     if (kDebugDownlink == true) {
-      const size_t data_symbol_idx_dl =
+      const size_t symbol_idx_dl =
           Configuration()->Frame().GetDLSymbolIdx(symbol_id);
+      const size_t data_symbol_idx_dl =
+          Configuration()->Frame().GetDLSymbolIdx(symbol_id) -
+          Configuration()->Frame().ClientDlPilotSymbols();
 
       if (ant_id != 0) {
         std::memset(pkt->data_, 0,
                     Configuration()->SampsPerSymbol() * sizeof(int16_t) * 2);
-      } else if (data_symbol_idx_dl <
+      } else if (symbol_idx_dl <
                  Configuration()->Frame().ClientDlPilotSymbols()) {
         std::memcpy(pkt->data_, Configuration()->UeSpecificPilotT()[0],
                     Configuration()->SampsPerSymbol() * sizeof(int16_t) * 2);

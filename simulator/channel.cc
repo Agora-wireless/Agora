@@ -1,5 +1,5 @@
 /**
- * @file channel.h
+ * @file channel.cc
  * @brief Implementation file for the channel class
  */
 #include "channel.h"
@@ -24,6 +24,7 @@ Channel::Channel(const Config* const config, std::string& in_channel_type,
 
   const float snr_lin = std::pow(10, channel_snr_db_ / 10.0f);
   noise_samp_std_ = std::sqrt(kMeanChannelGain / (snr_lin * 2.0f));
+
   std::cout << "Noise level to be used is: " << std::fixed << std::setw(5)
             << std::setprecision(2) << noise_samp_std_ << std::endl;
 }
@@ -33,7 +34,7 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
   arma::cx_fmat fmat_h;
 
   if (is_newChan) {
-    channel_model_->UpdateModel();
+    channel_model_->UpdateModel(kMeanChannelGain);
   }
 
   switch (channel_model_->GetFadingType()) {
@@ -43,11 +44,15 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
     }
 
     case ChannelModel::kSelective: {
-      //For each Subcarrier or OFDMSample input, multiply H Matrix slice
-      for (int h_index = 0; h_index < (int)fmat_src.n_rows; h_index++) {
-        arma::cx_fmat y_ = fmat_src.row(h_index) *
-                           channel_model_->GetMatrix(is_downlink, h_index);
-        fmat_h.insert_rows(h_index, y_);
+      const size_t n_rows = (cfg_->FreqDomainChannel())
+                                ? cfg_->OfdmCaNum()
+                                : cfg_->SampsPerSymbol();
+      const size_t n_cols = (is_downlink) ? cfg_->UeAntNum() : cfg_->BsAntNum();
+
+      fmat_h.zeros(n_rows, n_cols);
+      for (size_t h_index = 0; h_index < n_rows; h_index++) {
+        fmat_h.row(h_index) = fmat_src.row(h_index) *
+                              channel_model_->GetMatrix(is_downlink, h_index);
       }
       break;
     }
@@ -75,12 +80,6 @@ void Channel::Awgn(const arma::cx_fmat& src, arma::cx_fmat& dst) const {
     arma::cx_fmat noise(arma::randn<arma::fmat>(n_row, n_col),
                         arma::randn<arma::fmat>(n_row, n_col));
 
-    // Supposed to be faster
-    // arma::fmat x(n_row, n_col, arma::fill::arma::randn);
-    // arma::fmat y(n_row, n_col, arma::fill::arma::randn);
-    // arma::cx_fmat noise = arma::cx_fmat(x, y);
-
-    // Add noise to signal
     noise *= noise_samp_std_;
     dst = src + noise;
 

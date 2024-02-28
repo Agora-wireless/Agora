@@ -10,8 +10,12 @@
 #ifndef FRAMESTATS_H_
 #define FRAMESTATS_H_
 
+#include <cassert>
+#include <stdexcept>
 #include <string>
 #include <vector>
+
+#include "symbols.h"
 
 class FrameStats {
  public:
@@ -32,7 +36,6 @@ class FrameStats {
 
   /* Returns SIZE_MAX if symbol number is not a beacon */
   size_t GetBeaconSymbolIdx(size_t symbol_number) const;
-  size_t GetDLDataSymbolStart() const;
   size_t GetDLControlSymbolIdx(size_t symbol_number) const;
   size_t GetDLSymbol(size_t location) const;
   inline size_t GetDLDataSymbol(size_t location) const {
@@ -44,7 +47,6 @@ class FrameStats {
   /* Returns SIZE_MAX if there are no DL symbols */
   size_t GetDLSymbolIdx(size_t symbol_number) const;
 
-  size_t GetULDataSymbolStart() const;
   size_t GetULSymbol(size_t location) const;
   inline size_t GetULDataSymbol(size_t location) const {
     return GetULSymbol(location + client_ul_pilot_symbols_);
@@ -89,6 +91,55 @@ class FrameStats {
   inline size_t NumDlDataSyms() const {
     return this->NumDLSyms() - this->ClientDlPilotSymbols();
   }
+
+  //Returns Beacon+Dl symbol index
+  inline size_t GetBeaconDlIdx(size_t symbol_id) const {
+    size_t symbol_idx = SIZE_MAX;
+    const auto type = GetSymbolType(symbol_id);
+    if (type == SymbolType::kBeacon) {
+      symbol_idx = GetBeaconSymbolIdx(symbol_id);
+    } else if (type == SymbolType::kControl) {
+      symbol_idx = GetDLControlSymbolIdx(symbol_id) + NumBeaconSyms();
+    } else if (type == SymbolType::kDL) {
+      symbol_idx = GetDLSymbolIdx(symbol_id) + NumDlBcastSyms();
+    } else {
+      throw std::runtime_error("Invalid BS Beacon or DL symbol id " +
+                               std::to_string(symbol_id));
+    }
+    return symbol_idx;
+  }
+
+  //Returns Pilot+Ul symbol index
+  inline size_t GetPilotUlIdx(size_t symbol_id) const {
+    size_t symbol_idx = SIZE_MAX;
+    const auto type = this->GetSymbolType(symbol_id);
+    if (type == SymbolType::kPilot) {
+      symbol_idx = GetPilotSymbolIdx(symbol_id);
+    } else if (type == SymbolType::kUL) {
+      symbol_idx = GetULSymbolIdx(symbol_id) + NumPilotSyms();
+    } else {
+      throw std::runtime_error("Invalid Ue Pilot or UL symbol id " +
+                               std::to_string(symbol_id));
+    }
+    return symbol_idx;
+  }
+
+  /* Returns True if it is a dl pilot_
+   * False otherwise */
+  inline bool IsDlPilot(size_t symbol_id) const {
+    bool is_pilot = false;
+    assert(symbol_id < this->NumTotalSyms());
+    const auto type = this->GetSymbolType(symbol_id);
+    if (type == SymbolType::kDL && (this->ClientDlPilotSymbols() > 0)) {
+      size_t dl_index = this->GetDLSymbolIdx(symbol_id);
+      is_pilot = (this->ClientDlPilotSymbols() > dl_index);
+    }
+    return is_pilot;
+  }
+
+  /* Public functions that do not meet coding standard format */
+  /// Return the symbol type of this symbol in this frame
+  SymbolType GetSymbolType(size_t symbol_id) const;
 
  private:
   std::string frame_identifier_;

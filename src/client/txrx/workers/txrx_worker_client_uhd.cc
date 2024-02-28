@@ -645,7 +645,7 @@ ssize_t TxRxWorkerClientUhd::FindSyncBeacon(
 }
 
 bool TxRxWorkerClientUhd::IsRxSymbol(size_t symbol_id) {
-  auto symbol_type = Configuration()->GetSymbolType(symbol_id);
+  auto symbol_type = Configuration()->Frame().GetSymbolType(symbol_id);
   bool is_rx;
 
   if ((symbol_type == SymbolType::kBeacon) ||
@@ -706,10 +706,17 @@ void TxRxWorkerClientUhd::TxUplinkSymbols(size_t radio_id, size_t frame_id,
     for (size_t ch = 0; ch < channels_per_interface_; ch++) {
       const size_t tx_ant = (radio_id * channels_per_interface_) + ch;
       if (kDebugUplink) {
-        tx_data.at(ch) = reinterpret_cast<void*>(
-            &Configuration()
-                 ->UlIqT()[ul_symbol_idx]
-                          [tx_ant * Configuration()->SampsPerSymbol()]);
+        if (ul_symbol_idx < Configuration()->Frame().ClientUlPilotSymbols()) {
+          tx_data.at(ch) = reinterpret_cast<void*>(
+              Configuration()->UeSpecificPilotT()[tx_ant]);
+        } else {
+          size_t ul_data_symbol_idx =
+              ul_symbol_idx - Configuration()->Frame().ClientUlPilotSymbols();
+          tx_data.at(ch) = reinterpret_cast<void*>(
+              &Configuration()
+                   ->UlIqT()[ul_symbol_idx]
+                            [tx_ant * Configuration()->SampsPerSymbol()]);
+        }
       } else {
         auto* pkt = GetUlTxPacket(frame_id, tx_symbol_id, tx_ant);
         tx_data.at(ch) = reinterpret_cast<void*>(pkt->data_);

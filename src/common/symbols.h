@@ -54,6 +54,8 @@ enum class EventType : int {
   kModul,
   kPacketFromMac,
   kPacketToMac,
+  kPacketFromRp,
+  kPacketToRp,
   kFFTPilot,
   kSNRReport,    // Signal new SNR measurement from PHY to MAC
   kRANUpdate,    // Signal new RAN config to Agora
@@ -64,6 +66,28 @@ enum class EventType : int {
 
 static constexpr size_t kNumEventTypes =
     static_cast<size_t>(EventType::kThreadTermination) + 1;
+
+// Define a mapping from EventType to string
+static const std::array<std::string, kNumEventTypes> kEventTypeToString = {
+    "PacketRX",
+    "FFT",
+    "Beam",
+    "Demul",
+    "IFFT",
+    "Precode",
+    "PacketTX",
+    "PacketPilotTX",
+    "Decode",
+    "Encode",
+    "Modul",
+    "PacketFromMac",
+    "PacketToMac",
+    "FFTPilot",
+    "SNRReport",
+    "RANUpdate",
+    "RBIndicator",
+    "Broadcast",
+    "ThreadTermination"};
 
 // Types of Agora Doers
 enum class DoerType : size_t {
@@ -184,8 +208,6 @@ static constexpr bool kEnableMatLog = true;
 static constexpr bool kEnableMatLog = false;
 #endif
 
-static constexpr bool kCbSfScheduling = true;
-
 // Use 12-bit IQ sample to reduce network throughput
 static constexpr bool kUse12BitIQ = false;
 static constexpr bool kDebug12BitIQ = false;
@@ -230,6 +252,7 @@ enum class ThreadType {
   kWorkerTX,
   kWorkerTXRX,
   kWorkerMacTXRX,
+  kWorkerRpTXRX,
   kMasterRX,
   kMasterTX,
   kRecorderWorker
@@ -257,6 +280,8 @@ static inline std::string ThreadTypeStr(ThreadType thread_type) {
       return "TXRX";
     case ThreadType::kWorkerMacTXRX:
       return "MAC TXRX";
+    case ThreadType::kWorkerRpTXRX:
+      return "RP TXRX";
     case ThreadType::kMasterRX:
       return "Master (RX)";
     case ThreadType::kMasterTX:
@@ -278,6 +303,7 @@ enum class SymbolType {
   kGuard,
   kUnknown
 };
+
 static const std::map<char, SymbolType> kSymbolMap = {
     {'B', SymbolType::kBeacon}, {'C', SymbolType::kCalDL},
     {'D', SymbolType::kDL},     {'G', SymbolType::kGuard},
@@ -286,15 +312,13 @@ static const std::map<char, SymbolType> kSymbolMap = {
 
 enum class SubcarrierType { kNull, kDMRS, kPTRS, kData };
 
-// Number of subcarriers in a PRB
-static constexpr size_t kNumScPerPRB = 12;
+// Maximum number of events allowed for all threads per symbol in a logging frame
+static constexpr size_t kMaxLoggingEventsMaster = 100000;
 
-// Maximum number of data symbols in a slot
-static constexpr size_t kMaxNumDataSymbPerSlot = 12;
+// Maximum number of events allowed per thread per symbol in a logging frame
+static constexpr size_t kMaxLoggingEventsWorker = 1024;
 
 // Maximum number of symbols per frame allowed by Agora
-// Symbol dimension is used for code blocks for now
-// TBD: Update symbol dimension to store code blocks
 static constexpr size_t kMaxSymbols = 140;
 
 // Maximum number of OFDM data subcarriers in the 5G spec
@@ -326,6 +350,9 @@ static constexpr bool kIsWorkerTimingEnabled = true;
 
 // Maximum breakdown of a statistic (e.g., timing)
 static constexpr size_t kMaxStatsBreakdown = 4;
+
+// Minimum number of workers
+static constexpr size_t kMinWorkers = 2;
 
 // Maximum number of hardware threads on one machine
 static constexpr size_t kMaxThreads = 128;
@@ -385,4 +412,5 @@ static constexpr size_t kOfdmSymbolPerSlot = 1;
 static constexpr size_t kOutputFrameNum = 1;
 
 static constexpr bool kDebugTxData = false;
+static constexpr bool kDebugBypassEncode = false;
 #endif  // SYMBOLS_H_

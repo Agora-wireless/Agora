@@ -358,11 +358,12 @@ void RecorderWorkerHDF5::Init() {
                 "total syms %zu\n",
                 sym, ant, num_ul_syms);
             //UlIqF is indexed by complex float
-            hdf5_->WriteDataset(
-                dataset_name, start, tx_data_dims,
-                reinterpret_cast<const float*>(
-                    &const_cast<Config*>(cfg_)
-                         ->UlIqF()[sym][ant * (tx_data_size / 2)]));
+            complex_float* write_data =
+                (sym < cfg_->ClientUlPilotSymbols())
+                    ? cfg_->UeSpecificPilot()[ant]
+                    : &cfg_->UlIqF[sym][ant * (tx_data_size / 2)];
+            hdf5_->WriteDataset(dataset_name, start, tx_data_dims,
+                                reinterpret_cast<const float*>(write_data));
           }
         }
         hdf5_->FinalizeDataset(dataset_name);
@@ -433,7 +434,7 @@ int RecorderWorkerHDF5::Record(const Packet* pkt) {
           pkt->data_[5u], pkt->data_[6u], pkt->data_[7u]);
     }
 
-    auto rx_symbol_type = cfg_->GetSymbolType(symbol_id);
+    auto rx_symbol_type = cfg_->Frame().GetSymbolType(symbol_id);
     switch (rx_symbol_type) {
       case SymbolType::kBeacon: {
         const size_t beacon_symbol_id =

@@ -9,6 +9,7 @@
 #include <cassert>
 
 #include "comms-lib.h"
+#include "data_generator.h"
 #include "gettime.h"
 #include "logger.h"
 #include "message.h"
@@ -247,18 +248,16 @@ std::vector<RxPacket*> TxRxWorkerHw::DoRx(size_t interface_id,
             symbol_id, rx_info.SamplesAvailable(),
             Configuration()->SampsPerSymbol());
       }
-
-      const bool cal_rx =
-          (radio_id != Configuration()->RefRadio(cell_id) &&
-           Configuration()->IsCalUlPilot(global_frame_id, global_symbol_id)) ||
-          (radio_id == Configuration()->RefRadio(cell_id) &&
-           Configuration()->IsCalDlPilot(global_frame_id, global_symbol_id));
-      const bool ignore_rx_data =
-          (invalid_rx_symbol == true) ||
-          ((Configuration()->HwFramer() == false) &&
-           (!Configuration()->IsPilot(global_frame_id, global_symbol_id) &&
-            !Configuration()->IsUplink(global_frame_id, global_symbol_id) &&
-            !cal_rx));
+      auto symbol_type =
+          Configuration()->Frame().GetSymbolType(global_symbol_id);
+      const bool cal_rx = (radio_id != Configuration()->RefRadio(cell_id) &&
+                           symbol_type == SymbolType::kCalUL) ||
+                          (radio_id == Configuration()->RefRadio(cell_id) &&
+                           symbol_type == SymbolType::kCalDL);
+      const bool ignore_rx_data = (invalid_rx_symbol == true) ||
+                                  ((Configuration()->HwFramer() == false) &&
+                                   (symbol_type != SymbolType::kPilot &&
+                                    symbol_type != SymbolType::kUL && !cal_rx));
 
       // Update global frame_id and symbol_id
       global_symbol_id++;
@@ -350,7 +349,8 @@ void TxRxWorkerHw::TxBcastSymbolsHw(size_t frame_id, size_t radio_id,
   }
 
   std::vector<size_t> ctrl_data(1, frame_id);
-  Configuration()->GenBroadcastSlots(ctrl_samp_buffer, ctrl_data);
+  DataGenerator::GenBroadcastSlots(Configuration(), ctrl_samp_buffer,
+                                   ctrl_data);
 
   const size_t bcast_radio =
       Configuration()->BeaconAnt() / Configuration()->NumChannels();
@@ -526,6 +526,9 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
 
     const size_t dl_symbol_idx =
         Configuration()->Frame().GetDLSymbolIdx(symbol_id);
+    const size_t dl_data_symbol_idx =
+        Configuration()->Frame().GetDLSymbolIdx(symbol_id) -
+        Configuration()->Frame().ClientDlPilotSymbols();
 
     // All antenna data is ready to tx for a given symbol, if last then TX out the data
     if (last_antenna) {
@@ -534,18 +537,19 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
           "for radio %zu has tx data for all antennas / channels\n",
           tid_, frame_id, symbol_id, ant_id, radio_id);
 
-      // When the first Tx symbol of the frame is ready (for a specific radio), schedule beacon and cals
-      // assumes the symbols are in the correct order (ie get symbol 0 before symbol 1)
-      if (symbol_id == Configuration()->Frame().GetDLSymbol(0)) {
+      // When the first Tx symbol of the frame for a specific radio is ready (control or data),
+      // schedule beacon and cals
+      // Assumes the symbols are in the order: beacon, control, cal, data
+      if ((Configuration()->Frame().NumDlControlSyms() > 0 &&
+           symbol_id == Configuration()->Frame().GetDLControlSymbol(0)) ||
+          (Configuration()->Frame().NumDlControlSyms() == 0 &&
+           symbol_id == Configuration()->Frame().GetDLSymbol(0))) {
         // Schedule beacon in the future
         if (Configuration()->HwFramer() == false) {
           TxBeaconHw(tx_frame_id, radio_id, time0);
         }
-
-        if (Configuration()->Frame().NumDlControlSyms() > 0) {
-          TxBcastSymbolsHw(tx_frame_id, radio_id, time0);
-        }
-
+      }
+      if (symbol_id == Configuration()->Frame().GetDLSymbol(0)) {
         if (Configuration()->Frame().IsRecCalEnabled()) {
           TxReciprocityCalibPilots(tx_frame_id, radio_id, time0);
         }
@@ -573,8 +577,8 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
                     : pilot.data();
           } else {
             std::vector<std::complex<int16_t>> data_t(
-                Configuration()->DlIqT()[dl_symbol_idx],
-                Configuration()->DlIqT()[dl_symbol_idx] +
+                Configuration()->DlIqT()[dl_data_symbol_idx],
+                Configuration()->DlIqT()[dl_data_symbol_idx] +
                     Configuration()->SampsPerSymbol());
             std::vector<std::complex<int16_t>> nt_data_t(data_t);
             for (auto& v : nt_data_t) {
@@ -632,8 +636,9 @@ bool TxRxWorkerHw::IsTxSymbolNext(size_t radio_id, size_t current_symbol) {
   const auto cell_id = Configuration()->CellId().at(radio_id);
   const auto reference_radio = Configuration()->RefRadio(cell_id);
 
-  if (current_symbol != Configuration()->Frame().NumTotalSyms()) {
-    auto next_symbol = Configuration()->GetSymbolType(current_symbol + 1);
+  if (current_symbol < Configuration()->Frame().NumTotalSyms() - 1) {
+    auto next_symbol =
+        Configuration()->Frame().GetSymbolType(current_symbol + 1);
     if ((next_symbol == SymbolType::kDL) ||
         (next_symbol == SymbolType::kBeacon) ||
         (next_symbol == SymbolType::kControl)) {
@@ -693,7 +698,7 @@ TxRxWorkerRx::RxParameters TxRxWorkerHw::UpdateRxInterface(
 }
 
 bool TxRxWorkerHw::IsRxSymbol(size_t interface, size_t symbol_id) {
-  auto symbol_type = Configuration()->GetSymbolType(symbol_id);
+  auto symbol_type = Configuration()->Frame().GetSymbolType(symbol_id);
   const auto cell_id =
       Configuration()->CellId().at(interface + interface_offset_);
   const auto reference_radio = Configuration()->RefRadio(cell_id);

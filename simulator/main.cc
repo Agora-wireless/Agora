@@ -29,7 +29,7 @@ int main(int argc, char const* argv[]) {
                 conf_file.c_str());
   }
   auto cfg = std::make_unique<Config>(conf_file.c_str());
-  cfg->GenData();
+  cfg->LoadTestVectors();
   int ret;
   try {
     SignalHandler signal_handler;

@@ -26,7 +26,7 @@ std::unique_ptr<Radio> Radio::Create(Radio::RadioType type) {
 #endif
     default: {
       AGORA_LOG_ERROR("Unknown or unsupported radio type\n");
-      return std::unique_ptr<Radio>();
+      return {};
     }
   }
 }

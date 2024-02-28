@@ -52,6 +52,7 @@ EventData DoIFFT::Launch(size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ant_id = gen_tag_t(tag).ant_id_;
+  const bool bypass_ifft = cfg_->FreqDomainChannel();
 
   if (kDebugPrintInTask) {
     std::printf("In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n",
@@ -60,11 +61,11 @@ EventData DoIFFT::Launch(size_t tag) {
 
   const size_t dl_symbol_idx = cfg_->Frame().GetDLSymbolIdx(symbol_id);
   const size_t total_symbol_idx_dl =
-      cfg_->GetTotalDataSymbolIdxDl(frame_id, dl_symbol_idx);
+      cfg_->GetTotalSymbolIdxDl(frame_id, dl_symbol_idx);
   const size_t in_offset = (total_symbol_idx_dl * cfg_->BsAntNum()) + ant_id;
 
   const size_t total_symbol_idx =
-      cfg_->GetTotalSymbolIdxDl(frame_id, symbol_id);
+      cfg_->GetTotalSymbolIdxDlBcast(frame_id, symbol_id);
   const size_t out_offset = (total_symbol_idx * cfg_->BsAntNum()) + ant_id;
 
   const size_t start_tsc1 = GetTime::WorkerRdtsc();
@@ -74,35 +75,29 @@ EventData DoIFFT::Launch(size_t tag) {
   auto* ifft_out_ptr =
       (kUseOutOfPlaceIFFT || kMemcpyBeforeIFFT) ? ifft_out_ : ifft_in_ptr;
 
-  if (false) {
-    std::stringstream ss;
-    ss << "IFFT_input" << ant_id << "=[";
-    for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
-      ss << std::fixed << std::setw(5) << std::setprecision(3)
-         << dl_ifft_buffer_[in_offset][i].re << "+1j*"
-         << dl_ifft_buffer_[in_offset][i].im << " ";
-    }
-    ss << "];" << std::endl;
-    std::cout << ss.str();
-  }
-
   std::memset(ifft_in_ptr, 0, sizeof(float) * cfg_->OfdmDataStart() * 2);
   std::memset(ifft_in_ptr + (cfg_->OfdmDataStop()) * 2, 0,
               sizeof(float) * cfg_->OfdmDataStart() * 2);
-  CommsLib::FFTShift(reinterpret_cast<complex_float*>(ifft_in_ptr),
-                     ifft_shift_tmp_, cfg_->OfdmCaNum());
-  if (kMemcpyBeforeIFFT) {
+
+  if (bypass_ifft && kMemcpyBeforeIFFT) {
     std::memcpy(ifft_out_ptr, ifft_in_ptr,
                 sizeof(float) * cfg_->OfdmCaNum() * 2);
-    DftiComputeBackward(mkl_handle_, ifft_out_ptr);
   } else {
-    if (kUseOutOfPlaceIFFT) {
-      // Use out-of-place IFFT here is faster than in place IFFT
-      // There is no need to reset non-data subcarriers in ifft input
-      // to 0 since their values are not changed after IFFT
-      DftiComputeBackward(mkl_handle_, ifft_in_ptr, ifft_out_ptr);
+    CommsLib::FFTShift(reinterpret_cast<complex_float*>(ifft_in_ptr),
+                       ifft_shift_tmp_, cfg_->OfdmCaNum());
+    if (kMemcpyBeforeIFFT) {
+      std::memcpy(ifft_out_ptr, ifft_in_ptr,
+                  sizeof(float) * cfg_->OfdmCaNum() * 2);
+      DftiComputeBackward(mkl_handle_, ifft_out_ptr);
     } else {
-      DftiComputeBackward(mkl_handle_, ifft_in_ptr);
+      if (kUseOutOfPlaceIFFT) {
+        // Use out-of-place IFFT here is faster than in place IFFT
+        // There is no need to reset non-data subcarriers in ifft input
+        // to 0 since their values are not changed after IFFT
+        DftiComputeBackward(mkl_handle_, ifft_in_ptr, ifft_out_ptr);
+      } else {
+        DftiComputeBackward(mkl_handle_, ifft_in_ptr);
+      }
     }
   }
 
@@ -134,7 +129,7 @@ EventData DoIFFT::Launch(size_t tag) {
     std::printf("%2.3f\n", max_abs);
   }
 
-  if (false) {
+  if (kPrintIFFTOutput) {
     std::stringstream ss;
     ss << "IFFT_output" << ant_id << "=[";
     for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
@@ -172,5 +167,5 @@ EventData DoIFFT::Launch(size_t tag) {
 
   duration_stat_->task_count_++;
   duration_stat_->task_duration_[0u] += GetTime::WorkerRdtsc() - start_tsc;
-  return EventData(EventType::kIFFT, tag);
+  return {EventType::kIFFT, tag};
 }

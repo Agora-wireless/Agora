@@ -119,7 +119,6 @@ void SetCpuLayoutOnNumaNodes(bool verbose,
       }
     }
     std::printf("Usable Cpu count %zu\n", cpu_layout.size());
-
     numa_bitmask_free(bm);
     cpu_layout_initialized = true;
   }
@@ -202,6 +201,23 @@ void PinToCoreWithOffset(ThreadType thread_type, size_t core_offset,
       }
     }  // EnableThreadPinning == true
   }
+}
+
+void RemoveCoreFromList(int core_id, int core_offset) {
+  if (core_list.back().requested_core_ == (size_t)(core_id + core_offset)) {
+    core_list.pop_back();
+  }
+}
+
+size_t GetAvailableCores() {
+  std::ifstream file("/sys/fs/cgroup/cpuset/cpuset.cpus");
+  std::string s;
+  std::getline(file, s);
+
+  size_t start_core = (size_t)stoi(s.substr(0, s.find('-')));
+  size_t end_core = (size_t)stoi(s.substr(s.find('-') + 1));
+  // remove master core, tx/rx core
+  return end_core - start_core;
 }
 
 std::vector<size_t> Utils::StrToChannels(const std::string& channel) {
@@ -407,8 +423,8 @@ void Utils::PrintVector(const std::vector<std::complex<int16_t>>& data) {
 }
 
 void Utils::WriteBinaryFile(const std::string& name, size_t elem_size,
-                            size_t buffer_size, void* buff) {
-  auto* f_handle = std::fopen(name.c_str(), "wb");
+                            size_t buffer_size, void* buff, bool append) {
+  auto* f_handle = std::fopen(name.c_str(), append ? "ab" : "wb");
   if (f_handle == nullptr) {
     throw std::runtime_error("Failed to open binary file " + name);
   }
@@ -417,6 +433,29 @@ void Utils::WriteBinaryFile(const std::string& name, size_t elem_size,
   if (write_status != buffer_size) {
     throw std::runtime_error("Failed to write binary file " + name);
   }
+  const auto close_status = std::fclose(f_handle);
+  if (close_status != 0) {
+    throw std::runtime_error("Failed to close binary file " + name);
+  }
+}
+
+void Utils::ReadBinaryFile(const std::string& name, size_t elem_size,
+                           size_t buffer_size, size_t offset, void* buff) {
+  auto* f_handle = std::fopen(name.c_str(), "rb");
+  if (f_handle == nullptr) {
+    throw std::runtime_error("Failed to open binary file " + name);
+  }
+  const auto seek_status = std::fseek(f_handle, offset, SEEK_CUR);
+  if (seek_status != 0) {
+    throw std::runtime_error("Failed to seek properly into binary file " +
+                             name);
+  }
+
+  const auto read_status = std::fread(buff, elem_size, buffer_size, f_handle);
+  if (read_status != buffer_size) {
+    throw std::runtime_error("Failed to read binary file " + name);
+  }
+
   const auto close_status = std::fclose(f_handle);
   if (close_status != 0) {
     throw std::runtime_error("Failed to close binary file " + name);

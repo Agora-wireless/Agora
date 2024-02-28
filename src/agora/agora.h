@@ -24,6 +24,7 @@
 #include "phy_stats.h"
 #include "ran_config.h"
 #include "recorder_thread.h"
+#include "resource_provisioner_thread.h"
 #include "stats.h"
 #include "symbols.h"
 
@@ -71,9 +72,14 @@ class Agora {
   size_t FetchEvent(std::vector<EventData>& events_list,
                     bool is_turn_to_dequeue_from_io);
 
+  /// Dynamically (de)allocate cores during runtime
+  void UpdateCores(RPControlMsg rcm);
+
   void InitializeQueues();
+  void ReInitializeCounters();
   void InitializeCounters();
   void InitializeThreads();
+  void InitializeUesFromFile();
   void FreeQueues();
 
   void SaveDecodeDataToFile(int frame_id);
@@ -121,6 +127,10 @@ class Agora {
   // Handle for the MAC thread
   std::thread mac_std_thread_;
 
+  // The thread running RP thread functions
+  std::unique_ptr<ResourceProvisionerThread> rp_thread_;
+  std::thread rp_std_thread_;
+
   std::unique_ptr<MacScheduler> mac_sched_;
   std::unique_ptr<Stats> stats_;
   std::unique_ptr<PhyStats> phy_stats_;
@@ -161,6 +171,8 @@ class Agora {
   std::vector<size_t> encode_cur_frame_for_symbol_;
   // The frame index for a symbol whose IFFT is done
   std::vector<size_t> ifft_cur_frame_for_symbol_;
+  // An array that contains the adaptable number of UEs per every frame
+  std::vector<uint8_t> adapt_ues_array_;
 
   // The frame index for a symbol whose precode is done
   std::vector<size_t> precode_cur_frame_for_symbol_;
@@ -177,6 +189,10 @@ class Agora {
 
   // Worker-to-master queue for MAC
   moodycamel::ConcurrentQueue<EventData> mac_response_queue_;
+
+  // Resource Provisioner queue
+  moodycamel::ConcurrentQueue<EventData> rp_request_queue_;
+  moodycamel::ConcurrentQueue<EventData> rp_response_queue_;
 
   moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];

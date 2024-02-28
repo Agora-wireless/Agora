@@ -4,6 +4,7 @@
 
 #include "concurrentqueue.h"
 #include "config.h"
+#include "data_generator.h"
 #include "dodemul.h"
 #include "gettime.h"
 #include "modulation.h"
@@ -15,7 +16,7 @@ static constexpr size_t kMaxTestNum = 100;
 static constexpr size_t kMaxItrNum = (1 << 30);
 static constexpr size_t kModTestNum = 3;
 static constexpr size_t kModBitsNums[kModTestNum] = {4, 6, 2};
-static constexpr size_t kMCSIndeces[kModTestNum] = {10, 17, 5};
+static constexpr size_t kMCSIndices[kModTestNum] = {10, 17, 5};
 static constexpr size_t kFrameOffsets[kModTestNum] = {0, 20, 30};
 // A spinning barrier to synchronize the start of worker threads
 static std::atomic<size_t> num_workers_ready_atomic;
@@ -31,7 +32,7 @@ void MasterToWorkerDynamicMaster(
 
   for (size_t bs_ant_idx = 0; bs_ant_idx < kModTestNum; bs_ant_idx++) {
     nlohmann::json msc_params = cfg->MCSParams(Direction::kUplink);
-    msc_params["mcs_index"] = kMCSIndeces[bs_ant_idx];
+    msc_params["mcs_index"] = kMCSIndices[bs_ant_idx];
     cfg->UpdateUlMCS(msc_params);
     for (size_t i = 0; i < kMaxTestNum; i++) {
       uint32_t frame_id =
@@ -116,7 +117,8 @@ void MasterToWorkerDynamicWorker(
 TEST(TestDemul, VaryingConfig) {
   static constexpr size_t kNumIters = 10000;
   auto cfg = std::make_unique<Config>("files/config/ci/tddconfig-sim-ul.json");
-  cfg->GenData();
+  DataGenerator::GenerateUlTxTestVectors(cfg.get());
+  cfg->LoadTestVectors();
 
   auto event_queue = moodycamel::ConcurrentQueue<EventData>(2 * kNumIters);
   moodycamel::ProducerToken* ptoks[kNumWorkers];
@@ -141,7 +143,7 @@ TEST(TestDemul, VaryingConfig) {
                               cfg->Frame().ClientUlPilotSymbols() * kMaxUEs,
                               Agora_memory::Alignment_t::kAlign64);
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers(
-      kFrameWnd, cfg->Frame().NumTotalSyms(), cfg->UeAntNum(),
+      kFrameWnd, cfg->Frame().NumUlDataSyms(), cfg->UeAntNum(),
       kMaxModType * cfg->OfdmDataNum());
   std::printf(
       "Size of [data_buffer, ul_beam_matrices, equal_buffer, "

@@ -396,6 +396,8 @@ include_directories(
   src/common/loggers
   src/recorder
   src/mac/
+  src/mac/schedulers
+  src/resource_provisioner
   src/radio
   src/radio/radio_set
   src/agora/
@@ -441,6 +443,9 @@ set(COMMON_SOURCES
   src/common/memory_manage.cc
   src/common/scrambler.cc
   src/mac/mac_scheduler.cc
+  src/mac/schedulers/scheduler_model.cc
+  src/mac/schedulers/round_robbin.cc
+  src/mac/schedulers/proportional_fairness.cc
   src/common/ipc/udp_comm.cc
   src/common/ipc/network_utils.cc
   src/common/loggers/csv_logger.cc
@@ -478,7 +483,8 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/dodecode.cc
   src/mac/mac_thread_basestation.cc
   src/agora/txrx/packet_txrx_sim.cc
-  src/agora/txrx/workers/txrx_worker_sim.cc)
+  src/agora/txrx/workers/txrx_worker_sim.cc
+  src/resource_provisioner/resource_provisioner_thread.cc)
 
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
@@ -509,7 +515,7 @@ add_executable(agora
 target_link_libraries(agora ${COMMON_LIBS})
 
 add_executable(data_generator
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/data_generator/data_generator_main.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/data_generator/test_vector_generator.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(data_generator ${COMMON_LIBS})
 target_compile_definitions(data_generator PRIVATE GENERATE_DATA)

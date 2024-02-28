@@ -41,6 +41,12 @@ void PinToCoreWithOffset(ThreadType thread, size_t base_core_offset,
                          size_t thread_id, bool allow_reuse = false,
                          bool verbose = false);
 
+/* Remove core from core_list at (core_id + core_offset) */
+void RemoveCoreFromList(int core_id, int core_offset);
+
+/* Get the number of available cores in the machine */
+size_t GetAvailableCores();
+
 void PrintCoreAssignmentSummary();
 
 template <class T>
@@ -80,7 +86,10 @@ class Utils {
   static std::vector<std::string> Split(const std::string& s, char delimiter);
   static void PrintVector(const std::vector<std::complex<int16_t>>& data);
   static void WriteBinaryFile(const std::string& name, size_t elem_size,
-                              size_t buffer_size, void* buff);
+                              size_t buffer_size, void* buff,
+                              bool append = false);
+  static void ReadBinaryFile(const std::string& name, size_t elem_size,
+                             size_t buffer_size, size_t offset, void* buff);
   static void PrintVec(const arma::cx_fvec& c, const std::string& ss);
   static void SaveVec(const arma::cx_fvec& c, const std::string& filename,
                       const std::string& /*ss*/, const bool /*append*/);

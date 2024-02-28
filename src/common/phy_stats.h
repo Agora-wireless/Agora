@@ -16,6 +16,7 @@ class PhyStats {
  public:
   explicit PhyStats(Config* const cfg, Direction dir);
   ~PhyStats();
+  void LoadGroundTruthIq();
   void PrintPhyStats();
   void PrintEvmStats(size_t frame_id, const arma::uvec& ue_list);
   void UpdateBitErrors(size_t ue_id, size_t offset, size_t frame_slot,
@@ -64,8 +65,10 @@ class PhyStats {
   void UpdateCalibMat(size_t frame_id, size_t sc_id,
                       const arma::cx_fvec& vec_in);
 
+  std::vector<float> GetMaxSnrPerUes(size_t frame_id);
+
  private:
-  Config const* const config_;
+  Config* const config_;
   Direction dir_;
   Table<size_t> decoded_bits_count_;
   Table<size_t> bit_error_count_;

@@ -1,6 +1,7 @@
 #include <string>
 
 #include "agora.h"
+#include "data_generator.h"
 #include "datatype_conversion.h"
 #include "gflags/gflags.h"
 #include "logger.h"
@@ -9,15 +10,12 @@
 static const bool kDebugPrintUlCorr = false;
 static const bool kDebugPrintDlCorr = false;
 
-static const std::string kInputFileDirectory =
-    TOSTRING(PROJECT_DIRECTORY) "/files/experiment/";
 static const std::string kUlCheckFilePrefix =
-    kInputFileDirectory + "LDPC_orig_ul_data_";
+    kExperimentFilepath + kUlLdpcDataPrefix;
+static const std::string kDlCheckFilePrefix = kExperimentFilepath + kDlTxPrefix;
+static const std::string kTxFilename = kExperimentFilepath + "tx_data.bin";
 static const std::string kDecodedFilename =
-    kInputFileDirectory + "decode_data.bin";
-static const std::string kDlCheckFilePrefix =
-    kInputFileDirectory + "LDPC_dl_tx_data_";
-static const std::string kTxFilename = kInputFileDirectory + "tx_data.bin";
+    kExperimentFilepath + "decode_data.bin";
 
 template <class TableType>
 static void ReadFromFile(const std::string& filename, Table<TableType>& data,
@@ -40,17 +38,14 @@ static void ReadFromFile(const std::string& filename, Table<TableType>& data,
           filename.c_str(), i, read_elements, elements, strerror(errno));
     }
   }
+  fclose(fp);
 }
 
 static void ReadFromFileUl(const std::string& filename, Table<uint8_t>& data,
-                           int num_bytes, Config const* const cfg) {
-  if (kCbSfScheduling == false) {
-    ReadFromFile(filename, data, cfg->Frame().NumULSyms(),
-                 (num_bytes * cfg->UeAntNum()), sizeof(uint8_t));
-  } else {
-    ReadFromFile(filename, data, cfg->UeAntNum(),
-                 num_bytes * cfg->NumCbPerSlot(Direction::kUplink), sizeof(uint8_t));
-  }
+                           int ue_num, int num_bytes_per_ue,
+                           Config const* const cfg) {
+  ReadFromFile(filename, data, cfg->Frame().NumULSyms(),
+               (num_bytes_per_ue * ue_num), sizeof(uint8_t));
 }
 
 static void ReadFromFileDl(const std::string& filename, Table<short>& data,
@@ -60,93 +55,58 @@ static void ReadFromFileDl(const std::string& filename, Table<short>& data,
 }
 
 static unsigned int CheckCorrectnessUl(Config const* const cfg) {
+  int bs_ant_num = cfg->BsAntNum();
   int ue_num = cfg->UeAntNum();
+  int spatial_streams_num = cfg->SpatialStreamsNum();
   int num_uplink_syms = cfg->Frame().NumULSyms();
   int ofdm_data_num = cfg->OfdmDataNum();
   int ul_pilot_syms = cfg->Frame().ClientUlPilotSymbols();
 
-  const std::string raw_data_filename =
-      kUlCheckFilePrefix + std::to_string(cfg->OfdmCaNum()) + "_ant" +
-      std::to_string(cfg->UeAntNum()) + ".bin";
+  const std::string raw_data_filename = kUlCheckFilePrefix +
+                                        std::to_string(cfg->OfdmCaNum()) +
+                                        "_ue" + std::to_string(ue_num) + ".bin";
 
   Table<uint8_t> raw_data;
   Table<uint8_t> output_data;
+  raw_data.Calloc(num_uplink_syms, (ofdm_data_num * ue_num),
+                  Agora_memory::Alignment_t::kAlign64);
+  output_data.Calloc(num_uplink_syms, (ofdm_data_num * spatial_streams_num),
+                     Agora_memory::Alignment_t::kAlign64);
+
+  int num_bytes_per_ue =
+      (cfg->LdpcConfig(Direction::kUplink).NumCbLen() + 7) >>
+      3 * cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
+  ReadFromFileUl(raw_data_filename, raw_data, ue_num, num_bytes_per_ue, cfg);
+  ReadFromFileUl(kDecodedFilename, output_data, spatial_streams_num,
+                 num_bytes_per_ue, cfg);
+  std::printf(
+      "check_correctness_ul: bs ant %d, ues %d, spatial streams (last frame) "
+      "%d, "
+      "ul syms %d, ofdm %d, ul pilots %d, bytes per UE %d.\n",
+      bs_ant_num, ue_num, spatial_streams_num, num_uplink_syms, ofdm_data_num,
+      ul_pilot_syms, num_bytes_per_ue);
 
   unsigned int error_cnt = 0;
   unsigned int total_count = 0;
-
-if (kCbSfScheduling == false) {
-    raw_data.Calloc(num_uplink_syms, (ofdm_data_num * ue_num),
-                    Agora_memory::Alignment_t::kAlign64);
-    output_data.Calloc(num_uplink_syms, (ofdm_data_num * ue_num),
-                       Agora_memory::Alignment_t::kAlign64);
-
-    int num_bytes_per_ue =
-      (cfg->LdpcConfig(Direction::kUplink).NumCbLen() + 7) >>
-      3 * cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
-
-    ReadFromFileUl(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
-    ReadFromFileUl(kDecodedFilename, output_data, num_bytes_per_ue, cfg);
-
-    std::printf(
-        "check_correctness_ul: ue %d, ul syms %d, ofdm %d, ul pilots %d, bytes "
-        "per UE %d.\n",
-        ue_num, num_uplink_syms, ofdm_data_num, ul_pilot_syms, num_bytes_per_ue);
-
-    for (int i = 0; i < num_uplink_syms; i++) {
-      if (i >= ul_pilot_syms) {
-        for (int ue = 0; ue < ue_num; ue++) {
-          for (int j = 0; j < num_bytes_per_ue; j++) {
-            total_count++;
-            int offset_in_raw = num_bytes_per_ue * ue + j;
-            int offset_in_output = num_bytes_per_ue * ue + j;
-            if (raw_data[i][offset_in_raw] != output_data[i][offset_in_output]) {
-              error_cnt++;
-              if (kDebugPrintUlCorr) {
-                std::printf("(%d, %d, %u, %u)\n", i, j,
-                            raw_data[i][offset_in_raw],
-                            output_data[i][offset_in_output]);
-              }
-            }
-          }
-        }  //  for (int ue = 0; ue < ue_num; ue++)
-      }    // if (i >= ul_pilot_syms)
-    }      // for (int i = 0; i < num_uplink_syms; i++)
-  } else {
-    int ul_num_cb_per_slot = cfg->NumCbPerSlot(Direction::kUplink);
-    int num_bytes_per_cb = (cfg->LdpcConfig(Direction::kUplink).NumCbLen() + 7) >> 3;
-
-    raw_data.Calloc(ue_num, (num_bytes_per_cb * ul_num_cb_per_slot),
-                    Agora_memory::Alignment_t::kAlign64);
-    output_data.Calloc(ue_num, (num_bytes_per_cb * ul_num_cb_per_slot),
-                       Agora_memory::Alignment_t::kAlign64);
-
-    ReadFromFileUl(raw_data_filename, raw_data, num_bytes_per_cb, cfg);
-    ReadFromFileUl(kDecodedFilename, output_data, num_bytes_per_cb, cfg);
-
-    std::printf(
-        "check_correctness_ul: ue %d, ul cb %d, bytes "
-        "per UE %d.\n",
-        ue_num, ul_num_cb_per_slot, num_bytes_per_cb);
-
-    for (int ue = 0; ue < 1; ue++) {
-      for (int cb = 0; cb < ul_num_cb_per_slot; cb++) {
-        for (int j = 0; j < num_bytes_per_cb; j++) {
+  for (int i = 0; i < num_uplink_syms; i++) {
+    if (i >= ul_pilot_syms) {
+      for (int ue = 0; ue < spatial_streams_num; ue++) {
+        for (int j = 0; j < num_bytes_per_ue; j++) {
           total_count++;
-          int offset_in_raw = num_bytes_per_cb * cb + j;
-          int offset_in_output = num_bytes_per_cb * cb + j;
-          if (raw_data[ue][offset_in_raw] != output_data[ue][offset_in_output]) {
+          int offset_in_raw = num_bytes_per_ue * ue + j;
+          int offset_in_output = num_bytes_per_ue * ue + j;
+          if (raw_data[i][offset_in_raw] != output_data[i][offset_in_output]) {
             error_cnt++;
             if (kDebugPrintUlCorr) {
-              std::printf("(%d, %d, %d, %u, %u)\n", ue, cb, j,
-                          raw_data[ue][offset_in_raw],
-                          output_data[ue][offset_in_output]);
+              std::printf("(%d, %d, %d, %u, %u)\n", i, ue, j,
+                          raw_data[i][offset_in_raw],
+                          output_data[i][offset_in_output]);
             }
           }
-        }  // for (int j = 0; j < num_bytes_per_cb; j++)
-      }    // for (int cb = 0; cb < ul_num_cb_per_slot; cb++)
-    }      // for (int ue = 0; ue < ue_num; ue++)
-  }
+        }
+      }  //  for (int ue = 0; ue < ue_num; ue++)
+    }    // if (i >= ul_pilot_syms)
+  }      // for (int i = 0; i < num_uplink_syms; i++)
 
   raw_data.Free();
   output_data.Free();
@@ -156,13 +116,16 @@ if (kCbSfScheduling == false) {
 
 unsigned int CheckCorrectnessDl(Config const* const cfg) {
   const size_t bs_ant_num = cfg->BsAntNum();
+  const size_t ue_num = cfg->UeAntNum();
+  const size_t spatial_streams_num = cfg->SpatialStreamsNum();
   const size_t num_data_syms = cfg->Frame().NumDLSyms();
   const size_t ofdm_ca_num = cfg->OfdmCaNum();
   const size_t samps_per_symbol = cfg->SampsPerSymbol();
 
   std::string raw_data_filename = kDlCheckFilePrefix +
-                                  std::to_string(ofdm_ca_num) + "_ant" +
-                                  std::to_string(bs_ant_num) + ".bin";
+                                  std::to_string(ofdm_ca_num) + "_bsant" +
+                                  std::to_string(bs_ant_num) + "_ueant" +
+                                  std::to_string(spatial_streams_num) + ".bin";
 
   Table<short> raw_data;
   Table<short> tx_data;
@@ -174,9 +137,11 @@ unsigned int CheckCorrectnessDl(Config const* const cfg) {
   ReadFromFileDl(raw_data_filename, raw_data, samps_per_symbol, cfg);
   ReadFromFileDl(kTxFilename, tx_data, samps_per_symbol, cfg);
   std::printf(
-      "check_correctness_dl: bs ant %zu, dl syms %zu, ofdm %zu, samps per %zu. "
-      "\n",
-      bs_ant_num, num_data_syms, ofdm_ca_num, samps_per_symbol);
+      "check_correctness_dl: bs ant %zu, ues %zu, spatial streams (last frame) "
+      "%zu, "
+      " dl syms %zu, ofdm %zu, samps per symb %zu. \n",
+      bs_ant_num, ue_num, spatial_streams_num, num_data_syms, ofdm_ca_num,
+      samps_per_symbol);
 
   unsigned int error_cnt = 0;
   float sum_diff = 0;
@@ -241,7 +206,7 @@ int main(int argc, char* argv[]) {
   }
 
   auto cfg = std::make_unique<Config>(conf_file.c_str());
-  cfg->GenData();
+  cfg->LoadTestVectors();
 
   int ret;
   try {

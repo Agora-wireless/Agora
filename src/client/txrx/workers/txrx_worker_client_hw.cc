@@ -10,6 +10,7 @@
 #include <complex>
 
 #include "comms-lib.h"
+#include "data_generator.h"
 #include "datatype_conversion.h"
 #include "gettime.h"
 #include "logger.h"
@@ -265,10 +266,10 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(
                                    first_ant_id + ch);
               result_packets.push_back(raw_pkt);
 
-              if (Configuration()->GetSymbolType(global_symbol_id) ==
+              if (Configuration()->Frame().GetSymbolType(global_symbol_id) ==
                   SymbolType::kControl) {
-                size_t ctrl_frame_id =
-                    Configuration()->DecodeBroadcastSlots(raw_pkt->data_);
+                size_t ctrl_frame_id = DataGenerator::DecodeBroadcastSlots(
+                    Configuration(), raw_pkt->data_);
                 if (ctrl_frame_id != global_frame_id) {
                   AGORA_LOG_WARN(
                       "RecvEnqueue: Ctrl channel frame_id %zu/%zu mismatch "
@@ -506,7 +507,7 @@ ssize_t TxRxWorkerClientHw::FindSyncBeacon(
 }
 
 bool TxRxWorkerClientHw::IsRxSymbol(size_t symbol_id) {
-  auto symbol_type = Configuration()->GetSymbolType(symbol_id);
+  auto symbol_type = Configuration()->Frame().GetSymbolType(symbol_id);
   bool is_rx;
 
   if ((symbol_type == SymbolType::kBeacon) ||
@@ -540,10 +541,15 @@ void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
       tx_data.at(ch) = reinterpret_cast<void*>(pkt->data_);
 
       if (kDebugTxData) {
-        auto* data_truth =
-            &Configuration()
-                 ->UlIqT()[ul_symbol_idx]
-                          [tx_ant * Configuration()->SampsPerSymbol()];
+        std::complex<int16_t>* data_truth;
+        if (ul_symbol_idx < Configuration()->Frame().ClientUlPilotSymbols()) {
+          data_truth = Configuration()->UeSpecificPilotT()[tx_ant];
+        } else {
+          data_truth =
+              &Configuration()
+                   ->UlIqT()[ul_symbol_idx]
+                            [tx_ant * Configuration()->SampsPerSymbol()];
+        }
         auto* data_pkt = reinterpret_cast<std::complex<int16_t>*>(pkt->data_);
         if (memcmp(data_truth, data_pkt, Configuration()->PacketLength()) ==
             0) {
@@ -686,7 +692,8 @@ bool TxRxWorkerClientHw::IsTxSymbolNext(size_t radio_id,
 
   if (current_symbol != Configuration()->Frame().NumTotalSyms()) {
     const auto next_symbol = current_symbol + 1;
-    const auto next_symbol_type = Configuration()->GetSymbolType(next_symbol);
+    const auto next_symbol_type =
+        Configuration()->Frame().GetSymbolType(next_symbol);
     if (next_symbol_type == SymbolType::kUL) {
       tx_symbol_next = true;
     } else if (next_symbol_type == SymbolType::kPilot) {
