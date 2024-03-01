@@ -71,7 +71,7 @@ class DoPrecode : public Doer {
   complex_float* modulated_buffer_temp_;
   complex_float* precoded_buffer_temp_;
 #if defined(USE_MKL_JIT)
-  void* jitter_;
+  void* jitter_ = nullptr;
   cgemm_jit_kernel_t my_cgemm_;
 #endif
 };

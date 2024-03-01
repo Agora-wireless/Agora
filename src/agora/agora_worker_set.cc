@@ -34,7 +34,7 @@ AgoraWorkerSet::AgoraWorkerSet(Config* cfg, MacScheduler* mac_sched,
 }
 
 AgoraWorkerSet::~AgoraWorkerSet() {
-  //Destruct all the workers
+  // Destruct all the workers
   for (auto& worker : workers_) {
     worker->Disable();
     worker.reset();
@@ -49,7 +49,7 @@ void AgoraWorkerSet::CreateWorkers() {
   active_core_.resize(system_codes);
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
     active_core_.at(i) = true;
-    //workers_.emplace_back(&AgoraWorkerSet::WorkerThread, this, i);
+    // workers_.emplace_back(&AgoraWorkerSet::WorkerThread, this, i);
     workers_.push_back(std::make_unique<AgoraWorker>(
         config_, mac_sched_, stats_, phy_stats_, message_, buffer_, frame_, i,
         i + base_worker_core_offset_));
@@ -68,31 +68,31 @@ void AgoraWorkerSet::UpdateCores(RPControlMsg rcm) {
       sysconf(_SC_NPROCESSORS_ONLN) - base_worker_core_offset_);
 
   // Target core numbers
-  const size_t start_core_id = workers_.size();
+  const size_t current_core_num = workers_.size();
   size_t updated_core_num = workers_.size() + rcm.msg_arg_1_ - rcm.msg_arg_2_;
   // TODO: (size_t)sysconf(_SC_NPROCESSORS_ONLN) gives all available core # in the machine
   const size_t max_core_num =
       sysconf(_SC_NPROCESSORS_ONLN) - base_worker_core_offset_;
 
   AGORA_LOG_INFO(
-      "[ALERTTTTTT]: CPU Layout Update!!! start_core_id: %zu, "
+      "[ALERTTTTTT]: CPU Layout Update!!! current_core_num: %zu, "
       "updated_core_num: %zu, base_worker_core_offset: %zu, max_core_num: "
       "%zu\n",
-      start_core_id, updated_core_num, base_worker_core_offset_, max_core_num);
+      current_core_num, updated_core_num, base_worker_core_offset_, max_core_num);
 
   // Update workers
   if (workers_.size() < updated_core_num) {
     // Add workers
     updated_core_num = std::min(updated_core_num, max_core_num);
 
-    for (size_t core_i = start_core_id; core_i < updated_core_num; core_i++) {
+    for (size_t core_i = current_core_num; core_i < updated_core_num; core_i++) {
       // Update info
       if (active_core_.at(core_i) == true) {
         std::runtime_error(
             "Attempted to add a core that is already active!!!!");
       }
       active_core_.at(core_i) = true;
-      //workers_.emplace_back(&AgoraWorkerSet::WorkerThread, this, core_i);
+      // workers_.emplace_back(&AgoraWorkerSet::WorkerThread, this, core_i);
       workers_.push_back(std::make_unique<AgoraWorker>(
           config_, mac_sched_, stats_, phy_stats_, message_, buffer_, frame_,
           core_i, core_i + base_worker_core_offset_));
@@ -103,9 +103,9 @@ void AgoraWorkerSet::UpdateCores(RPControlMsg rcm) {
     // Remove workers
     // minimum core number?
     updated_core_num = std::max(updated_core_num, kMinWorkers);
-    //Remove from back to front....
-    for (size_t core_i = start_core_id; core_i > updated_core_num; core_i--) {
-      //\todo update the core numbers so we don't have to do this.
+    // Remove from back to front....
+    for (size_t core_i = current_core_num; core_i > updated_core_num; core_i--) {
+      // \todo update the core numbers so we don't have to do this.
       const size_t core_index = core_i - 1;
       // Update info
       AGORA_LOG_INFO("Agora: removing worker #%zu\n", core_index);
@@ -114,16 +114,16 @@ void AgoraWorkerSet::UpdateCores(RPControlMsg rcm) {
             "Attempted to remove a core that is already inactive!!!!");
       }
       active_core_.at(core_index) = false;
-      //Makes sense to move this to the worker class... but won't for now.
-      RemoveCoreFromList(core_index, base_worker_core_offset_);
-      //workers_.at(core_index).join();
+      // Makes sense to move this to the worker class... but won't for now.
+      // RemoveCoreFromList(core_index, base_worker_core_offset_);
+      // workers_.at(core_index).join();
       auto& del_worker = workers_.back();
       del_worker->Disable();
       del_worker.reset();
       workers_.pop_back();
     }
-    //Might be able to add this back in and remove the pop_back();
-    //workers_.resize(updated_core_num);
+    // Might be able to add this back in and remove the pop_back();
+    // workers_.resize(updated_core_num);
   }
 
   AGORA_LOG_INFO(

@@ -178,7 +178,7 @@ void AgoraWorker::WorkLoop() {
     }
   }
 
-  //Clean exit??? ptoks? queues empty?
+  // Clean exit??? ptoks? queues empty?
   enabled_.store(false);
   AGORA_LOG_INFO("Agora worker %d at core %zu exit\n", worker_id_, core_id_);
 }
