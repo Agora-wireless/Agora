@@ -77,7 +77,7 @@ class DoDemul : public Doer {
   int ue_num_simd256_;
 
 #if defined(USE_MKL_JIT)
-  void* jitter_;
+  void* jitter_ = nullptr;
   cgemm_jit_kernel_t mkl_jit_cgemm_;
 #endif
 };
