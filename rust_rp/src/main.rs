@@ -11,16 +11,18 @@ use rand::Rng;
 #[async_trait]
 trait AgoraEnv {
     fn new() -> Self;
-    fn set_initial_values(&mut self, num_max_cores: u16, num_min_cores: u16, num_users: u16, num_latency_levels: u16, num_actions: u16, max_latency_limit: f32, running_window_size: u16, window_size: u16, moving_window: Vec<f32>, rewards: Vec<i16>, state: u64, done: bool);
+    fn set_initial_values(&mut self, num_max_cores: u16, num_min_cores: u16, num_users: u16, num_latency_levels: u16, num_actions: u16, max_latency_limit: f32, ma_window_size: u16, outlier_percentage: u16, rewards: Vec<i16>, state: u64, done: bool);
     fn reset(&mut self) -> u64;
     fn set(&mut self, state: u64);
     fn compute_state(&mut self, curr_cores: u16, curr_users: u16, curr_latency: u16) -> u64;
     fn get_num_states(&mut self) -> u64;
     fn get_num_actions(&mut self) -> u16;
+    fn agora_to_rl_index_mapping(&mut self, index_param: u16) -> u16;
+    fn rl_to_agora_index_mapping(&mut self, index_param: u16) -> u16;
     fn compute_absolute_latency(&mut self, curr_cores: u16, curr_users: u16) -> f32;
     fn compute_curr_latency_reward_done_real(&mut self, absolute_latency: f32) -> (u16, i16, bool);
     fn compute_curr_latency_reward_done_emulated(&mut self, absolute_latency: f32) -> (u16, i16, bool);
-    fn moving_average(&mut self) -> f32;
+    fn moving_average(&mut self, curr_cores: u16,) -> f32;
     async fn step_real(&mut self, socket: &mut UdpSocket, action: u16) -> io::Result<(u64, i16, bool)>;
     fn step_emulated(&mut self, action: u16) -> (u64, i16, bool);
     async fn print_state(&mut self, state: u64, delay: u64);
@@ -36,9 +38,10 @@ struct MyAgoraEnv {
     num_actions: u16,
     max_latency_limit: f32,
     rewards: Vec<i16>,
-    running_window_size: u16,
-    window_size: u16,
-    moving_window: Vec<f32>,
+    ma_active_window_sizes: Vec<u16>,
+    ma_window_size: u16,
+    ma_window: Vec<Vec<f32>>,
+    outlier_percentage: u16,
     state: u64,
     done: bool,
 }
@@ -56,14 +59,15 @@ impl AgoraEnv for MyAgoraEnv {
             num_actions: 3,
             max_latency_limit: 1.0,
             rewards: vec![-12, -10, -8, -6, -4, -2, -1, 20, -12, -16, -20],
-            running_window_size: 0,
-            window_size: 10,
-            moving_window: vec![0.0; 10],
+            ma_active_window_sizes: vec![0; 25],
+            ma_window_size: 10,
+            ma_window: vec![vec![0.0; 10]; 25],
+            outlier_percentage: 10,
             state: 0,
             done: false }
     }
 
-    fn set_initial_values(&mut self, num_max_cores: u16, num_min_cores: u16, num_users: u16, num_latency_levels: u16, num_actions: u16, max_latency_limit: f32, running_window_size: u16, window_size: u16, moving_window: Vec<f32>, rewards: Vec<i16>, state: u64, done: bool) {
+    fn set_initial_values(&mut self, num_max_cores: u16, num_min_cores: u16, num_users: u16, num_latency_levels: u16, num_actions: u16, max_latency_limit: f32, ma_window_size: u16, outlier_percentage: u16, rewards: Vec<i16>, state: u64, done: bool) {
         // Set initial values
         self.num_max_cores = num_max_cores;
         self.num_min_cores = num_min_cores;
@@ -72,9 +76,10 @@ impl AgoraEnv for MyAgoraEnv {
         self.num_states = num_max_cores as u64 * num_users as u64 * num_latency_levels as u64;
         self.num_actions = num_actions;
         self.max_latency_limit = max_latency_limit;
-        self.running_window_size = running_window_size;
-        self.window_size = window_size;
-        self.moving_window = moving_window;
+        self.ma_active_window_sizes = vec![0; num_max_cores as usize];
+        self.ma_window_size = ma_window_size;
+        self.ma_window = vec![vec![0.0; ma_window_size as usize]; num_max_cores as usize];
+        self.outlier_percentage = outlier_percentage;
         self.rewards = rewards;
         self.state = state;
         self.done = done;
@@ -108,6 +113,16 @@ impl AgoraEnv for MyAgoraEnv {
         self.num_actions
     }
 
+    fn agora_to_rl_index_mapping(&mut self, index_param: u16) -> u16 {
+
+        index_param - 1
+    }
+
+    fn rl_to_agora_index_mapping(&mut self, index_param: u16) -> u16 {
+
+        index_param + 1
+    }
+
     fn compute_absolute_latency(&mut self, curr_cores: u16, curr_users: u16) -> f32 {
         let min_latency = 0.05 * self.max_latency_limit;
         let per_user_latency = 0.1 * self.max_latency_limit;
@@ -120,53 +135,10 @@ impl AgoraEnv for MyAgoraEnv {
         let next_latency;
         let reward;
         let mut done = false;
-        if absolute_latency < 165.0 {
-            next_latency = 0;
-            reward = self.rewards[0];
-        } else if 165.0 <= absolute_latency && absolute_latency < 180.0{
-            next_latency = 1;
-            reward = self.rewards[1];
-        } else if 180.0 <= absolute_latency && absolute_latency < 195.0 {
-            next_latency = 2;
-            reward = self.rewards[2];
-        } else if 195.0 <= absolute_latency && absolute_latency < 210.0 {
-            next_latency = 3;
-            reward = self.rewards[3];
-        } else if 210.0 <= absolute_latency && absolute_latency < 225.0 {
-            next_latency = 4;
-            reward = self.rewards[4];
-        } else if 225.0 <= absolute_latency && absolute_latency < 240.0 {
-            next_latency = 5;
-            reward = self.rewards[5];
-        } else if 240.0 <= absolute_latency && absolute_latency < 255.0 {
-            next_latency = 6;
-            reward = self.rewards[6];
-        } else if 255.0 <= absolute_latency && absolute_latency < 270.0 {
-            next_latency = 7;
-            reward = self.rewards[7];
-            done = true;
-        } else if 270.0 <= absolute_latency && absolute_latency < 285.0 {
-            next_latency = 8;
-            reward = self.rewards[8];
-        } else if 285.0 <= absolute_latency && absolute_latency < 300.0 {
-            next_latency = 9;
-            reward = self.rewards[9];
-        } else {
-            next_latency = 10;
-            reward = self.rewards[10];
-        }
-
-        (next_latency, reward, done)
-    }
-
-    fn compute_curr_latency_reward_done_emulated(&mut self, absolute_latency: f32) -> (u16, i16, bool) {
-        let next_latency;
-        let reward;
-        let mut done = false;
         if 0.0 * self.max_latency_limit <= absolute_latency && absolute_latency < 0.1 * self.max_latency_limit {
             next_latency = 0;
             reward = self.rewards[0];
-        } else if 0.1 * self.max_latency_limit <= absolute_latency && absolute_latency < 0.2 * self.max_latency_limit{
+        } else if 0.1 * self.max_latency_limit <= absolute_latency && absolute_latency < 0.2 * self.max_latency_limit {
             next_latency = 1;
             reward = self.rewards[1];
         } else if 0.2 * self.max_latency_limit <= absolute_latency && absolute_latency < 0.3 * self.max_latency_limit {
@@ -202,15 +174,59 @@ impl AgoraEnv for MyAgoraEnv {
         (next_latency, reward, done)
     }
 
-    fn moving_average(&mut self) -> f32 {
-        let moving_window_elements = &self.moving_window;
-        println!("running_window_size {}, window_size {}\n", self.running_window_size, self.window_size);
-        println!("moving_window_elements {:?}\n", moving_window_elements);
-        let mut average_value = 0.0;
-        for count in (self.window_size - self.running_window_size)..= (self.window_size - 1) {
-            average_value = average_value + self.moving_window[count as usize];
+    fn compute_curr_latency_reward_done_emulated(&mut self, absolute_latency: f32) -> (u16, i16, bool) {
+        let next_latency;
+        let reward;
+        let mut done = false;
+        if 0.0 * self.max_latency_limit <= absolute_latency && absolute_latency < 0.1 * self.max_latency_limit {
+            next_latency = 0;
+            reward = self.rewards[0];
+        } else if 0.1 * self.max_latency_limit <= absolute_latency && absolute_latency < 0.2 * self.max_latency_limit {
+            next_latency = 1;
+            reward = self.rewards[1];
+        } else if 0.2 * self.max_latency_limit <= absolute_latency && absolute_latency < 0.3 * self.max_latency_limit {
+            next_latency = 2;
+            reward = self.rewards[2];
+        } else if 0.3 * self.max_latency_limit <= absolute_latency && absolute_latency < 0.4 * self.max_latency_limit {
+            next_latency = 3;
+            reward = self.rewards[3];
+        } else if 0.4 * self.max_latency_limit <= absolute_latency && absolute_latency < 0.5 * self.max_latency_limit {
+            next_latency = 4;
+            reward = self.rewards[4];
+        } else if 0.5 * self.max_latency_limit <= absolute_latency && absolute_latency < 0.6 * self.max_latency_limit {
+            next_latency = 5;
+            reward = self.rewards[5];
+        } else if 0.6 * self.max_latency_limit <= absolute_latency && absolute_latency < 0.7 * self.max_latency_limit {
+            next_latency = 6;
+            reward = self.rewards[6];
+        } else if 0.7 * self.max_latency_limit <= absolute_latency && absolute_latency < 0.8 * self.max_latency_limit {
+            next_latency = 7;
+            reward = self.rewards[7];
+            done = true;
+        } else if 0.8 * self.max_latency_limit <= absolute_latency && absolute_latency < 0.9 * self.max_latency_limit {
+            next_latency = 8;
+            reward = self.rewards[8];
+        } else if 0.9 * self.max_latency_limit <= absolute_latency && absolute_latency < 1.0 * self.max_latency_limit {
+            next_latency = 9;
+            reward = self.rewards[9];
+        } else {
+            next_latency = 10;
+            reward = self.rewards[10];
         }
-        average_value = average_value/self.running_window_size as f32;
+
+        (next_latency, reward, done)
+    }
+
+    fn moving_average(&mut self, curr_cores: u16) -> f32 {
+        // let curr_cores_mapped = MyAgoraEnv::rl_to_agora_index_mapping(self, curr_cores);
+        // let ma_window_row_elements = &self.ma_window[curr_cores as usize];
+        // println!("agora cores {}, ma active window size {}, ma window size {}\n", curr_cores_mapped, self.ma_active_window_sizes[curr_cores as usize], self.ma_window_size);
+        // println!("ma window {:?}\n", ma_window_row_elements);
+        let mut average_value = 0.0;
+        for count in (self.ma_window_size - self.ma_active_window_sizes[curr_cores as usize])..= (self.ma_window_size - 1) {
+            average_value = average_value + self.ma_window[curr_cores as usize][count as usize];
+        }
+        average_value = average_value/self.ma_active_window_sizes[curr_cores as usize] as f32;
 
         average_value
     }
@@ -243,24 +259,80 @@ impl AgoraEnv for MyAgoraEnv {
             next_cores = curr_cores;
         }
 
-        delay_for(Duration::from_millis(PERIODICITY)).await;
-        let retrieved_msg = retrieve_agora_traffic(socket).await?;
-        let absolute_latency = retrieved_msg[0];
-        let agora_cores = retrieved_msg[1];
-        let frame_id = retrieved_msg[2];
-        println!("Agora status: absolute latency - {}, current cores - {}, frame id - {}\n", absolute_latency, agora_cores, frame_id);
-
-        for count in 1..= (self.window_size - 1) {
-            self.moving_window[count as usize - 1] = self.moving_window[count as usize];
+        // delay_for(Duration::from_millis(PERIODICITY)).await;
+        let mut retrieved_msg = retrieve_agora_traffic(socket).await?;
+        let mut absolute_latency = retrieved_msg[0];
+        let mut agora_cores = retrieved_msg[1];
+        let mut frame_id = retrieved_msg[2];
+        println!("Agora status: absolute latency - {}, current cores - {}, frame id - {}\n", absolute_latency, agora_cores, frame_id);    
+        let mut is_valid_latency = false;
+        while is_valid_latency == false {
+            if absolute_latency <= 2 * self.max_latency_limit as u64 {
+                is_valid_latency = true;
+            } else {
+                println!("Out of bound latency, requesting Agora again...\n");
+                // delay_for(Duration::from_millis(PERIODICITY)).await;
+                retrieved_msg = retrieve_agora_traffic(socket).await?;
+                absolute_latency = retrieved_msg[0];
+                agora_cores = retrieved_msg[1];
+                frame_id = retrieved_msg[2];
+                println!("Agora status: absolute latency - {}, current cores - {}, frame id - {}\n", absolute_latency, agora_cores, frame_id);            
+            }
         }
-        self.moving_window[self.window_size as usize - 1] = absolute_latency as f32;
-        if self.running_window_size < self.window_size {
-            self.running_window_size = self.running_window_size + 1;
-        }
-        let mv_absolute_latency = MyAgoraEnv::moving_average(self);
-        println!("mv_absolute_latency - {}\n", mv_absolute_latency);
 
-        let curr_latency_reward_done_real = MyAgoraEnv::compute_curr_latency_reward_done_real(self, mv_absolute_latency as f32);
+        // Outlier is ignored for moving average filtering
+        let agora_cores_unmapped = MyAgoraEnv::agora_to_rl_index_mapping(self, agora_cores as u16);
+        let ma_absolute_latency;
+        if self.ma_active_window_sizes[agora_cores_unmapped as usize] < self.ma_window_size {
+            let ma_window_row_elements = &self.ma_window[agora_cores_unmapped as usize];
+            println!("agora cores {}, ma active window size {}, ma window size {}\n", agora_cores, self.ma_active_window_sizes[agora_cores_unmapped as usize], self.ma_window_size);
+            println!("ma window (before update) {:?}\n", ma_window_row_elements);
+
+            for count in (self.ma_window_size - self.ma_active_window_sizes[agora_cores_unmapped as usize])..= (self.ma_window_size  - 1) {
+                // println!("agora cores {}, ma active window size {}, count {}\n", agora_cores, self.ma_active_window_sizes[agora_cores_unmapped as usize], count);
+                self.ma_window[agora_cores_unmapped as usize][count as usize - 1] = self.ma_window[agora_cores_unmapped as usize][count as usize];
+            }
+            self.ma_window[agora_cores_unmapped as usize][self.ma_window_size as usize - 1] = absolute_latency as f32;
+            self.ma_active_window_sizes[agora_cores_unmapped as usize] = self.ma_active_window_sizes[agora_cores_unmapped as usize] + 1;
+
+            let ma_window_row_elements = &self.ma_window[agora_cores_unmapped as usize];
+            println!("agora cores {}, ma active window size {}, ma window size {}\n", agora_cores, self.ma_active_window_sizes[agora_cores_unmapped as usize], self.ma_window_size);
+            println!("ma window (after update) {:?}\n", ma_window_row_elements);
+
+            ma_absolute_latency = MyAgoraEnv::moving_average(self, agora_cores_unmapped as u16);
+            println!("agora cores {}, ma active window size {}, ma absolute latency {}\n", agora_cores, self.ma_active_window_sizes[agora_cores_unmapped as usize], ma_absolute_latency);
+        } else {
+            let ma_absolute_latency_before_update = MyAgoraEnv::moving_average(self, agora_cores_unmapped as u16);
+            let outlier_lower_limit = ((100.0 - self.outlier_percentage as f32)/100.0) * ma_absolute_latency_before_update;
+            let outlier_higher_limit = ((100.0 + self.outlier_percentage as f32)/100.0) * ma_absolute_latency_before_update;
+            println!("agora cores {}, ma active window size {}, ma absolute latency before update {}, outlier percentage {}, outlier lower limit {}, outlier higher limit {}, absolute latency {}\n",
+                agora_cores, self.ma_active_window_sizes[agora_cores_unmapped as usize], ma_absolute_latency_before_update, self.outlier_percentage, outlier_lower_limit, outlier_higher_limit, absolute_latency);
+            if absolute_latency as f32 >= outlier_lower_limit as f32 && absolute_latency as f32 <= outlier_higher_limit as f32 {
+                let ma_window_row_elements = &self.ma_window[agora_cores_unmapped as usize];
+                println!("agora cores {}, ma active window size {}, ma window size {}\n", agora_cores, self.ma_active_window_sizes[agora_cores_unmapped as usize], self.ma_window_size);
+                println!("ma window (before update) {:?}\n", ma_window_row_elements);
+    
+                for count in 1..= (self.ma_window_size - 1) {
+                    self.ma_window[agora_cores_unmapped as usize][count as usize - 1] = self.ma_window[agora_cores_unmapped as usize][count as usize];
+                }
+                self.ma_window[agora_cores_unmapped as usize][self.ma_window_size as usize - 1] = absolute_latency as f32;
+                if self.ma_active_window_sizes[agora_cores_unmapped as usize] < self.ma_window_size {
+                    self.ma_active_window_sizes[agora_cores_unmapped as usize] = self.ma_active_window_sizes[agora_cores_unmapped as usize] + 1;
+                }
+
+                let ma_window_row_elements = &self.ma_window[agora_cores_unmapped as usize];
+                println!("agora cores {}, ma active window size {}, ma window size {}\n", agora_cores, self.ma_active_window_sizes[agora_cores_unmapped as usize], self.ma_window_size);
+                println!("ma window (after update) {:?}\n", ma_window_row_elements);
+        
+                ma_absolute_latency = MyAgoraEnv::moving_average(self, agora_cores_unmapped as u16);
+                println!("absolute_latency {} is not an outlier and taken in; ma absolute latency {}\n", absolute_latency, ma_absolute_latency);
+            } else {
+                ma_absolute_latency = ma_absolute_latency_before_update;
+                println!("absolute latency {} is an outlier and ignored; ma absolute latency {}\n", absolute_latency, ma_absolute_latency);
+            }
+        }
+
+        let curr_latency_reward_done_real = MyAgoraEnv::compute_curr_latency_reward_done_real(self, ma_absolute_latency as f32);
         let curr_latency = curr_latency_reward_done_real.0;
         let reward = curr_latency_reward_done_real.1;
         let done = curr_latency_reward_done_real.2;
@@ -332,8 +404,8 @@ impl AgoraEnv for MyAgoraEnv {
         println!("curr_cores: {}", curr_cores);
         println!("curr_users: {}", curr_users);
         println!("curr_latency: {}", curr_latency);
-        // println!("delay: {}", delay);
-        delay_for(Duration::from_millis(delay)).await;
+        println!("delay: {}", delay);
+        // delay_for(Duration::from_millis(delay)).await;
     }
 }
 
@@ -414,17 +486,16 @@ async fn main() -> io::Result<()> {
             let num_latency_levels;
             let num_actions;
             let max_latency_limit;
-            let running_window_size = 0;
-            let window_size = 10;
-            let moving_window = vec![0.0; window_size];
+            let ma_window_size = 10;
+            let outlier_percentage = 10;
             let rewards;
             if is_real_agora == true {
-                num_max_cores = 20;
-                num_min_cores = 8;
+                num_max_cores = 18;
+                num_min_cores = 4;
                 num_users = 8;
                 num_latency_levels = 10 + 1; // + 1 --> To account for max_latency_limit and beyond latency values
                 num_actions = 3;
-                max_latency_limit = 300.0;
+                max_latency_limit = 1000.0;
                 rewards = vec![-12, -10, -8, -6, -4, -2, -1, 20, -12, -16, -20];
             } else {
                 num_max_cores = 10;
@@ -443,25 +514,28 @@ async fn main() -> io::Result<()> {
         
             let num_episodes = 10;
             let terminate_count = 100; // Epochs count to terminate learning when not converging
-            let consecutive_epochs = 25; // Number of consecutive epochs with same state and reward to treat the learning converged. Applicable when the target reward is the least negative.
+            let consecutive_epochs = 10; // Number of consecutive epochs with same state and reward to treat the learning converged. Applicable when the target reward is the least negative.
 
             // Create an instance of the agora environment using the 'new' function
             let mut agora_env = MyAgoraEnv::new();
-            agora_env.set_initial_values(num_max_cores, num_min_cores, num_users, num_latency_levels, num_actions, max_latency_limit, running_window_size as u16, window_size as u16, moving_window, rewards, 0, false); // Set initial state to 2 and done to false
+            agora_env.set_initial_values(num_max_cores, num_min_cores, num_users, num_latency_levels, num_actions, max_latency_limit, ma_window_size as u16, outlier_percentage, rewards, 0, false); // Set initial state to 2 and done to false
         
             let num_states = agora_env.get_num_states();
+            // println!("num_states {:?}\n", num_states);
             let mut q_table: Vec<Vec<f32>> = vec![vec![0.0; num_actions as usize]; num_states as usize];
             // println!("{:?}", q_table);
 
             if one_time_cores_update == true {
                 // Training
-                println!("Training started ...");
+                println!("Training started - Running for {} Episodes...", num_episodes);
                 for episode in 0..= (num_episodes - 1) {
-                    println!("episode {:?}\n", episode);
+                    println!("Episode: {:?}\n", episode);
                     // Reset the state with a random value
-                    let mut state = agora_env.reset();
+                    let mut state;
+                    // let mut state = agora_env.reset();
                     // state = 269;
-                    let reset_cores = 9;
+                    let mut rng = rand::thread_rng();
+                    let reset_cores = rng.gen_range((num_min_cores as u16 - 1)..(num_max_cores as u16 - 1));
                     let reset_users = 7;
                     let mut epochs = 0;
                     let mut previous_reward = 0;
@@ -472,24 +546,26 @@ async fn main() -> io::Result<()> {
                     let mut done = false;
     
                     println!("Re-initializing cores in Agora as per reset state - START\n");
-                    delay_for(Duration::from_millis(UDP_WAIT_TIME)).await;
-                    let retrieved_msg = retrieve_agora_traffic(&mut socket).await?;
+                    // delay_for(Duration::from_millis(UDP_WAIT_TIME)).await;
+                    let mut retrieved_msg = retrieve_agora_traffic(&mut socket).await?;
                     println!("Agora status: absolute latency - {}, current cores - {}, frame id - {}\n", retrieved_msg[0], retrieved_msg[1], retrieved_msg[2]);
                     let agora_start_cores = retrieved_msg[1];
 
-                    let reset_cores_mapped = reset_cores as u8 + 1;
+                    let reset_cores_mapped = agora_env.rl_to_agora_index_mapping(reset_cores);
+                    println!("Agora to be reset with {} cores...\n", reset_cores_mapped);
                     let mut curr_cores;
-                    if reset_cores_mapped > agora_start_cores as u8 {
+                    if reset_cores_mapped as u8 > agora_start_cores as u8 {
                         let mut add_cores = CORES_STEP;
                         curr_cores = agora_start_cores as u8;
-                        for step_cores in (0..(reset_cores_mapped as u8 - agora_start_cores as u8)).step_by(CORES_STEP as usize) {
+                        for _step_cores in (0..(reset_cores_mapped as u8 - agora_start_cores as u8)).step_by(CORES_STEP as usize) {
                             if curr_cores as u8 + add_cores > max_cores_for_workers as u8 {
                                 add_cores = max_cores_for_workers as u8 - curr_cores as u8;
                             }
                             if add_cores > 0 {
-                                println!("Start cores in Agora {:?}; Re-initializing cores in Agora to {:?}; Target cores in Agora {:?}\n",
-                                    agora_start_cores, curr_cores as u8 + add_cores, reset_cores_mapped);
+                                println!("Start cores in Agora {:?}; Re-initializing cores in Agora to {:?}; Target reset cores in Agora {:?}\n", agora_start_cores, curr_cores as u8 + add_cores, reset_cores_mapped);
                                 send_cores_control_message(&mut socket, add_cores, 0, curr_cores as u8).await?;
+                                retrieved_msg = retrieve_agora_traffic(&mut socket).await?;
+                                println!("Agora status: absolute latency - {}, current cores - {}, frame id - {}\n", retrieved_msg[0], retrieved_msg[1], retrieved_msg[2]);
                             }
                             if add_cores <= 0 {
                                 println!("Reached maximum cores limit of {:?}\n", max_cores_for_workers);
@@ -499,14 +575,15 @@ async fn main() -> io::Result<()> {
                     } else {
                         let mut remove_cores = CORES_STEP;
                         curr_cores = agora_start_cores as u8;
-                        for step_cores in (0..(agora_start_cores as u8 - reset_cores_mapped as u8)).step_by(CORES_STEP as usize) {
+                        for _step_cores in (0..(agora_start_cores as u8 - reset_cores_mapped as u8)).step_by(CORES_STEP as usize) {
                             if curr_cores as u8 - remove_cores < min_cores_for_workers as u8 {
                                 remove_cores = curr_cores as u8 - min_cores_for_workers as u8;
                             }
                             if remove_cores > 0 {
-                                println!("Start cores in Agora {:?}; Re-initializing cores in Agora to {:?}; Target cores in Agora {:?}\n",
-                                    agora_start_cores, curr_cores as u8 - remove_cores, reset_cores_mapped);
+                                println!("Start cores in Agora {:?}; Re-initializing cores in Agora to {:?}; Target cores in Agora {:?}\n", agora_start_cores, curr_cores as u8 - remove_cores, reset_cores_mapped);
                                 send_cores_control_message(&mut socket, 0, remove_cores, curr_cores as u8).await?;
+                                retrieved_msg = retrieve_agora_traffic(&mut socket).await?;
+                                println!("Agora status: absolute latency - {}, current cores - {}, frame id - {}\n", retrieved_msg[0], retrieved_msg[1], retrieved_msg[2]);
                             }
                             if remove_cores <= 0 {
                                 println!("Reached maximum cores limit of {:?}\n", min_cores_for_workers);
@@ -516,7 +593,7 @@ async fn main() -> io::Result<()> {
                     }
                     println!("Re-initializing cores in Agora as per reset state - END\n");
 
-                    delay_for(Duration::from_millis(PERIODICITY)).await;
+                    // delay_for(Duration::from_millis(PERIODICITY)).await;
                     let retrieved_msg = retrieve_agora_traffic(&mut socket).await?;
                     let reset_absolute_latency = retrieved_msg[0];
                     let reset_cores = retrieved_msg[1];
@@ -528,9 +605,9 @@ async fn main() -> io::Result<()> {
                     state = agora_env.compute_state(reset_cores_unmapped as u16, reset_users as u16, reset_latency as u16);
             
                     while done == false {
-                        println!("epochs {:?}\n", epochs);
+                        println!("Episode {:?}, Epoch {:?}\n", episode, epochs);
                         agora_env.set(state);
-                        agora_env.print_state(state, UDP_WAIT_TIME);
+                        // agora_env.print_state(state, UDP_WAIT_TIME).await;
     
                         if 0 != 0 {
                             action = 0;
@@ -554,16 +631,16 @@ async fn main() -> io::Result<()> {
                             // println!("step_output: next_state {}, reward {}, done {}\n", next_state, reward, done);
                         }
 
-                        // Sum last consecutive_epochs same rewards in a same state to exit learning
+                        // Check consecutive epochs, rewards and statea condition to exit learning
                         if reward == previous_reward && state == next_state {
                             target_reward_count += 1;
                             if target_reward_count == consecutive_epochs {
                                 done = true;
-                                // println!("previous_reward: {}", previous_reward);
-                                // println!("reward: {}", reward);
-                                // println!("state: {}", state);
-                                // println!("next_state: {}", next_state);
-                                // println!("target_reward_count: {}", target_reward_count);
+                                println!("previous_reward: {}", previous_reward);
+                                println!("reward: {}", reward);
+                                println!("state: {}", state);
+                                println!("next_state: {}", next_state);
+                                println!("target_reward_count: {}", target_reward_count);
                             }
                         } else {
                             target_reward_count = 1;
@@ -589,18 +666,19 @@ async fn main() -> io::Result<()> {
                         epochs += 1;
 
                         if epochs == terminate_count {
+                            println!("Terminating training for Episode {} based on terminal count of {} Epochs ...\n", episode, terminate_count);
                             done = true;
                         }
                     }
                     println!("episode {:?} state {:?} reward {:?} epochs {:?}\n", episode, state, reward, epochs);
-                    // agora_env.print_state(next_state, UDP_WAIT_TIME);
+                    // agora_env.print_state(next_state, UDP_WAIT_TIME).await;
                 }
                 println!("Training completed ...");
 
                 // Testing
                 println!("Testing started ...");
                 let mut state = agora_env.reset();
-                agora_env.print_state(state, UDP_WAIT_TIME);
+                // agora_env.print_state(state, UDP_WAIT_TIME).await;
                 let mut epochs = 0;
                 let mut previous_reward = 0;
                 let mut target_reward_count = 1;
@@ -635,7 +713,7 @@ async fn main() -> io::Result<()> {
                         // println!("step_output: next_state {}, reward {}, done {}\n", next_state, reward, done);    
                     }
 
-                    // Sum last consecutive_epochs same rewards in a same state to exit learning
+                    // Check consecutive epochs, rewards and statea condition to exit learning
                     if reward == previous_reward && state == next_state {
                         target_reward_count += 1;
                         if target_reward_count == consecutive_epochs {
@@ -664,7 +742,7 @@ async fn main() -> io::Result<()> {
                     }
                 }
                 println!("state {:?} reward {:?} epochs {:?}\n", state, reward, epochs);
-                agora_env.print_state(state, UDP_WAIT_TIME);
+                // agora_env.print_state(state, UDP_WAIT_TIME).await;
                 one_time_cores_update = !one_time_cores_update;
             }
         } else if RP_MODE == 3 { // Update cores - legacy implementation
@@ -768,7 +846,7 @@ async fn retrieve_agora_traffic(socket: &mut UdpSocket) -> io::Result<[u64; 3]> 
 }
 
 // Send cores update to Agora
-async fn send_cores_control_message(socket: &mut UdpSocket, add_cores: u8, remove_cores: u8, curr_cores: u8) -> io::Result<()> {
+async fn send_cores_control_message(socket: &mut UdpSocket, add_cores: u8, remove_cores: u8, _curr_cores: u8) -> io::Result<()> {
     let mut message = [0; 24];
     message[0] = 1; // message type - update cores
     message[8] = add_cores;

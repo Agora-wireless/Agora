@@ -13,7 +13,7 @@ static const std::string kProjectDir = TOSTRING(PROJECT_DIRECTORY);
 static const std::string kStatsOutputFilePath =
     kProjectDir + "/files/experiment/";
 static const std::string kStatsSymbolDataFilename =
-kStatsOutputFilePath + "timeresult_symbol.txt";
+kStatsOutputFilePath + "timeresult_symbol";
 static const std::string kStatsDataFilename =
     kStatsOutputFilePath + "timeresult.txt";
 static const std::string kStatsDetailedDataFilename =
@@ -320,9 +320,14 @@ void Stats::SaveToFile() {
   }
   std::fclose(fp_debug);
 
+  const std::string filename_input = kStatsSymbolDataFilename +
+    "_bsant" + std::to_string(config_->BsAntNum()) +
+    "_ueant" + std::to_string(config_->UeAntNum()) +
+    "_workers" + std::to_string(config_->WorkerThreadNum()) + ".txt";
+
   AGORA_LOG_INFO("Stats: Saving symbol level master timestamps to %s\n",
-                 kStatsSymbolDataFilename.c_str());
-  FILE* fp_debug_symbol = std::fopen(kStatsSymbolDataFilename.c_str(), "w");
+                 filename_input.c_str());
+  FILE* fp_debug_symbol = std::fopen(filename_input.c_str(), "w");
   RtAssert(fp_debug_symbol != nullptr,
            std::string("Open file failed ") + std::to_string(errno));
 
