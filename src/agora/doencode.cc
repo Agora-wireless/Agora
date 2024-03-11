@@ -86,32 +86,26 @@ EventData DoEncode::Launch(size_t tag) {
         ue_id);
   }
 
-  int8_t* tx_data_ptr = nullptr;
   ///\todo Make GetMacBits and GetInfoBits
   /// universal with raw_buffer_rollover_ the parameter.
-  if constexpr (kEnableMac) {
-    // All cb's per symbol are included in 1 mac packet
-    tx_data_ptr = cfg_->GetMacBits(raw_data_buffer_, dir_,
-                                   (frame_id % raw_buffer_rollover_),
-                                   data_symbol_idx, ue_id, cur_cb_id);
+  // All cb's per symbol are included in 1 mac packet
+  int8_t* tx_data_ptr = cfg_->GetMacBits(raw_data_buffer_, dir_,
+                                         (frame_id % raw_buffer_rollover_),
+                                         data_symbol_idx, ue_id, cur_cb_id);
 
-    if (kPrintRawMacData) {
-      auto* pkt = reinterpret_cast<MacPacketPacked*>(tx_data_ptr);
-      std::printf(
-          "In doEncode [%d] mac packet frame: %d, symbol: %zu:%d, ue_id: %d, "
-          "data length %d, crc %d size %zu:%zu\n",
-          tid_, pkt->Frame(), data_symbol_idx, pkt->Symbol(), pkt->Ue(),
-          pkt->PayloadLength(), pkt->Crc(), cfg_->MacPacketLength(dir_),
-          cfg_->NumBytesPerCb(dir_));
-      std::printf("Data: ");
-      for (size_t i = 0; i < cfg_->MacPayloadMaxLength(dir_); i++) {
-        std::printf(" %02x", (uint8_t)(pkt->Data()[i]));
-      }
-      std::printf("\n");
+  if (kPrintRawMacData) {
+    auto* pkt = reinterpret_cast<MacPacketPacked*>(tx_data_ptr);
+    std::printf(
+        "In doEncode [%d] mac packet frame: %d, symbol: %zu:%d, ue_id: %d, "
+        "data length %d, crc %d size %zu:%zu\n",
+        tid_, pkt->Frame(), data_symbol_idx, pkt->Symbol(), pkt->Ue(),
+        pkt->PayloadLength(), pkt->Crc(), cfg_->MacPacketLength(dir_),
+        cfg_->NumBytesPerCb(dir_));
+    std::printf("Data: ");
+    for (size_t i = 0; i < cfg_->MacPayloadMaxLength(dir_); i++) {
+      std::printf(" %02x", (uint8_t)(pkt->Data()[i]));
     }
-  } else {
-    tx_data_ptr = cfg_->GetInfoBits(raw_data_buffer_, dir_, data_symbol_idx,
-                                    ue_id, cur_cb_id);
+    std::printf("\n");
   }
 
   int8_t* ldpc_input = tx_data_ptr;

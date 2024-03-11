@@ -129,7 +129,7 @@ EventData DoDecodeClient::Launch(size_t tag) {
     for (size_t i = 0; i < cfg_->NumBytesPerCb(Direction::kDownlink); i++) {
       uint8_t rx_byte = decoded_buffer_ptr[i];
       auto tx_byte = static_cast<uint8_t>(cfg_->GetInfoBits(
-          cfg_->DlBits(), Direction::kDownlink, data_symbol_idx_dl,
+          cfg_->UlBits(), Direction::kDownlink, data_symbol_idx_dl,
           kDebugDownlink ? 0 : ue_id, cur_cb_id)[i]);
       phy_stats_->UpdateBitErrors(ue_id, symbol_offset, frame_slot, tx_byte,
                                   rx_byte);

@@ -167,7 +167,7 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
         auto* pkt = reinterpret_cast<MacPacketPacked*>(
             &ul_mac_info.at(ue_id).at(pkt_offset));
 
-        pkt->Set(0, pkt_id, ue_id,
+        pkt->Set(0, cfg->Frame().GetDLSymbol(pkt_id), ue_id,
                  cfg->MacPayloadMaxLength(Direction::kUplink));
         data_generator->GenMacData(pkt, ue_id);
         pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
@@ -528,7 +528,7 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
         auto* pkt = reinterpret_cast<MacPacketPacked*>(
             &dl_mac_info.at(ue_id).at(pkt_offset));
 
-        pkt->Set(0, pkt_id, ue_id,
+        pkt->Set(0, cfg->Frame().GetDLSymbol(pkt_id), ue_id,
                  cfg->MacPayloadMaxLength(Direction::kDownlink));
         data_generator->GenMacData(pkt, ue_id);
         pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(pkt->Data(),
@@ -620,9 +620,9 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
           "_ue" + std::to_string(cfg->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving downlink data bits (encoder input) to %s\n",
                      filename_ldpc.c_str());
-      for (size_t i = 0; i < num_dl_codeblocks; i++) {
-        Utils::WriteBinaryFile(filename_ldpc, sizeof(uint8_t), dl_cb_bytes,
-                               dl_information.at(i).data(),
+      for (size_t i = 0; i < cfg->UeAntNum(); i++) {
+        Utils::WriteBinaryFile(filename_ldpc, sizeof(uint8_t), num_dl_mac_bytes,
+                               dl_mac_info.at(i).data(),
                                i != 0);  //Do not append in the first write
       }
 

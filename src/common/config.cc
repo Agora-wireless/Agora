@@ -1308,41 +1308,6 @@ void Config::LoadUplinkData() {
 
 void Config::LoadDownlinkData() {
   if (this->frame_.NumDlDataSyms() > 0) {
-    const size_t dl_num_bytes_per_ue_pad =
-        Roundup<64>(this->dl_num_bytes_per_cb_) *
-        this->dl_ldpc_config_.NumBlocksInSymbol();
-    // Downlink LDPC input bits
-    dl_bits_.Calloc(this->frame_.NumDlDataSyms(),
-                    dl_num_bytes_per_ue_pad * this->ue_ant_num_,
-                    Agora_memory::Alignment_t::kAlign64);
-    const std::string dl_data_file =
-        kExperimentFilepath + kDlLdpcDataPrefix +
-        std::to_string(this->ofdm_ca_num_) + "_ue" +
-        std::to_string(this->ue_ant_total_) + ".bin";
-    AGORA_LOG_FRAME("Config: Reading downlink data bits from %s\n",
-                    dl_data_file.c_str());
-
-    // \todo assumes one code block per symbol
-    const size_t code_block_in_symbol_i = 0;
-    size_t seek_offset = 0;
-    for (size_t i = 0; i < this->frame_.NumDlDataSyms(); i++) {
-      seek_offset +=
-          dl_data_bytes_num_persymbol_ * this->ue_ant_offset_ * sizeof(int8_t);
-      for (size_t j = 0; j < this->ue_ant_num_; j++) {
-        int8_t* dl_bits_ptr = this->GetInfoBits(
-            this->dl_bits_, Direction::kDownlink, i, j, code_block_in_symbol_i);
-        Utils::ReadBinaryFile(
-            dl_data_file, sizeof(int8_t), dl_data_bytes_num_persymbol_,
-            seek_offset,
-            dl_bits_ptr);  //this->dl_bits_[i] + (j * dl_num_bytes_per_ue_pad));
-        seek_offset += dl_data_bytes_num_persymbol_ * sizeof(int8_t);
-      }
-      seek_offset +=
-          dl_data_bytes_num_persymbol_ *
-          (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
-          sizeof(int8_t);
-    }
-
     // Downlink modulation input bits
     dl_mod_bits_.Calloc(this->frame_.NumDlDataSyms(),
                         Roundup<64>(this->GetOFDMDataNum()) * ue_ant_num_,
@@ -1352,7 +1317,7 @@ void Config::LoadDownlinkData() {
         std::to_string(this->ofdm_ca_num_) + "_ue" +
         std::to_string(this->ue_ant_total_) + ".bin";
     // reset seek offset for new file read
-    seek_offset = 0;
+    size_t seek_offset = 0;
     const size_t subcarr_i = 0u;
     for (size_t i = 0; i < this->frame_.NumDlDataSyms(); i++) {
       seek_offset +=
@@ -1628,7 +1593,6 @@ Config::~Config() {
 
   ul_mod_table_.Free();
   dl_mod_table_.Free();
-  dl_bits_.Free();
   ul_bits_.Free();
   ul_mod_bits_.Free();
   dl_mod_bits_.Free();

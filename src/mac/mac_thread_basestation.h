@@ -131,7 +131,8 @@ class MacThreadBaseStation {
   // TODO: decoded_buffer_ is used by only the server, so it should be moved
   // to server_ for clarity.
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer_;
-
+  Table<int8_t> dl_mac_bytes_;
+  size_t num_dl_mac_bytes_;
   struct {
     std::array<size_t, kMaxUEs> dl_bits_buffer_id_;
 

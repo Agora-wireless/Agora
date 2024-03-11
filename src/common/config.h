@@ -420,7 +420,6 @@ class Config {
     return this->beacon_ci16_;
   };
 
-  inline Table<int8_t>& DlBits() { return this->dl_bits_; }
   inline Table<int8_t>& UlBits() { return this->ul_bits_; }
   inline Table<int8_t>& DlModBits() { return this->dl_mod_bits_; }
   inline Table<int8_t>& UlModBits() { return this->ul_mod_bits_; }
@@ -829,7 +828,6 @@ class Config {
   std::vector<size_t> dl_symbol_data_id_;
   std::vector<size_t> dl_symbol_ctrl_id_;
 
-  Table<int8_t> dl_bits_;
   Table<int8_t> ul_bits_;
   Table<int8_t> ul_mod_bits_;
   Table<int8_t> dl_mod_bits_;
