@@ -57,13 +57,6 @@ DoDemul::~DoDemul() {
   std::free(data_gather_buffer_);
   std::free(equaled_buffer_temp_);
   std::free(equaled_buffer_temp_transposed_);
-
-#if defined(USE_MKL_JIT)
-  mkl_jit_status_t status = mkl_jit_destroy(jitter_);
-  if (MKL_JIT_ERROR == status) {
-    std::fprintf(stderr, "!!!!Error: Error while destorying MKL JIT\n");
-  }
-#endif
 }
 
 EventData DoDemul::Launch(size_t tag) {
@@ -81,6 +74,9 @@ EventData DoDemul::Launch(size_t tag) {
       symbol_idx_ul - this->cfg_->Frame().ClientUlPilotSymbols();
   const size_t total_data_symbol_idx_ul =
       cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
+
+  auto ue_list = mac_sched_->ScheduledUeList(frame_id, base_sc_id);
+  size_t n_users = ue_list.n_elem;
   size_t start_tsc = GetTime::WorkerRdtsc();
 
   if (kDebugPrintInTask == true) {
@@ -191,16 +187,14 @@ EventData DoDemul::Launch(size_t tag) {
 
       arma::cx_float* equal_ptr = nullptr;
       if (kExportConstellation) {
-        equal_ptr =
-            (arma::cx_float*)(&equal_buffer_[total_symbol_idx_ul]
-                                            [cur_sc_id *
-                                             cfg_->SpatialStreamsNum()]);
+        equal_ptr = (arma::cx_float*)(&equal_buffer_[total_symbol_idx_ul]
+                                                    [cur_sc_id * n_users]);
       } else {
         equal_ptr =
             (arma::cx_float*)(&equaled_buffer_temp_[(cur_sc_id - base_sc_id) *
-                                                    cfg_->SpatialStreamsNum()]);
+                                                    n_users]);
       }
-      arma::cx_fmat mat_equaled(equal_ptr, cfg_->SpatialStreamsNum(), 1, false);
+      arma::cx_fmat mat_equaled(equal_ptr, n_users, 1, false);
 
       arma::cx_float* data_ptr = reinterpret_cast<arma::cx_float*>(
           &data_gather_buffer_[j * cfg_->BsAntNum()]);
@@ -209,38 +203,33 @@ EventData DoDemul::Launch(size_t tag) {
           ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
 
       size_t start_tsc2 = GetTime::WorkerRdtsc();
-#if defined(USE_MKL_JIT)
+#if defined(USE_MKL_CBLAS)
       MKL_Complex8 alpha = {1, 0};
       MKL_Complex8 beta = {0, 0};
 
-      cblas_cgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
-                  cfg_->SpatialStreamsNum(), 1, cfg_->BsAntNum(), &alpha,
-                  (MKL_Complex8*)ul_beam_ptr, cfg_->SpatialStreamsNum(),
+      cblas_cgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n_users, 1,
+                  cfg_->BsAntNum(), &alpha, (MKL_Complex8*)ul_beam_ptr, n_users,
                   (MKL_Complex8*)data_ptr, cfg_->BsAntNum(), &beta,
-                  (MKL_Complex8*)equal_ptr, cfg_->SpatialStreamsNum());
+                  (MKL_Complex8*)equal_ptr, n_users);
 #else
       arma::cx_fmat mat_data(data_ptr, cfg_->BsAntNum(), 1, false);
 
-      arma::cx_fmat mat_ul_beam(ul_beam_ptr, cfg_->SpatialStreamsNum(),
-                                cfg_->BsAntNum(), false);
+      arma::cx_fmat mat_ul_beam(ul_beam_ptr, n_users, cfg_->BsAntNum(), false);
       mat_equaled = mat_ul_beam * mat_data;
 #endif
 
       if (kPrintInputData) {
         if (cur_sc_id == 0) {
-          arma::cx_fmat mat_ul_beam(ul_beam_ptr, cfg_->SpatialStreamsNum(),
-                                    cfg_->BsAntNum(), false);
+          arma::cx_fmat mat_ul_beam(ul_beam_ptr, n_users, cfg_->BsAntNum(),
+                                    false);
           std::printf(
               "UL Beam Weights (in demul): frame %zu, cur sc id %zu, rows "
               "%lld, cols %lld\n",
               frame_id, cur_sc_id, mat_ul_beam.n_rows, mat_ul_beam.n_cols);
-          for (arma::uword i = 0; i < mat_ul_beam.n_rows; i++) {
-            for (arma::uword j = 0; j < mat_ul_beam.n_cols; j++) {
-              std::printf(
-                  "(%.3f"
-                  "+1j*"
-                  "%.3f) ",
-                  mat_ul_beam(i, j).real(), mat_ul_beam(i, j).imag());
+          for (arma::uword row = 0; row < mat_ul_beam.n_rows; row++) {
+            for (arma::uword col = 0; col < mat_ul_beam.n_cols; col++) {
+              std::printf("(%.3f +1j* %.3f) ", mat_ul_beam(row, col).real(),
+                          mat_ul_beam(row, col).imag());
             }
             std::printf("\n");
           }
@@ -254,13 +243,10 @@ EventData DoDemul::Launch(size_t tag) {
           std::printf(
               "UL Data: frame %zu, cur sc id %zu, rows %lld, cols %lld\n",
               frame_id, cur_sc_id, mat_data.n_rows, mat_data.n_cols);
-          for (arma::uword i = 0; i < mat_data.n_rows; i++) {
-            for (arma::uword j = 0; j < mat_data.n_cols; j++) {
-              std::printf(
-                  "(%.3f"
-                  "+1j*"
-                  "%.3f) ",
-                  mat_data(i, j).real(), mat_data(i, j).imag());
+          for (arma::uword row = 0; row < mat_data.n_rows; row++) {
+            for (arma::uword col = 0; col < mat_data.n_cols; col++) {
+              std::printf("(%.3f+1j*%.3f) ", mat_data(row, col).real(),
+                          mat_data(row, col).imag());
             }
             std::printf("\n");
           }
@@ -270,19 +256,15 @@ EventData DoDemul::Launch(size_t tag) {
 
       if (kPrintEquOutput) {
         if (cur_sc_id == 0) {
-          arma::cx_fmat mat_equal(equal_ptr, cfg_->SpatialStreamsNum(), 1,
-                                  false);
+          arma::cx_fmat mat_equal(equal_ptr, n_users, 1, false);
           std::printf(
               "Equalized output: frame %zu, cur sc id %zu, rows %lld, cols "
               "%lld\n",
               frame_id, cur_sc_id, mat_equal.n_rows, mat_equal.n_cols);
-          for (arma::uword i = 0; i < mat_equal.n_rows; i++) {
-            for (arma::uword j = 0; j < mat_equal.n_cols; j++) {
-              std::printf(
-                  "(%.3f"
-                  "+1j*"
-                  "%.3f) ",
-                  mat_equal(i, j).real(), mat_equal(i, j).imag());
+          for (arma::uword row = 0; row < mat_equal.n_rows; row++) {
+            for (arma::uword col = 0; col < mat_equal.n_cols; col++) {
+              std::printf("(%.3f+1j*%.3f) ", mat_equal(row, col).real(),
+                          mat_equal(row, col).imag());
             }
             std::printf("\n");
           }
@@ -290,23 +272,21 @@ EventData DoDemul::Launch(size_t tag) {
         }
       }
 
-      auto ue_list = mac_sched_->ScheduledUeList(frame_id, cur_sc_id);
       if (symbol_idx_ul <
           cfg_->Frame().ClientUlPilotSymbols()) {  // Calc new phase shift
         if (symbol_idx_ul == 0 && cur_sc_id == 0) {
           // Reset previous frame
           arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
               ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
-          arma::cx_fmat mat_phase_shift(
-              phase_shift_ptr, cfg_->SpatialStreamsNum(),
-              cfg_->Frame().ClientUlPilotSymbols(), false);
+          arma::cx_fmat mat_phase_shift(phase_shift_ptr, n_users,
+                                        cfg_->Frame().ClientUlPilotSymbols(),
+                                        false);
           mat_phase_shift.fill(0);
         }
         arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
             &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
-                                  [symbol_idx_ul * cfg_->SpatialStreamsNum()]);
-        arma::cx_fmat mat_phase_shift(phase_shift_ptr,
-                                      cfg_->SpatialStreamsNum(), 1, false);
+                                  [symbol_idx_ul * n_users]);
+        arma::cx_fmat mat_phase_shift(phase_shift_ptr, n_users, 1, false);
 
         arma::cx_fvec cur_sc_pilot_data = ue_pilot_data_.col(cur_sc_id);
         arma::cx_fmat shift_sc =
@@ -317,12 +297,11 @@ EventData DoDemul::Launch(size_t tag) {
       else if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
         arma::cx_float* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
             ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
-        arma::cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->SpatialStreamsNum(),
+        arma::cx_fmat pilot_corr_mat(pilot_corr_ptr, n_users,
                                      cfg_->Frame().ClientUlPilotSymbols(),
                                      false);
         arma::fmat theta_mat = arg(pilot_corr_mat);
-        arma::fmat theta_inc =
-            arma::zeros<arma::fmat>(cfg_->SpatialStreamsNum(), 1);
+        arma::fmat theta_inc = arma::zeros<arma::fmat>(n_users, 1);
         for (size_t s = 1; s < cfg_->Frame().ClientUlPilotSymbols(); s++) {
           arma::fmat theta_diff = theta_mat.col(s) - theta_mat.col(s - 1);
           theta_inc += theta_diff;
@@ -352,18 +331,16 @@ EventData DoDemul::Launch(size_t tag) {
 
   size_t start_tsc3 = GetTime::WorkerRdtsc();
   if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
-    __m256i index2 = _mm256_setr_epi32(
-        0, 1, cfg_->SpatialStreamsNum() * 2, cfg_->SpatialStreamsNum() * 2 + 1,
-        cfg_->SpatialStreamsNum() * 4, cfg_->SpatialStreamsNum() * 4 + 1,
-        cfg_->SpatialStreamsNum() * 6, cfg_->SpatialStreamsNum() * 6 + 1);
+    __m256i index2 =
+        _mm256_setr_epi32(0, 1, n_users * 2, n_users * 2 + 1, n_users * 4,
+                          n_users * 4 + 1, n_users * 6, n_users * 6 + 1);
     auto* equal_t_ptr =
         reinterpret_cast<float*>(equaled_buffer_temp_transposed_);
-    for (size_t ss_id = 0; ss_id < cfg_->SpatialStreamsNum(); ss_id++) {
+    for (size_t ss_id = 0; ss_id < n_users; ss_id++) {
       float* equal_ptr = nullptr;
       if (kExportConstellation) {
         equal_ptr = reinterpret_cast<float*>(
-            &equal_buffer_[total_symbol_idx_ul]
-                          [base_sc_id * cfg_->SpatialStreamsNum() + ss_id]);
+            &equal_buffer_[total_symbol_idx_ul][base_sc_id * n_users + ss_id]);
       } else {
         equal_ptr = reinterpret_cast<float*>(equaled_buffer_temp_ + ss_id);
       }
@@ -373,7 +350,7 @@ EventData DoDemul::Launch(size_t tag) {
         __m256 equal_t_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
         _mm256_store_ps(equal_t_ptr, equal_t_temp);
         equal_t_ptr += 8;
-        equal_ptr += cfg_->SpatialStreamsNum() * k_num_double_in_sim_d256 * 2;
+        equal_ptr += n_users * k_num_double_in_sim_d256 * 2;
       }
       equal_t_ptr = (float*)(equaled_buffer_temp_transposed_);
       int8_t* demod_ptr =

@@ -705,7 +705,8 @@ Config::Config(std::string jsonfilename)
   this->UpdateCtrlMCS();
 
   freq_domain_channel_ = tdd_conf.value("freq_domain_channel", false);
-  scheduler_type_ = tdd_conf.value("scheduler_type", "round_robbin");
+  scheduler_type_ =
+      tdd_conf.value("scheduler_type", adapt_ues_ ? "custom" : "round_robbin");
 
   samps_per_symbol_ =
       ofdm_tx_zero_prefix_ + ofdm_ca_num_ + cp_len_ + ofdm_tx_zero_postfix_;

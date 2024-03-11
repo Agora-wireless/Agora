@@ -59,7 +59,8 @@ class DoPrecode : public Doer {
   // Load input data for a single UE and a single subcarrier
   void LoadInputData(size_t frame_id, size_t symbol_idx_dl, size_t sp_id,
                      size_t user_id, size_t sc_id, size_t sc_id_in_block);
-  void PrecodingPerSc(size_t frame_slot, size_t sc_id, size_t sc_id_in_block);
+  void PrecodingPerSc(size_t frame_slot, size_t sc_id, size_t sc_id_in_block,
+                      size_t ue_num);
 
  private:
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_beam_matrices_;
@@ -70,10 +71,6 @@ class DoPrecode : public Doer {
   DurationStat* duration_stat_;
   complex_float* modulated_buffer_temp_;
   complex_float* precoded_buffer_temp_;
-#if defined(USE_MKL_JIT)
-  void* jitter_;
-  cgemm_jit_kernel_t my_cgemm_;
-#endif
 };
 
 #endif  // DOPRECODE_H_

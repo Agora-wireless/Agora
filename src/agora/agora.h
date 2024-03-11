@@ -76,7 +76,6 @@ class Agora {
   void UpdateCores(RPControlMsg rcm);
 
   void InitializeQueues();
-  void ReInitializeCounters();
   void InitializeCounters();
   void InitializeThreads();
   void InitializeUesFromFile();
