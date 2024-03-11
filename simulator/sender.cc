@@ -4,15 +4,8 @@
  */
 #include "sender.h"
 
-#include <algorithm>
-#include <csignal>
-#include <thread>
-
 #include "data_generator.h"
-#include "datatype_conversion.h"
-#include "gettime.h"
 #include "logger.h"
-#include "message.h"
 #include "udp_client.h"
 
 #if defined(USE_DPDK)
@@ -20,7 +13,7 @@
 #include <arpa/inet.h>
 #endif
 
-static constexpr bool kPrintAdaptUes = false;
+static constexpr bool kPrintUeSchedule = true;
 static constexpr bool kDebugPrintSender = false;
 
 static std::atomic<bool> keep_running = true;
@@ -76,7 +69,16 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     i = new size_t[cfg->Frame().NumTotalSyms()]();
   }
 
-  InitUesFromFile(std::string(TOSTRING(PROJECT_DIRECTORY)));
+  // 2-element vector for schedule in each frame
+  // First element is schedule bit mat
+  // Second element is index of data to read
+  std::vector<size_t> init_vec(2, 0);
+  sched_map_array_.resize(cfg->FramesToTest(), init_vec);
+  adapt_ues_array_.resize(cfg->FramesToTest(), cfg->UeAntNum());
+  max_ue_sched_num_ = 1;
+  if (cfg->AdaptUes()) {
+    InitUesFromFile();
+  }
 
   InitIqFromFilePath(std::string(TOSTRING(PROJECT_DIRECTORY)));
 
@@ -449,7 +451,7 @@ void* Sender::WorkerThread(int tid) {
         pkt->ant_id_ = tag.ant_id_ - ant_num_per_cell * (pkt->cell_id_);
         std::memcpy(
             pkt->data_,
-            iq_data_short_[((adapt_ues_array_.at(pkt->frame_id_) - 1) *
+            iq_data_short_[(sched_map_array_.at(pkt->frame_id_).at(1) *
                             cfg_->Frame().NumTotalSyms() * cfg_->BsAntNum()) +
                            (pkt->symbol_id_ * cfg_->BsAntNum()) + tag.ant_id_],
             (cfg_->SampsPerSymbol()) * (kUse12BitIQ ? 3 : 4));
@@ -559,69 +561,109 @@ uint64_t Sender::GetTicksForFrame(size_t frame_id) const {
   }
 }
 
-void Sender::InitUesFromFile(const std::string& filepath) {
-  adapt_ues_array_.resize(cfg_->FramesToTest());
+void Sender::InitUesFromFile() {
+  size_t n_items = cfg_->UeAntNum();
+  std::vector<uint8_t> ue_map_array(n_items);
+  std::vector<size_t> sched_ue_set;
 
-  const std::string filename = filepath + "/files/experiment/adapt" + "_ueant" +
-                               std::to_string(cfg_->UeAntNum()) + ".bin";
-
+  const std::string directory =
+      TOSTRING(PROJECT_DIRECTORY) "/files/experiment/";
+  static const std::string kFilename =
+      directory + kUeSchedulePrefix + std::to_string(cfg_->UeAntNum()) + ".bin";
   AGORA_LOG_INFO(
-      "Sender: Reading adaptable number of UEs across frames from %s\n",
-      filename.c_str());
+      "Custom MAC Scheduler: Reading binary map of scheduled UEs across frames "
+      "from %s\n",
+      kFilename.c_str());
 
-  FILE* fp = std::fopen(filename.c_str(), "rb");
-  RtAssert(fp != nullptr, "Failed to open adapt UEs file");
+  FILE* fp = std::fopen(kFilename.c_str(), "rb");
+  RtAssert(fp != nullptr, "Failed to open scheduled UE file");
 
-  const size_t expected_count = cfg_->FramesToTest();
-  const size_t actual_count =
-      std::fread(&adapt_ues_array_.at(0), sizeof(uint8_t), expected_count, fp);
-  if (expected_count != actual_count) {
-    std::fprintf(stderr,
-                 "Sender: Failed to read adapt UEs file %s. expected "
-                 "%zu number of UE entries but read %zu. Errno %s\n",
-                 filename.c_str(), expected_count, actual_count,
-                 strerror(errno));
-    throw std::runtime_error("Sender: Failed to read adapt UEs file");
-  }
-  if (kPrintAdaptUes == true) {
-    std::printf("Sender: Adapted number of UEs across %zu frames\n",
-                cfg_->FramesToTest());
-    for (size_t n = 0; n < cfg_->FramesToTest(); n++) {
-      std::printf("%u ", adapt_ues_array_.at(n));
+  for (size_t i = 0; i < cfg_->FramesToTest(); i++) {
+    const size_t actual_count =
+        std::fread(&ue_map_array.at(0), sizeof(uint8_t), n_items, fp);
+
+    if (actual_count != n_items) {
+      std::fprintf(
+          stderr,
+          "Custom MAC Scheduler: Failed to read scheduled UEs file "
+          "%s. expected "
+          "%zu number of UE entries at frame %zu but read %zu. Errno %s\n",
+          kFilename.c_str(), n_items, i, actual_count, strerror(errno));
+      throw std::runtime_error("Agora: Failed to read scheduled UEs file");
     }
-    std::printf("\n");
+    if (kPrintUeSchedule == true) {
+      std::printf("Sender: Scheduled UEs at frame %zu: ", i);
+    }
+    for (size_t u = 0; u < ue_map_array.size(); u++) {
+      if (ue_map_array.at(u) == 1) {
+        adapt_ues_array_.at(i)++;
+        if (kPrintUeSchedule == true) {
+          std::printf("%zu ", u);
+        }
+      }
+    }
+    if (kPrintUeSchedule == true) {
+      std::printf("\n");
+    }
+    // convert the binary map of scheduled UE to a schedule index
+    size_t ue_sched_id = Utils::Bits2Int(ue_map_array);
+    sched_map_array_.at(i).at(0) = ue_sched_id;
+    if (sched_ue_set.empty()) {
+      sched_ue_set.push_back(ue_sched_id);
+    } else {
+      std::vector<size_t>::iterator it;
+      for (it = sched_ue_set.begin(); it < sched_ue_set.end(); it++) {
+        if (ue_sched_id == *it) {  // dont's push this to keep vector unique
+          break;
+        } else if (ue_sched_id > *it && (it + 1) == sched_ue_set.end()) {
+          sched_ue_set.push_back(ue_sched_id);
+          break;
+        } else if (ue_sched_id < *it && it == sched_ue_set.begin()) {
+          sched_ue_set.insert(it, ue_sched_id);
+          break;
+        } else if (ue_sched_id > *it && ue_sched_id < *(it + 1)) {
+          sched_ue_set.insert(it + 1, ue_sched_id);
+          break;
+        }
+      }
+    }
+  }
+  max_ue_sched_num_ = sched_ue_set.size();
+  std::fclose(fp);
+
+  for (size_t i = 0; i < cfg_->FramesToTest(); i++) {
+    auto sched_id = std::find(sched_ue_set.begin(), sched_ue_set.end(),
+                              sched_map_array_.at(i).at(0));
+    RtAssert(sched_id != sched_ue_set.end(),
+             "schedule index was calculated correctly!");
+    sched_map_array_.at(i).at(1) =
+        sched_id - sched_ue_set.begin();  // index of data in iq_data_short
   }
 }
 
 void Sender::InitIqFromFilePath(const std::string& filepath) {
   const size_t packets_per_frame =
       cfg_->Frame().NumTotalSyms() * cfg_->BsAntNum();
-  iq_data_short_.Calloc(packets_per_frame * cfg_->UeAntNum(),
+  iq_data_short_.Calloc(packets_per_frame * max_ue_sched_num_,
                         cfg_->SampsPerSymbol() * 2,
                         Agora_memory::Alignment_t::kAlign64);
 
   Table<short> iq_data_temp;
-  iq_data_temp.Calloc(packets_per_frame * cfg_->UeAntNum(),
-                      (cfg_->SampsPerSymbol()) * 2,
+  iq_data_temp.Calloc(packets_per_frame, (cfg_->SampsPerSymbol()) * 2,
                       Agora_memory::Alignment_t::kAlign64);
 
-  size_t ue_ant_id_start = cfg_->AdaptUes() ? 1 : cfg_->UeAntNum();
-  for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= cfg_->UeAntNum();
-       ue_ant_id++) {
-    const std::string filename = kExperimentFilepath + kUlRxPrefix +
-                                 std::to_string(cfg_->OfdmCaNum()) + "_bsant" +
-                                 std::to_string(cfg_->BsAntNum()) + "_ueant" +
-                                 std::to_string(ue_ant_id) + ".bin";
-
-    FILE* fp = std::fopen(filename.c_str(), "rb");
-    AGORA_LOG_INFO("Sender: Reading ul rx data for %zu UE(s) from %s\n",
-                   ue_ant_id, filename.c_str());
-    RtAssert(fp != nullptr, "Failed to open IQ data file");
+  const std::string filename = kExperimentFilepath + kUlRxPrefix +
+                               std::to_string(cfg_->OfdmCaNum()) + "_bsant" +
+                               std::to_string(cfg_->BsAntNum()) + "_ueant" +
+                               std::to_string(cfg_->UeAntNum()) + ".bin";
+  FILE* fp = std::fopen(filename.c_str(), "rb");
+  RtAssert(fp != nullptr, "Failed to open IQ data file");
+  AGORA_LOG_INFO("Sender: Reading ul rx data from %s\n", filename.c_str());
+  for (size_t sched_id = 0; sched_id < max_ue_sched_num_; sched_id++) {
     for (size_t i = 0; i < packets_per_frame; i++) {
       const size_t expected_count = (cfg_->SampsPerSymbol()) * 2;
       const size_t actual_count =
-          std::fread(iq_data_temp[packets_per_frame * (ue_ant_id - 1) + i],
-                     sizeof(short), expected_count, fp);
+          std::fread(iq_data_temp[i], sizeof(short), expected_count, fp);
       if (expected_count != actual_count) {
         std::fprintf(
             stderr,
@@ -633,18 +675,17 @@ void Sender::InitIqFromFilePath(const std::string& filepath) {
       if (kUse12BitIQ) {
         // Adapt 32-bit IQ samples to 24-bit to reduce network throughput
         ConvertShortTo12bitIq(
-            iq_data_temp[packets_per_frame * (ue_ant_id - 1) + i],
+            iq_data_temp[i],
             reinterpret_cast<uint8_t*>(
-                iq_data_short_[packets_per_frame * (ue_ant_id - 1) + i]),
+                iq_data_short_[packets_per_frame * sched_id + i]),
             expected_count);
       } else {
-        std::memcpy(iq_data_short_[packets_per_frame * (ue_ant_id - 1) + i],
-                    iq_data_temp[packets_per_frame * (ue_ant_id - 1) + i],
-                    expected_count * sizeof(short));
+        std::memcpy(iq_data_short_[packets_per_frame * sched_id + i],
+                    iq_data_temp[i], expected_count * sizeof(short));
       }
     }
-    std::fclose(fp);
   }
+  std::fclose(fp);
   iq_data_temp.Free();
 }
 

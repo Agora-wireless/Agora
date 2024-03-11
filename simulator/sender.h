@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <csignal>
 #include <iostream>
 #include <numeric>
 #include <thread>
@@ -75,11 +76,8 @@ class Sender {
 
   /**
    * @brief Read adapting UEs across frames and populate adapt_ues_array_
-   *
-   * [filepath] must contain the path to the adapted number of UEs files
-   * in every frame for cfg_->FramesToTest() frames.
   */
-  void InitUesFromFile(const std::string& filepath);
+  void InitUesFromFile();
 
   /**
    * @brief Read time-domain 32-bit floating-point IQ samples from [filepath]
@@ -142,6 +140,8 @@ class Sender {
   moodycamel::ProducerToken** task_ptok_;
 
   std::vector<uint8_t> adapt_ues_array_;
+  std::vector<std::vector<size_t>> sched_map_array_;
+  size_t max_ue_sched_num_;
 
   // First dimension: symbol_num_perframe * BS_ANT_NUM
   // Second dimension: (CP_LEN + OFDM_CA_NUM) * 2

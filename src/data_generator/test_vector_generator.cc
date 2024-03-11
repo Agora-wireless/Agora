@@ -32,8 +32,7 @@ static constexpr bool kPrintDownlinkMacBytes = false;
 static constexpr bool kPrintUplinkEncodedBytes = false;
 static constexpr bool kPrintDownlinkEncodedBytes = false;
 
-static constexpr bool kPrintAdaptUes = false;
-static const std::string kAdaptUesPrefix = "adapt";
+static constexpr bool kPrintUeSchedule = false;
 
 DEFINE_string(profile, "random",
               "The profile of the input user bytes (e.g., 'random', '123')");
@@ -74,47 +73,79 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
   const size_t ul_cb_bytes = cfg->NumBytesPerCb(Direction::kUplink);
   LDPCconfig ul_ldpc_config = cfg->LdpcConfig(Direction::kUplink);
 
-  // Generating an array of this->cfg->FramesToTest() elements containing
-  // number of UEs varying from 1 to this->cfg->UeAntNum() for adapting
-  // UEs across frames
-  {
-    // Set seed for the random number generator
-    std::random_device rd;
-    std::mt19937 gen(rd());
+  // Generating an array of cfg->FramesToTest() * cfg->UeAntNum() elements
+  // containing a bitmap of scheduled UEs across frames
+  size_t n_sched = static_cast<size_t>(std::pow(2, cfg->UeAntNum())) - 1;
+  // Set seed for the random number generator
+  std::random_device rd;
+  std::mt19937 gen(rd());
 
-    // Define the range for adapting the number of UEs
-    std::uniform_int_distribution<> distribution(1, cfg->UeAntNum());
-
-    uint8_t adapt_ues_array[cfg->FramesToTest()];
-
+  // Define the binary distribution for bitmap of scheduled UEs
+  std::uniform_int_distribution<> distribution(0, 1);
+  std::vector<uint8_t> sched_ue_map(cfg->FramesToTest() * cfg->UeAntNum(), 1);
+  std::vector<size_t> sched_ue_set;
+  if (cfg->AdaptUes() == true) {
     for (size_t i = 0; i < cfg->FramesToTest(); ++i) {
-      adapt_ues_array[i] =
-          cfg->AdaptUes() ? distribution(gen) : cfg->UeAntNum();
-    }
-    const std::string filename_input = directory + kAdaptUesPrefix + "_ueant" +
-                                       std::to_string(cfg->UeAntNum()) + ".bin";
-    AGORA_LOG_INFO("Saving adaptable number of UEs across frames to %s\n",
-                   filename_input.c_str());
-    auto* fp_input = std::fopen(filename_input.c_str(), "wb");
-    if (fp_input == nullptr) {
-      AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
-      throw std::runtime_error("Failed to create file" + filename_input);
-    } else {
-      const auto write_status = std::fwrite(adapt_ues_array, sizeof(uint8_t),
-                                            cfg->FramesToTest(), fp_input);
-      if (write_status != cfg->FramesToTest()) {
-        throw std::runtime_error("Failed to write to file" + filename_input);
+      size_t max_ue_num = 0;
+      size_t ue_sched_id = 0;
+      for (size_t u = 0; u < cfg->UeAntNum(); ++u) {
+        uint8_t val = distribution(gen);
+        sched_ue_map[i * cfg->UeAntNum() + u] = val;
+        max_ue_num += val;
+        ue_sched_id += static_cast<size_t>(val * std::pow(2, u));
       }
-      const auto close_status = std::fclose(fp_input);
-      if (close_status != 0) {
-        throw std::runtime_error("Failed to close file" + filename_input);
+      // if no UE was scheduled in this frame, schedule UE 0
+      if (max_ue_num == 0) {
+        sched_ue_map[i * cfg->UeAntNum()] = 1;
+        ue_sched_id = 1;
+      }
+      if (sched_ue_set.empty()) {
+        sched_ue_set.push_back(ue_sched_id);
+      } else {
+        std::vector<size_t>::iterator it;
+        for (it = sched_ue_set.begin(); it < sched_ue_set.end(); it++) {
+          if (ue_sched_id == *it) {  // dont's push this to keep vector unique
+            break;
+          } else if (ue_sched_id > *it && (it + 1) == sched_ue_set.end()) {
+            sched_ue_set.push_back(ue_sched_id);
+            break;
+          } else if (ue_sched_id < *it && it == sched_ue_set.begin()) {
+            sched_ue_set.insert(it, ue_sched_id);
+            break;
+          } else if (ue_sched_id > *it && ue_sched_id < *(it + 1)) {
+            sched_ue_set.insert(it + 1, ue_sched_id);
+            break;
+          }
+        }
       }
     }
-    if (kPrintAdaptUes) {
-      std::printf("Adapted number of UEs across %zu frames\n",
-                  cfg->FramesToTest());
-      for (size_t n = 0; n < cfg->FramesToTest(); n++) {
-        std::printf("%u ", adapt_ues_array[n]);
+  } else {
+    sched_ue_set.push_back(n_sched);
+  }
+  const std::string filename_input =
+      directory + kUeSchedulePrefix + std::to_string(cfg->UeAntNum()) + ".bin";
+  AGORA_LOG_INFO("Saving scheduled number of UEs across frames to %s\n",
+                 filename_input.c_str());
+  auto* fp_input = std::fopen(filename_input.c_str(), "wb");
+  if (fp_input == nullptr) {
+    AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
+    throw std::runtime_error("Failed to create file" + filename_input);
+  } else {
+    const auto write_status = std::fwrite(&sched_ue_map.at(0), sizeof(uint8_t),
+                                          sched_ue_map.size(), fp_input);
+    if (write_status != sched_ue_map.size()) {
+      throw std::runtime_error("Failed to write to file" + filename_input);
+    }
+    const auto close_status = std::fclose(fp_input);
+    if (close_status != 0) {
+      throw std::runtime_error("Failed to close file" + filename_input);
+    }
+  }
+  if (kPrintUeSchedule) {
+    for (size_t i = 0; i < cfg->FramesToTest(); i++) {
+      std::printf("Scheduled UEs at frame %zu:\n", i);
+      for (size_t u = 0; u < cfg->UeAntNum(); u++) {
+        std::printf("%u ", sched_ue_map.at(i * cfg->UeAntNum() + u));
       }
       std::printf("\n");
     }
@@ -414,13 +445,25 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
   rx_data_all_symbols.Calloc(cfg->Frame().NumTotalSyms(),
                              cfg->OfdmCaNum() * cfg->BsAntNum(),
                              Agora_memory::Alignment_t::kAlign64);
-  size_t ue_ant_id_start = cfg->AdaptUes() ? 1 : cfg->UeAntNum();
-  for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= cfg->UeAntNum();
-       ue_ant_id++) {
+  const std::string filename_rx = directory + kUlRxPrefix +
+                                  std::to_string(cfg->OfdmCaNum()) + "_bsant" +
+                                  std::to_string(cfg->BsAntNum()) + "_ueant" +
+                                  std::to_string(cfg->UeAntNum()) + ".bin";
+  AGORA_LOG_INFO("Saving uplink rx samples to %s\n", filename_rx.c_str());
+  auto* rx_data_temp =
+      static_cast<std::complex<short>*>(Agora_memory::PaddedAlignedAlloc(
+          Agora_memory::Alignment_t::kAlign64,
+          cfg->OfdmCaNum() * cfg->BsAntNum() * sizeof(short) * 2));
+  for (const auto& sched_id : sched_ue_set) {
+    auto ue_map = Utils::Int2Bits(sched_id, cfg->UeAntNum());
+    auto ue_map_mat = arma::repmat(ue_map, cfg->BsAntNum(), 1);
+    if (kPrintUeSchedule) {
+      std::cout << ue_map << std::endl;
+    }
     for (size_t i = 0; i < cfg->Frame().NumTotalSyms(); i++) {
       arma::cx_fmat mat_input_data(
           reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
-          cfg->OfdmCaNum(), ue_ant_id, false);
+          cfg->OfdmCaNum(), cfg->UeAntNum(), false);
       arma::cx_fmat mat_output(
           reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
           cfg->OfdmCaNum(), cfg->BsAntNum(), false);
@@ -428,8 +471,9 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
       for (size_t j = 0; j < cfg->OfdmCaNum(); j++) {
         arma::cx_fmat mat_csi(
             reinterpret_cast<arma::cx_float*>(csi_matrices[j]), cfg->BsAntNum(),
-            ue_ant_id, false);
-        mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
+            cfg->UeAntNum(), false);
+        mat_output.row(j) =
+            (mat_input_data.row(j) % ue_map) * (mat_csi % ue_map_mat).st();
       }
       arma::cx_fmat noise_mat(size(mat_output));
       noise_mat.set_real(arma::randn<arma::fmat>(size(real(mat_output))));
@@ -440,30 +484,18 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
         CommsLib::FFTShift(this_ofdm_symbol, cfg->OfdmCaNum());
         CommsLib::IFFT(this_ofdm_symbol, cfg->OfdmCaNum(), false);
       }
-    }
-
-    const std::string filename_rx =
-        directory + kUlRxPrefix + std::to_string(cfg->OfdmCaNum()) + "_bsant" +
-        std::to_string(cfg->BsAntNum()) + "_ueant" + std::to_string(ue_ant_id) +
-        ".bin";
-    std::complex<short>* rx_data_temp;
-    rx_data_temp =
-        static_cast<std::complex<short>*>(Agora_memory::PaddedAlignedAlloc(
-            Agora_memory::Alignment_t::kAlign64,
-            cfg->OfdmCaNum() * cfg->BsAntNum() * sizeof(short) * 2));
-    AGORA_LOG_INFO("Saving uplink rx samples to %s\n", filename_rx.c_str());
-    for (size_t i = 0; i < cfg->Frame().NumTotalSyms(); i++) {
       SimdConvertFloatToShort(reinterpret_cast<float*>(rx_data_all_symbols[i]),
                               reinterpret_cast<short*>(rx_data_temp),
                               2 * cfg->OfdmCaNum() * cfg->BsAntNum());
-      Utils::WriteBinaryFile(filename_rx, sizeof(short),
-                             cfg->OfdmCaNum() * cfg->BsAntNum() * 2,
-                             rx_data_temp,
-                             i != 0);  //Do not append in the first write
+      Utils::WriteBinaryFile(
+          filename_rx, sizeof(short), cfg->OfdmCaNum() * cfg->BsAntNum() * 2,
+          rx_data_temp,
+          i != 0 || sched_id !=
+                        sched_ue_set.at(0));  //Do not append in the first write
     }
 
     if (kDebugPrintRxData) {
-      std::printf("For %zu ue(s), rx data\n", ue_ant_id);
+      std::printf("For %zu ue(s), rx data\n", sched_id);
       for (size_t i = 0; i < 10; i++) {
         for (size_t j = 0; j < cfg->OfdmCaNum() * cfg->BsAntNum(); j++) {
           if (j % cfg->OfdmCaNum() == 0) {
@@ -673,12 +705,23 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
     precoder.Calloc(cfg->OfdmCaNum(), cfg->UeAntNum() * cfg->BsAntNum(),
                     Agora_memory::Alignment_t::kAlign32);
 
-    for (size_t ue_ant_id = ue_ant_id_start; ue_ant_id <= cfg->UeAntNum();
-         ue_ant_id++) {
+    std::string filename_dl_tx = directory + kDlTxPrefix +
+                                 std::to_string(cfg->OfdmCaNum()) + "_bsant" +
+                                 std::to_string(cfg->BsAntNum()) + "_ueant" +
+                                 std::to_string(cfg->UeAntNum()) + ".bin";
+    AGORA_LOG_INFO("Saving downlink tx data to %s\n", filename_dl_tx.c_str());
+    for (const auto& sched_id : sched_ue_set) {
+      auto sched_ues = Utils::BitOneIndices(sched_id, cfg->UeAntNum());
       for (size_t i = 0; i < cfg->Frame().NumDLSyms(); i++) {
-        arma::cx_fmat mat_input_data(
-            reinterpret_cast<arma::cx_float*>(dl_mod_data[i]), cfg->OfdmCaNum(),
-            ue_ant_id, false);
+        arma::cx_fmat mat_input_data(cfg->OfdmCaNum(), sched_ues.n_elem,
+                                     arma::fill::zeros);
+        for (size_t u = 0; u < sched_ues.n_elem; u++) {
+          arma::cx_fvec ue_data(
+              reinterpret_cast<arma::cx_float*>(
+                  dl_mod_data[i] + cfg->OfdmCaNum() * sched_ues(u)),
+              cfg->OfdmCaNum(), false);
+          mat_input_data.col(u) = ue_data;
+        }
 
         arma::cx_fmat mat_output(
             reinterpret_cast<arma::cx_float*>(dl_ifft_data[i]),
@@ -688,23 +731,23 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
              j < cfg->OfdmDataNum() + cfg->OfdmDataStart(); j++) {
           arma::cx_fmat mat_csi(
               reinterpret_cast<arma::cx_float*>(csi_matrices[j]),
-              cfg->BsAntNum(), ue_ant_id, false);
+              cfg->BsAntNum(), cfg->UeAntNum(), false);
           arma::cx_fmat mat_precoder(
-              reinterpret_cast<arma::cx_float*>(precoder[j]), ue_ant_id,
+              reinterpret_cast<arma::cx_float*>(precoder[j]), sched_ues.n_elem,
               cfg->BsAntNum(), false);
-          pinv(mat_precoder, mat_csi, 1e-2, "dc");
+          pinv(mat_precoder, mat_csi.cols(sched_ues), 1e-2, "dc");
           mat_precoder /= abs(mat_precoder).max();
           mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
 
           if (kPrintDebugCSI) {
             std::printf("CSI \n");
-            for (size_t j = 0; j < ue_ant_id * cfg->BsAntNum(); j++) {
+            for (size_t j = 0; j < cfg->UeAntNum() * cfg->BsAntNum(); j++) {
               std::printf("%.3f+%.3fi ",
                           csi_matrices[cfg->OfdmDataStart()][j].re,
                           csi_matrices[cfg->OfdmDataStart()][j].im);
             }
             std::printf("\nprecoder \n");
-            for (size_t j = 0; j < ue_ant_id * cfg->BsAntNum(); j++) {
+            for (size_t j = 0; j < cfg->UeAntNum() * cfg->BsAntNum(); j++) {
               std::printf("%.3f+%.3fi ", precoder[cfg->OfdmDataStart()][j].re,
                           precoder[cfg->OfdmDataStart()][j].im);
             }
@@ -735,21 +778,12 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
           std::memset(tx_symbol + tx_zero_postfix_offset, 0,
                       sizeof(short) * 2 * cfg->OfdmTxZeroPostfix());
         }
-      }
-
-      {
-        std::string filename_dl_tx =
-            directory + kDlTxPrefix + std::to_string(cfg->OfdmCaNum()) +
-            "_bsant" + std::to_string(cfg->BsAntNum()) + "_ueant" +
-            std::to_string(ue_ant_id) + ".bin";
-        AGORA_LOG_INFO("Saving downlink tx data for %zu UE(s) to %s\n",
-                       ue_ant_id, filename_dl_tx.c_str());
-        for (size_t i = 0; i < cfg->Frame().NumDLSyms(); i++) {
-          Utils::WriteBinaryFile(filename_dl_tx, sizeof(short),
-                                 cfg->SampsPerSymbol() * cfg->BsAntNum() * 2,
-                                 reinterpret_cast<void*>(dl_tx_data[i]),
-                                 i != 0);  //Do not append in the first write
-        }
+        Utils::WriteBinaryFile(
+            filename_dl_tx, sizeof(short),
+            cfg->SampsPerSymbol() * cfg->BsAntNum() * 2,
+            reinterpret_cast<void*>(dl_tx_data[i]),
+            i != 0 || sched_id != sched_ue_set.at(
+                                      0));  //Do not append in the first write
       }
     }
     if (kPrintDlTxData) {

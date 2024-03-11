@@ -73,7 +73,6 @@ Agora::Agora(Config* const cfg)
   InitializeQueues();
   InitializeCounters();
   InitializeThreads();
-  InitializeUesFromFile();
 
   if (kRecordUplinkFrame) {
     recorder_ = std::make_unique<Agora_recorder::RecorderThread>(
@@ -412,10 +411,9 @@ void Agora::Start() {
 
           AGORA_LOG_TRACE(
               "Agora: event_type_ %s, cur_sche_frame_id_ %zu, "
-              "frame_id_ %zu, symbol_id_ %zu, ant_id_ %zu, adapt ue(s) %zu\n",
+              "frame_id_ %zu, symbol_id_ %zu, ant_id_ %zu\n",
               "kPacketRX", frame_tracking_.cur_sche_frame_id_, pkt->frame_id_,
-              pkt->symbol_id_, pkt->ant_id_,
-              adapt_ues_array_.at(pkt->frame_id_));
+              pkt->symbol_id_, pkt->ant_id_);
 
           if (recorder_ != nullptr) {
             rx->Use();
@@ -1312,42 +1310,6 @@ void Agora::InitializeThreads() {
   }
 }
 
-void Agora::InitializeUesFromFile() {
-  adapt_ues_array_.resize(config_->FramesToTest());
-
-  static const std::string kFilename = kOutputFilepath + "adapt_ueant" +
-                                       std::to_string(config_->UeAntNum()) +
-                                       ".bin";
-
-  AGORA_LOG_INFO(
-      "Agora: Reading adaptable number of UEs across frames from %s\n",
-      kFilename.c_str());
-
-  FILE* fp = std::fopen(kFilename.c_str(), "rb");
-  RtAssert(fp != nullptr, "Failed to open adapt UEs file");
-
-  const size_t expected_count = config_->FramesToTest();
-  const size_t actual_count =
-      std::fread(&adapt_ues_array_.at(0), sizeof(uint8_t), expected_count, fp);
-
-  if (expected_count != actual_count) {
-    std::fprintf(stderr,
-                 "Agora: Failed to read adapt UEs file %s. expected "
-                 "%zu number of UE entries but read %zu. Errno %s\n",
-                 kFilename.c_str(), expected_count, actual_count,
-                 strerror(errno));
-    throw std::runtime_error("Agora: Failed to read adapt UEs file");
-  }
-  if (kPrintAdaptUes) {
-    std::printf("Agora: Adapted number of UEs across %zu frames\n",
-                config_->FramesToTest());
-    for (size_t n = 0; n < config_->FramesToTest(); n++) {
-      std::printf("%u ", adapt_ues_array_.at(n));
-    }
-    std::printf("\n");
-  }
-}
-
 void Agora::SaveDecodeDataToFile(int frame_id) {
   const auto& cfg = config_;
   const size_t num_decoded_bytes =
@@ -1359,7 +1321,7 @@ void Agora::SaveDecodeDataToFile(int frame_id) {
   if (fp == nullptr) {
     AGORA_LOG_ERROR("SaveDecodeDataToFile error creating file pointer\n");
   } else {
-    for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
+    for (size_t i = 0; i < cfg->Frame().NumUlDataSyms(); i++) {
       for (const auto& j : ue_list) {
         const int8_t* ptr =
             agora_memory_->GetDecod()[(frame_id % kFrameWnd)][i][j];
