@@ -33,13 +33,6 @@ DoPrecode::DoPrecode(
 DoPrecode::~DoPrecode() {
   FreeBuffer1d(&modulated_buffer_temp_);
   FreeBuffer1d(&precoded_buffer_temp_);
-
-#if defined(USE_MKL_JIT)
-  mkl_jit_status_t status = mkl_jit_destroy(jitter_);
-  if (MKL_JIT_ERROR == status) {
-    std::fprintf(stderr, "!!!!Error: Error while destorying MKL JIT\n");
-  }
-#endif
 }
 
 EventData DoPrecode::Launch(size_t tag) {
@@ -158,7 +151,7 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
            : 0));
   arma::cx_float* precoded_ptr = reinterpret_cast<arma::cx_float*>(
       precoded_buffer_temp_ + sc_id_in_block * cfg_->BsAntNum());
-#if defined(USE_MKL_JIT)
+#if defined(USE_MKL_CBLAS)
   MKL_Complex8 alpha = {1, 0};
   MKL_Complex8 beta = {0, 0};
 
