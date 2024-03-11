@@ -57,13 +57,6 @@ DoDemul::~DoDemul() {
   std::free(data_gather_buffer_);
   std::free(equaled_buffer_temp_);
   std::free(equaled_buffer_temp_transposed_);
-
-#if defined(USE_MKL_JIT)
-  mkl_jit_status_t status = mkl_jit_destroy(jitter_);
-  if (MKL_JIT_ERROR == status) {
-    std::fprintf(stderr, "!!!!Error: Error while destorying MKL JIT\n");
-  }
-#endif
 }
 
 EventData DoDemul::Launch(size_t tag) {
@@ -210,7 +203,7 @@ EventData DoDemul::Launch(size_t tag) {
           ul_beam_matrices_[frame_slot][cfg_->GetBeamScId(cur_sc_id)]);
 
       size_t start_tsc2 = GetTime::WorkerRdtsc();
-#if defined(USE_MKL_JIT)
+#if defined(USE_MKL_CBLAS)
       MKL_Complex8 alpha = {1, 0};
       MKL_Complex8 beta = {0, 0};
 
@@ -233,13 +226,10 @@ EventData DoDemul::Launch(size_t tag) {
               "UL Beam Weights (in demul): frame %zu, cur sc id %zu, rows "
               "%lld, cols %lld\n",
               frame_id, cur_sc_id, mat_ul_beam.n_rows, mat_ul_beam.n_cols);
-          for (arma::uword i = 0; i < mat_ul_beam.n_rows; i++) {
-            for (arma::uword j = 0; j < mat_ul_beam.n_cols; j++) {
-              std::printf(
-                  "(%.3f"
-                  "+1j*"
-                  "%.3f) ",
-                  mat_ul_beam(i, j).real(), mat_ul_beam(i, j).imag());
+          for (arma::uword row = 0; row < mat_ul_beam.n_rows; row++) {
+            for (arma::uword col = 0; col < mat_ul_beam.n_cols; col++) {
+              std::printf("(%.3f +1j* %.3f) ", mat_ul_beam(row, col).real(),
+                          mat_ul_beam(row, col).imag());
             }
             std::printf("\n");
           }
@@ -253,13 +243,10 @@ EventData DoDemul::Launch(size_t tag) {
           std::printf(
               "UL Data: frame %zu, cur sc id %zu, rows %lld, cols %lld\n",
               frame_id, cur_sc_id, mat_data.n_rows, mat_data.n_cols);
-          for (arma::uword i = 0; i < mat_data.n_rows; i++) {
-            for (arma::uword j = 0; j < mat_data.n_cols; j++) {
-              std::printf(
-                  "(%.3f"
-                  "+1j*"
-                  "%.3f) ",
-                  mat_data(i, j).real(), mat_data(i, j).imag());
+          for (arma::uword row = 0; row < mat_data.n_rows; row++) {
+            for (arma::uword col = 0; col < mat_data.n_cols; col++) {
+              std::printf("(%.3f+1j*%.3f) ", mat_data(row, col).real(),
+                          mat_data(row, col).imag());
             }
             std::printf("\n");
           }
@@ -274,13 +261,10 @@ EventData DoDemul::Launch(size_t tag) {
               "Equalized output: frame %zu, cur sc id %zu, rows %lld, cols "
               "%lld\n",
               frame_id, cur_sc_id, mat_equal.n_rows, mat_equal.n_cols);
-          for (arma::uword i = 0; i < mat_equal.n_rows; i++) {
-            for (arma::uword j = 0; j < mat_equal.n_cols; j++) {
-              std::printf(
-                  "(%.3f"
-                  "+1j*"
-                  "%.3f) ",
-                  mat_equal(i, j).real(), mat_equal(i, j).imag());
+          for (arma::uword row = 0; row < mat_equal.n_rows; row++) {
+            for (arma::uword col = 0; col < mat_equal.n_cols; col++) {
+              std::printf("(%.3f+1j*%.3f) ", mat_equal(row, col).real(),
+                          mat_equal(row, col).imag());
             }
             std::printf("\n");
           }

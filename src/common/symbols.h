@@ -24,8 +24,10 @@ static constexpr size_t kFrameWnd = 40;
 // update 3. Disable this on systems with an older MKL version.
 #if __INTEL_MKL__ >= 2020 || (__INTEL_MKL__ == 2019 && __INTEL_MKL_UPDATE__ > 3)
 #define USE_MKL_JIT (1)
+#define USE_MKL_CBLAS (1)
 #else
 #undef USE_MKL_JIT
+#undef USE_MKL_CBLAS
 #endif
 
 //Define to allow mac addition of RB IND to allow dynamic change of mcs

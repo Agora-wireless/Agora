@@ -75,11 +75,6 @@ class DoDemul : public Doer {
   complex_float* equaled_buffer_temp_transposed_;
   arma::cx_fmat ue_pilot_data_;
   int ue_num_simd256_;
-
-#if defined(USE_MKL_JIT)
-  void* jitter_;
-  cgemm_jit_kernel_t mkl_jit_cgemm_;
-#endif
 };
 
 #endif  // DODEMUL_H_

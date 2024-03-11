@@ -392,11 +392,15 @@ void Agora::Start() {
 
     // Handle each event
     for (size_t ev_i = 0; ev_i < num_events; ev_i++) {
-      EventData& event = events_list.at(ev_i);
-      size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-      if (frame_id == this->config_->FrameToProfile()) {
-        stats_->LogDequeueStatsMaster(event.event_type_, dequeue_start_tsc,
-                                      dequeue_end_tsc);
+      const EventData& event = events_list.at(ev_i);
+      //Scope this frame id, just in case it is not in the same spot
+      //for each event
+      {
+        const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+        if (frame_id == this->config_->FrameToProfile()) {
+          stats_->LogDequeueStatsMaster(event.event_type_, dequeue_start_tsc,
+                                        dequeue_end_tsc);
+        }
       }
 
       // FFT processing is scheduled after falling through the switch
@@ -688,6 +692,7 @@ void Agora::Start() {
                          pkt->Frame(), ue_id, radio_buf_id,
                          reinterpret_cast<intptr_t>(pkt));
 
+          const size_t frame_id = pkt->Frame();
           if (kDebugPrintPacketsFromMac) {
             std::stringstream ss;
 
@@ -709,7 +714,6 @@ void Agora::Start() {
           }
 
           auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
-          const size_t frame_id = pkt->Frame();
           const bool last_ue = this->mac_to_phy_counters_.CompleteTask(
               frame_id, 0, ue_list.n_elem);
           if (last_ue == true) {
