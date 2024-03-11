@@ -608,9 +608,9 @@ void Sender::InitUesFromFile() {
     // convert the binary map of scheduled UE to a schedule index
     size_t ue_sched_id = Utils::Bits2Int(ue_map_array);
     sched_map_array_.at(i).at(0) = ue_sched_id;
-    if (sched_ue_set.size() == 0)
+    if (sched_ue_set.empty()) {
       sched_ue_set.push_back(ue_sched_id);
-    else {
+    } else {
       std::vector<size_t>::iterator it;
       for (it = sched_ue_set.begin(); it < sched_ue_set.end(); it++) {
         if (ue_sched_id == *it) {  // dont's push this to keep vector unique

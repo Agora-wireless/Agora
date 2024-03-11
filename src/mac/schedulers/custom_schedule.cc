@@ -56,9 +56,9 @@ CustomSchedule::CustomSchedule(Config* const cfg) : SchedulerModel(cfg) {
       }
       cnt += sched_bit;
     }
-    if (ue_sched_set_.size() == 0)
+    if (ue_sched_set_.empty()) {
       ue_sched_set_.push_back(ue_sched_id);
-    else {
+    } else {
       std::vector<size_t>::iterator it;
       for (it = ue_sched_set_.begin(); it < ue_sched_set_.end(); it++) {
         if (ue_sched_id == *it) {  // dont's push this to keep vector unique

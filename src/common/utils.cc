@@ -349,7 +349,7 @@ size_t Utils::BitIndices2Int(arma::uvec in) {
 arma::cx_frowvec Utils::Int2Bits(size_t in, size_t num_bits) {
   arma::cx_frowvec out(num_bits, arma::fill::zeros);
   for (size_t i = 0; i < num_bits; i++) {
-    if (in & 1) {
+    if ((in & 1) != 0u) {
       out(i) = arma::cx_float(1, 0);
     }
     in >>= 1;
@@ -360,7 +360,7 @@ arma::cx_frowvec Utils::Int2Bits(size_t in, size_t num_bits) {
 arma::uvec Utils::BitOneIndices(size_t in, size_t num_bits) {
   arma::uvec out;
   for (size_t i = 0; i < num_bits; i++) {
-    if (in & 1) {
+    if ((in & 1) != 0u) {
       out = arma::join_cols(out, arma::uvec({i}));
     }
     in >>= 1;

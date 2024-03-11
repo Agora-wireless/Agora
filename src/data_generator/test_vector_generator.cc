@@ -99,9 +99,9 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
         sched_ue_map[i * cfg->UeAntNum()] = 1;
         ue_sched_id = 1;
       }
-      if (sched_ue_set.size() == 0)
+      if (sched_ue_set.empty()) {
         sched_ue_set.push_back(ue_sched_id);
-      else {
+      } else {
         std::vector<size_t>::iterator it;
         for (it = sched_ue_set.begin(); it < sched_ue_set.end(); it++) {
           if (ue_sched_id == *it) {  // dont's push this to keep vector unique
@@ -170,10 +170,10 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg->MacPayloadMaxLength(Direction::kUplink));
         data_generator->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
-                                pkt->Data(),
-                                cfg->MacPayloadMaxLength(Direction::kUplink)) &
-                            0xFFFF));
+        pkt->Crc((uint16_t)(
+            crc_obj->CalculateCrc24(
+                pkt->Data(), cfg->MacPayloadMaxLength(Direction::kUplink)) &
+            0xFFFF));
       }
     }
 
@@ -531,10 +531,10 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg->MacPayloadMaxLength(Direction::kDownlink));
         data_generator->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(pkt->Data(),
-                                                    cfg->MacPayloadMaxLength(
-                                                        Direction::kDownlink)) &
-                            0xFFFF));
+        pkt->Crc((uint16_t)(
+            crc_obj->CalculateCrc24(
+                pkt->Data(), cfg->MacPayloadMaxLength(Direction::kDownlink)) &
+            0xFFFF));
       }
     }
 
