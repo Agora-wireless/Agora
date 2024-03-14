@@ -11,6 +11,7 @@
   },
   /* set sample rate to 1Ms
   to make sure tests pass*/
+  "max_frame": 40,
   "sample_rate" : 1e6,
   "spatial_streams" : 2,
   "ue_radio_num": 4,
