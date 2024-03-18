@@ -59,13 +59,14 @@ MacThreadBaseStation::MacThreadBaseStation(
       cfg_->MacDataBytesNumPerframe(Direction::kDownlink);
   udp_pkt_buf_.resize(udp_pkt_len + kUdpRxBufferPadding);
 
-  // TODO: See if it makes more sense to split up the UE's by port here for
-  // client mode.
-  size_t udp_server_port = cfg_->BsMacRxPort();
-  AGORA_LOG_INFO(
-      "MacThreadBaseStation: setting up udp server for mac data at port %zu\n",
-      udp_server_port);
   if (kEnableMac == true) {
+    // TODO: See if it makes more sense to split up the UE's by port here for
+    // client mode.
+    size_t udp_server_port = cfg_->BsMacRxPort();
+    AGORA_LOG_INFO(
+        "MacThreadBaseStation: setting up udp server for mac data at port "
+        "%zu\n",
+        udp_server_port);
     udp_comm_ =
         std::make_unique<UDPComm>(cfg_->BsServerAddr(), udp_server_port,
                                   udp_pkt_len * kMaxUEs * kMaxPktsPerUE, 0);
@@ -110,6 +111,9 @@ void MacThreadBaseStation::ProcessRxFromPhy() {
   if (event.event_type_ == EventType::kPacketToMac) {
     AGORA_LOG_TRACE("MacThreadBaseStation: MAC thread event kPacketToMac\n");
     ProcessCodeblocksFromPhy(event);
+  } else if (event.event_type_ == EventType::kPacketFromMac) {
+    AGORA_LOG_TRACE("MacThreadBaseStation: MAC thread event kPacketFromMac\n");
+    ProcessUdpPacketsFromApps(event);
   } else if (event.event_type_ == EventType::kSNRReport) {
     AGORA_LOG_TRACE("MacThreadBaseStation: MAC thread event kSNRReport\n");
     ProcessSnrReportFromPhy(event);
@@ -304,7 +308,7 @@ void MacThreadBaseStation::SendControlInformation() {
   SendRanConfigUpdate(EventData(EventType::kRANUpdate));
 }
 
-void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
+void MacThreadBaseStation::ProcessUdpPacketsFromApps(EventData event) {
   const size_t max_data_bytes_per_frame =
       cfg_->MacDataBytesNumPerframe(Direction::kDownlink);
   const size_t num_mac_packets_per_frame =
@@ -405,13 +409,14 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
     RtAssert(packets_received == packets_required,
              "MacThreadBaseStation: ProcessUdpPacketsFromApps incorrect data "
              "received!");
-  } else {
   }
   // Currently this is a packet list of mac packets
-  ProcessUdpPacketsFromAppsBs((char*)&udp_pkt_buf_[0]);
+  ProcessUdpPacketsFromAppsBs(event, (char*)&udp_pkt_buf_[0]);
 }
 
-void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
+void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(EventData event,
+                                                       const char* payload) {
+  const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
   const size_t mac_packet_length = cfg_->MacPacketLength(Direction::kDownlink);
   const size_t num_mac_packets_per_frame =
       cfg_->MacPacketsPerframe(Direction::kDownlink);
@@ -421,14 +426,19 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
     size_t pkt_offset = 0;
     size_t ue_id = 0;
     size_t symbol_id = 0;
-    size_t frame_id = 0;
+    //size_t frame_id = 0;
     for (size_t packet = 0u; packet < num_mac_packets_per_frame; packet++) {
       const auto* pkt =
           reinterpret_cast<const MacPacketPacked*>(&payload[pkt_offset]);
 
+      if (frame_id != pkt->Frame()) {
+        AGORA_LOG_ERROR(
+            "Received pkt %zu data with unexpected frame id %zu, expected "
+            "%d\n",
+            packet, frame_id, pkt->Frame());
+      }
       if (packet == 0) {
         ue_id = pkt->Ue();
-        frame_id = pkt->Frame();
       } else {
         if (ue_id != pkt->Ue()) {
           AGORA_LOG_ERROR(
@@ -438,13 +448,6 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
         if ((symbol_id + 1) != pkt->Symbol()) {
           AGORA_LOG_ERROR("Received out of order symbol id %d, expected %zu\n",
                           pkt->Symbol(), symbol_id + 1);
-        }
-
-        if (frame_id != pkt->Frame()) {
-          AGORA_LOG_ERROR(
-              "Received pkt %zu data with unexpected frame id %zu, expected "
-              "%d\n",
-              packet, frame_id, pkt->Frame());
         }
       }
       symbol_id = pkt->Symbol();
@@ -471,7 +474,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
           log_file_,
           "MacThreadBasestation: Received data from app for frame %zu, ue "
           "%zu size %zu\n",
-          next_tx_frame_id_, next_radio_id_, pkt_offset);
+          frame_id, next_radio_id_, pkt_offset);
 
       for (size_t i = 0; i < pkt_offset; i++) {
         ss << std::to_string((uint8_t)(payload[i])) << " ";
@@ -512,7 +515,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
     RtAssert((symbol_idx == pkt_id) && (src_packet->Ue() == next_radio_id_),
              "Invalid MAC packet symbol or radio ID!\n");
 
-    pkt->Set(next_tx_frame_id_, src_packet->Symbol(), src_packet->Ue(),
+    pkt->Set(frame_id, src_packet->Symbol(), src_packet->Ue(),
              src_packet->PayloadLength());
 
 #if ENABLE_RB_IND
@@ -529,7 +532,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
     if (kLogMacPackets) {
       std::stringstream ss;
 
-      ss << "MacThreadBasestation: created packet frame " << next_tx_frame_id_
+      ss << "MacThreadBasestation: created packet frame " << frame_id
          << ", pkt " << pkt_id << ", size "
          << cfg_->MacPayloadMaxLength(Direction::kDownlink) << " radio buff id "
          << radio_buf_id << ", loc " << (size_t)pkt << " dest offset "
@@ -554,7 +557,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
   (*client_.dl_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
   EventData msg(EventType::kPacketFromMac,
                 rx_mac_tag_t(next_radio_id_, radio_buf_id).tag_);
-  AGORA_LOG_FRAME("MacThreadBasestation: Tx mac information to %zu %zu\n",
+  AGORA_LOG_TRACE("MacThreadBasestation: Tx mac information to %zu %zu\n",
                   next_radio_id_, radio_buf_id);
   RtAssert(tx_queue_->enqueue(msg),
            "MacThreadBasestation: Failed to enqueue downlink packet");
@@ -588,9 +591,9 @@ void MacThreadBaseStation::RunEventLoop() {
     }
 
     // No need to process incomming packets if we are finished
-    if (next_tx_frame_id_ != cfg_->FramesToTest()) {
+    /*if (next_tx_frame_id_ != cfg_->FramesToTest()) {
       ProcessUdpPacketsFromApps();
-    }
+    }*/
   }
 }
 

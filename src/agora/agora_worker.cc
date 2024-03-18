@@ -19,16 +19,16 @@
 
 AgoraWorker::AgoraWorker(Config* cfg, MacScheduler* mac_sched, Stats* stats,
                          PhyStats* phy_stats, MessageInfo* message,
-                         AgoraBuffer* buffer, FrameInfo* frame)
-    : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum() +
-                               (cfg->DynamicCoreAlloc() ? 1 : 0)),
-      config_(cfg),
+                         AgoraBuffer* buffer, FrameInfo* frame,
+                         size_t worker_core_offset)
+    : config_(cfg),
       mac_sched_(mac_sched),
       stats_(stats),
       phy_stats_(phy_stats),
       message_(message),
       buffer_(buffer),
-      frame_(frame) {
+      frame_(frame),
+      base_worker_core_offset_(worker_core_offset) {
   CreateThreads();
 }
 

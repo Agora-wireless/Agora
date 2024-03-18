@@ -118,15 +118,16 @@ PhyUe::PhyUe(Config* config)
   }
 
   size_t core_offset_worker = config_->UeCoreOffset() + 1 + rx_thread_num_;
-  if constexpr (kEnableMac) {
-    mac_thread_ = std::make_unique<MacThreadClient>(
-        config_, core_offset_worker, decoded_buffer_, &ul_bits_buffer_,
-        &ul_bits_buffer_status_, &to_mac_queue_, &complete_queue_);
+  //if constexpr (kEnableMac) {
+  mac_thread_ = std::make_unique<MacThreadClient>(
+      config_, core_offset_worker, decoded_buffer_, &ul_bits_buffer_,
+      &ul_bits_buffer_status_, &to_mac_queue_, &complete_queue_,
+      mac_sched_.get(), phy_stats_.get());
 
-    core_offset_worker++;
-    mac_std_thread_ =
-        std::thread(&MacThreadClient::RunEventLoop, mac_thread_.get());
-  }
+  core_offset_worker++;
+  mac_std_thread_ =
+      std::thread(&MacThreadClient::RunEventLoop, mac_thread_.get());
+  //}
 
   for (size_t i = 0; i < config_->UeWorkerThreadNum(); i++) {
     auto new_worker = std::make_unique<UeWorker>(
@@ -203,9 +204,9 @@ PhyUe::~PhyUe() {
   }
   recorders_.clear();
 
-  if constexpr (kEnableMac) {
-    mac_std_thread_.join();
-  }
+  //if constexpr (kEnableMac) {
+  mac_std_thread_.join();
+  //}
 
   for (size_t i = 0; i < rx_thread_num_; i++) {
     delete rx_ptoks_ptr_[i];
@@ -569,16 +570,16 @@ void PhyUe::Start() {
           const bool symbol_complete =
               decode_counters_.CompleteTask(frame_id, symbol_id);
           if (symbol_complete == true) {
-            if constexpr (kEnableMac) {
-              auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
+            //if constexpr (kEnableMac) {
+            auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
 
-              for (size_t i = 0; i < config_->UeAntNum(); i++) {
-                ScheduleTask(EventData(EventType::kPacketToMac, base_tag.tag_),
-                             &to_mac_queue_, ptok_mac);
+            for (size_t i = 0; i < config_->UeAntNum(); i++) {
+              ScheduleTask(EventData(EventType::kPacketToMac, base_tag.tag_),
+                           &to_mac_queue_, ptok_mac);
 
-                base_tag.ue_id_++;
-              }
+              base_tag.ue_id_++;
             }
+            //}
             PrintPerSymbolDone(PrintType::kDecode, frame_id, symbol_id);
 
             bool decode_complete = decode_counters_.CompleteSymbol(frame_id);

@@ -119,7 +119,7 @@ EventData DoDecodeClient::Launch(size_t tag) {
     AGORA_LOG_INFO("\n");
   }
 
-  if ((kEnableMac == false) && (kPrintPhyStats == true) &&
+  /*if ((kEnableMac == false) && (kPrintPhyStats == true) &&
       (symbol_idx_dl >= cfg_->Frame().ClientDlPilotSymbols())) {
     phy_stats_->UpdateDecodedBits(
         ue_id, symbol_offset, frame_slot,
@@ -130,6 +130,7 @@ EventData DoDecodeClient::Launch(size_t tag) {
       uint8_t rx_byte = decoded_buffer_ptr[i];
       auto tx_byte = static_cast<uint8_t>(cfg_->GetInfoBits(
           cfg_->UlBits(), Direction::kDownlink, data_symbol_idx_dl,
+
           kDebugDownlink ? 0 : ue_id, cur_cb_id)[i]);
       phy_stats_->UpdateBitErrors(ue_id, symbol_offset, frame_slot, tx_byte,
                                   rx_byte);
@@ -139,7 +140,7 @@ EventData DoDecodeClient::Launch(size_t tag) {
     }
     phy_stats_->UpdateBlockErrors(ue_id, symbol_offset, frame_slot,
                                   block_error);
-  }
+  }*/
 
   size_t duration = GetTime::WorkerRdtsc() - start_tsc;
   duration_stat_->task_duration_[0] += duration;

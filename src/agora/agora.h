@@ -95,6 +95,7 @@ class Agora {
                         size_t symbol_id);
   void ScheduleAntennasTX(size_t frame_id, size_t symbol_id);
   void ScheduleDownlinkProcessing(size_t frame_id);
+  void ScheduleDownlinkMAC(size_t frame_id);
 
   /**
    * @brief Schedule LDPC decoding or encoding over code blocks
@@ -185,6 +186,9 @@ class Agora {
 
   // Worker-to-master queue for MAC
   moodycamel::ConcurrentQueue<EventData> mac_response_queue_;
+
+  //moodycamel::ProducerToken* mac_request_ptok_ptr_;
+  //moodycamel::ProducerToken* mac_response_ptok_ptr_;
 
   // Resource Provisioner queue
   moodycamel::ConcurrentQueue<EventData> rp_request_queue_;

@@ -23,7 +23,8 @@ class AgoraWorker {
  public:
   explicit AgoraWorker(Config* cfg, MacScheduler* mac_sched, Stats* stats,
                        PhyStats* phy_stats, MessageInfo* message,
-                       AgoraBuffer* buffer, FrameInfo* frame);
+                       AgoraBuffer* buffer, FrameInfo* frame,
+                       size_t worker_core_offset);
   ~AgoraWorker();
   void UpdateCores(RPControlMsg rcm);
   size_t GetCoresInfo();
@@ -31,8 +32,6 @@ class AgoraWorker {
  private:
   void WorkerThread(int tid);
   void CreateThreads();
-
-  const size_t base_worker_core_offset_;
 
   Config* const config_;
 
@@ -45,6 +44,8 @@ class AgoraWorker {
   MessageInfo* message_;
   AgoraBuffer* buffer_;
   FrameInfo* frame_;
+
+  const size_t base_worker_core_offset_;
 };
 
 #endif  // AGORA_WORKER_H_

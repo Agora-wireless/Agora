@@ -4,6 +4,7 @@
  */
 #include "mac_thread_client.h"
 
+#include "data_generator.h"
 #include "gettime.h"
 #include "logger.h"
 #include "message.h"
@@ -16,15 +17,17 @@ MacThreadClient::MacThreadClient(
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
     Table<int8_t>* ul_bits_buffer, Table<int8_t>* ul_bits_buffer_status,
     moodycamel::ConcurrentQueue<EventData>* rx_queue,
-    moodycamel::ConcurrentQueue<EventData>* tx_queue,
-    const std::string& log_filename)
+    moodycamel::ConcurrentQueue<EventData>* tx_queue, MacScheduler* mac_sched,
+    PhyStats* in_phy_stats, const std::string& log_filename)
     : cfg_(cfg),
       freq_ghz_(GetTime::MeasureRdtscFreq()),
       tsc_delta_((cfg_->GetFrameDurationSec() * 1e9) / freq_ghz_),
       core_offset_(core_offset),
       decoded_buffer_(decoded_buffer),
       rx_queue_(rx_queue),
-      tx_queue_(tx_queue) {
+      tx_queue_(tx_queue),
+      mac_sched_(mac_sched),
+      phy_stats_(in_phy_stats) {
   // Set up MAC log file
   if (log_filename.empty() == false) {
     log_filename_ = log_filename;  // Use a non-default log filename
@@ -53,29 +56,52 @@ MacThreadClient::MacThreadClient(
     v.resize(cfg_->MacDataBytesNumPerframe(Direction::kDownlink));
   }
 
-  const size_t udp_pkt_len = cfg_->MacDataBytesNumPerframe(Direction::kUplink);
-  udp_pkt_buf_.resize(udp_pkt_len + kUdpRxBufferPadding);
-
-  // TODO: See if it makes more sense to split up the UE's by port here for
-  // client mode.
-  const size_t udp_server_port = cfg_->UeMacRxPort();
-  AGORA_LOG_INFO(
-      "MacThreadClient: setting up udp server for mac data at port %zu\n",
-      udp_server_port);
-  udp_comm_ =
-      std::make_unique<UDPComm>(cfg_->UeServerAddr(), udp_server_port,
-                                udp_pkt_len * kMaxUEs * kMaxPktsPerUE, 0);
-
   const size_t udp_control_len = sizeof(RBIndicator);
   udp_control_buf_.resize(udp_control_len);
 
   AGORA_LOG_INFO(
-      "MacThreadClient: setting up udp server for mac control channel at port "
+      "MacThreadClient: setting up udp server for mac control channel at "
+      "port "
       "%zu\n",
       kMacBaseClientPort);
   udp_control_channel_ =
       std::make_unique<UDPServer>(cfg_->UeServerAddr(), kMacBaseClientPort,
                                   udp_control_len * kMaxUEs * kMaxPktsPerUE);
+
+  const size_t udp_pkt_len = cfg_->MacDataBytesNumPerframe(Direction::kUplink);
+  udp_pkt_buf_.resize(udp_pkt_len + kUdpRxBufferPadding);
+
+  if (kEnableMac == true) {
+    // TODO: See if it makes more sense to split up the UE's by port here for
+    // client mode.
+    const size_t udp_server_port = cfg_->UeMacRxPort();
+    AGORA_LOG_INFO(
+        "MacThreadClient: setting up udp server for mac data at port %zu\n",
+        udp_server_port);
+    udp_comm_ =
+        std::make_unique<UDPComm>(cfg_->UeServerAddr(), udp_server_port,
+                                  udp_pkt_len * kMaxUEs * kMaxPktsPerUE, 0);
+
+  } else {
+    num_dl_mac_bytes_ = cfg->MacBytesNumPerframe(Direction::kDownlink);
+    // Downlink LDPC input bits
+    dl_mac_bytes_.Calloc(cfg_->UeAntNum(), num_dl_mac_bytes_,
+                         Agora_memory::Alignment_t::kAlign64);
+    const std::string dl_data_file = kExperimentFilepath + kDlLdpcDataPrefix +
+                                     std::to_string(cfg_->OfdmCaNum()) + "_ue" +
+                                     std::to_string(cfg_->UeAntTotal()) +
+                                     ".bin";
+    AGORA_LOG_FRAME("Config: Reading downlink data bits from %s\n",
+                    dl_data_file.c_str());
+
+    size_t seek_offset =
+        num_dl_mac_bytes_ * cfg_->UeAntOffset() * sizeof(int8_t);
+    for (size_t j = 0; j < cfg_->UeAntNum(); j++) {
+      Utils::ReadBinaryFile(dl_data_file, sizeof(int8_t), num_dl_mac_bytes_,
+                            seek_offset, dl_mac_bytes_[j]);
+      seek_offset += num_dl_mac_bytes_ * sizeof(int8_t);
+    }
+  }
   crc_obj_ = std::make_unique<DoCRC>();
 
   //Init the UL Bits Buffer
@@ -159,14 +185,33 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
       cfg_->MacPacketsPerframe(Direction::kDownlink);
   const size_t dest_packet_size =
       cfg_->MacPayloadMaxLength(Direction::kDownlink);
+  const size_t data_symbol_idx_dl = symbol_array_index - num_pilot_symbols;
+  const size_t symbol_offset =
+      cfg_->GetTotalDataSymbolIdxDl(frame_id, data_symbol_idx_dl);
+  const size_t frame_slot = (frame_id % kFrameWnd);
 
   std::stringstream ss;  // Debug-only
 
   // Only non-pilot data symbols have application data.
   if (symbol_array_index >= num_pilot_symbols) {
-    const int8_t* src_data =
-        decoded_buffer_[(frame_id % kFrameWnd)]
-                       [symbol_array_index - num_pilot_symbols][ue_id];
+    const int8_t* src_data = decoded_buffer_[frame_slot][symbol_offset][ue_id];
+    if ((kEnableMac == false) && (kPrintPhyStats == true)) {
+      phy_stats_->UpdateDecodedBits(ue_id, symbol_offset, frame_slot,
+                                    dest_packet_size * 8);
+      phy_stats_->IncrementDecodedBlocks(ue_id, symbol_offset, frame_slot);
+      size_t block_error(0);
+      for (size_t i = 0; i < dest_packet_size; i++) {
+        uint8_t rx_byte = src_data[i];
+        auto tx_byte = this->dl_mac_bytes_[ue_id][i];
+        phy_stats_->UpdateBitErrors(ue_id, symbol_offset, frame_slot, tx_byte,
+                                    rx_byte);
+        if (rx_byte != tx_byte) {
+          block_error++;
+        }
+      }
+      phy_stats_->UpdateBlockErrors(ue_id, symbol_offset, frame_slot,
+                                    block_error);
+    }
 
     // The decoded symbol knows nothing about the padding / storage of the data
     const auto* pkt = reinterpret_cast<const MacPacketPacked*>(src_data);
@@ -241,46 +286,47 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
   }
 
   // When the frame is full, send it to the application
-  if (server_.n_filled_in_frame_.at(ue_id) == mac_data_bytes_per_frame) {
-    server_.n_filled_in_frame_.at(ue_id) = 0;
-    /// Spot to be optimized #2 -- left shift data over to remove padding
-    bool shifted = false;
-    size_t src_offset = 0;
-    size_t dest_offset = 0;
-    for (size_t packet = 0; packet < num_mac_packets_per_frame; packet++) {
-      const size_t rx_packet_size = server_.data_size_.at(ue_id).at(packet);
-      if (rx_packet_size < dest_packet_size || (shifted == true)) {
-        shifted = true;
-        if (rx_packet_size > 0) {
-          std::memmove(&server_.frame_data_.at(ue_id).at(dest_offset),
-                       &server_.frame_data_.at(ue_id).at(src_offset),
-                       rx_packet_size);
+  if (kEnableMac == true) {
+    if (server_.n_filled_in_frame_.at(ue_id) == mac_data_bytes_per_frame) {
+      server_.n_filled_in_frame_.at(ue_id) = 0;
+      /// Spot to be optimized #2 -- left shift data over to remove padding
+      bool shifted = false;
+      size_t src_offset = 0;
+      size_t dest_offset = 0;
+      for (size_t packet = 0; packet < num_mac_packets_per_frame; packet++) {
+        const size_t rx_packet_size = server_.data_size_.at(ue_id).at(packet);
+        if (rx_packet_size < dest_packet_size || (shifted == true)) {
+          shifted = true;
+          if (rx_packet_size > 0) {
+            std::memmove(&server_.frame_data_.at(ue_id).at(dest_offset),
+                         &server_.frame_data_.at(ue_id).at(src_offset),
+                         rx_packet_size);
+          }
         }
+        dest_offset += rx_packet_size;
+        src_offset += cfg_->MacPayloadMaxLength(Direction::kDownlink);
       }
-      dest_offset += rx_packet_size;
-      src_offset += cfg_->MacPayloadMaxLength(Direction::kDownlink);
-    }
 
-    if (dest_offset > 0) {
-      udp_comm_->Send(kMacRemoteHostname, cfg_->UeMacTxPort() + ue_id,
-                      &server_.frame_data_.at(ue_id).at(0), dest_offset);
-    }
+      if (dest_offset > 0) {
+        udp_comm_->Send(kMacRemoteHostname, cfg_->UeMacTxPort() + ue_id,
+                        &server_.frame_data_.at(ue_id).at(0), dest_offset);
+      }
 
-    ss << "MacThreadClient: Sent data for frame " << frame_id << ", ue "
-       << ue_id << ", size " << dest_offset << ":" << mac_data_bytes_per_frame
-       << std::endl;
+      ss << "MacThreadClient: Sent data for frame " << frame_id << ", ue "
+         << ue_id << ", size " << dest_offset << ":" << mac_data_bytes_per_frame
+         << std::endl;
 
-    if (kLogMacPackets) {
-      std::fprintf(stdout, "%s", ss.str().c_str());
-    }
+      if (kLogMacPackets) {
+        std::fprintf(stdout, "%s", ss.str().c_str());
+      }
 
-    for (size_t i = 0u; i < dest_offset; i++) {
-      ss << static_cast<uint8_t>(server_.frame_data_.at(ue_id).at(i)) << " ";
+      for (size_t i = 0u; i < dest_offset; i++) {
+        ss << static_cast<uint8_t>(server_.frame_data_.at(ue_id).at(i)) << " ";
+      }
+      std::fprintf(log_file_, "%s", ss.str().c_str());
+      ss.str("");
     }
-    std::fprintf(log_file_, "%s", ss.str().c_str());
-    ss.str("");
   }
-
   RtAssert(
       tx_queue_->enqueue(EventData(EventType::kPacketToMac, event.tags_[0])),
       "Socket message enqueue failed\n");
@@ -314,94 +360,98 @@ void MacThreadClient::ProcessUdpPacketsFromApps(RBIndicator ri) {
     return;
   }
 
-  // Processes the packets of an entire frame (remove variable later)
-  const size_t packets_required = num_mac_packets_per_frame;
+  if (kEnableMac) {
+    // Processes the packets of an entire frame (remove variable later)
+    const size_t packets_required = num_mac_packets_per_frame;
 
-  size_t packets_received = 0;
-  size_t current_packet_bytes = 0;
-  size_t current_packet_start_index = 0;
+    size_t packets_received = 0;
+    size_t current_packet_bytes = 0;
+    size_t current_packet_start_index = 0;
 
-  size_t total_bytes_received = 0;
+    size_t total_bytes_received = 0;
 
-  const size_t max_recv_attempts = (packets_required * 10u);
-  size_t rx_attempts;
-  for (rx_attempts = 0u; rx_attempts < max_recv_attempts; rx_attempts++) {
-    ssize_t ret = udp_comm_->Recv(&udp_pkt_buf_.at(total_bytes_received),
-                                  (udp_pkt_buf_.size() - total_bytes_received));
-    if (ret == 0) {
-      AGORA_LOG_TRACE("MacThreadClient: No data received with %zu pending\n",
-                      total_bytes_received);
-      if (total_bytes_received == 0) {
-        return;  // No data received
-      } else {
-        AGORA_LOG_INFO(
-            "MacThreadClient: No data received but there was data in "
-            "buffer pending %zu : try %zu out of %zu\n",
-            total_bytes_received, rx_attempts, max_recv_attempts);
-      }
-    } else if (ret < 0) {
-      // There was an error in receiving
-      AGORA_LOG_ERROR("MacThreadClient: Error in reception %zu\n", ret);
-      cfg_->Running(false);
-      return;
-    } else { /* Got some data */
-      total_bytes_received += ret;
-      current_packet_bytes += ret;
-
-      // std::printf(
-      //    "Received %zu bytes packet number %zu packet size %zu total %zu\n",
-      //    ret, packets_received, total_bytes_received, current_packet_bytes);
-
-      // While we have packets remaining and a header to process
-      const size_t header_size = sizeof(MacPacketHeaderPacked);
-      while ((packets_received < packets_required) &&
-             (current_packet_bytes >= header_size)) {
-        // See if we have enough data and process the MacPacket header
-        const auto* rx_mac_packet_header =
-            reinterpret_cast<const MacPacketPacked*>(
-                &udp_pkt_buf_.at(current_packet_start_index));
-
-        const size_t current_packet_size =
-            header_size + rx_mac_packet_header->PayloadLength();
-
-        // std::printf("Packet number %zu @ %zu packet size %d:%zu total %zu\n",
-        //            packets_received, current_packet_start_index,
-        //            rx_mac_packet_header->datalen_, current_packet_size,
-        //            current_packet_bytes);
-
-        if (current_packet_bytes >= current_packet_size) {
-          current_packet_bytes = current_packet_bytes - current_packet_size;
-          current_packet_start_index =
-              current_packet_start_index + current_packet_size;
-          packets_received++;
+    const size_t max_recv_attempts = (packets_required * 10u);
+    size_t rx_attempts;
+    for (rx_attempts = 0u; rx_attempts < max_recv_attempts; rx_attempts++) {
+      ssize_t ret =
+          udp_comm_->Recv(&udp_pkt_buf_.at(total_bytes_received),
+                          (udp_pkt_buf_.size() - total_bytes_received));
+      if (ret == 0) {
+        AGORA_LOG_TRACE("MacThreadClient: No data received with %zu pending\n",
+                        total_bytes_received);
+        if (total_bytes_received == 0) {
+          return;  // No data received
         } else {
-          // Don't have the entire packet, keep trying
-          break;
+          AGORA_LOG_INFO(
+              "MacThreadClient: No data received but there was data in "
+              "buffer pending %zu : try %zu out of %zu\n",
+              total_bytes_received, rx_attempts, max_recv_attempts);
         }
+      } else if (ret < 0) {
+        // There was an error in receiving
+        AGORA_LOG_ERROR("MacThreadClient: Error in reception %zu\n", ret);
+        cfg_->Running(false);
+        return;
+      } else { /* Got some data */
+        total_bytes_received += ret;
+        current_packet_bytes += ret;
+
+        // std::printf(
+        //    "Received %zu bytes packet number %zu packet size %zu total %zu\n",
+        //    ret, packets_received, total_bytes_received, current_packet_bytes);
+
+        // While we have packets remaining and a header to process
+        const size_t header_size = sizeof(MacPacketHeaderPacked);
+        while ((packets_received < packets_required) &&
+               (current_packet_bytes >= header_size)) {
+          // See if we have enough data and process the MacPacket header
+          const auto* rx_mac_packet_header =
+              reinterpret_cast<const MacPacketPacked*>(
+                  &udp_pkt_buf_.at(current_packet_start_index));
+
+          const size_t current_packet_size =
+              header_size + rx_mac_packet_header->PayloadLength();
+
+          // std::printf("Packet number %zu @ %zu packet size %d:%zu total %zu\n",
+          //            packets_received, current_packet_start_index,
+          //            rx_mac_packet_header->datalen_, current_packet_size,
+          //            current_packet_bytes);
+
+          if (current_packet_bytes >= current_packet_size) {
+            current_packet_bytes = current_packet_bytes - current_packet_size;
+            current_packet_start_index =
+                current_packet_start_index + current_packet_size;
+            packets_received++;
+          } else {
+            // Don't have the entire packet, keep trying
+            break;
+          }
+        }
+        AGORA_LOG_FRAME(
+            "MacThreadClient: Received %zu : %zu bytes in packet %zu : %zu\n",
+            ret, total_bytes_received, packets_received, packets_required);
       }
-      AGORA_LOG_FRAME(
-          "MacThreadClient: Received %zu : %zu bytes in packet %zu : %zu\n",
-          ret, total_bytes_received, packets_received, packets_required);
-    }
 
-    // Check for completion
-    if (packets_received == packets_required) {
-      break;
-    }
-  }  // end rx attempts
+      // Check for completion
+      if (packets_received == packets_required) {
+        break;
+      }
+    }  // end rx attempts
 
-  if (packets_received != packets_required) {
-    AGORA_LOG_ERROR(
-        "MacThreadClient: Received %zu : %zu packets with %zu total bytes in "
-        "%zu attempts\n",
-        packets_received, packets_required, total_bytes_received, rx_attempts);
+    if (packets_received != packets_required) {
+      AGORA_LOG_ERROR(
+          "MacThreadClient: Received %zu : %zu packets with %zu total bytes in "
+          "%zu attempts\n",
+          packets_received, packets_required, total_bytes_received,
+          rx_attempts);
+    } else {
+      AGORA_LOG_FRAME("MacThreadClient: Received Mac Frame Data\n");
+    }
+    RtAssert(
+        packets_received == packets_required,
+        "MacThreadClient: ProcessUdpPacketsFromApps incorrect data received!");
   } else {
-    AGORA_LOG_FRAME("MacThreadClient: Received Mac Frame Data\n");
   }
-  RtAssert(
-      packets_received == packets_required,
-      "MacThreadClient: ProcessUdpPacketsFromApps incorrect data received!");
-
   // Currently this is a packet list of mac packets
   ProcessUdpPacketsFromAppsClient((char*)&udp_pkt_buf_[0], ri);
 }
@@ -411,48 +461,63 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
   const size_t num_mac_packets_per_frame =
       cfg_->MacPacketsPerframe(Direction::kUplink);
   const size_t num_pilot_symbols = cfg_->Frame().ClientUlPilotSymbols();
-  // Data integrity check
-  size_t pkt_offset = 0;
-  size_t ue_id = 0;
-  size_t symbol_id = 0;
-  size_t frame_id = 0;
-  for (size_t packet = 0u; packet < num_mac_packets_per_frame; packet++) {
-    const auto* pkt =
-        reinterpret_cast<const MacPacketPacked*>(&payload[pkt_offset]);
+  if (kEnableMac) {
+    // Data integrity check
+    size_t pkt_offset = 0;
+    size_t ue_id = 0;
+    size_t symbol_id = 0;
+    size_t frame_id = 0;
+    for (size_t packet = 0u; packet < num_mac_packets_per_frame; packet++) {
+      const auto* pkt =
+          reinterpret_cast<const MacPacketPacked*>(&payload[pkt_offset]);
 
-    // std::printf("Frame %d, Packet %zu, symbol %d, user %d\n", pkt->Frame(),
-    //            packet, pkt->Symbol(), pkt->Ue());
-    if (packet == 0) {
-      ue_id = pkt->Ue();
-      frame_id = pkt->Frame();
-    } else {
-      if (ue_id != pkt->Ue()) {
-        AGORA_LOG_ERROR(
-            "Received pkt %zu data with unexpected UE id %zu, expected %d\n",
-            packet, ue_id, pkt->Ue());
-      }
-      if ((symbol_id + 1) != pkt->Symbol()) {
-        AGORA_LOG_ERROR("Received out of order symbol id %d, expected %zu\n",
-                        pkt->Symbol(), symbol_id + 1);
-      }
+      // std::printf("Frame %d, Packet %zu, symbol %d, user %d\n", pkt->Frame(),
+      //            packet, pkt->Symbol(), pkt->Ue());
+      if (packet == 0) {
+        ue_id = pkt->Ue();
+        frame_id = pkt->Frame();
+      } else {
+        if (ue_id != pkt->Ue()) {
+          AGORA_LOG_ERROR(
+              "Received pkt %zu data with unexpected UE id %zu, expected %d\n",
+              packet, ue_id, pkt->Ue());
+        }
+        if ((symbol_id + 1) != pkt->Symbol()) {
+          AGORA_LOG_ERROR("Received out of order symbol id %d, expected %zu\n",
+                          pkt->Symbol(), symbol_id + 1);
+        }
 
-      if (frame_id != pkt->Frame()) {
-        AGORA_LOG_ERROR(
-            "Received pkt %zu data with unexpected frame id %zu, expected %d\n",
-            packet, frame_id, pkt->Frame());
+        if (frame_id != pkt->Frame()) {
+          AGORA_LOG_ERROR(
+              "Received pkt %zu data with unexpected frame id %zu, expected "
+              "%d\n",
+              packet, frame_id, pkt->Frame());
+        }
       }
+      symbol_id = pkt->Symbol();
+      pkt_offset += MacPacketPacked::kHeaderSize + pkt->PayloadLength();
     }
-    symbol_id = pkt->Symbol();
-    pkt_offset += MacPacketPacked::kHeaderSize + pkt->PayloadLength();
-  }
 
-  if (next_radio_id_ != ue_id) {
-    AGORA_LOG_ERROR("Error - radio id %zu, expected %zu\n", ue_id,
-                    next_radio_id_);
-  }
-  // End data integrity check
+    if (next_radio_id_ != ue_id) {
+      AGORA_LOG_ERROR("Error - radio id %zu, expected %zu\n", ue_id,
+                      next_radio_id_);
+    }
+    // End data integrity check
 
-  next_radio_id_ = ue_id;
+    next_radio_id_ = ue_id;
+    if (kLogMacPackets) {
+      std::stringstream ss;
+      std::fprintf(log_file_,
+                   "MacThreadClient: Received data from app for frame %zu, ue "
+                   "%zu size %zu\n",
+                   next_tx_frame_id_, next_radio_id_, pkt_offset);
+
+      for (size_t i = 0; i < pkt_offset; i++) {
+        ss << std::to_string((uint8_t)(payload[i])) << " ";
+      }
+      std::fprintf(log_file_, "%s\n", ss.str().c_str());
+    }
+  }
 
   // We've received bits for the uplink.
   size_t& radio_buf_id = client_.ul_bits_buffer_id_[next_radio_id_];
@@ -468,19 +533,6 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
       next_tx_frame_id_++;
     }
     return;
-  }
-
-  if (kLogMacPackets) {
-    std::stringstream ss;
-    std::fprintf(log_file_,
-                 "MacThreadClient: Received data from app for frame %zu, ue "
-                 "%zu size %zu\n",
-                 next_tx_frame_id_, next_radio_id_, pkt_offset);
-
-    for (size_t i = 0; i < pkt_offset; i++) {
-      ss << std::to_string((uint8_t)(payload[i])) << " ";
-    }
-    std::fprintf(log_file_, "%s\n", ss.str().c_str());
   }
 
   size_t src_pkt_offset = 0;

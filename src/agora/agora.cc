@@ -51,7 +51,7 @@ static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
 // add 1 if dedicating core for RP
 Agora::Agora(Config* const cfg)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum() +
-                               (cfg->DynamicCoreAlloc() ? 1 : 0)),
+                               1 + (cfg->DynamicCoreAlloc() ? 1 : 0)),
       config_(cfg),
       mac_sched_(std::make_unique<MacScheduler>(cfg)),
       stats_(std::make_unique<Stats>(cfg)),
@@ -88,9 +88,7 @@ Agora::Agora(Config* const cfg)
 }
 
 Agora::~Agora() {
-  //if constexpr (kEnableMac) {
   mac_std_thread_.join();
-  //}
 
   worker_set_.reset();
   if (recorder_ != nullptr) {
@@ -114,18 +112,12 @@ void Agora::Stop() {
   packet_tx_rx_.reset();
 }
 
-void Agora::SendSnrReport(EventType event_type, size_t frame_id,
-                          size_t symbol_id) {
-  assert(event_type == EventType::kSNRReport);
-  unused(event_type);
-  auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
-  for (size_t i = 0; i < config_->UeAntNum(); i++) {
-    EventData snr_report(EventType::kSNRReport, base_tag.tag_);
-    snr_report.num_tags_ = 2;
-    const float snr = this->phy_stats_->GetEvmSnr(frame_id, i);
-    std::memcpy(&snr_report.tags_[1], &snr, sizeof(float));
-    TryEnqueueFallback(&mac_request_queue_, snr_report);
-    base_tag.ue_id_++;
+void Agora::ScheduleDownlinkMAC(size_t frame_id) {
+  auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+  for (const auto& ue : ue_list) {
+    auto base_tag = gen_tag_t::FrmUe(frame_id, ue);
+    EventData mac_event(EventType::kPacketFromMac, base_tag.tag_);
+    TryEnqueueFallback(&mac_request_queue_, mac_event);
   }
 }
 
@@ -296,6 +288,21 @@ void Agora::ScheduleUsers(EventType event_type, size_t frame_id,
   }
 }
 
+void Agora::SendSnrReport(EventType event_type, size_t frame_id,
+                          size_t symbol_id) {
+  assert(event_type == EventType::kSNRReport);
+  unused(event_type);
+  auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
+  for (size_t i = 0; i < config_->UeAntNum(); i++) {
+    EventData snr_report(event_type, base_tag.tag_);
+    snr_report.num_tags_ = 2;
+    const float snr = this->phy_stats_->GetEvmSnr(frame_id, i);
+    std::memcpy(&snr_report.tags_[1], &snr, sizeof(float));
+    TryEnqueueFallback(&mac_request_queue_, snr_report);
+    base_tag.ue_id_++;
+  }
+}
+
 void Agora::ScheduleBroadCastSymbols(EventType event_type, size_t frame_id) {
   auto base_tag = gen_tag_t::FrmSym(frame_id, 0u);
   const size_t qid = (frame_id & 0x1);
@@ -328,7 +335,6 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
       }
     }
 
-    //if constexpr (kEnableMac) {
     if (remaining_events > 0) {
       const size_t new_events = mac_response_queue_.try_dequeue_bulk(
           &events_list.at(total_events), remaining_events);
@@ -339,7 +345,7 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
                      remaining_events, total_events,
                      mac_response_queue_.size_approx());
     }
-    //}
+
     if (config_->DynamicCoreAlloc()) {
       if (remaining_events > 0) {
         const size_t new_events = rp_response_queue_.try_dequeue_bulk(
@@ -561,9 +567,9 @@ void Agora::Start() {
           const bool last_decode_task = this->decode_counters_.CompleteTask(
               frame_id, symbol_id, ue_list.n_elem);
           if (last_decode_task == true) {
-            if constexpr (kEnableMac) {
-              ScheduleUsers(EventType::kPacketToMac, frame_id, symbol_id);
-            }
+            //if constexpr (kEnableMac) {
+            ScheduleUsers(EventType::kPacketToMac, frame_id, symbol_id);
+            //}
             stats_->PrintPerSymbolDone(
                 PrintType::kDecode, frame_id, symbol_id,
                 decode_counters_.GetSymbolCount(frame_id) + 1);
@@ -589,7 +595,7 @@ void Agora::Start() {
         case EventType::kPacketToMac: {
           const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-
+          AGORA_LOG_INFO("dfwed\n");
           auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
           const bool last_tomac_task = this->tomac_counters_.CompleteTask(
               frame_id, symbol_id, ue_list.n_elem);
@@ -621,9 +627,9 @@ void Agora::Start() {
                                                  config_->MacBytesNumPerframe(
                                                      Direction::kDownlink)]);
 
-          AGORA_LOG_INFO("Agora: frame %d @ offset %zu %zu @ location %zu\n",
-                         pkt->Frame(), ue_id, radio_buf_id,
-                         reinterpret_cast<intptr_t>(pkt));
+          AGORA_LOG_TRACE("Agora: frame %d @ offset %zu %zu @ location %zu\n",
+                          pkt->Frame(), ue_id, radio_buf_id,
+                          reinterpret_cast<intptr_t>(pkt));
 
           const size_t frame_id = pkt->Frame();
           if (kDebugPrintPacketsFromMac) {
@@ -1098,21 +1104,18 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
   }
   // Receive first packet in a frame
   if (rx_counters_.num_pkts_.at(frame_slot) == 0) {
-    /*if constexpr (kEnableMac == false) {
-      // schedule this frame's encoding
-      // Defer the schedule.  If frames are already deferred or the current
-      // received frame is too far off
-      if ((encode_deferral_.empty() == false) ||
-          (frame_id >=
-           (frame_tracking_.cur_proc_frame_id_ + kScheduleQueues))) {
-        if (kDebugDeferral) {
-          AGORA_LOG_INFO("   +++ Deferring encoding of frame %zu\n", frame_id);
-        }
-        encode_deferral_.push(frame_id);
-      } else {
-        ScheduleDownlinkProcessing(frame_id);
+    // schedule this frame's encoding
+    // Defer the schedule.  If frames are already deferred or the current
+    // received frame is too far off
+    if ((encode_deferral_.empty() == false) ||
+        (frame_id >= (frame_tracking_.cur_proc_frame_id_ + kScheduleQueues))) {
+      if (kDebugDeferral) {
+        AGORA_LOG_INFO("   +++ Deferring encoding of frame %zu\n", frame_id);
       }
-    }*/
+      encode_deferral_.push(frame_id);
+    } else {
+      ScheduleDownlinkMAC(frame_id);
+    }
     this->stats_->MasterSetTsc(TsType::kFirstSymbolRX, frame_id);
     if (kDebugPrintPerFrameStart) {
       const size_t prev_frame_slot = (frame_slot + kFrameWnd - 1) % kFrameWnd;
@@ -1144,7 +1147,7 @@ void Agora::InitializeQueues() {
   // Create concurrent queues for each Doer
   message_ = std::make_unique<MessageInfo>(kDefaultWorkerQueueSize *
                                            data_symbol_num_perframe);
-
+  // An additional set of ptoks for MAC
   for (size_t i = 0; i < config_->SocketThreadNum(); i++) {
     rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(message_queue_);
     tx_ptoks_ptr_[i] = new moodycamel::ProducerToken(
@@ -1261,10 +1264,8 @@ void Agora::InitializeThreads() {
         this->stats_->FrameStart(), agora_memory_->GetDlSocket());
   }
 
-  //if constexpr (kEnableMac) {
-  const size_t mac_cpu_core = config_->CoreOffset() +
-                              config_->SocketThreadNum() +
-                              config_->WorkerThreadNum() + 1;
+  const size_t mac_cpu_core =
+      config_->CoreOffset() + config_->SocketThreadNum() + 1;
   mac_thread_ = std::make_unique<MacThreadBaseStation>(
       config_, mac_cpu_core, agora_memory_->GetDecod(),
       &agora_memory_->GetDlBits(), &agora_memory_->GetDlBitsStatus(),
@@ -1272,13 +1273,12 @@ void Agora::InitializeThreads() {
 
   mac_std_thread_ =
       std::thread(&MacThreadBaseStation::RunEventLoop, mac_thread_.get());
-  //}
 
   // Enable dynamic core allocation
   if (config_->DynamicCoreAlloc()) {
     // TODO : dedicate a core to RP?
     const size_t rp_cpu_core =
-        config_->CoreOffset() + config_->SocketThreadNum() + 1;
+        config_->CoreOffset() + config_->SocketThreadNum() + 2;
     rp_thread_ = std::make_unique<ResourceProvisionerThread>(
         config_, rp_cpu_core, &rp_request_queue_, &rp_response_queue_);
     rp_std_thread_ =
@@ -1289,16 +1289,17 @@ void Agora::InitializeThreads() {
   ///\todo convert unique ptr to shared
   worker_set_ = std::make_unique<AgoraWorker>(
       config_, mac_sched_.get(), stats_.get(), phy_stats_.get(), message_.get(),
-      agora_memory_.get(), &frame_tracking_);
+      agora_memory_.get(), &frame_tracking_, base_worker_core_offset_);
 
   if (config_->DynamicCoreAlloc() == false) {
     AGORA_LOG_INFO(
         "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
-        "cores %zu--%zu\n",
+        "cores %zu--%zu, MAC thread %zu\n",
         config_->CoreOffset(), config_->CoreOffset() + 1,
         config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1,
         base_worker_core_offset_,
-        base_worker_core_offset_ + config_->WorkerThreadNum() - 1);
+        base_worker_core_offset_ + config_->WorkerThreadNum() - 1,
+        mac_cpu_core);
   } else {
     AGORA_LOG_INFO(
         "Master thread core %zu, TX/RX thread cores %zu--%zu, RP thread core "
@@ -1414,12 +1415,9 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
   // Complete if last frame and ifft / decode complete
   if ((true == this->ifft_counters_.IsLastSymbol(frame_id)) &&
       (true == this->tx_counters_.IsLastSymbol(frame_id)) &&
-      (/*((false == kEnableMac) &&
-        (true == this->decode_counters_.IsLastSymbol(frame_id))) ||*/
-       ((true == kUplinkHardDemod) &&
+      (((true == kUplinkHardDemod) &&
         (true == this->demul_counters_.IsLastSymbol(frame_id))) ||
-       (/*(true == kEnableMac) &&*/
-        (true == this->tomac_counters_.IsLastSymbol(frame_id))))) {
+       ((true == this->tomac_counters_.IsLastSymbol(frame_id))))) {
     this->stats_->UpdateStats(frame_id);
     assert(frame_id == frame_tracking_.cur_proc_frame_id_);
     if (true == kUplinkHardDemod) {
@@ -1455,7 +1453,7 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
           RtAssert(deferred_frame >= frame_tracking_.cur_proc_frame_id_,
                    "Error scheduling encoding because deferral frame is less "
                    "than current frame");
-          ScheduleDownlinkProcessing(deferred_frame);
+          ScheduleDownlinkMAC(deferred_frame);
           this->encode_deferral_.pop();
         } else {
           // No need to check the next frame because it is too large

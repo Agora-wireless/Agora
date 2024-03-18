@@ -76,8 +76,8 @@ class MacThreadBaseStation {
   // Receive user data bits (downlink bits at the MAC thread running at the
   // server, uplink bits at the MAC thread running at the client) and forward
   // them to the PHY.
-  void ProcessUdpPacketsFromApps();
-  void ProcessUdpPacketsFromAppsBs(const char* payload);
+  void ProcessUdpPacketsFromApps(EventData event);
+  void ProcessUdpPacketsFromAppsBs(EventData event, const char* payload);
 
   Config* const cfg_;
 
