@@ -28,7 +28,7 @@
   "rp_rx_port": 4000,
   "worker_thread_num": 12,
   "socket_thread_num": 1,
-  "max_frame": 100000,
+  "max_frame": 1000000,
   "sample_rate": 2.048e6, /* To make symbol duration as 1ms */
   "noise_level": 0.01
 }
