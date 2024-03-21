@@ -90,8 +90,6 @@ PhyUe::PhyUe(Config* config)
   for (size_t i = 0; i < rx_thread_num_; i++) {
     rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(complete_queue_);
     tx_ptoks_ptr_[i] = new moodycamel::ProducerToken(tx_queue_);
-    mac_rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(complete_queue_);
-    mac_tx_ptoks_ptr_[i] = new moodycamel::ProducerToken(to_mac_queue_);
   }
 
   work_producer_token_ =
@@ -211,8 +209,6 @@ PhyUe::~PhyUe() {
   for (size_t i = 0; i < rx_thread_num_; i++) {
     delete rx_ptoks_ptr_[i];
     delete tx_ptoks_ptr_[i];
-    delete mac_rx_ptoks_ptr_[i];
-    delete mac_tx_ptoks_ptr_[i];
   }
 
   FreeUplinkBuffers();
@@ -374,6 +370,10 @@ void PhyUe::Start() {
           const size_t symbol_id = pkt->symbol_id_;
           const size_t ant_id = pkt->ant_id_;
           const size_t frame_slot = frame_id % kFrameWnd;
+          if (rx_counters_.num_pkts_.at(frame_slot) == 0) {
+            AGORA_LOG_INFO("Received frame id %zu, Cur frame id %zu\n",
+                           pkt->frame_id_, cur_frame_id);
+          }
           RtAssert(pkt->frame_id_ < (cur_frame_id + kFrameWnd),
                    "Error: Received packet for future frame beyond frame "
                    "window. This can happen if PHY is running "
@@ -567,17 +567,17 @@ void PhyUe::Start() {
 
           PrintPerTaskDone(PrintType::kDecode, frame_id, symbol_id, ant_id);
 
-          const bool symbol_complete =
-              decode_counters_.CompleteTask(frame_id, symbol_id);
+          auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+          const bool symbol_complete = decode_counters_.CompleteTask(
+              frame_id, symbol_id, ue_list.n_elem);
+
           if (symbol_complete == true) {
             //if constexpr (kEnableMac) {
-            auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
 
-            for (size_t i = 0; i < config_->UeAntNum(); i++) {
+            for (const auto& ue : ue_list) {
+              auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, ue);
               ScheduleTask(EventData(EventType::kPacketToMac, base_tag.tag_),
                            &to_mac_queue_, ptok_mac);
-
-              base_tag.ue_id_++;
             }
             //}
             PrintPerSymbolDone(PrintType::kDecode, frame_id, symbol_id);
@@ -588,10 +588,9 @@ void PhyUe::Start() {
               PrintPerFrameDone(PrintType::kDecode, frame_id);
               decode_counters_.Reset(frame_id);
               auto ue_map = mac_sched_->ScheduledUeMap(frame_id, 0u);
-              auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
               this->phy_stats_->RecordBer(frame_id, ue_map);
               this->phy_stats_->RecordSer(frame_id, ue_map);
-              bool finished =
+              const bool finished =
                   FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
               if (finished == true) {
                 if ((cur_frame_id + 1) >= config_->FramesToTest()) {
@@ -609,7 +608,8 @@ void PhyUe::Start() {
           const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
           const size_t dl_symbol_idx =
-              config_->Frame().GetDLSymbolIdx(symbol_id);
+              config_->Frame().GetDLSymbolIdx(symbol_id) -
+              config_->Frame().ClientDlPilotSymbols();
 
           if (kDebugPrintPacketsToMac) {
             AGORA_LOG_INFO(
@@ -617,8 +617,9 @@ void PhyUe::Start() {
                 "MAC\n",
                 frame_id, symbol_id, dl_symbol_idx);
           }
-          const bool last_tomac_task =
-              tomac_counters_.CompleteTask(frame_id, dl_symbol_idx);
+          auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+          const bool last_tomac_task = tomac_counters_.CompleteTask(
+              frame_id, dl_symbol_idx, ue_list.n_elem);
 
           if (last_tomac_task == true) {
             PrintPerSymbolDone(PrintType::kPacketToMac, frame_id, symbol_id);
@@ -631,7 +632,7 @@ void PhyUe::Start() {
               tomac_counters_.Reset(frame_id);
 
               const bool finished =
-                  FrameComplete(frame_id, FrameTasksFlags::kMacTxComplete);
+                  FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
               if (finished == true) {
                 if ((cur_frame_id + 1) >= config_->FramesToTest()) {
                   config_->Running(false);
@@ -648,8 +649,18 @@ void PhyUe::Start() {
           // This is an entire frame (multiple mac packets)
           const size_t ue_id = rx_mac_tag_t(event.tags_[0]).tid_;
           const size_t radio_buf_id = rx_mac_tag_t(event.tags_[0]).offset_;
+          const size_t frame_id = rx_mac_tag_t(event.tags_[0]).frame_id_;
           RtAssert(radio_buf_id == (expected_frame_id_from_mac_ % kFrameWnd),
                    "Radio buffer id does not match expected");
+
+          RtAssert(
+              frame_id == static_cast<uint16_t>(expected_frame_id_from_mac_),
+              "PhyUe: Incorrect frame ID from MAC");
+          current_frame_user_num_ =
+              (current_frame_user_num_ + 1) % config_->UeAntNum();
+          if (current_frame_user_num_ == 0) {
+            expected_frame_id_from_mac_++;
+          }
 
           const auto* pkt = reinterpret_cast<const MacPacketPacked*>(
               &ul_bits_buffer_[ue_id]
@@ -661,14 +672,6 @@ void PhyUe::Start() {
               "%zu\n",
               pkt->Frame(), pkt->Symbol(), pkt->Ue(), ue_id, radio_buf_id,
               (size_t)pkt);
-          RtAssert(pkt->Frame() ==
-                       static_cast<uint16_t>(expected_frame_id_from_mac_),
-                   "PhyUe: Incorrect frame ID from MAC");
-          current_frame_user_num_ =
-              (current_frame_user_num_ + 1) % config_->UeAntNum();
-          if (current_frame_user_num_ == 0) {
-            expected_frame_id_from_mac_++;
-          }
 #if defined(ENABLE_RB_IND)
           config_->UpdateModCfgs(pkt->rb_indicator_.mod_order_bits_);
 #endif
@@ -1247,9 +1250,9 @@ void PhyUe::FrameInit(size_t frame) {
     initial |= static_cast<std::uint8_t>(FrameTasksFlags::kDownlinkComplete);
   }
 
-  if ((kEnableMac == false) || (config_->Frame().NumDLSyms() == 0)) {
+  /*if ((kEnableMac == false) || (config_->Frame().NumDLSyms() == 0)) {
     initial |= static_cast<std::uint8_t>(FrameTasksFlags::kMacTxComplete);
-  }
+  }*/
   frame_tasks_.at(frame % kFrameWnd) = initial;
 }
 

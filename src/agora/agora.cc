@@ -567,9 +567,7 @@ void Agora::Start() {
           const bool last_decode_task = this->decode_counters_.CompleteTask(
               frame_id, symbol_id, ue_list.n_elem);
           if (last_decode_task == true) {
-            //if constexpr (kEnableMac) {
             ScheduleUsers(EventType::kPacketToMac, frame_id, symbol_id);
-            //}
             stats_->PrintPerSymbolDone(
                 PrintType::kDecode, frame_id, symbol_id,
                 decode_counters_.GetSymbolCount(frame_id) + 1);
@@ -581,13 +579,6 @@ void Agora::Start() {
               auto ue_map = mac_sched_->ScheduledUeMap(frame_id, 0u);
               this->phy_stats_->RecordBer(frame_id, ue_map);
               this->phy_stats_->RecordSer(frame_id, ue_map);
-              /*if constexpr (kEnableMac == false) {
-                assert(frame_tracking_.cur_proc_frame_id_ == frame_id);
-                const bool work_finished = this->CheckFrameComplete(frame_id);
-                if (work_finished == true) {
-                  goto finish;
-                }
-              }*/
             }
           }
         } break;
@@ -595,7 +586,6 @@ void Agora::Start() {
         case EventType::kPacketToMac: {
           const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          AGORA_LOG_INFO("dfwed\n");
           auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
           const bool last_tomac_task = this->tomac_counters_.CompleteTask(
               frame_id, symbol_id, ue_list.n_elem);
@@ -622,19 +612,17 @@ void Agora::Start() {
           // This is an entire frame (multiple mac packets)
           const size_t ue_id = rx_mac_tag_t(event.tags_[0u]).tid_;
           const size_t radio_buf_id = rx_mac_tag_t(event.tags_[0u]).offset_;
-          const auto* pkt = reinterpret_cast<const MacPacketPacked*>(
-              &agora_memory_->GetDlBits()[ue_id][radio_buf_id *
-                                                 config_->MacBytesNumPerframe(
-                                                     Direction::kDownlink)]);
+          const size_t frame_id = rx_mac_tag_t(event.tags_[0u]).frame_id_;
 
-          AGORA_LOG_TRACE("Agora: frame %d @ offset %zu %zu @ location %zu\n",
-                          pkt->Frame(), ue_id, radio_buf_id,
-                          reinterpret_cast<intptr_t>(pkt));
-
-          const size_t frame_id = pkt->Frame();
           if (kDebugPrintPacketsFromMac) {
+            const auto* pkt = reinterpret_cast<const MacPacketPacked*>(
+                &agora_memory_->GetDlBits()[ue_id][radio_buf_id *
+                                                   config_->MacBytesNumPerframe(
+                                                       Direction::kDownlink)]);
+            AGORA_LOG_INFO("Agora: frame %d @ offset %zu %zu @ location %zu\n",
+                           frame_id, ue_id, radio_buf_id,
+                           reinterpret_cast<intptr_t>(pkt));
             std::stringstream ss;
-
             for (size_t dl_data_symbol = 0;
                  dl_data_symbol < config_->Frame().NumDlDataSyms();
                  dl_data_symbol++) {
@@ -980,9 +968,10 @@ finish:
   }
 
   // Calculate and print per-user BER
-  if constexpr (kEnableMac) {
-    this->mac_thread_->PrintUplinkMacErrors();
-  } else if (kPrintPhyStats == true) {
+  //if constexpr (kEnableMac) {
+  this->mac_thread_->PrintUplinkMacErrors();
+  //} else
+  if (kPrintPhyStats == true) {
     this->phy_stats_->PrintPhyStats();
   }
   this->Stop();
@@ -1293,20 +1282,19 @@ void Agora::InitializeThreads() {
 
   if (config_->DynamicCoreAlloc() == false) {
     AGORA_LOG_INFO(
-        "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
-        "cores %zu--%zu, MAC thread %zu\n",
+        "Master thread core %zu, TX/RX thread cores %zu--%zu, MAC thread %zu, "
+        "worker thread cores %zu--%zu\n",
         config_->CoreOffset(), config_->CoreOffset() + 1,
         config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1,
-        base_worker_core_offset_,
-        base_worker_core_offset_ + config_->WorkerThreadNum() - 1,
-        mac_cpu_core);
+        mac_cpu_core, base_worker_core_offset_,
+        base_worker_core_offset_ + config_->WorkerThreadNum() - 1);
   } else {
     AGORA_LOG_INFO(
-        "Master thread core %zu, TX/RX thread cores %zu--%zu, RP thread core "
-        "%zu, worker thread cores %zu--%zu\n",
+        "Master thread core %zu, TX/RX thread cores %zu--%zu, MAC thread %zu, "
+        "RP thread core %zu, worker thread cores %zu--%zu\n",
         config_->CoreOffset(), config_->CoreOffset() + 1,
         config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1,
-        config_->CoreOffset() + config_->SocketThreadNum() + 1,
+        mac_cpu_core, config_->CoreOffset() + config_->SocketThreadNum() + 2,
         base_worker_core_offset_,
         base_worker_core_offset_ + config_->WorkerThreadNum() - 1);
   }

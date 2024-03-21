@@ -122,23 +122,23 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
   } else {
     sched_ue_set.push_back(n_sched);
   }
-  const std::string filename_input =
+  const std::string filename_sched =
       directory + kUeSchedulePrefix + std::to_string(cfg->UeAntNum()) + ".bin";
   AGORA_LOG_INFO("Saving scheduled number of UEs across frames to %s\n",
-                 filename_input.c_str());
-  auto* fp_input = std::fopen(filename_input.c_str(), "wb");
+                 filename_sched.c_str());
+  auto* fp_input = std::fopen(filename_sched.c_str(), "wb");
   if (fp_input == nullptr) {
-    AGORA_LOG_ERROR("Failed to create file %s\n", filename_input.c_str());
-    throw std::runtime_error("Failed to create file" + filename_input);
+    AGORA_LOG_ERROR("Failed to create file %s\n", filename_sched.c_str());
+    throw std::runtime_error("Failed to create file" + filename_sched);
   } else {
     const auto write_status = std::fwrite(&sched_ue_map.at(0), sizeof(uint8_t),
                                           sched_ue_map.size(), fp_input);
     if (write_status != sched_ue_map.size()) {
-      throw std::runtime_error("Failed to write to file" + filename_input);
+      throw std::runtime_error("Failed to write to file" + filename_sched);
     }
     const auto close_status = std::fclose(fp_input);
     if (close_status != 0) {
-      throw std::runtime_error("Failed to close file" + filename_input);
+      throw std::runtime_error("Failed to close file" + filename_sched);
     }
   }
   if (kPrintUeSchedule) {
@@ -167,7 +167,7 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
         auto* pkt = reinterpret_cast<MacPacketPacked*>(
             &ul_mac_info.at(ue_id).at(pkt_offset));
 
-        pkt->Set(0, cfg->Frame().GetDLSymbol(pkt_id), ue_id,
+        pkt->Set(0, cfg->Frame().GetULSymbol(pkt_id), ue_id,
                  cfg->MacPayloadMaxLength(Direction::kUplink));
         data_generator->GenMacData(pkt, ue_id);
         pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
@@ -508,6 +508,7 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
       }
     }
   }
+  std::free(rx_data_temp);
 
   /* ------------------------------------------------
    * Generate data for downlink test
@@ -516,6 +517,7 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
   const size_t dl_cb_bytes = cfg->NumBytesPerCb(Direction::kDownlink);
   const size_t num_dl_mac_bytes =
       cfg->MacBytesNumPerframe(Direction::kDownlink);
+  const size_t num_dl_pilots = cfg->Frame().ClientDlPilotSymbols();
   if (num_dl_mac_bytes > 0) {
     std::vector<std::vector<int8_t>> dl_mac_info(cfg->UeAntNum());
     AGORA_LOG_FRAME("Total number of downlink MAC bytes: %zu\n",
@@ -528,7 +530,7 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
         auto* pkt = reinterpret_cast<MacPacketPacked*>(
             &dl_mac_info.at(ue_id).at(pkt_offset));
 
-        pkt->Set(0, cfg->Frame().GetDLSymbol(pkt_id), ue_id,
+        pkt->Set(0, cfg->Frame().GetDLSymbol(pkt_id + num_dl_pilots), ue_id,
                  cfg->MacPayloadMaxLength(Direction::kDownlink));
         data_generator->GenMacData(pkt, ue_id);
         pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(pkt->Data(),
@@ -738,21 +740,19 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
           pinv(mat_precoder, mat_csi.cols(sched_ues), 1e-2, "dc");
           mat_precoder /= abs(mat_precoder).max();
           mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
-
-          if (kPrintDebugCSI) {
-            std::printf("CSI \n");
-            for (size_t j = 0; j < cfg->UeAntNum() * cfg->BsAntNum(); j++) {
-              std::printf("%.3f+%.3fi ",
-                          csi_matrices[cfg->OfdmDataStart()][j].re,
-                          csi_matrices[cfg->OfdmDataStart()][j].im);
-            }
-            std::printf("\nprecoder \n");
-            for (size_t j = 0; j < cfg->UeAntNum() * cfg->BsAntNum(); j++) {
-              std::printf("%.3f+%.3fi ", precoder[cfg->OfdmDataStart()][j].re,
-                          precoder[cfg->OfdmDataStart()][j].im);
-            }
-            std::printf("\n");
+        }
+        if (kPrintDebugCSI) {
+          std::printf("CSI \n");
+          for (size_t j = 0; j < cfg->UeAntNum() * cfg->BsAntNum(); j++) {
+            std::printf("%.3f+%.3fi ", csi_matrices[cfg->OfdmDataStart()][j].re,
+                        csi_matrices[cfg->OfdmDataStart()][j].im);
           }
+          std::printf("\nprecoder \n");
+          for (size_t j = 0; j < cfg->UeAntNum() * cfg->BsAntNum(); j++) {
+            std::printf("%.3f+%.3fi ", precoder[cfg->OfdmDataStart()][j].re,
+                        precoder[cfg->OfdmDataStart()][j].im);
+          }
+          std::printf("\n");
         }
         for (size_t j = 0; j < cfg->BsAntNum(); j++) {
           complex_float* ptr_ifft = dl_ifft_data[i] + j * cfg->OfdmCaNum();

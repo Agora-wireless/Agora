@@ -330,12 +330,14 @@ struct MacPacketPacked {
 // Event data tag for Mac RX events
 union rx_mac_tag_t {
   struct {
-    size_t tid_ : 8;      // ID of the socket thread that received the packet
-    size_t offset_ : 56;  // Offset in the socket thread's RX buffer
+    size_t tid_ : 8;        // ID of the socket thread that received the packet
+    size_t offset_ : 24;    // Offset in the socket thread's RX buffer
+    size_t frame_id_ : 32;  // PHY frame_id
   };
   size_t tag_;
 
-  rx_mac_tag_t(size_t tid, size_t offset) : tid_(tid), offset_(offset) {}
+  rx_mac_tag_t(size_t tid, size_t offset, size_t frame_id)
+      : tid_(tid), offset_(offset), frame_id_(frame_id) {}
   explicit rx_mac_tag_t(size_t _tag) : tag_(_tag) {}
 };
 static_assert(sizeof(rx_mac_tag_t) == sizeof(size_t));

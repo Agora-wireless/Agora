@@ -25,7 +25,7 @@
   "beacon_position": 0,
   "bs_server_port": 8100,
   "bs_rru_port": 8200,
-  "core_offset": 5,
+  "core_offset": 6,
   "worker_thread_num": 12,
   "socket_thread_num": 1,
   "ue_core_offset": 1,

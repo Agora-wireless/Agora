@@ -593,7 +593,7 @@ void PhyStats::UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t sc_id,
 void PhyStats::UpdateBitErrors(size_t ue_id, size_t offset, size_t frame_slot,
                                uint8_t tx_byte, uint8_t rx_byte) {
   static constexpr size_t kBitsInByte = 8;
-  AGORA_LOG_TRACE("Updating bit errors: User %zu Offset  %zu Tx %d Rx %d\n",
+  AGORA_LOG_FRAME("Updating bit errors: User %zu Offset  %zu Tx %d Rx %d\n",
                   ue_id, offset, tx_byte, rx_byte);
   uint8_t xor_byte(tx_byte ^ rx_byte);
   size_t bit_errors = 0;

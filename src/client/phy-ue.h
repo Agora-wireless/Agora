@@ -35,8 +35,7 @@ class PhyUe {
     kNoWorkComplete = 0x00,
     kDownlinkComplete = 0x01,
     kUplinkTxComplete = 0x02,
-    kMacTxComplete = 0x04,
-    kFrameComplete = (kDownlinkComplete | kMacTxComplete | kUplinkTxComplete)
+    kFrameComplete = (kDownlinkComplete | kUplinkTxComplete)
   };
 
   explicit PhyUe(Config* config);
