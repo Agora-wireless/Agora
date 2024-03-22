@@ -1258,7 +1258,8 @@ void Agora::InitializeThreads() {
   mac_thread_ = std::make_unique<MacThreadBaseStation>(
       config_, mac_cpu_core, agora_memory_->GetDecod(),
       &agora_memory_->GetDlBits(), &agora_memory_->GetDlBitsStatus(),
-      &mac_request_queue_, &mac_response_queue_);
+      &mac_request_queue_, &mac_response_queue_, mac_sched_.get(),
+      phy_stats_.get());
 
   mac_std_thread_ =
       std::thread(&MacThreadBaseStation::RunEventLoop, mac_thread_.get());

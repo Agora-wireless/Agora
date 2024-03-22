@@ -153,6 +153,7 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
 
   // Step 1: Generate the information buffers (MAC Packets) and LDPC-encoded
   // buffers for uplink
+  const size_t num_ul_pilots = cfg->Frame().ClientUlPilotSymbols();
   const size_t num_ul_mac_bytes = cfg->MacBytesNumPerframe(Direction::kUplink);
   std::vector<std::vector<complex_float>> pre_ifft_data_syms;
   if (num_ul_mac_bytes > 0) {
@@ -167,7 +168,7 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
         auto* pkt = reinterpret_cast<MacPacketPacked*>(
             &ul_mac_info.at(ue_id).at(pkt_offset));
 
-        pkt->Set(0, cfg->Frame().GetULSymbol(pkt_id), ue_id,
+        pkt->Set(0, cfg->Frame().GetULSymbol(pkt_id + num_ul_pilots), ue_id,
                  cfg->MacPayloadMaxLength(Direction::kUplink));
         data_generator->GenMacData(pkt, ue_id);
         pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
@@ -333,14 +334,15 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
     }
 
     {
+      // Save uplink information bytes to file
       const std::string filename_ldpc =
           directory + kUlLdpcDataPrefix + std::to_string(cfg->OfdmCaNum()) +
           "_ue" + std::to_string(cfg->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving uplink data bits (encoder input) to %s\n",
                      filename_ldpc.c_str());
-      for (size_t i = 0; i < num_ul_codeblocks; i++) {
-        Utils::WriteBinaryFile(filename_ldpc, sizeof(uint8_t), ul_cb_bytes,
-                               ul_information.at(i).data(),
+      for (size_t i = 0; i < cfg->UeAntNum(); i++) {
+        Utils::WriteBinaryFile(filename_ldpc, sizeof(uint8_t), num_ul_mac_bytes,
+                               ul_mac_info.at(i).data(),
                                i != 0);  //Do not append in the first write
       }
 

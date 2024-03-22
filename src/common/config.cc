@@ -1244,40 +1244,6 @@ void Config::GenPilots() {
 
 void Config::LoadUplinkData() {
   if (this->frame_.NumUlDataSyms() > 0) {
-    const size_t ul_num_bytes_per_ue_pad =
-        Roundup<64>(this->ul_num_bytes_per_cb_) *
-        this->ul_ldpc_config_.NumBlocksInSymbol();
-    // Uplink LDPC input bits
-    ul_bits_.Calloc(this->frame_.NumUlDataSyms(),
-                    ul_num_bytes_per_ue_pad * this->ue_ant_num_,
-                    Agora_memory::Alignment_t::kAlign64);
-    const std::string ul_data_file =
-        kExperimentFilepath + kUlLdpcDataPrefix +
-        std::to_string(this->ofdm_ca_num_) + "_ue" +
-        std::to_string(this->ue_ant_total_) + ".bin";
-    AGORA_LOG_FRAME("Config: Reading uplink data bits from %s\n",
-                    ul_data_file.c_str());
-
-    // \todo assumes one code block per symbol
-    const size_t code_block_in_symbol_i = 0u;
-    size_t seek_offset = 0u;
-    for (size_t i = 0; i < this->frame_.NumUlDataSyms(); i++) {
-      seek_offset +=
-          ul_data_bytes_num_persymbol_ * this->ue_ant_offset_ * sizeof(int8_t);
-      for (size_t j = 0; j < this->ue_ant_num_; j++) {
-        int8_t* ul_bits_ptr = this->GetInfoBits(
-            this->ul_bits_, Direction::kUplink, i, j, code_block_in_symbol_i);
-        Utils::ReadBinaryFile(ul_data_file, sizeof(int8_t),
-                              ul_data_bytes_num_persymbol_, seek_offset,
-                              ul_bits_ptr);
-        seek_offset += ul_data_bytes_num_persymbol_ * sizeof(int8_t);
-      }
-      seek_offset +=
-          ul_data_bytes_num_persymbol_ *
-          (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
-          sizeof(int8_t);
-    }
-
     // Uplink modulation input bits
     ul_mod_bits_.Calloc(this->frame_.NumUlDataSyms(),
                         Roundup<64>(this->ofdm_data_num_) * this->ue_ant_num_,
@@ -1287,7 +1253,7 @@ void Config::LoadUplinkData() {
         std::to_string(this->ofdm_ca_num_) + "_ue" +
         std::to_string(this->ue_ant_total_) + ".bin";
     // reset seek offset for new file read
-    seek_offset = 0;
+    size_t seek_offset = 0;
     const size_t subcarr_i = 0u;
     for (size_t i = 0; i < this->frame_.NumUlDataSyms(); i++) {
       seek_offset += ofdm_data_num_ * this->ue_ant_offset_ * sizeof(int8_t);

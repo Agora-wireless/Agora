@@ -370,10 +370,6 @@ void PhyUe::Start() {
           const size_t symbol_id = pkt->symbol_id_;
           const size_t ant_id = pkt->ant_id_;
           const size_t frame_slot = frame_id % kFrameWnd;
-          if (rx_counters_.num_pkts_.at(frame_slot) == 0) {
-            AGORA_LOG_INFO("Received frame id %zu, Cur frame id %zu\n",
-                           pkt->frame_id_, cur_frame_id);
-          }
           RtAssert(pkt->frame_id_ < (cur_frame_id + kFrameWnd),
                    "Error: Received packet for future frame beyond frame "
                    "window. This can happen if PHY is running "
@@ -419,33 +415,27 @@ void PhyUe::Start() {
             // (Only when in Downlink Only mode, otherwise the pilots
             // will be transmitted with the uplink data)
             if (ul_symbol_perframe_ == 0) {
-              const EventData do_tx_pilot_task(
+              const EventData tx_pilot_task(
                   EventType::kPacketPilotTX,
                   gen_tag_t::FrmUe(frame_id, ant_id).tag_);
-              ScheduleTask(do_tx_pilot_task, &tx_queue_,
+              ScheduleTask(tx_pilot_task, &tx_queue_,
                            *tx_ptoks_ptr_[ru_->AntNumToWorkerId(ant_id)]);
             } else {
               // Schedule the Uplink tasks
               for (size_t symbol_idx = 0;
-                   symbol_idx < config_->Frame().NumULSyms(); symbol_idx++) {
-                if (symbol_idx < config_->Frame().ClientUlPilotSymbols()) {
-                  EventData do_ifft_task(
-                      EventType::kIFFT,
-                      gen_tag_t::FrmSymUe(
-                          frame_id, config_->Frame().GetULSymbol(symbol_idx),
-                          ant_id)
-                          .tag_);
-                  ScheduleWork(do_ifft_task);
-                } else {
-                  EventData do_encode_task(
-                      EventType::kEncode,
-                      gen_tag_t::FrmSymUe(
-                          frame_id, config_->Frame().GetULSymbol(symbol_idx),
-                          ant_id)
-                          .tag_);
-                  ScheduleWork(do_encode_task);
-                }
+                   symbol_idx < config_->Frame().ClientUlPilotSymbols();
+                   symbol_idx++) {
+                EventData ifft_task(
+                    EventType::kIFFT,
+                    gen_tag_t::FrmSymUe(
+                        frame_id, config_->Frame().GetULSymbol(symbol_idx),
+                        ant_id)
+                        .tag_);
+                ScheduleWork(ifft_task);
               }  // For all UL Symbols
+              EventData req_mac_task(EventType::kPacketFromMac,
+                                     gen_tag_t::FrmUe(frame_id, ant_id).tag_);
+              ScheduleTask(req_mac_task, &to_mac_queue_, ptok_mac);
             }
           }
 
@@ -662,6 +652,15 @@ void PhyUe::Start() {
             expected_frame_id_from_mac_++;
           }
 
+          for (size_t i = config_->Frame().ClientUlPilotSymbols();
+               i < config_->Frame().NumULSyms(); i++) {
+            EventData do_encode_task(
+                EventType::kEncode,
+                gen_tag_t::FrmSymUe(frame_id, config_->Frame().GetULSymbol(i),
+                                    ue_id)
+                    .tag_);
+            ScheduleWork(do_encode_task);
+          }
           const auto* pkt = reinterpret_cast<const MacPacketPacked*>(
               &ul_bits_buffer_[ue_id]
                               [radio_buf_id * config_->MacBytesNumPerframe(

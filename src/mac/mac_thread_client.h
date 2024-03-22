@@ -76,8 +76,8 @@ class MacThreadClient {
   // Receive user data bits (downlink bits at the MAC thread running at the
   // server, uplink bits at the MAC thread running at the client) and forward
   // them to the PHY.
-  void ProcessUdpPacketsFromApps(RBIndicator ri);
-  void ProcessUdpPacketsFromAppsClient(const char* payload, RBIndicator ri);
+  void ProcessUdpPacketsFromApps(EventData event);
+  void ProcessUdpPacketsFromAppsClient(const char* payload, EventData event);
 
   // If Mode::kServer, this thread is running at the Agora server. Else at
   // the client.
@@ -143,6 +143,8 @@ class MacThreadClient {
 
   Table<int8_t> dl_mac_bytes_;
   size_t num_dl_mac_bytes_;
+  Table<int8_t> ul_mac_bytes_;
+  size_t num_ul_mac_bytes_;
   struct {
     // ul_bits_buffer_id_[i] is the index of the uplink data bits buffer to
     // next use for radio #i
@@ -163,6 +165,8 @@ class MacThreadClient {
 
   // CRC
   std::unique_ptr<DoCRC> crc_obj_;
+
+  RBIndicator* ri_;
 };
 
 #endif  // MAC_THREAD_H_
