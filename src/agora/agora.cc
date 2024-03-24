@@ -278,13 +278,12 @@ void Agora::ScheduleCodeblocks(EventType event_type, Direction dir,
 void Agora::ScheduleUsers(EventType event_type, size_t frame_id,
                           size_t symbol_id) {
   assert(event_type == EventType::kPacketToMac);
-  auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
 
   auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0);
-  for (size_t i = 0; i < ue_list.n_elem; i++) {
+  for (const auto& ue_id : ue_list) {
+    auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id);
     TryEnqueueFallback(&mac_request_queue_,
                        EventData(EventType::kPacketToMac, base_tag.tag_));
-    base_tag.ue_id_++;
   }
 }
 
@@ -563,9 +562,8 @@ void Agora::Start() {
           const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
 
-          auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
-          const bool last_decode_task = this->decode_counters_.CompleteTask(
-              frame_id, symbol_id, ue_list.n_elem);
+          const bool last_decode_task =
+              this->decode_counters_.CompleteTask(frame_id, symbol_id);
           if (last_decode_task == true) {
             ScheduleUsers(EventType::kPacketToMac, frame_id, symbol_id);
             stats_->PrintPerSymbolDone(
@@ -762,14 +760,15 @@ void Agora::Start() {
                   this->ifft_counters_.CompleteSymbol(frame_id);
               if (last_ifft_symbol == true) {
                 ifft_next_symbol_ = 0;
+                this->ifft_counters_.Reset(frame_id);
                 this->stats_->MasterSetTsc(TsType::kIFFTDone, frame_id);
                 stats_->PrintPerFrameDone(PrintType::kIFFT, frame_id);
                 assert(frame_id == frame_tracking_.cur_proc_frame_id_);
                 this->CheckIncrementScheduleFrame(frame_id, kDownlinkComplete);
-                const bool work_finished = this->CheckFrameComplete(frame_id);
+                /*const bool work_finished = this->CheckFrameComplete(frame_id);
                 if (work_finished == true) {
                   goto finish;
-                }
+                }*/
               }
             }
           }
@@ -968,10 +967,9 @@ finish:
   }
 
   // Calculate and print per-user BER
-  //if constexpr (kEnableMac) {
-  this->mac_thread_->PrintUplinkMacErrors();
-  //} else
-  if (kPrintPhyStats == true) {
+  if constexpr (kEnableMac) {
+    this->mac_thread_->PrintUplinkMacErrors();
+  } else if (kPrintPhyStats == true) {
     this->phy_stats_->PrintPhyStats();
   }
   this->Stop();
@@ -1402,7 +1400,7 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
       static_cast<int>(this->tx_counters_.IsLastSymbol(frame_id)));
 
   // Complete if last frame and ifft / decode complete
-  if ((true == this->ifft_counters_.IsLastSymbol(frame_id)) &&
+  if (/*(true == this->ifft_counters_.IsLastSymbol(frame_id)) &&*/
       (true == this->tx_counters_.IsLastSymbol(frame_id)) &&
       (((true == kUplinkHardDemod) &&
         (true == this->demul_counters_.IsLastSymbol(frame_id))) ||
@@ -1414,11 +1412,13 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
     }
     this->decode_counters_.Reset(frame_id);
     this->tomac_counters_.Reset(frame_id);
-    this->ifft_counters_.Reset(frame_id);
+    /*this->ifft_counters_.Reset(frame_id);*/
     this->tx_counters_.Reset(frame_id);
     if (config_->Frame().NumDLSyms() > 0) {
       auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0 /*sc_id*/);
       for (const auto& ue_id : ue_list) {
+        std::cout << "Reset dl bits buffer frame " << frame_id << " ue "
+                  << ue_id << std::endl;
         this->agora_memory_->GetDlBitsStatus()[ue_id][frame_id % kFrameWnd] = 0;
       }
     }
