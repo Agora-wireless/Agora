@@ -1301,17 +1301,15 @@ void Agora::InitializeThreads() {
 
 void Agora::SaveDecodeDataToFile(int frame_id) {
   const auto& cfg = config_;
-  const size_t num_decoded_bytes =
-      cfg->NumBytesPerCb(Direction::kUplink) *
-      cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
+  const size_t num_decoded_bytes = cfg->MacPacketLength(Direction::kUplink);
   auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0 /*sc_id*/);
   AGORA_LOG_INFO("Saving decode data to %s\n", kDecodeDataFilename.c_str());
   auto* fp = std::fopen(kDecodeDataFilename.c_str(), "wb");
   if (fp == nullptr) {
     AGORA_LOG_ERROR("SaveDecodeDataToFile error creating file pointer\n");
   } else {
-    for (size_t i = 0; i < cfg->Frame().NumUlDataSyms(); i++) {
-      for (const auto& j : ue_list) {
+    for (const auto& j : ue_list) {
+      for (size_t i = 0; i < cfg->Frame().NumUlDataSyms(); i++) {
         const int8_t* ptr =
             agora_memory_->GetDecod()[(frame_id % kFrameWnd)][i][j];
         const auto write_status =

@@ -46,7 +46,7 @@ static void ReadFromFile(const std::string& filename, Table<TableType>& data,
 static void ReadFromFileUl(const std::string& filename, Table<uint8_t>& data,
                            int ue_num, int num_bytes_per_ue,
                            Config const* const cfg) {
-  ReadFromFile(filename, data, 0, cfg->Frame().NumULSyms(),
+  ReadFromFile(filename, data, 0, cfg->Frame().NumUlDataSyms(),
                (num_bytes_per_ue * ue_num), sizeof(uint8_t));
 }
 
