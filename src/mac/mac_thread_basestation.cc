@@ -514,18 +514,13 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(EventData event,
     }
     pkt_offset += mac_packet_length;
   }
-
-  /*if (next_radio_id_ != ue_id) {
-    AGORA_LOG_ERROR("Error - radio id %zu, expected %zu\n", ue_id,
-                    next_radio_id_);
-  }*/
   // End data integrity check
 
   next_radio_id_ = ue_id;
 
 #if defined(ENABLE_RB_IND)
   RBIndicator ri;
-  ri.ue_id_ = ue_id;  //next_radio_id_;
+  ri.ue_id_ = ue_id;
   ri.mcs_index_ = kDefaultMcsIndex;
 #endif
 
@@ -535,7 +530,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(EventData event,
         log_file_,
         "MacThreadBasestation: Received data from app for frame %zu, ue "
         "%zu size %zu\n",
-        frame_id, ue_id /*next_radio_id_*/, pkt_offset);
+        frame_id, ue_id, pkt_offset);
 
     for (size_t i = 0; i < pkt_offset; i++) {
       ss << std::to_string((uint8_t)(payload[i])) << " ";
@@ -543,10 +538,8 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(EventData event,
     std::fprintf(log_file_, "%s\n", ss.str().c_str());
   }
   // We've received bits for the uplink.
-  //size_t& radio_buf_id = client_.dl_bits_buffer_id_[ue_id][next_radio_id_];
   size_t radio_buf_id = frame_id % kFrameWnd;
 
-  //if ((*client_.dl_bits_buffer_status_)[next_radio_id_][radio_buf_id] == 1) {
   if ((*client_.dl_bits_buffer_status_)[ue_id][radio_buf_id] == 1) {
     std::fprintf(
         stderr,
@@ -565,19 +558,10 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(EventData event,
         mac_packet_length;
 
     auto* pkt = reinterpret_cast<MacPacketPacked*>(
-        //&(*client_.dl_bits_buffer_)[next_radio_id_][dest_pkt_offset]);
         &(*client_.dl_bits_buffer_)[ue_id][dest_pkt_offset]);
 
     const char* src_data = &payload[src_pkt_offset];
-    /*kEnableMac ? &payload[src_pkt_offset]
-                   : reinterpret_cast<const char*>(
-                         dl_mac_bytes_[next_radio_id_] + src_pkt_offset);*/
     const auto* src_packet = reinterpret_cast<const MacPacketPacked*>(src_data);
-    /*const size_t symbol_idx =
-        cfg_->Frame().GetDLSymbolIdx(src_packet->Symbol());
-    RtAssert((symbol_idx == pkt_id + num_pilot_symbols) &&
-                 (src_packet->Ue() == next_radio_id_),
-             "Invalid MAC packet symbol or radio ID!\n");*/
 
     pkt->Set(kEnableMac ? frame_id : 0, src_packet->Symbol(), src_packet->Ue(),
              src_packet->PayloadLength());
@@ -618,23 +602,13 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(EventData event,
     }
   }  // end all packets
 
-  //(*client_.dl_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
   (*client_.dl_bits_buffer_status_)[ue_id][radio_buf_id] = 1;
   EventData msg(EventType::kPacketFromMac,
                 rx_mac_tag_t(ue_id, radio_buf_id, frame_id).tag_);
-  //rx_mac_tag_t(next_radio_id_, radio_buf_id, frame_id).tag_);
   AGORA_LOG_TRACE("MacThreadBasestation: Tx mac information to %zu %zu\n",
                   ue_id, radio_buf_id);
-  //next_radio_id_, radio_buf_id);
   RtAssert(tx_queue_->enqueue(msg),
            "MacThreadBasestation: Failed to enqueue downlink packet");
-
-  //radio_buf_id = (radio_buf_id + 1) % kFrameWnd;
-  // Might be unnecessary now.
-  /*next_radio_id_ = (next_radio_id_ + 1) % cfg_->UeAntNum();
-  if (next_radio_id_ == 0) {
-    next_tx_frame_id_++;
-  }*/
 }
 
 void MacThreadBaseStation::RunEventLoop() {
@@ -656,11 +630,6 @@ void MacThreadBaseStation::RunEventLoop() {
         last_frame_tx_tsc = GetTime::Rdtsc();
       }
     }
-
-    // No need to process incomming packets if we are finished
-    /*if (next_tx_frame_id_ != cfg_->FramesToTest()) {
-      ProcessUdpPacketsFromApps();
-    }*/
   }
 }
 
