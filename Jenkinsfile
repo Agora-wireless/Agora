@@ -67,8 +67,8 @@ pipeline {
 			steps {
 				echo "CI building Agora ..."
 				dir("${WORKSPACE}") {
-					sh '''
-						. /opt/intel/oneapi/setvars.sh --config="/opt/intel/oneapi/renew-config.txt"
+					sh '''#!/bin/bash
+						source /opt/intel/oneapi/setvars.sh --config="/opt/intel/oneapi/renew-config.txt"
 						mkdir build && cd build
 						cmake .. && make -j && cd ..
 						cp ./build/CTestTestfile.cmake ./
@@ -81,8 +81,8 @@ pipeline {
 			steps {
 				echo "CI Emulated Agora testing ..."
 				dir("${WORKSPACE}") {
-					sh '''
-						. /opt/intel/oneapi/setvars.sh --config="/opt/intel/oneapi/renew-config.txt"
+					sh '''#!/bin/bash
+						source /opt/intel/oneapi/setvars.sh --config="/opt/intel/oneapi/renew-config.txt"
 						./test/test_agora/test_agora.sh
 					'''
 					script {
@@ -113,13 +113,13 @@ pipeline {
 				echo "CI unit testing ..."
 				dir("${WORKSPACE}") {
 					echo "Building data for unit tests ..."
-					sh '''
-						. /opt/intel/oneapi/setvars.sh --config="/opt/intel/oneapi/renew-config.txt"
+					sh '''#!/bin/bash
+						source /opt/intel/oneapi/setvars.sh --config="/opt/intel/oneapi/renew-config.txt"
 						./build/data_generator --conf_file files/config/ci/tddconfig-sim-ul.json
 					'''
 					
-					sh '''
-						. /opt/intel/oneapi/setvars.sh --config="/opt/intel/oneapi/renew-config.txt"
+					sh '''#!/bin/bash
+						source /opt/intel/oneapi/setvars.sh --config="/opt/intel/oneapi/renew-config.txt"
 						ctest
 					'''
 				}
@@ -130,8 +130,8 @@ pipeline {
 			steps {
 				echo "CI E2E testing ..."
 				dir("${WORKSPACE}") {
-					sh '''
-						. /opt/intel/oneapi/setvars.sh --config="/opt/intel/oneapi/renew-config.txt"
+					sh '''#!/bin/bash
+						source /opt/intel/oneapi/setvars.sh --config="/opt/intel/oneapi/renew-config.txt"
 						./test/sim_tests/test_e2e_sim.sh 0.05
 					'''
 					script {
