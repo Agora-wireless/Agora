@@ -593,7 +593,7 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
   }  // end all packets
   (*client_.ul_bits_buffer_status_)[ue_id][radio_buf_id] = 1;
   EventData msg(EventType::kPacketFromMac,
-                rx_mac_tag_t(ue_id, radio_buf_id, frame_id).tag_);
+                rx_mac_tag_t(frame_id, ue_id, radio_buf_id).tag_);
 
   AGORA_LOG_FRAME("MacThreadClient: Tx mac information for ue %zu frame %zu\n",
                   ue_id, frame_id);

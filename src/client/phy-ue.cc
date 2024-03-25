@@ -634,20 +634,9 @@ void PhyUe::Start() {
 
         case EventType::kPacketFromMac: {
           // This is an entire frame (multiple mac packets)
+          const size_t frame_id = rx_mac_tag_t(event.tags_[0]).frame_id_;
           const size_t ue_id = rx_mac_tag_t(event.tags_[0]).tid_;
           const size_t radio_buf_id = rx_mac_tag_t(event.tags_[0]).offset_;
-          const size_t frame_id = rx_mac_tag_t(event.tags_[0]).frame_id_;
-          /*RtAssert(radio_buf_id == (expected_frame_id_from_mac_ % kFrameWnd),
-                   "Radio buffer id does not match expected");
-
-          RtAssert(
-              frame_id == static_cast<uint16_t>(expected_frame_id_from_mac_),
-              "PhyUe: Incorrect frame ID from MAC");
-          current_frame_user_num_ =
-              (current_frame_user_num_ + 1) % config_->UeAntNum();
-          if (current_frame_user_num_ == 0) {
-            expected_frame_id_from_mac_++;
-          }*/
           // TODO: Consider code blocks per symbol
           for (size_t i = config_->Frame().ClientUlPilotSymbols();
                i < config_->Frame().NumULSyms(); i++) {

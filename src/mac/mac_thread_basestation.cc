@@ -604,7 +604,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(EventData event,
 
   (*client_.dl_bits_buffer_status_)[ue_id][radio_buf_id] = 1;
   EventData msg(EventType::kPacketFromMac,
-                rx_mac_tag_t(ue_id, radio_buf_id, frame_id).tag_);
+                rx_mac_tag_t(frame_id, ue_id, radio_buf_id).tag_);
   AGORA_LOG_TRACE("MacThreadBasestation: Tx mac information to %zu %zu\n",
                   ue_id, radio_buf_id);
   RtAssert(tx_queue_->enqueue(msg),

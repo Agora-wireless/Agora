@@ -608,9 +608,9 @@ void Agora::Start() {
 
         case EventType::kPacketFromMac: {
           // This is an entire frame (multiple mac packets)
+          const size_t frame_id = rx_mac_tag_t(event.tags_[0u]).frame_id_;
           const size_t ue_id = rx_mac_tag_t(event.tags_[0u]).tid_;
           const size_t radio_buf_id = rx_mac_tag_t(event.tags_[0u]).offset_;
-          const size_t frame_id = rx_mac_tag_t(event.tags_[0u]).frame_id_;
 
           if (kDebugPrintPacketsFromMac) {
             const auto* pkt = reinterpret_cast<const MacPacketPacked*>(
