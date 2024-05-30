@@ -18,7 +18,8 @@ class MacUtils {
  public:
   explicit MacUtils(FrameStats frame);
   MacUtils(FrameStats frame, double frame_duration, size_t ul_ofdm_data_num,
-           size_t dl_ofdm_data_num, size_t ctrl_ofdm_data_num);
+           size_t dl_ofdm_data_num, size_t ctrl_ofdm_data_num, bool prb_alloc,
+           size_t ul_sc_per_prbg, size_t dl_sc_per_prbg);
 
   void SetMacParams(const nlohmann::json& ul_mcs_json,
                     const nlohmann::json& dl_mcs_json, bool verbose = false);
@@ -144,6 +145,10 @@ class MacUtils {
   size_t ul_ofdm_data_num_;
   size_t dl_ofdm_data_num_;
   size_t ctrl_ofdm_data_num_;
+
+  bool prb_alloc_;
+  size_t ul_sc_per_prbg_;
+  size_t dl_sc_per_prbg_;
 
   nlohmann::json ul_mcs_json_;
   nlohmann::json dl_mcs_json_;

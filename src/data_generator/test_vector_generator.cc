@@ -238,7 +238,9 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
   std::unique_ptr<DoCRC> crc_obj = std::make_unique<DoCRC>();
   MacUtils mac_params(cfg->Frame(), cfg->GetFrameDurationSec(),
                       cfg->OfdmDataNum(), cfg->GetOFDMDataNum(),
-                      cfg->GetOFDMCtrlNum());
+                      cfg->GetOFDMCtrlNum(), cfg->SlotScheduling(),
+                      cfg->NumScPerCb(Direction::kUplink),
+                      cfg->NumScPerCb(Direction::kDownlink));
   mac_params.UpdateUlMcsParams(cfg->MacParams().McsIndex(Direction::kUplink));
   mac_params.UpdateDlMcsParams(cfg->MacParams().McsIndex(Direction::kDownlink));
 
@@ -308,27 +310,37 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
 
       const size_t symbol_blocks =
           ul_ldpc_config.NumBlocksInSymbol() * cfg->UeAntNum();
-      const size_t num_ul_codeblocks =
-          cfg->Frame().NumUlDataSyms() * symbol_blocks;
+      size_t num_ul_codeblocks;
+      if (cfg->SlotScheduling() == false) {
+        num_ul_codeblocks = cfg->Frame().NumUlDataSyms() * symbol_blocks;
+      } else {
+        num_ul_codeblocks = symbol_blocks;
+      }
       AGORA_LOG_FRAME("Total number of ul blocks: %zu\n", num_ul_codeblocks);
 
       std::vector<std::vector<int8_t>> ul_information(num_ul_codeblocks);
       std::vector<std::vector<int8_t>> ul_encoded_codewords(num_ul_codeblocks);
+      size_t ue_id, ue_cb_id, ue_cb_cnt;
       for (size_t cb = 0; cb < num_ul_codeblocks; cb++) {
-        // i : symbol -> ue -> cb (repeat)
-        size_t sym_id = cb / (symbol_blocks);
-        // ue antenna for code block
-        size_t sym_offset = cb % (symbol_blocks);
-        size_t ue_id = sym_offset / ul_ldpc_config.NumBlocksInSymbol();
-        size_t ue_cb_id = sym_offset % ul_ldpc_config.NumBlocksInSymbol();
-        size_t ue_cb_cnt =
-            (sym_id * ul_ldpc_config.NumBlocksInSymbol()) + ue_cb_id;
-
+        if (cfg->SlotScheduling() == false) {
+          // i : symbol -> ue -> cb (repeat)
+          size_t sym_id = cb / (symbol_blocks);
+          // ue antenna for code block
+          size_t sym_offset = cb % (symbol_blocks);
+          ue_id = sym_offset / ul_ldpc_config.NumBlocksInSymbol();
+          ue_cb_id = sym_offset % ul_ldpc_config.NumBlocksInSymbol();
+          ue_cb_cnt = (sym_id * ul_ldpc_config.NumBlocksInSymbol()) + ue_cb_id;
+        } else {
+          ue_id = cb / ul_ldpc_config.NumBlocksInSymbol();
+          ue_cb_id = cb % ul_ldpc_config.NumBlocksInSymbol();
+          ue_cb_cnt = ue_cb_id;
+        }
         AGORA_LOG_TRACE(
             "cb %zu -- user %zu -- user block %zu -- user cb id %zu -- input "
             "size %zu, index %zu, total size %zu\n",
             cb, ue_id, ue_cb_id, ue_cb_cnt, ul_cb_bytes,
             ue_cb_cnt * ul_cb_bytes, ul_mac_info.at(ue_id).size());
+
         int8_t* cb_start = &ul_mac_info.at(ue_id).at(ue_cb_cnt * ul_cb_bytes);
         ul_information.at(cb) =
             std::vector<int8_t>(cb_start, cb_start + ul_cb_bytes);
@@ -361,24 +373,55 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
       std::vector<std::vector<complex_float>> ul_modulated_symbols(
           num_ul_codeblocks);
       for (size_t i = 0; i < num_ul_codeblocks; i++) {
-        ul_modulated_codewords.at(i).resize(cfg->OfdmDataNum(), 0);
+        size_t num_subcr = cfg->SlotScheduling()
+                               ? cfg->NumScPerCb(Direction::kUplink) *
+                                     cfg->Frame().NumUlDataSyms()
+                               : cfg->OfdmDataNum();
+        ul_modulated_codewords.at(i).resize(num_subcr, 0);
         auto ofdm_symbol = DataGenerator::GetModulation(
             &ul_encoded_codewords.at(i).at(0),
             &ul_modulated_codewords.at(i).at(0),
             mac_params.ModTable(Direction::kUplink),
             mac_params.LdpcConfig(Direction::kUplink).NumCbCodewLen(),
-            cfg->OfdmDataNum(), mac_params.ModOrderBits(Direction::kUplink));
-        ul_modulated_symbols.at(i) = DataGenerator::MapOFDMSymbol(
-            cfg, ofdm_symbol, nullptr, SymbolType::kUL);
+            num_subcr, mac_params.ModOrderBits(Direction::kUplink));
+        if (cfg->SlotScheduling() == false) {
+          ul_modulated_symbols.at(i) = DataGenerator::MapOFDMSymbol(
+              cfg, ofdm_symbol, nullptr, SymbolType::kUL);
+        } else {
+          ul_modulated_symbols.at(i) = DataGenerator::MapPRB(
+              cfg, ofdm_symbol, nullptr, Direction::kUplink,
+              i % ul_ldpc_config.NumBlocksInSymbol());
+        }
       }
 
       // Place modulated uplink data codewords into central IFFT bins
       RtAssert(ul_ldpc_config.NumBlocksInSymbol() == 1);  // TODO: Assumption
       std::vector<std::vector<complex_float>> pre_ifft_data_syms;
       pre_ifft_data_syms.resize(cfg->UeAntNum() * cfg->Frame().NumUlDataSyms());
-      for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
-        pre_ifft_data_syms.at(i) =
-            DataGenerator::BinForIfft(cfg, ul_modulated_symbols.at(i));
+      if (cfg->SlotScheduling() == false) {
+        for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
+          pre_ifft_data_syms.at(i) =
+              DataGenerator::BinForIfft(cfg, ul_modulated_symbols.at(i));
+        }
+      } else {
+        std::vector<std::vector<complex_float>> prb_to_ofdm(
+            cfg->UeAntNum() * cfg->Frame().NumUlDataSyms());
+        for (size_t i = 0; i < prb_to_ofdm.size(); i++) {
+          prb_to_ofdm.at(i).resize(cfg->OfdmDataNum());
+          size_t ue = i % cfg->UeAntNum();
+          size_t sym = i / cfg->UeAntNum();
+          for (size_t j = 0; j < cfg->OfdmDataNum(); j++) {
+            size_t cb =
+                (j / ul_ldpc_config.NumBlocksInSymbol()) * cfg->UeAntNum() + ue;
+            size_t sc = sym * cfg->NumScPerCb(Direction::kUplink) +
+                        (j % ul_ldpc_config.NumBlocksInSymbol());
+            prb_to_ofdm.at(i).at(j) = ul_modulated_symbols.at(cb).at(sc);
+          }
+        }
+        for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
+          pre_ifft_data_syms.at(i) =
+              DataGenerator::BinForIfft(cfg, prb_to_ofdm.at(i));
+        }
       }
 
       {
@@ -563,22 +606,32 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
 
       const size_t symbol_blocks =
           dl_ldpc_config.NumBlocksInSymbol() * cfg->UeAntNum();
-      const size_t num_dl_codeblocks =
-          cfg->Frame().NumDlDataSyms() * symbol_blocks;
+      size_t num_dl_codeblocks;
+      if (cfg->SlotScheduling() == false) {
+        num_dl_codeblocks = cfg->Frame().NumDlDataSyms() * symbol_blocks;
+      } else {
+        num_dl_codeblocks = symbol_blocks;
+      }
       AGORA_LOG_FRAME("Total number of dl data blocks: %zu\n",
                       num_dl_codeblocks);
 
       std::vector<std::vector<int8_t>> dl_information(num_dl_codeblocks);
       std::vector<std::vector<int8_t>> dl_encoded_codewords(num_dl_codeblocks);
+      size_t ue_id, ue_cb_id, ue_cb_cnt;
       for (size_t cb = 0; cb < num_dl_codeblocks; cb++) {
-        // i : symbol -> ue -> cb (repeat)
-        const size_t sym_id = cb / (symbol_blocks);
-        // ue antenna for code block
-        const size_t sym_offset = cb % (symbol_blocks);
-        const size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
-        const size_t ue_cb_id = sym_offset % dl_ldpc_config.NumBlocksInSymbol();
-        const size_t ue_cb_cnt =
-            (sym_id * dl_ldpc_config.NumBlocksInSymbol()) + ue_cb_id;
+        if (cfg->SlotScheduling() == false) {
+          // i : symbol -> ue -> cb (repeat)
+          const size_t sym_id = cb / (symbol_blocks);
+          // ue antenna for code block
+          const size_t sym_offset = cb % (symbol_blocks);
+          ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
+          ue_cb_id = sym_offset % dl_ldpc_config.NumBlocksInSymbol();
+          ue_cb_cnt = (sym_id * dl_ldpc_config.NumBlocksInSymbol()) + ue_cb_id;
+        } else {
+          ue_id = cb / dl_ldpc_config.NumBlocksInSymbol();
+          ue_cb_id = cb % dl_ldpc_config.NumBlocksInSymbol();
+          ue_cb_cnt = ue_cb_id;
+        }
         int8_t* cb_start = &dl_mac_info.at(ue_id).at(ue_cb_cnt * dl_cb_bytes);
         dl_information.at(cb) =
             std::vector<int8_t>(cb_start, cb_start + dl_cb_bytes);
@@ -606,25 +659,55 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
       std::vector<std::vector<complex_float>> dl_modulated_symbols(
           num_dl_codeblocks);
       for (size_t i = 0; i < num_dl_codeblocks; i++) {
-        const size_t sym_offset = i % (symbol_blocks);
-        const size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
-        dl_modulated_codewords.at(i).resize(cfg->GetOFDMDataNum());
+        size_t num_subcr = cfg->SlotScheduling()
+                               ? cfg->NumScPerCb(Direction::kDownlink) *
+                                     cfg->Frame().NumDlDataSyms()
+                               : cfg->GetOFDMDataNum();
+        dl_modulated_codewords.at(i).resize(num_subcr, 0);
         auto ofdm_symbol = DataGenerator::GetModulation(
             &dl_encoded_codewords.at(i)[0], &dl_modulated_codewords.at(i)[0],
             mac_params.ModTable(Direction::kDownlink),
             mac_params.LdpcConfig(Direction::kDownlink).NumCbCodewLen(),
-            cfg->GetOFDMDataNum(),
-            mac_params.ModOrderBits(Direction::kDownlink));
-        dl_modulated_symbols.at(i) = DataGenerator::MapOFDMSymbol(
-            cfg, ofdm_symbol, ue_specific_pilot[ue_id], SymbolType::kDL);
+            num_subcr, mac_params.ModOrderBits(Direction::kDownlink));
+        if (cfg->SlotScheduling() == false) {
+          const size_t sym_offset = i % (symbol_blocks);
+          const size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
+          dl_modulated_symbols.at(i) = DataGenerator::MapOFDMSymbol(
+              cfg, ofdm_symbol, ue_specific_pilot[ue_id], SymbolType::kDL);
+        } else {
+          dl_modulated_symbols.at(i) = DataGenerator::MapPRB(
+              cfg, ofdm_symbol, nullptr, Direction::kDownlink,
+              i % dl_ldpc_config.NumBlocksInSymbol());
+        }
       }
 
       // Non-beamformed version of downlink data
       std::vector<std::vector<complex_float>> pre_ifft_dl_data_syms(
           cfg->UeAntNum() * cfg->Frame().NumDlDataSyms());
-      for (size_t i = 0; i < pre_ifft_dl_data_syms.size(); i++) {
-        pre_ifft_dl_data_syms.at(i) =
-            DataGenerator::BinForIfft(cfg, dl_modulated_symbols.at(i));
+      if (cfg->SlotScheduling() == false) {
+        for (size_t i = 0; i < pre_ifft_dl_data_syms.size(); i++) {
+          pre_ifft_dl_data_syms.at(i) =
+              DataGenerator::BinForIfft(cfg, dl_modulated_symbols.at(i));
+        }
+      } else {
+        std::vector<std::vector<complex_float>> prb_to_ofdm(
+            cfg->UeAntNum() * cfg->Frame().NumDlDataSyms());
+        for (size_t i = 0; i < prb_to_ofdm.size(); i++) {
+          prb_to_ofdm.at(i).resize(cfg->OfdmDataNum());
+          size_t ue = i % cfg->UeAntNum();
+          size_t sym = i / cfg->UeAntNum();
+          for (size_t j = 0; j < cfg->OfdmDataNum(); j++) {
+            size_t cb =
+                (j / dl_ldpc_config.NumBlocksInSymbol()) * cfg->UeAntNum() + ue;
+            size_t sc = sym * cfg->NumScPerCb(Direction::kDownlink) +
+                        (j % dl_ldpc_config.NumBlocksInSymbol());
+            prb_to_ofdm.at(i).at(j) = dl_modulated_symbols.at(cb).at(sc);
+          }
+        }
+        for (size_t i = 0; i < pre_ifft_dl_data_syms.size(); i++) {
+          pre_ifft_dl_data_syms.at(i) =
+              DataGenerator::BinForIfft(cfg, prb_to_ofdm.at(i));
+        }
       }
 
       {

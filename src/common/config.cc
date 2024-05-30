@@ -695,18 +695,33 @@ Config::Config(std::string jsonfilename)
   // Scrambler and descrambler configurations
   scramble_enabled_ = tdd_conf.value("wlan_scrambler", true);
 
+  slot_scheduling_ = tdd_conf.value("slot_scheduling", false);
+
+  ul_num_prb_per_cb_ = tdd_conf.value("ul_num_prb_per_cb", 8);
+  ul_num_sc_per_cb_ = ul_num_prb_per_cb_ * kTransposeBlockSize;
+
+  dl_num_prb_per_cb_ = tdd_conf.value("dl_num_prb_per_cb", 8);
+  dl_num_sc_per_cb_ = dl_num_prb_per_cb_ * kTransposeBlockSize;
+
+  if (slot_scheduling_) {
+    RtAssert(
+        ofdm_data_num_ % ul_num_sc_per_cb_ == 0,
+        "Number of OFDM data subcarriers must be a multiple of subcarriers "
+        "in an uplink code block");
+    RtAssert(
+        ofdm_data_num_ % dl_num_sc_per_cb_ == 0,
+        "Number of OFDM data subcarriers must be a multiple of subcarriers "
+        "in an downlink code block");
+  }
+
   // LDPC Coding and Modulation configurations
   ul_mcs_params_ = this->Parse(tdd_conf, "ul_mcs");
   dl_mcs_params_ = this->Parse(tdd_conf, "dl_mcs");
   mac_params_ =
       MacUtils(this->frame_, this->GetFrameDurationSec(), ofdm_data_num_,
-               this->GetOFDMDataNum(), GetOFDMCtrlNum());
+               this->GetOFDMDataNum(), GetOFDMCtrlNum(), slot_scheduling_,
+               ul_num_sc_per_cb_, dl_num_sc_per_cb_);
   mac_params_.SetMacParams(ul_mcs_params_, dl_mcs_params_, true);
-
-  /*ul_mac_packet_size_ = kDefaultSpectralEff * ofdm_data_num_;
-  dl_mac_packet_size_ = kDefaultSpectralEff * ofdm_data_num_;
-  ul_mac_payload_size_ = ul_mac_packet_size_ - sizeof(MacPacketHeaderPacked);
-  dl_mac_payload_size_ = dl_mac_packet_size_ - sizeof(MacPacketHeaderPacked);*/
 
   freq_domain_channel_ = tdd_conf.value("freq_domain_channel", false);
   scheduler_type_ =

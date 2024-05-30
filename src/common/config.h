@@ -54,6 +54,9 @@ class Config {
 
   inline size_t OfdmDataStop() const { return this->ofdm_data_stop_; }
   inline size_t OfdmPilotSpacing() const { return this->ofdm_pilot_spacing_; }
+  inline size_t RbNum() const {
+    return this->ofdm_data_num_ / kTransposeBlockSize;
+  }
 
   inline bool HwFramer() const { return this->hw_framer_; }
   inline bool UeHwFramer() const { return this->ue_hw_framer_; }
@@ -272,6 +275,16 @@ class Config {
   inline size_t FramesToTest() const { return this->frames_to_test_; }
   inline size_t FrameToProfile() const { return this->frame_to_profile_; }
   inline float NoiseLevel() const { return this->noise_level_; }
+
+  inline size_t SlotScheduling() const { return this->slot_scheduling_; }
+  inline size_t NumPrbPerCb(Direction dir) const {
+    return dir == Direction::kUplink ? this->ul_num_prb_per_cb_
+                                     : this->dl_num_prb_per_cb_;
+  }
+  inline size_t NumScPerCb(Direction dir) const {
+    return dir == Direction::kUplink ? this->ul_num_sc_per_cb_
+                                     : this->dl_num_sc_per_cb_;
+  }
 
   inline bool FreqDomainChannel() const { return this->freq_domain_channel_; }
   inline uint16_t DpdkNumPorts() const { return this->dpdk_num_ports_; }
@@ -869,6 +882,21 @@ class Config {
   float scale_;  // Scaling factor for all transmit symbols
 
   bool bigstation_mode_;  // If true, use pipeline-parallel scheduling
+
+  // Code blocks are scheduled over a complete slot in time domain
+  size_t slot_scheduling_;
+
+  // The total number of uplink PRBs allocated per code bloack in a subframe
+  size_t ul_num_prb_per_cb_;
+
+  // The total number of subcarriers per uplink code block
+  size_t ul_num_sc_per_cb_;
+
+  // The total number of downlink PRBs allocated per code bloack in a subframe
+  size_t dl_num_prb_per_cb_;
+
+  // The total number of subcarriers per downlink code block
+  size_t dl_num_sc_per_cb_;
 
   // IP address of the machine running the baseband processing for UE
   std::string ue_server_addr_;

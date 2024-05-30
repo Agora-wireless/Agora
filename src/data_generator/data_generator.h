@@ -100,6 +100,9 @@ class DataGenerator {
       Config* cfg, const std::vector<complex_float>& modulated_codeword,
       const complex_float* pilot_seq, SymbolType symbol_type);
 
+  static std::vector<complex_float> MapPRB(
+      Config* cfg, const std::vector<complex_float>& modulated_codeword,
+      const complex_float* pilot_seq, Direction dir, size_t cb_id);
   /**
    * @param modulated_codeword The modulated codeword with OfdmDataNum()
    * elements

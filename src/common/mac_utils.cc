@@ -12,12 +12,16 @@ MacUtils::MacUtils(FrameStats frame)
 
 MacUtils::MacUtils(FrameStats frame, double frame_duration,
                    size_t ul_ofdm_data_num, size_t dl_ofdm_data_num,
-                   size_t ctrl_ofdm_data_num)
+                   size_t ctrl_ofdm_data_num, bool prb_alloc,
+                   size_t ul_sc_per_prbg, size_t dl_sc_per_prbg)
     : frame_(frame),
       frame_duration_(frame_duration),
       ul_ofdm_data_num_(ul_ofdm_data_num),
       dl_ofdm_data_num_(dl_ofdm_data_num),
       ctrl_ofdm_data_num_(ctrl_ofdm_data_num),
+      prb_alloc_(prb_alloc),
+      ul_sc_per_prbg_(ul_sc_per_prbg),
+      dl_sc_per_prbg_(dl_sc_per_prbg),
       ul_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_bcast_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0) {}
@@ -77,6 +81,7 @@ void MacUtils::UpdateUlMacParams() {
       (frame_.NumUlDataSyms() > 0) ? (ul_ldpc_config_.NumCbLen() / 8) : 0;
   ul_num_padding_bytes_per_cb_ =
       Roundup<64>(ul_num_bytes_per_cb_) - ul_num_bytes_per_cb_;
+  // TODO: mac packet size can change based on allocated PRBs
   ul_data_bytes_num_persymbol_ =
       ul_num_bytes_per_cb_ * ul_ldpc_config_.NumBlocksInSymbol();
   ul_mac_packet_length_ = ul_data_bytes_num_persymbol_;
@@ -111,7 +116,7 @@ void MacUtils::UpdateUlMacParams() {
   ul_mac_data_length_max_ =
       ul_mac_packet_length_ - sizeof(MacPacketHeaderPacked);
 
-  ul_mac_packets_perframe_ = this->frame_.NumUlDataSyms();
+  ul_mac_packets_perframe_ = prb_alloc_ ? 1 : this->frame_.NumUlDataSyms();
   ul_mac_data_bytes_num_perframe_ =
       ul_mac_data_length_max_ * ul_mac_packets_perframe_;
   ul_mac_bytes_num_perframe_ = ul_mac_packet_length_ * ul_mac_packets_perframe_;
@@ -122,6 +127,7 @@ void MacUtils::UpdateDlMacParams() {
       (frame_.NumDlDataSyms() > 0) ? (dl_ldpc_config_.NumCbLen() / 8) : 0;
   dl_num_padding_bytes_per_cb_ =
       Roundup<64>(dl_num_bytes_per_cb_) - dl_num_bytes_per_cb_;
+  // TODO: mac packet size could change based on allocated PRBs
   dl_data_bytes_num_persymbol_ =
       dl_num_bytes_per_cb_ * dl_ldpc_config_.NumBlocksInSymbol();
   dl_mac_packet_length_ = dl_data_bytes_num_persymbol_;
@@ -132,7 +138,7 @@ void MacUtils::UpdateDlMacParams() {
   dl_mac_data_length_max_ =
       dl_mac_packet_length_ - sizeof(MacPacketHeaderPacked);
 
-  dl_mac_packets_perframe_ = this->frame_.NumDlDataSyms();
+  dl_mac_packets_perframe_ = prb_alloc_ ? 1 : this->frame_.NumDlDataSyms();
   dl_mac_data_bytes_num_perframe_ =
       dl_mac_data_length_max_ * dl_mac_packets_perframe_;
   dl_mac_bytes_num_perframe_ = dl_mac_packet_length_ * dl_mac_packets_perframe_;
@@ -235,8 +241,15 @@ void MacUtils::UpdateUlMCS(size_t ul_mcs_index) {
   const bool early_term = true;
   const int16_t max_decoder_iter = 5;
 
-  size_t zc = SelectZc(base_graph, ul_code_rate_, ul_mod_order_bits_,
-                       ul_ofdm_data_num_, kCbPerSymbol, "uplink");
+  size_t zc;
+  if (prb_alloc_ == true) {
+    zc = SelectZc(base_graph, ul_code_rate_, ul_mod_order_bits_,
+                  ul_sc_per_prbg_ * frame_.NumUlDataSyms(), kCbPerSymbol,
+                  "uplink");
+  } else {
+    zc = SelectZc(base_graph, ul_code_rate_, ul_mod_order_bits_,
+                  ul_ofdm_data_num_, kCbPerSymbol, "uplink");
+  }
 
   // Always positive since ul_code_rate is smaller than 1024
   size_t num_rows =
@@ -249,8 +262,12 @@ void MacUtils::UpdateUlMCS(size_t ul_mcs_index) {
   ul_ldpc_config_ = LDPCconfig(base_graph, zc, max_decoder_iter, early_term,
                                num_cb_len, num_cb_codew_len, num_rows, 0);
 
-  ul_ldpc_config_.NumBlocksInSymbol((ul_ofdm_data_num_ * ul_mod_order_bits_) /
-                                    ul_ldpc_config_.NumCbCodewLen());
+  if (prb_alloc_ == true) {
+    ul_ldpc_config_.NumBlocksInSymbol(ul_ofdm_data_num_ / ul_sc_per_prbg_);
+  } else {
+    ul_ldpc_config_.NumBlocksInSymbol((ul_ofdm_data_num_ * ul_mod_order_bits_) /
+                                      ul_ldpc_config_.NumCbCodewLen());
+  }
   RtAssert(
       (frame_.NumULSyms() == 0) || (ul_ldpc_config_.NumBlocksInSymbol() > 0),
       "Uplink LDPC expansion factor is too large for number of OFDM data "
@@ -295,8 +312,15 @@ void MacUtils::UpdateDlMCS(size_t dl_mcs_index) {
   const bool early_term = true;
   const int16_t max_decoder_iter = 5;
 
-  size_t zc = SelectZc(base_graph, dl_code_rate_, dl_mod_order_bits_,
-                       dl_ofdm_data_num_, kCbPerSymbol, "downlink");
+  size_t zc;
+  if (prb_alloc_ == true) {
+    zc = SelectZc(base_graph, dl_code_rate_, dl_mod_order_bits_,
+                  dl_sc_per_prbg_ * frame_.NumDlDataSyms(), kCbPerSymbol,
+                  "downlink");
+  } else {
+    zc = SelectZc(base_graph, dl_code_rate_, dl_mod_order_bits_,
+                  dl_ofdm_data_num_, kCbPerSymbol, "downlink");
+  }
 
   // Always positive since dl_code_rate is smaller than 1024
   size_t num_rows =
@@ -309,8 +333,12 @@ void MacUtils::UpdateDlMCS(size_t dl_mcs_index) {
   dl_ldpc_config_ = LDPCconfig(base_graph, zc, max_decoder_iter, early_term,
                                num_cb_len, num_cb_codew_len, num_rows, 0);
 
-  dl_ldpc_config_.NumBlocksInSymbol((dl_ofdm_data_num_ * dl_mod_order_bits_) /
-                                    dl_ldpc_config_.NumCbCodewLen());
+  if (prb_alloc_ == true) {
+    dl_ldpc_config_.NumBlocksInSymbol(dl_ofdm_data_num_ / dl_sc_per_prbg_);
+  } else {
+    dl_ldpc_config_.NumBlocksInSymbol((dl_ofdm_data_num_ * dl_mod_order_bits_) /
+                                      dl_ldpc_config_.NumCbCodewLen());
+  }
   RtAssert(
       this->frame_.NumDLSyms() == 0 || dl_ldpc_config_.NumBlocksInSymbol() > 0,
       "Downlink LDPC expansion factor is too large for number of OFDM data "
