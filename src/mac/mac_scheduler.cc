@@ -23,16 +23,20 @@ size_t MacScheduler::ScheduledUeIndex(size_t frame_id, size_t sc_id,
                                                    sc_id)[sched_ue_id];
 }
 
-bool MacScheduler::IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id) {
-  return scheduler_model_->IsUeScheduled(frame_id, sc_id, ue_id);
+bool MacScheduler::IsUeScheduled(size_t frame_id, size_t prb_id, size_t ue_id) {
+  return scheduler_model_->IsUeScheduled(frame_id, prb_id, ue_id);
 }
 
-arma::uvec MacScheduler::ScheduledUeMap(size_t frame_id, size_t sc_id) {
-  return scheduler_model_->ScheduledUeMap(frame_id, sc_id);
+arma::uvec MacScheduler::ScheduledUeMap(size_t frame_id, size_t prb_id) {
+  return scheduler_model_->ScheduledUeMap(frame_id, prb_id);
 }
 
-arma::uvec MacScheduler::ScheduledUeList(size_t frame_id, size_t sc_id) {
-  return scheduler_model_->ScheduledUeList(frame_id, sc_id);
+arma::uvec MacScheduler::ScheduledUeList(size_t frame_id, size_t prb_id) {
+  return scheduler_model_->ScheduledUeList(frame_id, prb_id);
+}
+
+arma::uvec MacScheduler::SchedulePrbList(size_t frame_id, size_t ue_id) {
+  return scheduler_model_->SchedulePrbList(frame_id, ue_id);
 }
 
 size_t MacScheduler::UeScheduleIndex(size_t sched_id) {
@@ -74,4 +78,14 @@ void MacScheduler::UpdateMcsParams(size_t frame_id) {
                  ul_mcs, dl_mcs);
   this->Params().UpdateUlMcsParams(ul_mcs);
   this->Params().UpdateDlMcsParams(dl_mcs);
+}
+
+size_t MacScheduler::MacPacketLength(Direction dir, size_t frame_id,
+                                     size_t ue_id) {
+  if (cfg_->SlotScheduling()) {
+    return params_.NumBytesPerCb(dir) *
+           this->SchedulePrbList(frame_id, ue_id).n_elem;
+  } else {
+    return params_.MacPacketLength(dir);
+  }
 }

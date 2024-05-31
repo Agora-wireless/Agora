@@ -23,16 +23,19 @@ class SchedulerModel {
                       [[maybe_unused]] const std::vector<float>& snr_per_ue) {}
 
   virtual bool IsUeScheduled([[maybe_unused]] size_t frame_id,
-                             [[maybe_unused]] size_t sc_id,
+                             [[maybe_unused]] size_t prb_id,
                              [[maybe_unused]] size_t ue_id) {
     return false;
   }
   virtual arma::uvec ScheduledUeList([[maybe_unused]] size_t frame_id,
-                                     [[maybe_unused]] size_t sc_id) {
+                                     [[maybe_unused]] size_t prb_id) {
     return {};
   }
   virtual arma::uvec ScheduledUeMap([[maybe_unused]] size_t frame_id,
-                                    [[maybe_unused]] size_t sc_id) {
+                                    [[maybe_unused]] size_t prb_id) {
+    return {};
+  }
+  virtual arma::uvec SchedulePrbList(size_t frame_id, size_t ue_id) {
     return {};
   }
   virtual size_t UeScheduleIndex([[maybe_unused]] size_t sched_id) {

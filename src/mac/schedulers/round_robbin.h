@@ -18,8 +18,8 @@ class RoundRobbin : public SchedulerModel {
   ~RoundRobbin() override = default;
 
   bool IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id) final;
-  arma::uvec ScheduledUeList(size_t frame_id, size_t sc_id) final;
-  arma::uvec ScheduledUeMap(size_t frame_id, size_t sc_id) final;
+  arma::uvec ScheduledUeList(size_t frame_id, size_t prb_id) final;
+  arma::uvec ScheduledUeMap(size_t frame_id, size_t prb_id) final;
   size_t SelectedUlMcs(size_t frame_id, size_t ue_id) final;
   size_t SelectedDlMcs(size_t frame_id, size_t ue_id) final;
 };

@@ -20,6 +20,7 @@ class CustomSchedule : public SchedulerModel {
   bool IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id) final;
   arma::uvec ScheduledUeList(size_t frame_id, size_t sc_id) final;
   arma::uvec ScheduledUeMap(size_t frame_id, size_t sc_id) final;
+  arma::uvec SchedulePrbList(size_t frame_id, size_t ue_id);
   size_t UeScheduleIndex(size_t sched_id) final;
   size_t SelectedUlMcs(size_t frame_id, size_t ue_id) final;
   size_t SelectedDlMcs(size_t frame_id, size_t ue_id) final;
@@ -31,6 +32,8 @@ class CustomSchedule : public SchedulerModel {
   std::vector<uint8_t> ue_num_array_;
   std::vector<size_t> ue_sched_set_;
   std::vector<size_t> sched_id_array_;
+
+  size_t num_prbs_;
 };
 
 #endif  //CUSTOM_SCHEDULE_H_

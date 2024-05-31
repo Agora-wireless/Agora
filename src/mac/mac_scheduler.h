@@ -21,12 +21,14 @@ class MacScheduler {
   ~MacScheduler();
 
   bool IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id);
-  size_t ScheduledUeIndex(size_t frame_id, size_t sc_id, size_t sched_ue_id);
-  arma::uvec ScheduledUeList(size_t frame_id, size_t sc_id);
-  arma::uvec ScheduledUeMap(size_t frame_id, size_t sc_id);
-  size_t UeScheduleIndex(size_t sched_d);
+  size_t ScheduledUeIndex(size_t frame_id, size_t prb_id, size_t sched_ue_id);
+  arma::uvec ScheduledUeList(size_t frame_id, size_t prb_id);
+  arma::uvec ScheduledUeMap(size_t frame_id, size_t prb_id);
+  arma::uvec SchedulePrbList(size_t frame_id, size_t ue_id);
+  size_t UeScheduleIndex(size_t sched_id);
   size_t SelectedUlMcs(size_t frame_id, size_t ue_id);
   size_t SelectedDlMcs(size_t frame_id, size_t ue_id);
+  size_t MacPacketLength(Direction dir, size_t frame_id, size_t ue_id);
 
   //Used for Proportional Fairness Algorithm
   void UpdateCSI(size_t cur_sc_id, const arma::cx_fmat& csi_in);
