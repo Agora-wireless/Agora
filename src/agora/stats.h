@@ -71,10 +71,6 @@ class Stats {
   /// stats for all uplink and donwlink Doer types. Else return immediately.
   void UpdateStats(size_t frame_id);
 
-  /// Tsc difference between last cb decode and first rx packet received
-  /// in the last ofdm symbol of the frame
-  size_t MeasureLastFrameTsc();
-
   /// Measure the last frame latency
   /// Time taken with decoding - time starting process
   double MeasureLastFrameLatency();

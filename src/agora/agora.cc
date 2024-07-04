@@ -496,15 +496,16 @@ void Agora::Start() {
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
           const size_t base_sc_id = gen_tag_t(event.tags_[0]).sc_id_;
 
-          this->stats_->MasterSetTscSymbol(TsType::kDemulDone, frame_id, symbol_id, base_sc_id);
+          if (config_->DynamicCoreAlloc()) {
+            this->stats_->MasterSetTscSymbol(TsType::kDemulDone, frame_id, symbol_id, base_sc_id);
+          }
+
           stats_->PrintPerTaskDone(
               PrintType::kDemul, frame_id, symbol_id, base_sc_id,
               demul_counters_.GetTaskCount(frame_id, symbol_id));
 
           const bool last_demul_task =
               this->demul_counters_.CompleteTask(frame_id, symbol_id);
-          // AGORA_LOG_INFO("Agora:kDemul frame_id %zu, symbol_id %zu, base_sc_id %zu, tsc %zu, last_demul_task %zu\n",
-          //   frame_id, symbol_id, base_sc_id, this->stats_->MasterGetTscSymbol(TsType::kDemulDone, frame_id, symbol_id, base_sc_id), last_demul_task);
 
           if (last_demul_task == true) {
             if (kUplinkHardDemod == false) {
@@ -574,11 +575,13 @@ void Agora::Start() {
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
           const size_t cb_id = gen_tag_t(event.tags_[0]).cb_id_;
 
-          this->stats_->MasterSetTscSymbol(TsType::kDecodeDone, frame_id, symbol_id, cb_id);
+          if (config_->DynamicCoreAlloc()) {
+            this->stats_->MasterSetTscSymbol(TsType::kDecodeDone, frame_id, symbol_id, cb_id);
+          }
+
           const bool last_decode_task =
               this->decode_counters_.CompleteTask(frame_id, symbol_id);
-          // AGORA_LOG_INFO("Agora:kDecodeDone frame_id %zu, symbol_id %zu, cb_id %zu, tsc %zu, last_decode_task %zu\n",
-          //   frame_id, symbol_id, cb_id, this->stats_->MasterGetTscSymbol(TsType::kDecodeDone, frame_id, symbol_id, cb_id), last_decode_task);
+
           if (last_decode_task == true) {
             if constexpr (kEnableMac) {
               ScheduleUsers(EventType::kPacketToMac, frame_id, symbol_id);
@@ -1108,9 +1111,11 @@ void Agora::UpdateRanConfig(RanConfig rc) {
 void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id, size_t ant_id) {
   const size_t frame_slot = frame_id % kFrameWnd;
   auto symbol_type = config_->Frame().GetSymbolType(symbol_id);
-  this->stats_->MasterSetTscSymbol(TsType::kSymbolRX, frame_id, symbol_id, ant_id);
-  // AGORA_LOG_INFO("Agora:kSymbolRX frame_id %zu, symbol_id %zu, ant_id %zu tsc %zu\n", frame_id, symbol_id, ant_id,
-  //   this->stats_->MasterGetTscSymbol(TsType::kSymbolRX, frame_id, symbol_id, ant_id));
+
+  if (config_->DynamicCoreAlloc()) {
+    this->stats_->MasterSetTscSymbol(TsType::kSymbolRX, frame_id, symbol_id, ant_id);
+  }
+
   if (symbol_type == SymbolType::kPilot) {
     rx_counters_.num_pilot_pkts_[frame_slot]++;
     if (rx_counters_.num_pilot_pkts_.at(frame_slot) ==
