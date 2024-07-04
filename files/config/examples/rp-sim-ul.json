@@ -4,9 +4,10 @@
   "demul_block_size": 48,
   "bs_radio_num": 64,
   "ue_radio_num": 16,
-  "adapt_ues": true,
+  "adapt_ues": false,
   "ul_mcs" : {
-    "mcs_index" : 17 /* 64QAM, 466/1024 from Table 6.1.4.1-1 of 3GPP TS 38.214 */
+    "mcs_index" : 25, /* 64QAM, 466/1024 from Table 6.1.4.1-1 of 3GPP TS 38.214 */
+    "decoderIter" : 5
   },
   "dl_mcs" : {
     "mcs_index" : 25 /* 256QAM, 885/1024 from Table 5.1.3.1-2 of 3GPP TS 38.214 */
@@ -26,9 +27,9 @@
   "rp_remote_host_name": "127.0.0.1",
   "rp_tx_port": 3000,
   "rp_rx_port": 4000,
-  "worker_thread_num": 8,
+  "worker_thread_num": 10,
   "socket_thread_num": 1,
-  "max_frame": 100000,
+  "max_frame": 1000,
   "sample_rate": 2.048e6, /* To make symbol duration as 1ms */
-  "noise_level": 0.01
+  "noise_level": 0.01 /* 40 dB SNR */
 }

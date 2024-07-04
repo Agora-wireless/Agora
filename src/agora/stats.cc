@@ -321,9 +321,14 @@ void Stats::SaveToFile() {
   }
   std::fclose(fp_debug);
 
+  size_t snr_db = (size_t) 10*std::log10((float)(1.0F)/(config_->NoiseLevel()*config_->NoiseLevel()));
+
   const std::string filename_input = kStatsSymbolDataFilename +
     "_bsant" + std::to_string(config_->BsAntNum()) +
     "_ueant" + std::to_string(config_->UeAntNum()) +
+    "_mcsul" + std::to_string(config_->McsIndex(Direction::kUplink)) +
+    "_snrdb" + std::to_string(snr_db) +
+    "_ldpciter" + std::to_string(config_->LdpcConfig(Direction::kUplink).MaxDecoderIter()) +
     "_workers" + std::to_string(config_->WorkerThreadNum()) + ".txt";
 
   AGORA_LOG_INFO("Stats: Saving symbol level master timestamps to %s\n",
