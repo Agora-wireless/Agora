@@ -460,8 +460,6 @@ void Agora::Start() {
                                      beam_counters_.GetTaskCount(frame_id), 0);
             const bool last_beam_task =
                 this->beam_counters_.CompleteTask(frame_id);
-            // AGORA_LOG_INFO("Agora:kBeam frame_id %zu, last_beam_task %zu\n",
-            //   frame_id, last_beam_task);
             if (last_beam_task == true) {
               this->stats_->MasterSetTsc(TsType::kBeamDone, frame_id);
               beam_last_frame_ = frame_id;
@@ -807,8 +805,6 @@ void Agora::Start() {
               precode_counters_.GetTaskCount(frame_id, symbol_id));
           const bool last_precode_task =
               this->precode_counters_.CompleteTask(frame_id, symbol_id);
-          AGORA_LOG_INFO("Agora:kPrecode frame_id %zu, symbol_id %zu, sc_id %zu, last_precode_task %zu\n",
-            frame_id, symbol_id, sc_id, last_precode_task);
 
           if (last_precode_task == true) {
             // precode_cur_frame_for_symbol_.at(

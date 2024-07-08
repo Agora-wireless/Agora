@@ -18,6 +18,7 @@
 // s -> sample standard deviation
 // m -> sample mean
 // For r = 5%, s = 53, m = 535 (64x16 MIMO, 25 MCS UL, 5 UL LDPC Iterations and 10 workers Agora configuration), n = 15
+// Reference for Statistical Analysis: "The art of Computer Systems Perforamnce Analysis - Raj Jain"
 
 use tokio::net::UdpSocket;
 use tokio::time::{delay_for, Duration};
@@ -729,7 +730,6 @@ impl AgoraEnv for MyAgoraEnv {
             println!("increasing_latency (printing reverse): {:?}\n", increasing_latency_elements);
             let decreasing_latency_elements = &decreasing_latency;
             println!("decreasing_latency (printing reverse): {:?}\n", decreasing_latency_elements);
-            // println!("latency_pattern: {}\n", latency_pattern);
         }
         
         (self.cores_latency_sgd[current_cores_rl as usize - 2 * delta as usize], self.cores_latency_sgd[current_cores_rl as usize - delta as usize], self.cores_latency_sgd[current_cores_rl as usize], self.cores_latency_sgd[current_cores_rl as usize + delta as usize], latency_pattern)
@@ -740,7 +740,6 @@ impl AgoraEnv for MyAgoraEnv {
         let cores = start_cores;
         let delta = 1;
         let mut update_cores = 1;
-        // let mut back_cores = self.cores_latency_window_sgd - 1 as u16;
         let mut back_cores = self.num_max_cores_sgd;
         let optimal_cores;
         let mut oscillation_started = false;
@@ -757,12 +756,6 @@ impl AgoraEnv for MyAgoraEnv {
             let gradient = (latency2 - latency1) / (delta as f32);
             println!("iter_count: {}, current_cores: {}, osc_latency0: {}, osc_latency1: {}, osc_latency2: {}, osc_latency3: {}, latency_pattern: {}, gradient: {}\n",
                 iter_count, cores + iter_count as u16 + 1 as u16, osc_latency0, osc_latency1, osc_latency2, osc_latency3, latency_pattern, gradient);
-
-            // let diff = -self.learn_rate_sgd * gradient;
-            // println!("diff: {}, learn_rate:{}, tolerance: {}\n", diff, self.learn_rate_sgd, self.tolerance_sgd);
-            // if diff.abs() < self.tolerance_sgd {
-            //     return Ok(cores); // Terminate the loop by returning current cores
-            // }
 
             println!("Before update: oscillation_started: {}, update_cores: {}, back_cores: {}\n", oscillation_started, update_cores, back_cores);
             if latency_pattern == 2 { // Oscillating
@@ -796,6 +789,7 @@ impl AgoraEnv for MyAgoraEnv {
             }
             println!("After udpate: oscillation_started: {}, update_cores: {}, back_cores: {}\n", oscillation_started, update_cores, back_cores);
 
+            // A simple gradient check based on sign change below
             // if gradient > 0.0 {
             //     return Ok(cores - 1); // Terminate the loop by returning previous cores
             // }
@@ -929,7 +923,8 @@ async fn main() -> io::Result<()> {
                 let alpha = 0.1;  // learning rate
                 let gamma = 0.9;  // discount factor
                 let epsilon = 0.1;  // exploration-exploitation trade-off
-        
+
+                // num_episodes and terminate_count can be modified as needed based on state space size and training accuracy 
                 let num_episodes = 1000; // Episodes count for training
                 let terminate_count = 1000; // Epochs count to terminate training when not converging
 
@@ -1050,7 +1045,7 @@ async fn main() -> io::Result<()> {
                         }
                         println!("Training: Re-initializing cores in Agora as per reset state - END\n");
 
-                        // delay_for(Duration::from_millis(PERIODICITY)).await;
+                        // delay_for(Duration::from_millis(UDP_WAIT_TIME)).await;
                         let retrieved_msg = retrieve_agora_traffic(&mut socket).await?;
                         let reset_absolute_latency = retrieved_msg[0];
                         let reset_cores = retrieved_msg[1];
@@ -1279,7 +1274,7 @@ async fn main() -> io::Result<()> {
                     }
                     println!("Testing: Re-initializing cores in Agora as per reset state - END\n");
 
-                    // delay_for(Duration::from_millis(PERIODICITY)).await;
+                    // delay_for(Duration::from_millis(UDP_WAIT_TIME)).await;
                     let retrieved_msg = retrieve_agora_traffic(&mut socket).await?;
                     let reset_absolute_latency = retrieved_msg[0];
                     let reset_cores = retrieved_msg[1];

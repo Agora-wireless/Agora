@@ -145,14 +145,9 @@ void ResourceProvisionerThread::RunEventLoop() {
 
   PinToCoreWithOffset(ThreadType::kWorkerRpTXRX, core_offset_,
                       0 /* thread ID */);
-  // keep the frequency of function call
-  // size_t last_frame_tx_tsc = 0;
 
   while (cfg_->Running() == true) {
-    // if ((GetTime::Rdtsc() - last_frame_tx_tsc) > tsc_delta_) {
       ReceiveEventFromAgora();
       ReceiveUdpPacketsFromRp();
-    //   last_frame_tx_tsc = GetTime::Rdtsc();
-    // }
   }
 }

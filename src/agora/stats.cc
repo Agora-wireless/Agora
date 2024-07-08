@@ -338,7 +338,6 @@ void Stats::SaveToFile() {
         }
         // Find tsc of first RX packet and last decode events in every ofdm symbol
         for (size_t k = ul_data_symbol_start; k < config_->Frame().NumTotalSyms(); k++) {
-          // AGORA_LOG_INFO("stats: frame: %zu, i: %zu, k: %zu\n", frame, i, k);
           size_t master_min_tsc_symbolrx = MasterGetTscSymbol(TsType::kSymbolRX, i, k, 0);
           size_t master_min_tsc_symbolrx_idx = 0;
           for (size_t l = 1; l < config_->BsAntNum(); l++) {
