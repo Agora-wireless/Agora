@@ -5,6 +5,7 @@
 #include "scheduler_model.h"
 
 //scheduler models
+#include "custom_schedule.h"
 #include "logger.h"
 #include "proportional_fairness.h"
 #include "round_robbin.h"
@@ -17,6 +18,8 @@ std::unique_ptr<SchedulerModel> SchedulerModel::CreateSchedulerModel(
     return std::make_unique<RoundRobbin>(cfg);
   } else if (scheduler_type == "proportional_fairness") {
     return std::make_unique<ProportionalFairness>(cfg);
+  } else if (scheduler_type == "custom") {
+    return std::make_unique<CustomSchedule>(cfg);
   } else {
     AGORA_LOG_WARN("Invalid scheduler type (%s), using Round Robbin... \n",
                    scheduler_type.c_str());

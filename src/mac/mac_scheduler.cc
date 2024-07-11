@@ -49,6 +49,10 @@ arma::uvec MacScheduler::ScheduledUeList(size_t frame_id, size_t sc_id) {
   return scheduler_model_->ScheduledUeList(frame_id, sc_id);
 }
 
+size_t MacScheduler::UeScheduleIndex(size_t sched_id) {
+  return scheduler_model_->UeScheduleIndex(sched_id);
+}
+
 void MacScheduler::UpdateScheduler(size_t frame_id) {
   scheduler_model_->Update(frame_id, csi_, snr_per_ue_);
 }

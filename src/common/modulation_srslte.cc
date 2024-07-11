@@ -249,7 +249,7 @@ void DemodQpskSoftSse(float* x, int8_t* z, int len) {
   // too many permutes across 128-bit boundaries
 
   __m128 s = _mm_set1_ps(-SCALE_BYTE_CONV_QPSK * M_SQRT2);
-  if (((size_t)(x)&0x0F) == 0 && ((size_t)(z)&0x0F) == 0) {
+  if (((size_t)(x) & 0x0F) == 0 && ((size_t)(z) & 0x0F) == 0) {
     for (; i < len - 16 + 1; i += 16) {
       __m128 a = _mm_load_ps(&x[i]);
       __m128 b = _mm_load_ps(&x[i + 1 * 4]);

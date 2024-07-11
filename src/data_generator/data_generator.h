@@ -27,6 +27,7 @@ static const std::string kUlIfftPrefix = "ul_ifft_data_";
 static const std::string kDlIfftPrefix = "dl_ifft_data_";
 static const std::string kUlRxPrefix = "ul_rx_data_";
 static const std::string kDlTxPrefix = "dl_tx_data_";
+static const std::string kUeSchedulePrefix = "ue_schedule_map_";
 
 using rand_byte_generator =
     std::independent_bits_engine<std::mt19937, 8, std::uint_fast8_t>;

@@ -11,12 +11,14 @@
 #include "config.h"
 #include "crc.h"
 #include "gettime.h"
+#include "mac_ring_buffer.h"
+#include "mac_scheduler.h"
 #include "message.h"
+#include "phy_stats.h"
 #include "ran_config.h"
 #include "symbols.h"
 #include "udp_comm.h"
 #include "udp_server.h"
-
 /**
  * @brief The MAC thread that runs alongside the PHY processing at the Agora
  * server or client.
@@ -44,8 +46,8 @@ class MacThreadClient {
       PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
       Table<int8_t>* ul_bits_buffer, Table<int8_t>* ul_bits_buffer_status,
       moodycamel::ConcurrentQueue<EventData>* rx_queue,
-      moodycamel::ConcurrentQueue<EventData>* tx_queue,
-      const std::string& log_filename = "");
+      moodycamel::ConcurrentQueue<EventData>* tx_queue, MacScheduler* mac_sched,
+      PhyStats* in_phy_stats, const std::string& log_filename = "");
 
   ~MacThreadClient();
 
@@ -72,10 +74,13 @@ class MacThreadClient {
   void ProcessControlInformation();
 
   // Receive user data bits (downlink bits at the MAC thread running at the
-  // server, uplink bits at the MAC thread running at the client) and forward
-  // them to the PHY.
-  void ProcessUdpPacketsFromApps(RBIndicator ri);
-  void ProcessUdpPacketsFromAppsClient(const char* payload, RBIndicator ri);
+  // server, uplink bits at the MAC thread running at the client)
+  // and save them to ring buffers
+  void ProcessUdpPacketsFromApps();
+
+  // Triggered by message from PHY, read MAC Packets from appropriate buffer
+  // and forward to PHY
+  void SendCodeblocksToPhy(EventData event);
 
   // If Mode::kServer, this thread is running at the Agora server. Else at
   // the client.
@@ -139,6 +144,10 @@ class MacThreadClient {
   // to server_ for clarity.
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer_;
 
+  Table<int8_t> dl_mac_bytes_;
+  size_t num_dl_mac_bytes_;
+  Table<int8_t> ul_mac_bytes_;
+  size_t num_ul_mac_bytes_;
   struct {
     // ul_bits_buffer_id_[i] is the index of the uplink data bits buffer to
     // next use for radio #i
@@ -154,8 +163,14 @@ class MacThreadClient {
   // FIFO queue for sending messages to the master thread
   moodycamel::ConcurrentQueue<EventData>* tx_queue_;
 
+  MacScheduler* mac_sched_;
+  PhyStats* phy_stats_;
+
   // CRC
   std::unique_ptr<DoCRC> crc_obj_;
+
+  RBIndicator* ri_;
+  MacMultiRingBuffer mac_ring_;
 };
 
 #endif  // MAC_THREAD_H_

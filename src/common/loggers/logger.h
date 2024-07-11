@@ -108,10 +108,10 @@ constexpr size_t kLogThreadCount = 1;
   spdlog::set_default_logger(                                         \
       spdlog::create_async_nb<spdlog::sinks::stdout_color_sink_mt>(   \
           "console"));                                                \
-  auto f = std::make_unique<spdlog::pattern_formatter>(               \
+  auto formatter = std::make_unique<spdlog::pattern_formatter>(       \
       spdlog::pattern_time_type::utc, std::string(""));               \
-  f->set_pattern("[%S:%f][%^%L%$] %v");                               \
-  spdlog::set_formatter(std::move(f));                                \
+  formatter->set_pattern("[%S:%f][%^%L%$] %v");                       \
+  spdlog::set_formatter(std::move(formatter));                        \
   spdlog::set_level(SPDLOG_LEVEL);
 
 #define AGORA_LOG_SHUTDOWN() spdlog::shutdown();

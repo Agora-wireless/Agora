@@ -353,7 +353,7 @@ size_t RadioSocket::UnpackSamples(std::vector<void*>& out_samples,
       processed_bytes += bytes_per_element_;
       RtAssert(rx_bytes_ >= processed_bytes, "Exceeded rx byte count!");
     }  // end pkt
-  }    // end (processed_samples < req_samples) && (processed_bytes < rx_bytes_)
+  }  // end (processed_samples < req_samples) && (processed_bytes < rx_bytes_)
   rx_bytes_ = rx_bytes_ - processed_bytes;
   rx_samples_ = rx_samples_ - (processed_samples * num_out_dims);
   AGORA_LOG_TRACE(

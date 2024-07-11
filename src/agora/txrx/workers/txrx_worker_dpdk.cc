@@ -146,7 +146,7 @@ void TxRxWorkerDpdk::DoTxRx() {
         rx_index = 0;
       }
     }  // send_result == 0
-  }    // running
+  }  // running
   running_ = false;
 }
 

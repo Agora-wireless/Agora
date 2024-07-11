@@ -5,6 +5,7 @@
  */
 #include "cyclic_shift.h"
 
+#include <cstdint>
 #include <cstring> /* std::strerror, std::memset, std::memcpy */
 
 namespace avx2enc {

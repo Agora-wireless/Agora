@@ -20,7 +20,6 @@
 #include "signal_handler.h"
 
 static const bool kPrintAdaptUes = false;
-static const bool kDebugPrintPacketsFromMac = false;
 static const bool kDebugDeferral = true;
 
 static const std::string kProjectDirectory = TOSTRING(PROJECT_DIRECTORY);
@@ -51,7 +50,7 @@ static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
 // add 1 if dedicating core for RP
 Agora::Agora(Config* const cfg)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum() +
-                               (cfg->DynamicCoreAlloc() ? 1 : 0)),
+                               1 + (cfg->DynamicCoreAlloc() ? 1 : 0)),
       config_(cfg),
       mac_sched_(std::make_unique<MacScheduler>(cfg)),
       stats_(std::make_unique<Stats>(cfg)),
@@ -73,7 +72,6 @@ Agora::Agora(Config* const cfg)
   InitializeQueues();
   InitializeCounters();
   InitializeThreads();
-  InitializeUesFromFile();
 
   if (kRecordUplinkFrame) {
     recorder_ = std::make_unique<Agora_recorder::RecorderThread>(
@@ -89,9 +87,7 @@ Agora::Agora(Config* const cfg)
 }
 
 Agora::~Agora() {
-  if constexpr (kEnableMac) {
-    mac_std_thread_.join();
-  }
+  mac_std_thread_.join();
 
   worker_set_.reset();
   if (recorder_ != nullptr) {
@@ -115,18 +111,14 @@ void Agora::Stop() {
   packet_tx_rx_.reset();
 }
 
-void Agora::SendSnrReport(EventType event_type, size_t frame_id,
-                          size_t symbol_id) {
-  assert(event_type == EventType::kSNRReport);
-  unused(event_type);
-  auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
-  for (size_t i = 0; i < config_->UeAntNum(); i++) {
-    EventData snr_report(EventType::kSNRReport, base_tag.tag_);
-    snr_report.num_tags_ = 2;
-    const float snr = this->phy_stats_->GetEvmSnr(frame_id, i);
-    std::memcpy(&snr_report.tags_[1], &snr, sizeof(float));
-    TryEnqueueFallback(&mac_request_queue_, snr_report);
-    base_tag.ue_id_++;
+void Agora::ScheduleDownlinkMAC(size_t frame_id) {
+  if (config_->Frame().NumDLSyms() > 0) {
+    auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+    for (const auto& ue : ue_list) {
+      auto base_tag = gen_tag_t::FrmUe(frame_id, ue);
+      EventData mac_event(EventType::kPacketFromMac, base_tag.tag_);
+      TryEnqueueFallback(&mac_request_queue_, mac_event);
+    }
   }
 }
 
@@ -258,8 +250,9 @@ void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
 void Agora::ScheduleCodeblocks(EventType event_type, Direction dir,
                                size_t frame_id, size_t symbol_idx) {
   auto base_tag = gen_tag_t::FrmSymCb(frame_id, symbol_idx, 0);
-  const size_t num_tasks = config_->SpatialStreamsNum() *
-                           config_->LdpcConfig(dir).NumBlocksInSymbol();
+  auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0);
+  const size_t num_tasks =
+      ue_list.n_elem * config_->LdpcConfig(dir).NumBlocksInSymbol();
   size_t num_blocks = num_tasks / config_->EncodeBlockSize();
   const size_t num_remainder = num_tasks % config_->EncodeBlockSize();
   if (num_remainder > 0) {
@@ -283,14 +276,29 @@ void Agora::ScheduleCodeblocks(EventType event_type, Direction dir,
   }
 }
 
-void Agora::ScheduleUsers(EventType event_type, size_t frame_id,
-                          size_t symbol_id) {
+void Agora::ScheduleUsers([[maybe_unused]] EventType event_type,
+                          size_t frame_id, size_t symbol_id) {
   assert(event_type == EventType::kPacketToMac);
-  auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
 
-  for (size_t i = 0; i < config_->SpatialStreamsNum(); i++) {
+  auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0);
+  for (const auto& ue_id : ue_list) {
+    auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id);
     TryEnqueueFallback(&mac_request_queue_,
                        EventData(EventType::kPacketToMac, base_tag.tag_));
+  }
+}
+
+void Agora::SendSnrReport(EventType event_type, size_t frame_id,
+                          size_t symbol_id) {
+  assert(event_type == EventType::kSNRReport);
+  unused(event_type);
+  auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
+  for (size_t i = 0; i < config_->UeAntNum(); i++) {
+    EventData snr_report(event_type, base_tag.tag_);
+    snr_report.num_tags_ = 2;
+    const float snr = this->phy_stats_->GetEvmSnr(frame_id, i);
+    std::memcpy(&snr_report.tags_[1], &snr, sizeof(float));
+    TryEnqueueFallback(&mac_request_queue_, snr_report);
     base_tag.ue_id_++;
   }
 }
@@ -327,18 +335,17 @@ size_t Agora::FetchEvent(std::vector<EventData>& events_list,
       }
     }
 
-    if constexpr (kEnableMac) {
-      if (remaining_events > 0) {
-        const size_t new_events = mac_response_queue_.try_dequeue_bulk(
-            &events_list.at(total_events), remaining_events);
-        remaining_events = remaining_events - new_events;
-        total_events = total_events + new_events;
-      } else {
-        AGORA_LOG_WARN(
-            "remaining_events = %zu:%zu, mac queue num elements %zu\n",
-            remaining_events, total_events, mac_response_queue_.size_approx());
-      }
+    if (remaining_events > 0) {
+      const size_t new_events = mac_response_queue_.try_dequeue_bulk(
+          &events_list.at(total_events), remaining_events);
+      remaining_events = remaining_events - new_events;
+      total_events = total_events + new_events;
+    } else {
+      AGORA_LOG_WARN("remaining_events = %zu:%zu, mac queue num elements %zu\n",
+                     remaining_events, total_events,
+                     mac_response_queue_.size_approx());
     }
+
     if (config_->DynamicCoreAlloc()) {
       if (remaining_events > 0) {
         const size_t new_events = rp_response_queue_.try_dequeue_bulk(
@@ -391,11 +398,15 @@ void Agora::Start() {
 
     // Handle each event
     for (size_t ev_i = 0; ev_i < num_events; ev_i++) {
-      EventData& event = events_list.at(ev_i);
-      size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-      if (frame_id == this->config_->FrameToProfile()) {
-        stats_->LogDequeueStatsMaster(event.event_type_, dequeue_start_tsc,
-                                      dequeue_end_tsc);
+      const EventData& event = events_list.at(ev_i);
+      //Scope this frame id, just in case it is not in the same spot
+      //for each event
+      {
+        const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+        if (frame_id == this->config_->FrameToProfile()) {
+          stats_->LogDequeueStatsMaster(event.event_type_, dequeue_start_tsc,
+                                        dequeue_end_tsc);
+        }
       }
 
       // FFT processing is scheduled after falling through the switch
@@ -404,27 +415,11 @@ void Agora::Start() {
           RxPacket* rx = rx_tag_t(event.tags_[0u]).rx_packet_;
           Packet* pkt = rx->RawPacket();
 
-          if ((config_->AdaptUes() == true) and
-              (config_->SpatialStreamsNum() !=
-               adapt_ues_array_.at(pkt->frame_id_))) {
-            AGORA_LOG_INFO(
-                "[ALERTTTTTT]: Spatial Streams Update!!! "
-                "configured/previous number of spatial streams: %zu, "
-                "updated number of spatial streams: %zu, frame id: %zu \n",
-                config_->SpatialStreamsNum(),
-                adapt_ues_array_.at(pkt->frame_id_),
-                frame_tracking_.cur_proc_frame_id_);
-            config_->UpdateSpatialStreamsNum(
-                adapt_ues_array_.at(pkt->frame_id_));
-            ReInitializeCounters();
-          }
-
           AGORA_LOG_TRACE(
               "Agora: event_type_ %s, cur_sche_frame_id_ %zu, "
-              "frame_id_ %zu, symbol_id_ %zu, ant_id_ %zu, adapt ue(s) %zu\n",
+              "frame_id_ %zu, symbol_id_ %zu, ant_id_ %zu\n",
               "kPacketRX", frame_tracking_.cur_sche_frame_id_, pkt->frame_id_,
-              pkt->symbol_id_, pkt->ant_id_,
-              adapt_ues_array_.at(pkt->frame_id_));
+              pkt->symbol_id_, pkt->ant_id_);
 
           if (recorder_ != nullptr) {
             rx->Use();
@@ -581,9 +576,7 @@ void Agora::Start() {
               this->decode_counters_.CompleteTask(frame_id, symbol_id);
 
           if (last_decode_task == true) {
-            if constexpr (kEnableMac) {
-              ScheduleUsers(EventType::kPacketToMac, frame_id, symbol_id);
-            }
+            ScheduleUsers(EventType::kPacketToMac, frame_id, symbol_id);
             stats_->PrintPerSymbolDone(
                 PrintType::kDecode, frame_id, symbol_id,
                 decode_counters_.GetSymbolCount(frame_id) + 1);
@@ -595,13 +588,6 @@ void Agora::Start() {
               auto ue_map = mac_sched_->ScheduledUeMap(frame_id, 0u);
               this->phy_stats_->RecordBer(frame_id, ue_map);
               this->phy_stats_->RecordSer(frame_id, ue_map);
-              if constexpr (kEnableMac == false) {
-                assert(frame_tracking_.cur_proc_frame_id_ == frame_id);
-                const bool work_finished = this->CheckFrameComplete(frame_id);
-                if (work_finished == true) {
-                  goto finish;
-                }
-              }
             }
           }
         } break;
@@ -688,9 +674,9 @@ void Agora::Start() {
         case EventType::kPacketToMac: {
           const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-
-          const bool last_tomac_task =
-              this->tomac_counters_.CompleteTask(frame_id, symbol_id);
+          auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+          const bool last_tomac_task = this->tomac_counters_.CompleteTask(
+              frame_id, symbol_id, ue_list.n_elem);
           if (last_tomac_task == true) {
             stats_->PrintPerSymbolDone(
                 PrintType::kPacketToMac, frame_id, symbol_id,
@@ -712,40 +698,11 @@ void Agora::Start() {
 
         case EventType::kPacketFromMac: {
           // This is an entire frame (multiple mac packets)
-          const size_t ue_id = rx_mac_tag_t(event.tags_[0u]).tid_;
-          const size_t radio_buf_id = rx_mac_tag_t(event.tags_[0u]).offset_;
-          const auto* pkt = reinterpret_cast<const MacPacketPacked*>(
-              &agora_memory_->GetDlBits()[ue_id][radio_buf_id *
-                                                 config_->MacBytesNumPerframe(
-                                                     Direction::kDownlink)]);
-
-          AGORA_LOG_INFO("Agora: frame %d @ offset %zu %zu @ location %zu\n",
-                         pkt->Frame(), ue_id, radio_buf_id,
-                         reinterpret_cast<intptr_t>(pkt));
-
-          if (kDebugPrintPacketsFromMac) {
-            std::stringstream ss;
-
-            for (size_t dl_data_symbol = 0;
-                 dl_data_symbol < config_->Frame().NumDlDataSyms();
-                 dl_data_symbol++) {
-              ss << "Agora: kPacketFromMac, frame " << pkt->Frame()
-                 << ", symbol " << std::to_string(pkt->Symbol()) << " crc "
-                 << std::to_string(pkt->Crc()) << " bytes: ";
-              for (size_t i = 0; i < pkt->PayloadLength(); i++) {
-                ss << std::to_string((pkt->Data()[i])) << ", ";
-              }
-              ss << std::endl;
-              pkt = reinterpret_cast<const MacPacketPacked*>(
-                  reinterpret_cast<const uint8_t*>(pkt) +
-                  config_->MacPacketLength(Direction::kDownlink));
-            }
-            AGORA_LOG_INFO("%s\n", ss.str().c_str());
-          }
-
-          const size_t frame_id = pkt->Frame();
-          const bool last_ue =
-              this->mac_to_phy_counters_.CompleteTask(frame_id, 0);
+          const size_t frame_id = rx_mac_tag_t(event.tags_[0u]).frame_id_;
+          // Assert ue_id is in ue_list
+          auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+          const bool last_ue = this->mac_to_phy_counters_.CompleteTask(
+              frame_id, 0, ue_list.n_elem);
           if (last_ue == true) {
             // schedule this frame's encoding
             // Defer the schedule.  If frames are already deferred or the
@@ -771,8 +728,9 @@ void Agora::Start() {
             const size_t frame_id = gen_tag_t(event.tags_[i]).frame_id_;
             const size_t symbol_id = gen_tag_t(event.tags_[i]).symbol_id_;
 
-            const bool last_encode_task =
-                encode_counters_.CompleteTask(frame_id, symbol_id);
+            auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+            const bool last_encode_task = encode_counters_.CompleteTask(
+                frame_id, symbol_id, ue_list.n_elem);
             if (last_encode_task == true) {
               this->encode_cur_frame_for_symbol_.at(
                   cfg->Frame().GetDLSymbolIdx(symbol_id)) = frame_id;
@@ -864,14 +822,15 @@ void Agora::Start() {
                   this->ifft_counters_.CompleteSymbol(frame_id);
               if (last_ifft_symbol == true) {
                 ifft_next_symbol_ = 0;
+                this->ifft_counters_.Reset(frame_id);
                 this->stats_->MasterSetTsc(TsType::kIFFTDone, frame_id);
                 stats_->PrintPerFrameDone(PrintType::kIFFT, frame_id);
                 assert(frame_id == frame_tracking_.cur_proc_frame_id_);
                 this->CheckIncrementScheduleFrame(frame_id, kDownlinkComplete);
-                const bool work_finished = this->CheckFrameComplete(frame_id);
+                /*const bool work_finished = this->CheckFrameComplete(frame_id);
                 if (work_finished == true) {
                   goto finish;
-                }
+                }*/
               }
             }
           }
@@ -941,6 +900,7 @@ void Agora::Start() {
             }
           }
         } break;
+
         default:
           AGORA_LOG_ERROR("Wrong event type in message queue!");
           std::exit(0);
@@ -988,7 +948,7 @@ void Agora::Start() {
         }
       }
     } /* End of for */
-  }   /* End of while */
+  } /* End of while */
 
 finish:
   AGORA_LOG_INFO("Agora: printing stats and saving to file\n");
@@ -1094,8 +1054,8 @@ void Agora::HandleEventFft(size_t tag) {
           phy_stats_->PrintCalibSnrStats(previous_cal_slot);
         }
       }  // kPrintPhyStats
-    }    // last_rc_task
-  }      // kCaLDL || kCalUl
+    }  // last_rc_task
+  }  // kCaLDL || kCalUl
 }
 
 void Agora::UpdateRanConfig(RanConfig rc) {
@@ -1131,20 +1091,17 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id, size_t ant_id) {
   }
   // Receive first packet in a frame
   if (rx_counters_.num_pkts_.at(frame_slot) == 0) {
-    if constexpr (kEnableMac == false) {
-      // schedule this frame's encoding
-      // Defer the schedule.  If frames are already deferred or the current
-      // received frame is too far off
-      if ((encode_deferral_.empty() == false) ||
-          (frame_id >=
-           (frame_tracking_.cur_proc_frame_id_ + kScheduleQueues))) {
-        if (kDebugDeferral) {
-          AGORA_LOG_INFO("   +++ Deferring encoding of frame %zu\n", frame_id);
-        }
-        encode_deferral_.push(frame_id);
-      } else {
-        ScheduleDownlinkProcessing(frame_id);
+    // schedule this frame's encoding
+    // Defer the schedule.  If frames are already deferred or the current
+    // received frame is too far off
+    if ((encode_deferral_.empty() == false) ||
+        (frame_id >= (frame_tracking_.cur_proc_frame_id_ + kScheduleQueues))) {
+      if (kDebugDeferral) {
+        AGORA_LOG_INFO("   +++ Deferring encoding of frame %zu\n", frame_id);
       }
+      encode_deferral_.push(frame_id);
+    } else {
+      ScheduleDownlinkMAC(frame_id);
     }
     this->stats_->MasterSetTsc(TsType::kFirstSymbolRX, frame_id);
     if (kDebugPrintPerFrameStart) {
@@ -1177,7 +1134,7 @@ void Agora::InitializeQueues() {
   // Create concurrent queues for each Doer
   message_ = std::make_unique<MessageInfo>(kDefaultWorkerQueueSize *
                                            data_symbol_num_perframe);
-
+  // An additional set of ptoks for MAC
   for (size_t i = 0; i < config_->SocketThreadNum(); i++) {
     rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(message_queue_);
     tx_ptoks_ptr_[i] = new moodycamel::ProducerToken(
@@ -1195,29 +1152,6 @@ void Agora::FreeQueues() {
     delete tx_ptoks_ptr_[i];
     rx_ptoks_ptr_[i] = nullptr;
     tx_ptoks_ptr_[i] = nullptr;
-  }
-}
-
-void Agora::ReInitializeCounters() {
-  const auto& cfg = config_;
-
-  AGORA_LOG_INFO("Agora: Re-Initializing counters with %zu spatial stream(s)\n",
-                 cfg->SpatialStreamsNum());
-
-  decode_counters_.Init(
-      cfg->Frame().NumULSyms(),
-      cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
-          cfg->SpatialStreamsNum());
-
-  tomac_counters_.Init(cfg->Frame().NumULSyms(), cfg->SpatialStreamsNum());
-
-  if (config_->Frame().NumDLSyms() > 0) {
-    encode_counters_.Init(
-        config_->Frame().NumDlDataSyms(),
-        config_->LdpcConfig(Direction::kDownlink).NumBlocksInSymbol() *
-            config_->SpatialStreamsNum());
-    // mac data is sent per frame, so we set max symbol to 1
-    mac_to_phy_counters_.Init(1, config_->SpatialStreamsNum());
   }
 }
 
@@ -1320,24 +1254,22 @@ void Agora::InitializeThreads() {
         this->stats_->FrameStart(), agora_memory_->GetDlSocket());
   }
 
-  if constexpr (kEnableMac) {
-    const size_t mac_cpu_core = config_->CoreOffset() +
-                                config_->SocketThreadNum() +
-                                config_->WorkerThreadNum() + 1;
-    mac_thread_ = std::make_unique<MacThreadBaseStation>(
-        config_, mac_cpu_core, agora_memory_->GetDecod(),
-        &agora_memory_->GetDlBits(), &agora_memory_->GetDlBitsStatus(),
-        &mac_request_queue_, &mac_response_queue_);
+  const size_t mac_cpu_core =
+      config_->CoreOffset() + config_->SocketThreadNum() + 1;
+  mac_thread_ = std::make_unique<MacThreadBaseStation>(
+      config_, mac_cpu_core, agora_memory_->GetDecod(),
+      &agora_memory_->GetDlBits(), &agora_memory_->GetDlBitsStatus(),
+      &mac_request_queue_, &mac_response_queue_, mac_sched_.get(),
+      phy_stats_.get());
 
-    mac_std_thread_ =
-        std::thread(&MacThreadBaseStation::RunEventLoop, mac_thread_.get());
-  }
+  mac_std_thread_ =
+      std::thread(&MacThreadBaseStation::RunEventLoop, mac_thread_.get());
 
   // Enable dynamic core allocation
   if (config_->DynamicCoreAlloc()) {
     // TODO : dedicate a core to RP?
     const size_t rp_cpu_core =
-        config_->CoreOffset() + config_->SocketThreadNum() + 1;
+        config_->CoreOffset() + config_->SocketThreadNum() + 2;
     rp_thread_ = std::make_unique<ResourceProvisionerThread>(
         config_, rp_cpu_core, &rp_request_queue_, &rp_response_queue_);
     rp_std_thread_ =
@@ -1351,73 +1283,35 @@ void Agora::InitializeThreads() {
 
   if (config_->DynamicCoreAlloc() == false) {
     AGORA_LOG_INFO(
-        "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
-        "cores %zu--%zu\n",
+        "Master thread core %zu, TX/RX thread cores %zu--%zu, MAC thread %zu, "
+        "worker thread cores %zu--%zu\n",
         config_->CoreOffset(), config_->CoreOffset() + 1,
         config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1,
-        base_worker_core_offset_,
+        mac_cpu_core, base_worker_core_offset_,
         base_worker_core_offset_ + config_->WorkerThreadNum() - 1);
   } else {
     AGORA_LOG_INFO(
-        "Master thread core %zu, TX/RX thread cores %zu--%zu, RP thread core "
-        "%zu, worker thread cores %zu--%zu\n",
+        "Master thread core %zu, TX/RX thread cores %zu--%zu, MAC thread %zu, "
+        "RP thread core %zu, worker thread cores %zu--%zu\n",
         config_->CoreOffset(), config_->CoreOffset() + 1,
         config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1,
-        config_->CoreOffset() + config_->SocketThreadNum() + 1,
+        mac_cpu_core, config_->CoreOffset() + config_->SocketThreadNum() + 2,
         base_worker_core_offset_,
         base_worker_core_offset_ + config_->WorkerThreadNum() - 1);
-  }
-}
-
-void Agora::InitializeUesFromFile() {
-  adapt_ues_array_.resize(config_->FramesToTest());
-
-  static const std::string kFilename = kOutputFilepath + "adapt_ueant" +
-                                       std::to_string(config_->UeAntNum()) +
-                                       ".bin";
-
-  AGORA_LOG_INFO(
-      "Agora: Reading adaptable number of UEs across frames from %s\n",
-      kFilename.c_str());
-
-  FILE* fp = std::fopen(kFilename.c_str(), "rb");
-  RtAssert(fp != nullptr, "Failed to open adapt UEs file");
-
-  const size_t expected_count = config_->FramesToTest();
-  const size_t actual_count =
-      std::fread(&adapt_ues_array_.at(0), sizeof(uint8_t), expected_count, fp);
-
-  if (expected_count != actual_count) {
-    std::fprintf(stderr,
-                 "Agora: Failed to read adapt UEs file %s. expected "
-                 "%zu number of UE entries but read %zu. Errno %s\n",
-                 kFilename.c_str(), expected_count, actual_count,
-                 strerror(errno));
-    throw std::runtime_error("Agora: Failed to read adapt UEs file");
-  }
-  if (kPrintAdaptUes) {
-    std::printf("Agora: Adapted number of UEs across %zu frames\n",
-                config_->FramesToTest());
-    for (size_t n = 0; n < config_->FramesToTest(); n++) {
-      std::printf("%u ", adapt_ues_array_.at(n));
-    }
-    std::printf("\n");
   }
 }
 
 void Agora::SaveDecodeDataToFile(int frame_id) {
   const auto& cfg = config_;
-  const size_t num_decoded_bytes =
-      cfg->NumBytesPerCb(Direction::kUplink) *
-      cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
-
+  const size_t num_decoded_bytes = cfg->MacPacketLength(Direction::kUplink);
+  auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0 /*sc_id*/);
   AGORA_LOG_INFO("Saving decode data to %s\n", kDecodeDataFilename.c_str());
   auto* fp = std::fopen(kDecodeDataFilename.c_str(), "wb");
   if (fp == nullptr) {
     AGORA_LOG_ERROR("SaveDecodeDataToFile error creating file pointer\n");
   } else {
-    for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
-      for (size_t j = 0; j < cfg->SpatialStreamsNum(); j++) {
+    for (const auto& j : ue_list) {
+      for (size_t i = 0; i < cfg->Frame().NumUlDataSyms(); i++) {
         const int8_t* ptr =
             agora_memory_->GetDecod()[(frame_id % kFrameWnd)][i][j];
         const auto write_status =
@@ -1506,14 +1400,11 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
       static_cast<int>(this->tx_counters_.IsLastSymbol(frame_id)));
 
   // Complete if last frame and ifft / decode complete
-  if ((true == this->ifft_counters_.IsLastSymbol(frame_id)) &&
+  if (/*(true == this->ifft_counters_.IsLastSymbol(frame_id)) &&*/
       (true == this->tx_counters_.IsLastSymbol(frame_id)) &&
-      (((false == kEnableMac) &&
-        (true == this->decode_counters_.IsLastSymbol(frame_id))) ||
-       ((true == kUplinkHardDemod) &&
+      (((true == kUplinkHardDemod) &&
         (true == this->demul_counters_.IsLastSymbol(frame_id))) ||
-       ((true == kEnableMac) &&
-        (true == this->tomac_counters_.IsLastSymbol(frame_id))))) {
+       ((true == this->tomac_counters_.IsLastSymbol(frame_id))))) {
     this->stats_->UpdateStats(frame_id);
     assert(frame_id == frame_tracking_.cur_proc_frame_id_);
     if (true == kUplinkHardDemod) {
@@ -1521,10 +1412,11 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
     }
     this->decode_counters_.Reset(frame_id);
     this->tomac_counters_.Reset(frame_id);
-    this->ifft_counters_.Reset(frame_id);
+    /*this->ifft_counters_.Reset(frame_id);*/
     this->tx_counters_.Reset(frame_id);
     if (config_->Frame().NumDLSyms() > 0) {
-      for (size_t ue_id = 0; ue_id < config_->SpatialStreamsNum(); ue_id++) {
+      auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0 /*sc_id*/);
+      for (const auto& ue_id : ue_list) {
         this->agora_memory_->GetDlBitsStatus()[ue_id][frame_id % kFrameWnd] = 0;
       }
     }
@@ -1548,14 +1440,14 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
           RtAssert(deferred_frame >= frame_tracking_.cur_proc_frame_id_,
                    "Error scheduling encoding because deferral frame is less "
                    "than current frame");
-          ScheduleDownlinkProcessing(deferred_frame);
+          ScheduleDownlinkMAC(deferred_frame);
           this->encode_deferral_.pop();
         } else {
           // No need to check the next frame because it is too large
           break;
         }
       }  // for each encodable frames in kScheduleQueues
-    }    // !finished
+    }  // !finished
   }
   return finished;
 }

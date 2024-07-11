@@ -291,6 +291,11 @@ Config::Config(std::string jsonfilename)
   bs_mac_tx_port_ = tdd_conf.value("bs_mac_tx_port", kMacBaseRemotePort);
   bs_mac_rx_port_ = tdd_conf.value("bs_mac_rx_port", kMacBaseLocalPort);
 
+  ue_app_rx_addr_ = tdd_conf.value("ue_app_rx_addr", "127.0.0.1");
+  bs_app_rx_addr_ = tdd_conf.value("bs_app_rx_addr", "127.0.0.1");
+  ue_app_rx_port_ = tdd_conf.value("ue_app_rx_port", kAppUserLocalPort);
+  bs_app_rx_port_ = tdd_conf.value("bs_app_rx_port", kAppBaseLocalPort);
+
   log_listener_addr_ = tdd_conf.value("log_listener_addr", "");
   log_listener_port_ = tdd_conf.value("log_listener_port", 33300);
 
@@ -705,7 +710,8 @@ Config::Config(std::string jsonfilename)
   this->UpdateCtrlMCS();
 
   freq_domain_channel_ = tdd_conf.value("freq_domain_channel", false);
-  scheduler_type_ = tdd_conf.value("scheduler_type", "round_robbin");
+  scheduler_type_ =
+      tdd_conf.value("scheduler_type", adapt_ues_ ? "custom" : "round_robbin");
 
   samps_per_symbol_ =
       ofdm_tx_zero_prefix_ + ofdm_ca_num_ + cp_len_ + ofdm_tx_zero_postfix_;
@@ -1243,40 +1249,6 @@ void Config::GenPilots() {
 
 void Config::LoadUplinkData() {
   if (this->frame_.NumUlDataSyms() > 0) {
-    const size_t ul_num_bytes_per_ue_pad =
-        Roundup<64>(this->ul_num_bytes_per_cb_) *
-        this->ul_ldpc_config_.NumBlocksInSymbol();
-    // Uplink LDPC input bits
-    ul_bits_.Calloc(this->frame_.NumUlDataSyms(),
-                    ul_num_bytes_per_ue_pad * this->ue_ant_num_,
-                    Agora_memory::Alignment_t::kAlign64);
-    const std::string ul_data_file =
-        kExperimentFilepath + kUlLdpcDataPrefix +
-        std::to_string(this->ofdm_ca_num_) + "_ue" +
-        std::to_string(this->ue_ant_total_) + ".bin";
-    AGORA_LOG_FRAME("Config: Reading uplink data bits from %s\n",
-                    ul_data_file.c_str());
-
-    // \todo assumes one code block per symbol
-    const size_t code_block_in_symbol_i = 0u;
-    size_t seek_offset = 0u;
-    for (size_t i = 0; i < this->frame_.NumUlDataSyms(); i++) {
-      seek_offset +=
-          ul_data_bytes_num_persymbol_ * this->ue_ant_offset_ * sizeof(int8_t);
-      for (size_t j = 0; j < this->ue_ant_num_; j++) {
-        int8_t* ul_bits_ptr = this->GetInfoBits(
-            this->ul_bits_, Direction::kUplink, i, j, code_block_in_symbol_i);
-        Utils::ReadBinaryFile(ul_data_file, sizeof(int8_t),
-                              ul_data_bytes_num_persymbol_, seek_offset,
-                              ul_bits_ptr);
-        seek_offset += ul_data_bytes_num_persymbol_ * sizeof(int8_t);
-      }
-      seek_offset +=
-          ul_data_bytes_num_persymbol_ *
-          (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
-          sizeof(int8_t);
-    }
-
     // Uplink modulation input bits
     ul_mod_bits_.Calloc(this->frame_.NumUlDataSyms(),
                         Roundup<64>(this->ofdm_data_num_) * this->ue_ant_num_,
@@ -1286,7 +1258,7 @@ void Config::LoadUplinkData() {
         std::to_string(this->ofdm_ca_num_) + "_ue" +
         std::to_string(this->ue_ant_total_) + ".bin";
     // reset seek offset for new file read
-    seek_offset = 0;
+    size_t seek_offset = 0;
     const size_t subcarr_i = 0u;
     for (size_t i = 0; i < this->frame_.NumUlDataSyms(); i++) {
       seek_offset += ofdm_data_num_ * this->ue_ant_offset_ * sizeof(int8_t);
@@ -1307,41 +1279,6 @@ void Config::LoadUplinkData() {
 
 void Config::LoadDownlinkData() {
   if (this->frame_.NumDlDataSyms() > 0) {
-    const size_t dl_num_bytes_per_ue_pad =
-        Roundup<64>(this->dl_num_bytes_per_cb_) *
-        this->dl_ldpc_config_.NumBlocksInSymbol();
-    // Downlink LDPC input bits
-    dl_bits_.Calloc(this->frame_.NumDlDataSyms(),
-                    dl_num_bytes_per_ue_pad * this->ue_ant_num_,
-                    Agora_memory::Alignment_t::kAlign64);
-    const std::string dl_data_file =
-        kExperimentFilepath + kDlLdpcDataPrefix +
-        std::to_string(this->ofdm_ca_num_) + "_ue" +
-        std::to_string(this->ue_ant_total_) + ".bin";
-    AGORA_LOG_FRAME("Config: Reading downlink data bits from %s\n",
-                    dl_data_file.c_str());
-
-    // \todo assumes one code block per symbol
-    const size_t code_block_in_symbol_i = 0;
-    size_t seek_offset = 0;
-    for (size_t i = 0; i < this->frame_.NumDlDataSyms(); i++) {
-      seek_offset +=
-          dl_data_bytes_num_persymbol_ * this->ue_ant_offset_ * sizeof(int8_t);
-      for (size_t j = 0; j < this->ue_ant_num_; j++) {
-        int8_t* dl_bits_ptr = this->GetInfoBits(
-            this->dl_bits_, Direction::kDownlink, i, j, code_block_in_symbol_i);
-        Utils::ReadBinaryFile(
-            dl_data_file, sizeof(int8_t), dl_data_bytes_num_persymbol_,
-            seek_offset,
-            dl_bits_ptr);  //this->dl_bits_[i] + (j * dl_num_bytes_per_ue_pad));
-        seek_offset += dl_data_bytes_num_persymbol_ * sizeof(int8_t);
-      }
-      seek_offset +=
-          dl_data_bytes_num_persymbol_ *
-          (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
-          sizeof(int8_t);
-    }
-
     // Downlink modulation input bits
     dl_mod_bits_.Calloc(this->frame_.NumDlDataSyms(),
                         Roundup<64>(this->GetOFDMDataNum()) * ue_ant_num_,
@@ -1351,7 +1288,7 @@ void Config::LoadDownlinkData() {
         std::to_string(this->ofdm_ca_num_) + "_ue" +
         std::to_string(this->ue_ant_total_) + ".bin";
     // reset seek offset for new file read
-    seek_offset = 0;
+    size_t seek_offset = 0;
     const size_t subcarr_i = 0u;
     for (size_t i = 0; i < this->frame_.NumDlDataSyms(); i++) {
       seek_offset +=
@@ -1627,7 +1564,6 @@ Config::~Config() {
 
   ul_mod_table_.Free();
   dl_mod_table_.Free();
-  dl_bits_.Free();
   ul_bits_.Free();
   ul_mod_bits_.Free();
   dl_mod_bits_.Free();

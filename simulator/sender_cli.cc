@@ -38,7 +38,7 @@ int main(int argc, char* argv[]) {
           FLAGS_server_mac_addr);
       sender->StartTx();
     }  // end context sender
-  }    // end context Config
+  }  // end context Config
 
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();

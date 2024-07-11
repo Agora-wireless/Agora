@@ -171,8 +171,8 @@ void TxRxWorkerHw::DoTxRx() {
           }
         }
       }  // if (pkt.size() > 0)
-    }    // DoTx(time0) == 0
-  }      // Configuration()->Running() == true
+    }  // DoTx(time0) == 0
+  }  // Configuration()->Running() == true
   running_ = false;
 }
 
@@ -493,7 +493,7 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
         caldltxbuf.at(channel_offset) = zeros_.data();
       }
     }  // end s < Configuration()->RadioPerGroup()
-  }    // ! ref radio
+  }  // ! ref radio
 }
 
 //Tx data
@@ -918,7 +918,7 @@ void TxRxWorkerHw::ScheduleTxInit(size_t frames_to_schedule, long long time0) {
 
       TxDownlinkZeros(frame, radio, time0);
     }  // for each radio
-  }    // fpr each frame
+  }  // fpr each frame
 }
 
 // All DL symbols

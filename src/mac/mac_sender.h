@@ -46,6 +46,7 @@ class MacSender {
   MacSender(Config* cfg, std::string& data_filename, size_t mac_packet_length,
             size_t mac_payload_max_length, size_t packets_per_frame,
             std::string server_address, size_t server_rx_port,
+            std::string data_src_addr, size_t data_src_port,
             std::function<size_t(size_t)> get_data_symbol_id,
             size_t core_offset = 30, size_t worker_thread_num = 1,
             size_t update_thread_num = 1, size_t frame_duration_us = 0,
@@ -66,7 +67,6 @@ class MacSender {
 
   // Get number of CPU ticks for a symbol given a frame index
   uint64_t GetTicksForFrame(size_t frame_id) const;
-  size_t GetMaxSymbolId() const;
 
   // Launch threads to run worker with thread IDs from tid_start to tid_end
   void CreateWorkerThreads(size_t num_workers);
@@ -126,6 +126,8 @@ class MacSender {
   size_t packets_per_frame_;
   const std::string server_address_;
   const size_t server_rx_port_;
+  const std::string data_src_addr_;
+  const size_t data_src_port_;
   std::function<size_t(size_t)> get_data_symbol_id_;
   const bool has_master_thread_;
 };

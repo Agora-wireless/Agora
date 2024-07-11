@@ -470,10 +470,10 @@ void DataGenerator::GenerateUlTxTestVectors(Config* const cfg) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg->MacPayloadMaxLength(Direction::kUplink));
         DataGenerator::GenMacRandomBits(pkt);
-        pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(
-                pkt->Data(), cfg->MacPayloadMaxLength(Direction::kUplink)) &
-            0xFFFF));
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
+                                pkt->Data(),
+                                cfg->MacPayloadMaxLength(Direction::kUplink)) &
+                            0xFFFF));
       }
     }
 
@@ -605,10 +605,10 @@ void DataGenerator::GenerateDlTxTestVectors(Config* const cfg,
         pkt->Set(0, pkt_id, ue_id,
                  cfg->MacPayloadMaxLength(Direction::kDownlink));
         DataGenerator::GenMacRandomBits(pkt);
-        pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(
-                pkt->Data(), cfg->MacPayloadMaxLength(Direction::kDownlink)) &
-            0xFFFF));
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(pkt->Data(),
+                                                    cfg->MacPayloadMaxLength(
+                                                        Direction::kDownlink)) &
+                            0xFFFF));
       }
     }
 

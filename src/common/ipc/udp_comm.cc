@@ -106,6 +106,7 @@ UDPComm::UDPComm(std::string local_addr, const std::string& local_port,
   }
   ::freeaddrinfo(local_info);
   if (sock_fd_ == -1) {
+    AGORA_LOG_INFO("local_port %s\n", local_port.c_str());
     throw std::runtime_error(
         "UDPComm: Failed to create local socket. errno = " +
         std::string(std::strerror(errno)));

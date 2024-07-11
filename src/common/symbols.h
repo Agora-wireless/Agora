@@ -27,8 +27,10 @@ static constexpr size_t kNumSymbolsPerFrame = 14;
 // update 3. Disable this on systems with an older MKL version.
 #if __INTEL_MKL__ >= 2020 || (__INTEL_MKL__ == 2019 && __INTEL_MKL_UPDATE__ > 3)
 #define USE_MKL_JIT (1)
+#define USE_MKL_CBLAS (1)
 #else
 #undef USE_MKL_JIT
+#undef USE_MKL_CBLAS
 #endif
 
 //Define to allow mac addition of RB IND to allow dynamic change of mcs
@@ -225,7 +227,7 @@ static constexpr bool kDownlinkHardDemod = false;
 static constexpr bool kUplinkHardDemod = false;
 
 static constexpr bool kExportConstellation = false;
-static constexpr bool kPrintPhyStats = true;
+static constexpr bool kPrintPhyStats = !kEnableMac;
 static constexpr bool kCollectPhyStats = true;
 static constexpr bool kPrintBeamStats = true;
 
@@ -242,7 +244,8 @@ static constexpr bool kRecordCalibrationMats = false;
 static constexpr bool kDebugRadioTX = false;
 static constexpr bool kDebugRadioRX = false;
 
-static constexpr bool kLogMacPackets = false;
+static constexpr bool kLogTxMacPackets = true;
+static constexpr bool kLogRxMacPackets = true;
 
 enum class ThreadType {
   kMaster,
@@ -382,6 +385,9 @@ static constexpr size_t kMacBaseRemotePort = 8080;
 // Agora listens for UDP packets (downlink data packets at the server) at
 // port kBaseLocalPort
 static constexpr size_t kMacBaseLocalPort = 8180;
+
+static constexpr size_t kAppUserLocalPort = 1350u;
+static constexpr size_t kAppBaseLocalPort = 1450u;
 
 // Agora sends control information over an out-of-band control channel
 // to each UE #i, at port kBaseClientPort + i

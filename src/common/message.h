@@ -351,12 +351,14 @@ struct MacPacketPacked {
 // Event data tag for Mac RX events
 union rx_mac_tag_t {
   struct {
-    size_t tid_ : 8;      // ID of the socket thread that received the packet
-    size_t offset_ : 56;  // Offset in the socket thread's RX buffer
+    size_t frame_id_ : 32;  // PHY frame_id
+    size_t tid_ : 8;        // ID of the socket thread that received the packet
+    size_t offset_ : 24;    // Offset in the socket thread's RX buffer
   };
   size_t tag_;
 
-  rx_mac_tag_t(size_t tid, size_t offset) : tid_(tid), offset_(offset) {}
+  rx_mac_tag_t(size_t frame_id, size_t tid, size_t offset)
+      : frame_id_(frame_id), tid_(tid), offset_(offset) {}
   explicit rx_mac_tag_t(size_t _tag) : tag_(_tag) {}
 };
 static_assert(sizeof(rx_mac_tag_t) == sizeof(size_t));
@@ -432,7 +434,19 @@ class FrameCounters {
   bool CompleteTask(size_t frame_id, size_t symbol_id) {
     const size_t frame_slot = (frame_id % kFrameWnd);
     this->task_count_.at(frame_slot).at(symbol_id)++;
-    return this->IsLastTask(frame_id, symbol_id);
+    return this->IsLastTask(frame_id, symbol_id, this->max_task_count_);
+  }
+
+  /**
+   * @brief Increments the task count for input frame and symbol
+   * @param frame_slot The frame index to increment
+   * @param symbol_id The symbol id of the task to increment
+   * @param new_max_tasks Check against task count to decide complete task
+   */
+  bool CompleteTask(size_t frame_id, size_t symbol_id, size_t new_max_tasks) {
+    const size_t frame_slot = (frame_id % kFrameWnd);
+    this->task_count_.at(frame_slot).at(symbol_id)++;
+    return this->IsLastTask(frame_id, symbol_id, new_max_tasks);
   }
 
   /**
@@ -479,13 +493,14 @@ class FrameCounters {
    * @param frame_id The frame id to check
    * @param symbol_id The symbol id to check
    */
-  bool IsLastTask(size_t frame_id, size_t symbol_id) const {
+  bool IsLastTask(size_t frame_id, size_t symbol_id,
+                  size_t max_task_count) const {
     const size_t frame_slot = frame_id % kFrameWnd;
     const size_t task_count = this->task_count_.at(frame_slot).at(symbol_id);
     bool is_last;
-    if (task_count == this->max_task_count_) {
+    if (task_count == max_task_count) {
       is_last = true;
-    } else if (task_count < this->max_task_count_) {
+    } else if (task_count < max_task_count) {
       is_last = false;
     } else {
       // This should never happen
@@ -493,7 +508,7 @@ class FrameCounters {
       std::printf(
           "Unexpected result in IsLastTask: Task Count %zu, Max Count %zu, "
           "Frame %zu, Symbol %zu\n",
-          task_count, this->max_task_count_, frame_id, symbol_id);
+          task_count, max_task_count, frame_id, symbol_id);
       assert(false);
       throw std::runtime_error("IsLastTask error!");
     }

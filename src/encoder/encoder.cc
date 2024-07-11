@@ -295,10 +295,10 @@ int32_t BblibLdpcEncoder5gnr(
     p_addr = kBg2Address;
   }
 
-  __attribute__((aligned(64)))
-  int8_t input_internal_buffer[BG1_COL_TOTAL * avx2enc::kProcBytes] = {0};
-  __attribute__((aligned(64)))
-  int8_t parity_internal_buffer[BG1_ROW_TOTAL * avx2enc::kProcBytes] = {0};
+  __attribute__((aligned(64))) int8_t
+      input_internal_buffer[BG1_COL_TOTAL * avx2enc::kProcBytes] = {0};
+  __attribute__((aligned(64))) int8_t
+      parity_internal_buffer[BG1_ROW_TOTAL * avx2enc::kProcBytes] = {0};
 
   avx2enc::LDPC_ADAPTER_P ldpc_adapter_func =
       avx2enc::LdpcSelectAdapterFunc(zc);

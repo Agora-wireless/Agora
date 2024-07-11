@@ -67,5 +67,5 @@ class Hdf5Lib {
   std::map<std::string, size_t> ds_name_id_;
   std::vector<std::unique_ptr<H5::DataSet>> datasets_;
 };
-};      // namespace Agora_recorder
+};  // namespace Agora_recorder
 #endif  // AGORA_HDF5LIB_H_

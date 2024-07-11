@@ -326,7 +326,7 @@ void TxRxWorkerClientUhd::DoTxRx() {
       //Necessary?
       //std::this_thread::yield();
     }  // end tx_success
-  }    // end main while loop
+  }  // end main while loop
   running_ = false;
   if (tx_thread.joinable()) {
     tx_thread.join();

@@ -76,10 +76,8 @@ class Agora {
   void UpdateCores(RPControlMsg rcm);
 
   void InitializeQueues();
-  void ReInitializeCounters();
   void InitializeCounters();
   void InitializeThreads();
-  void InitializeUesFromFile();
   void FreeQueues();
 
   void SaveDecodeDataToFile(int frame_id);
@@ -97,6 +95,7 @@ class Agora {
                         size_t symbol_id);
   void ScheduleAntennasTX(size_t frame_id, size_t symbol_id);
   void ScheduleDownlinkProcessing(size_t frame_id);
+  void ScheduleDownlinkMAC(size_t frame_id);
 
   /**
    * @brief Schedule LDPC decoding or encoding over code blocks
@@ -171,8 +170,6 @@ class Agora {
   std::vector<size_t> encode_cur_frame_for_symbol_;
   // The frame index for a symbol whose IFFT is done
   std::vector<size_t> ifft_cur_frame_for_symbol_;
-  // An array that contains the adaptable number of UEs per every frame
-  std::vector<uint8_t> adapt_ues_array_;
 
   // The frame index for a symbol whose precode is done
   std::vector<size_t> precode_cur_frame_for_symbol_;
@@ -189,6 +186,9 @@ class Agora {
 
   // Worker-to-master queue for MAC
   moodycamel::ConcurrentQueue<EventData> mac_response_queue_;
+
+  //moodycamel::ProducerToken* mac_request_ptok_ptr_;
+  //moodycamel::ProducerToken* mac_response_ptok_ptr_;
 
   // Resource Provisioner queue
   moodycamel::ConcurrentQueue<EventData> rp_request_queue_;

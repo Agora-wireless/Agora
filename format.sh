@@ -1,58 +1,59 @@
-clang-format-11 -i src/agora/txrx/*.cc
-clang-format-11 -i src/agora/txrx/*.h
+FORMAT_EXE=clang-format-11
+$FORMAT_EXE -i src/agora/txrx/*.cc
+$FORMAT_EXE -i src/agora/txrx/*.h
 
-clang-format-11 -i src/agora/txrx/workers/*.cc
-clang-format-11 -i src/agora/txrx/workers/*.h
+$FORMAT_EXE -i src/agora/txrx/workers/*.cc
+$FORMAT_EXE -i src/agora/txrx/workers/*.h
 
-clang-format-11 -i src/radio/*.cc
-clang-format-11 -i src/radio/*.h
+$FORMAT_EXE -i src/radio/*.cc
+$FORMAT_EXE -i src/radio/*.h
 
-clang-format-11 -i src/agora/*.cc
-clang-format-11 -i src/agora/*.h
+$FORMAT_EXE -i src/agora/*.cc
+$FORMAT_EXE -i src/agora/*.h
 
-clang-format-11 -i src/recorder/*.cc
-clang-format-11 -i src/recorder/*.h
+$FORMAT_EXE -i src/recorder/*.cc
+$FORMAT_EXE -i src/recorder/*.h
 
-clang-format-11 -i src/client/*.cc
-clang-format-11 -i src/client/*.h
+$FORMAT_EXE -i src/client/*.cc
+$FORMAT_EXE -i src/client/*.h
 
-clang-format-11 -i src/client/txrx/*.cc
-clang-format-11 -i src/client/txrx/*.h
+$FORMAT_EXE -i src/client/txrx/*.cc
+$FORMAT_EXE -i src/client/txrx/*.h
 
-clang-format-11 -i src/client/txrx/workers/*.cc
-clang-format-11 -i src/client/txrx/workers/*.h
+$FORMAT_EXE -i src/client/txrx/workers/*.cc
+$FORMAT_EXE -i src/client/txrx/workers/*.h
 
-clang-format-11 -i src/common/*.cc
-clang-format-11 -i src/common/*.h
+$FORMAT_EXE -i src/common/*.cc
+$FORMAT_EXE -i src/common/*.h
 
-clang-format-11 -i src/common/ipc/*.cc
-clang-format-11 -i src/common/ipc/*.h
+$FORMAT_EXE -i src/common/ipc/*.cc
+$FORMAT_EXE -i src/common/ipc/*.h
 
-clang-format-11 -i src/common/loggers/*.cc
-clang-format-11 -i src/common/loggers/*.h
+$FORMAT_EXE -i src/common/loggers/*.cc
+$FORMAT_EXE -i src/common/loggers/*.h
 
-clang-format-11 -i src/encoder/*.cc
-clang-format-11 -i src/encoder/*.h
+$FORMAT_EXE -i src/encoder/*.cc
+$FORMAT_EXE -i src/encoder/*.h
 
-clang-format-11 -i src/mac/*.cc
-clang-format-11 -i src/mac/*.h
+$FORMAT_EXE -i src/mac/*.cc
+$FORMAT_EXE -i src/mac/*.h
 
-clang-format-11 -i src/mac/schedulers/*.cc
-clang-format-11 -i src/mac/schedulers/*.h
+$FORMAT_EXE -i src/mac/schedulers/*.cc
+$FORMAT_EXE -i src/mac/schedulers/*.h
 
-clang-format-11 -i src/resource_provisioner/*.cc
-clang-format-11 -i src/resource_provisioner/*.h
+$FORMAT_EXE -i src/resource_provisioner/*.cc
+$FORMAT_EXE -i src/resource_provisioner/*.h
 
-clang-format-11 -i simulator/*.cc
-clang-format-11 -i simulator/*.h
-clang-format-11 -i simulator/channel_models/*.cc
-clang-format-11 -i simulator/channel_models/*.h
+$FORMAT_EXE -i simulator/*.cc
+$FORMAT_EXE -i simulator/*.h
+$FORMAT_EXE -i simulator/channel_models/*.cc
+$FORMAT_EXE -i simulator/channel_models/*.h
 
-clang-format-11 -i src/data_generator/*.cc
-clang-format-11 -i src/data_generator/*.h
+$FORMAT_EXE -i src/data_generator/*.cc
+$FORMAT_EXE -i src/data_generator/*.h
 
-clang-format-11 -i test/test_agora/*.cc
-clang-format-11 -i test/unit_tests/*.cc
-clang-format-11 -i test/compute_kernels/*.cc
-clang-format-11 -i test/compute_kernels/*.h
-clang-format-11 -i test/compute_kernels/ldpc/*.cc
+$FORMAT_EXE -i test/test_agora/*.cc
+$FORMAT_EXE -i test/unit_tests/*.cc
+$FORMAT_EXE -i test/compute_kernels/*.cc
+$FORMAT_EXE -i test/compute_kernels/*.h
+$FORMAT_EXE -i test/compute_kernels/ldpc/*.cc

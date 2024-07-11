@@ -240,12 +240,12 @@ static inline void LdpcEncodeHelper(size_t base_graph, size_t zc, size_t nRows,
           "Zc values >= values that are not multiples of four");
     }
 
-    __attribute__((aligned(avx2enc::kProcBytes)))
-    int8_t internal_buffer0[BG1_COL_INF_NUM * avx2enc::kProcBytes] = {0};
-    __attribute__((aligned(avx2enc::kProcBytes)))
-    int8_t internal_buffer1[BG1_ROW_TOTAL * avx2enc::kProcBytes] = {0};
-    __attribute__((aligned(avx2enc::kProcBytes)))
-    int8_t internal_buffer2[BG1_COL_TOTAL * avx2enc::kProcBytes] = {0};
+    __attribute__((aligned(avx2enc::kProcBytes))) int8_t
+        internal_buffer0[BG1_COL_INF_NUM * avx2enc::kProcBytes] = {0};
+    __attribute__((aligned(avx2enc::kProcBytes))) int8_t
+        internal_buffer1[BG1_ROW_TOTAL * avx2enc::kProcBytes] = {0};
+    __attribute__((aligned(avx2enc::kProcBytes))) int8_t
+        internal_buffer2[BG1_COL_TOTAL * avx2enc::kProcBytes] = {0};
 
     auto adapter_func = avx2enc::LdpcSelectAdapterFunc(zc);
 

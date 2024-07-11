@@ -296,7 +296,7 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(
                   radio_id, receive_time);
             }
           }  // end is RxSymbol
-        }    // sample offset <= 0
+        }  // sample offset <= 0
         sample_offset = 0;
         ResetRxStatus(interface_id, ignore);
       } else {
@@ -799,8 +799,8 @@ long long TxRxWorkerClientHw::EstablishTime0(size_t local_interface) {
           }
         }
       }  // end verify first sync
-    }    // received Frame 0 Symbol 0
-  }      // end - establish time0 for a given interface}
+    }  // received Frame 0 Symbol 0
+  }  // end - establish time0 for a given interface}
   return time0;
 }
 

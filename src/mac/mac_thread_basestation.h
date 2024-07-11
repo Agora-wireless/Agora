@@ -11,7 +11,10 @@
 #include "config.h"
 #include "crc.h"
 #include "gettime.h"
+#include "mac_ring_buffer.h"
+#include "mac_scheduler.h"
 #include "message.h"
+#include "phy_stats.h"
 #include "ran_config.h"
 #include "symbols.h"
 #include "udp_comm.h"
@@ -43,8 +46,8 @@ class MacThreadBaseStation {
       PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
       Table<int8_t>* dl_bits_buffer, Table<int8_t>* dl_bits_buffer_status,
       moodycamel::ConcurrentQueue<EventData>* rx_queue,
-      moodycamel::ConcurrentQueue<EventData>* tx_queue,
-      const std::string& log_filename = "");
+      moodycamel::ConcurrentQueue<EventData>* tx_queue, MacScheduler* mac_sched,
+      PhyStats* in_phy_stats, const std::string& log_filename = "");
 
   ~MacThreadBaseStation();
 
@@ -74,10 +77,13 @@ class MacThreadBaseStation {
   void SendControlInformation();
 
   // Receive user data bits (downlink bits at the MAC thread running at the
-  // server, uplink bits at the MAC thread running at the client) and forward
-  // them to the PHY.
+  // server, uplink bits at the MAC thread running at the client) and
+  // save in the ring buffer
   void ProcessUdpPacketsFromApps();
-  void ProcessUdpPacketsFromAppsBs(const char* payload);
+
+  // Triggered by message from PHY, read downlink MAC packets from the ring buffer
+  // and forward them to the PHY.
+  void SendCodeblocksToPhy(EventData event);
 
   Config* const cfg_;
 
@@ -131,18 +137,25 @@ class MacThreadBaseStation {
   // TODO: decoded_buffer_ is used by only the server, so it should be moved
   // to server_ for clarity.
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer_;
-
+  Table<int8_t> dl_mac_bytes_;
+  size_t num_dl_mac_bytes_;
+  Table<int8_t> ul_mac_bytes_;
+  size_t num_ul_mac_bytes_;
   struct {
     std::array<size_t, kMaxUEs> dl_bits_buffer_id_;
 
     Table<int8_t>* dl_bits_buffer_;
     Table<int8_t>* dl_bits_buffer_status_;
   } client_;
+
   // FIFO queue for receiving messages from the master thread
   moodycamel::ConcurrentQueue<EventData>* rx_queue_;
 
   // FIFO queue for sending messages to the master thread
   moodycamel::ConcurrentQueue<EventData>* tx_queue_;
+
+  MacScheduler* mac_sched_;
+  PhyStats* phy_stats_;
 
   // CRC
   std::unique_ptr<DoCRC> crc_obj_;
@@ -150,6 +163,7 @@ class MacThreadBaseStation {
   //MAC decoding stats
   std::array<size_t, kMaxUEs> valid_mac_packets_;
   std::array<size_t, kMaxUEs> error_mac_packets_;
+  MacMultiRingBuffer mac_ring_;
 };
 
 #endif  // MAC_THREAD_H_

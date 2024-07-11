@@ -14,8 +14,8 @@ static constexpr size_t kMaxRxAttempts = 25u;
 //Receive on all addresses
 static const std::string kRxAddress = "";
 
-VideoReceiver::VideoReceiver(uint16_t port)
-    : udp_video_receiver_(kRxAddress, port,
+VideoReceiver::VideoReceiver(std::string addr, uint16_t port)
+    : udp_video_receiver_(addr, port,
                           VideoReceiver::kVideoStreamSocketRxBufSize) {}
 
 size_t VideoReceiver::Load(unsigned char *destination, size_t requested_bytes) {

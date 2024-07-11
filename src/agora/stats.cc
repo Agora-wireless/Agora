@@ -804,9 +804,9 @@ void Stats::PrintPerFrameDone(PrintType print_type, size_t frame_id) const {
             this->config_->Frame().NumUlDataSyms());
         break;
       case (PrintType::kPacketFromMac):
-        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed MAC RX \n",
-                       frame_id,
-                       MasterGetMsSince(TsType::kFirstSymbolRX, frame_id));
+        AGORA_LOG_INFO(
+            "Main [frame %zu + %.2f ms]: Completed Packet From MAC \n",
+            frame_id, MasterGetMsSince(TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kEncode):
         AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed LDPC encoding\n",
@@ -851,7 +851,7 @@ void Stats::PrintPerFrameDone(PrintType print_type, size_t frame_id) const {
             this->config_->Frame().NumDlControlSyms());
         break;
       case (PrintType::kPacketToMac):
-        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed MAC TX \n",
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed Packet to MAC \n",
                        frame_id,
                        MasterGetMsSince(TsType::kFirstSymbolRX, frame_id));
         break;

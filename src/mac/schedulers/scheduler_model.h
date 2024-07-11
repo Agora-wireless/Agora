@@ -18,16 +18,24 @@ class SchedulerModel {
   explicit SchedulerModel(Config* const cfg);
   virtual ~SchedulerModel();
 
-  virtual void Update(size_t frame_id, const arma::cx_fmat& csi,
-                      const std::vector<float>& snr_per_ue) {}
+  virtual void Update([[maybe_unused]] size_t frame_id,
+                      [[maybe_unused]] const arma::cx_fmat& csi,
+                      [[maybe_unused]] const std::vector<float>& snr_per_ue) {}
 
-  virtual bool IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id) {
+  virtual bool IsUeScheduled([[maybe_unused]] size_t frame_id,
+                             [[maybe_unused]] size_t sc_id,
+                             [[maybe_unused]] size_t ue_id) {
     return false;
   }
-  virtual arma::uvec ScheduledUeList(size_t frame_id, size_t sc_id) {
+  virtual arma::uvec ScheduledUeList([[maybe_unused]] size_t frame_id,
+                                     [[maybe_unused]] size_t sc_id) {
     return {};
   }
-  virtual arma::uvec ScheduledUeMap(size_t frame_id, size_t sc_id) {
+  virtual arma::uvec ScheduledUeMap([[maybe_unused]] size_t frame_id,
+                                    [[maybe_unused]] size_t sc_id) {
+    return {};
+  }
+  virtual size_t UeScheduleIndex([[maybe_unused]] size_t sched_id) {
     return {};
   }
 

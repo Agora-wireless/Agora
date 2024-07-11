@@ -24,7 +24,7 @@
 #define CRCSEED (0)              // could be non-zero to detect leading zeros
 
 // CRC segments
-#define LO(x) (unsigned char)((x)&0xff)
+#define LO(x) (unsigned char)((x) & 0xff)
 #define MID(x) (unsigned char)(((x) >> 8) & 0xff)
 #define HI(x) (unsigned char)(((x) >> 16) & 0xff)
 

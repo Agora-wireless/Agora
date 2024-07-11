@@ -43,6 +43,6 @@ class Recorder {
   const size_t recorder_core_;
 
   size_t num_writter_threads_;
-};     /* class Recorder */
-};     // namespace Agora_recorder
+}; /* class Recorder */
+};  // namespace Agora_recorder
 #endif /* AGORA_RECORDER_H_ */

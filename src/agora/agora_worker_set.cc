@@ -21,7 +21,7 @@ AgoraWorkerSet::AgoraWorkerSet(Config* cfg, MacScheduler* mac_sched,
                                Stats* stats, PhyStats* phy_stats,
                                MessageInfo* message, AgoraBuffer* buffer,
                                FrameInfo* frame)
-    : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum() +
+    : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum() + 1 +
                                (cfg->DynamicCoreAlloc() ? 1 : 0)),
       config_(cfg),
       mac_sched_(mac_sched),

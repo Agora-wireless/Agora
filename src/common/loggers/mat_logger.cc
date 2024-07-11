@@ -53,9 +53,9 @@ void MatLogger::SaveMatBuf() {
                             i, j, cx.real(), cx.imag());
             }
           }  // end kUEAnts
-        }    // end kBSAnts
-      }      // end kSCs
-    }        // end kFrames
+        }  // end kBSAnts
+      }  // end kSCs
+    }  // end kFrames
   }
 #endif
 }

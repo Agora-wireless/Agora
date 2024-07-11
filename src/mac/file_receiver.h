@@ -6,6 +6,7 @@
 #define FILE_RECEIVER_H_
 
 #include <array>
+#include <cstdint>
 #include <fstream>
 #include <ios>
 #include <iostream>

@@ -189,14 +189,14 @@ if (${ENABLE_HDF5})
   include_directories(${HDF5_INCLUDE_DIRS})
 endif()
 
-#Python
-find_package(PythonLibs REQUIRED)
-set(PYTHON_LIB ${PYTHON_LIBRARIES})
-include_directories(${PYTHON_INCLUDE_DIRS})
-message(VERBOSE "  PythonLibs Includes: ${PYTHON_INCLUDE_DIRS} Libraries: ${PYTHON_LIBRARIES}")
-
 #Soapy (optional based on radio type)
 if(RADIO_TYPE STREQUAL SOAPY_IRIS)
+  #Python
+  find_package(PythonLibs REQUIRED)
+  set(PYTHON_LIB ${PYTHON_LIBRARIES})
+  include_directories(${PYTHON_INCLUDE_DIRS})
+  message(VERBOSE "  PythonLibs Includes: ${PYTHON_INCLUDE_DIRS} Libraries: ${PYTHON_LIBRARIES}")
+
   find_package(SoapySDR "0.8.0" CONFIG)
   if(NOT SoapySDR_FOUND)
     message(FATAL_ERROR "SoapySDR development files not found")
@@ -444,6 +444,7 @@ set(COMMON_SOURCES
   src/common/scrambler.cc
   src/mac/mac_scheduler.cc
   src/mac/schedulers/scheduler_model.cc
+  src/mac/schedulers/custom_schedule.cc
   src/mac/schedulers/round_robbin.cc
   src/mac/schedulers/proportional_fairness.cc
   src/common/ipc/udp_comm.cc

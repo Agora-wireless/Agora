@@ -246,8 +246,7 @@ void PhyStats::PrintUlSnrStats(size_t frame_id) {
     if (max_snr == FLT_MIN) {
       max_snr = -100;
     }
-    ss << "User " << i << ": [" << min_snr << "," << max_snr << "]"
-       << " ";
+    ss << "User " << i << ": [" << min_snr << "," << max_snr << "]" << " ";
     if (max_snr - min_snr > 20 && min_snr < 0) {
       ss << "(Possible bad antenna " << min_snr_id << ") ";
     }
@@ -593,7 +592,7 @@ void PhyStats::UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t sc_id,
 void PhyStats::UpdateBitErrors(size_t ue_id, size_t offset, size_t frame_slot,
                                uint8_t tx_byte, uint8_t rx_byte) {
   static constexpr size_t kBitsInByte = 8;
-  AGORA_LOG_TRACE("Updating bit errors: User %zu Offset  %zu Tx %d Rx %d\n",
+  AGORA_LOG_FRAME("Updating bit errors: User %zu Offset  %zu Tx %d Rx %d\n",
                   ue_id, offset, tx_byte, rx_byte);
   uint8_t xor_byte(tx_byte ^ rx_byte);
   size_t bit_errors = 0;

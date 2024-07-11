@@ -115,9 +115,9 @@ void Simulator::Start() {
             throw std::runtime_error(
                 "Simulator: Wrong event type in message queue!");
         }  // end of switch
-      }    // end of for
-    }      // end ret > 0
-  }        // end of while
+      }  // end of for
+    }  // end ret > 0
+  }  // end of while
   this->Stop();
   sender_.reset();
   const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);

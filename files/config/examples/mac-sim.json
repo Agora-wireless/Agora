@@ -6,13 +6,13 @@
       "mcs_index" : 17
   },
   "dl_mcs": {
-      "mcs_index" : 17
+      "mcs_index" : 10
   },
   "ue_radio_num": 1,
   "bs_radio_num": 8,
   "freq_orthogonal_pilot": true,
   "pilot_num" : 1,
-  "symbol_num_perframe": 70,
+  "symbol_num_perframe": 14,
   "client_ul_pilot_syms": 2,
   "ul_data_symbol_start": 3,
   "ul_symbol_num_perframe": 3,
@@ -20,8 +20,8 @@
   "dl_data_symbol_start": 8,
   "dl_symbol_num_perframe": 3,
   "beacon_position": 0,
-  "mac_rx_port": 8070,
-  "mac_tx_port": 8080,
+  "bs_mac_rx_port": 8070,
+  "bs_mac_tx_port": 8090,
   "core_offset": 16,
   "worker_thread_num": 8,
   "socket_thread_num": 1,
@@ -30,5 +30,5 @@
   "ue_core_offset": 12,
   "ue_worker_thread_num": 1,
   "ue_socket_thread_num": 1,
-  "max_frame": 5
+  "max_frame": 5000
 }

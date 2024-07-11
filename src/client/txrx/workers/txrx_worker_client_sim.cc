@@ -94,7 +94,7 @@ void TxRxWorkerClientSim::DoTxRx() {
         thread_local_interface = 0;
       }
     }  // end if -1 == send_result
-  }    // end while
+  }  // end while
   running_ = false;
 }
 
