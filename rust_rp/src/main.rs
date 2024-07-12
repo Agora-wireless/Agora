@@ -1,23 +1,27 @@
 // =============
 // Read me first
 // =============
-// This RUST implementation has support for both Steepest Gradient Descent (SGD) and Reinforcement Learning (RL) appraoches for optimal cores detection
+// This RUST implementation has support for both Steepest Gradient Descent (SGD) and Reinforcement Learning (RL) approaches for dynamic resource provisioning
 // RP_MODE should be set to 2 for RL and 3 for SGD
 // UDP_WAIT_TIME and REPEAT_REQUEST variables must be correctly set (can be further tuned) for the approach chosen
-// rp-sim-ul.json should be run on Agora and sender first before starting this RUST implementation
+// rp-sim-ul.json should be run on Agora and sender side before running this RUST implementation
 // Build RUST code:
-// <workspace>/rust_rp cargo build (debug build)
+// <agora_workspace>/rust_rp cargo build (debug build)
 // Run RUST code:
-// <workspace>/rust_rp/target/debug ./rust_rp
-// In RL appraoch (RP_MODE == 2), is_training_enabled to be set true and is_testing_enabled to be set false for training
-// In RL appraoch (RP_MODE == 2), is_training_enabled to be set false and is_testing_enabled to be set true for testing
+// <agora_workspace>/rust_rp/target/debug ./rust_rp (on a separate third terminal)
+// For SGD, an example output will be "SGD: The optimal number of CPU cores is 9" for the below Agora configuration
+// For RL, model has to be trained first and then the trained model should be used to determine optimal cores as per the reward function defined
+// In RL approach (RP_MODE == 2), is_training_enabled to be set true and is_testing_enabled to be set false for training
+// In RL approach (RP_MODE == 2), is_training_enabled to be set false and is_testing_enabled to be set true for testing
+// num_episodes and terminate_count can be further changed as needed. Their current values work proper for the below Agora configuration
+//
 // Sample Size for moving averaging is computed as n = (100*z*s/r*m)^2
 // where, 
 // z -> normal variate od the desired confidence level = 1.96 for 95% confidence level
 // r -> accuracy required
 // s -> sample standard deviation
 // m -> sample mean
-// For r = 5%, s = 53, m = 535 (64x16 MIMO, 25 MCS UL, 5 UL LDPC Iterations and 10 workers Agora configuration), n = 15
+// For r = 5%, s = 53, m = 535 (Agora configuration: 64x16 MIMO, 25 MCS UL, 5 UL LDPC Iterations and 10 workers), n = 15
 // Reference for Statistical Analysis: "The art of Computer Systems Perforamnce Analysis - Raj Jain"
 
 use tokio::net::UdpSocket;
