@@ -3,7 +3,7 @@
   "ofdm_data_num": 1200,
   "demul_block_size": 48,
   "bs_radio_num": 64,
-  "ue_radio_num": 16,
+  "ue_radio_num": 8,
   "adapt_ues": false,
   "ul_mcs" : {
     "mcs_index" : 25, /* 64QAM, 466/1024 from Table 6.1.4.1-1 of 3GPP TS 38.214 */

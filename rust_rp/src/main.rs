@@ -9,7 +9,7 @@
 // <agora_workspace>/rust_rp cargo build (debug build)
 // Run RUST code:
 // <agora_workspace>/rust_rp/target/debug ./rust_rp (on a separate third terminal)
-// For SGD, an example output will be "SGD: The optimal number of CPU cores is 9" for the below Agora configuration
+// For SGD, an example output will be "SGD: The optimal number of CPU cores is 8" for the below Agora configuration
 // For RL, model has to be trained first and then the trained model should be used to determine optimal cores as per the reward function defined
 // In RL approach (RP_MODE == 2), is_training_enabled to be set true and is_testing_enabled to be set false for training
 // In RL approach (RP_MODE == 2), is_training_enabled to be set false and is_testing_enabled to be set true for testing
@@ -21,7 +21,7 @@
 // r -> accuracy required
 // s -> sample standard deviation
 // m -> sample mean
-// For r = 5%, s = 53, m = 535 (Agora configuration: 64x16 MIMO, 25 MCS UL, 5 UL LDPC Iterations and 10 workers), n = 15
+// For r = 5%, s = 53, m = 535 (Agora configuration: 64x8 MIMO, 25 MCS UL, 5 UL LDPC Iterations and 10 workers), n = 15
 // Reference for Statistical Analysis: "The art of Computer Systems Perforamnce Analysis - Raj Jain"
 
 use tokio::net::UdpSocket;
