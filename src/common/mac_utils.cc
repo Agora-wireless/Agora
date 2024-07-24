@@ -13,15 +13,15 @@ MacUtils::MacUtils(FrameStats frame)
 MacUtils::MacUtils(FrameStats frame, double frame_duration,
                    size_t ul_ofdm_data_num, size_t dl_ofdm_data_num,
                    size_t ctrl_ofdm_data_num, bool prb_alloc,
-                   size_t ul_sc_per_prbg, size_t dl_sc_per_prbg)
+                   size_t ul_sc_per_cb, size_t dl_sc_per_cb)
     : frame_(frame),
       frame_duration_(frame_duration),
       ul_ofdm_data_num_(ul_ofdm_data_num),
       dl_ofdm_data_num_(dl_ofdm_data_num),
       ctrl_ofdm_data_num_(ctrl_ofdm_data_num),
       prb_alloc_(prb_alloc),
-      ul_sc_per_prbg_(ul_sc_per_prbg),
-      dl_sc_per_prbg_(dl_sc_per_prbg),
+      ul_sc_per_cb_(ul_sc_per_cb),
+      dl_sc_per_cb_(dl_sc_per_cb),
       ul_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_bcast_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0) {}
@@ -241,15 +241,10 @@ void MacUtils::UpdateUlMCS(size_t ul_mcs_index) {
   const bool early_term = true;
   const int16_t max_decoder_iter = 5;
 
-  size_t zc;
-  if (prb_alloc_ == true) {
-    zc = SelectZc(base_graph, ul_code_rate_, ul_mod_order_bits_,
-                  ul_sc_per_prbg_ * frame_.NumUlDataSyms(), kCbPerSymbol,
-                  "uplink");
-  } else {
-    zc = SelectZc(base_graph, ul_code_rate_, ul_mod_order_bits_,
-                  ul_ofdm_data_num_, kCbPerSymbol, "uplink");
-  }
+  size_t num_sc = (prb_alloc_ == true) ? ul_sc_per_cb_ * frame_.NumUlDataSyms()
+                                       : ul_ofdm_data_num_;
+  size_t zc = SelectZc(base_graph, ul_code_rate_, ul_mod_order_bits_, num_sc,
+                       kCbPerSymbol, "uplink");
 
   // Always positive since ul_code_rate is smaller than 1024
   size_t num_rows =
@@ -263,7 +258,7 @@ void MacUtils::UpdateUlMCS(size_t ul_mcs_index) {
                                num_cb_len, num_cb_codew_len, num_rows, 0);
 
   if (prb_alloc_ == true) {
-    ul_ldpc_config_.NumBlocksInSymbol(ul_ofdm_data_num_ / ul_sc_per_prbg_);
+    ul_ldpc_config_.NumBlocksInSymbol(ul_ofdm_data_num_ / ul_sc_per_cb_);
   } else {
     ul_ldpc_config_.NumBlocksInSymbol((ul_ofdm_data_num_ * ul_mod_order_bits_) /
                                       ul_ldpc_config_.NumCbCodewLen());
@@ -312,15 +307,10 @@ void MacUtils::UpdateDlMCS(size_t dl_mcs_index) {
   const bool early_term = true;
   const int16_t max_decoder_iter = 5;
 
-  size_t zc;
-  if (prb_alloc_ == true) {
-    zc = SelectZc(base_graph, dl_code_rate_, dl_mod_order_bits_,
-                  dl_sc_per_prbg_ * frame_.NumDlDataSyms(), kCbPerSymbol,
-                  "downlink");
-  } else {
-    zc = SelectZc(base_graph, dl_code_rate_, dl_mod_order_bits_,
-                  dl_ofdm_data_num_, kCbPerSymbol, "downlink");
-  }
+  size_t num_sc = (prb_alloc_ == true) ? dl_sc_per_cb_ * frame_.NumDlDataSyms()
+                                       : dl_ofdm_data_num_;
+  size_t zc = SelectZc(base_graph, dl_code_rate_, dl_mod_order_bits_, num_sc,
+                       kCbPerSymbol, "downlink");
 
   // Always positive since dl_code_rate is smaller than 1024
   size_t num_rows =
@@ -334,7 +324,7 @@ void MacUtils::UpdateDlMCS(size_t dl_mcs_index) {
                                num_cb_len, num_cb_codew_len, num_rows, 0);
 
   if (prb_alloc_ == true) {
-    dl_ldpc_config_.NumBlocksInSymbol(dl_ofdm_data_num_ / dl_sc_per_prbg_);
+    dl_ldpc_config_.NumBlocksInSymbol(dl_ofdm_data_num_ / dl_sc_per_cb_);
   } else {
     dl_ldpc_config_.NumBlocksInSymbol((dl_ofdm_data_num_ * dl_mod_order_bits_) /
                                       dl_ldpc_config_.NumCbCodewLen());

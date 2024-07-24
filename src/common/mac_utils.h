@@ -19,7 +19,7 @@ class MacUtils {
   explicit MacUtils(FrameStats frame);
   MacUtils(FrameStats frame, double frame_duration, size_t ul_ofdm_data_num,
            size_t dl_ofdm_data_num, size_t ctrl_ofdm_data_num, bool prb_alloc,
-           size_t ul_sc_per_prbg, size_t dl_sc_per_prbg);
+           size_t ul_sc_per_cb, size_t dl_sc_per_cb);
 
   void SetMacParams(const nlohmann::json& ul_mcs_json,
                     const nlohmann::json& dl_mcs_json, bool verbose = false);
@@ -98,17 +98,21 @@ class MacUtils {
   inline const size_t MaxPacketBytes(Direction dir) const {
     size_t max_mod_bits = GetModOrderBits(kMaxMcsIndex);
     size_t max_code_rate = GetCodeRate(kMaxMcsIndex);
-    size_t num_sc =
+    size_t n_sc =
         (dir == Direction::kUplink) ? ul_ofdm_data_num_ : dl_ofdm_data_num_;
-    return (static_cast<size_t>(num_sc * max_code_rate * max_mod_bits /
+    size_t n_syms = (dir == Direction::kUplink) ? frame_.NumUlDataSyms()
+                                                : frame_.NumDlDataSyms();
+    size_t total_sc = prb_alloc_ ? n_sc * n_syms : n_sc;
+    return (static_cast<size_t>(total_sc * max_code_rate * max_mod_bits /
                                 1024.0) +
             7) /
            8;
   }
+
   /// Get mac bits for this frame, symbol, user and code block ID
   inline int8_t* GetMacBits(Table<int8_t>& info_bits, Direction dir,
-                            size_t frame_id, size_t symbol_id, size_t ue_id,
-                            size_t cb_id) const {
+                            size_t frame_id, [[maybe_unused]] size_t symbol_id,
+                            size_t ue_id, size_t cb_id) const {
     size_t mac_offset_perframe;
     size_t num_bytes_per_cb;
     size_t max_packet_length;
@@ -121,8 +125,12 @@ class MacUtils {
       max_packet_length = this->MaxPacketBytes(Direction::kUplink);
       mac_offset_perframe = this->ul_mac_packets_perframe_ * max_packet_length;
     }
-    return &info_bits[ue_id][(frame_id % kFrameWnd) * mac_offset_perframe +
-                             symbol_id * max_packet_length +
+    if (prb_alloc_ == false) {
+      return &info_bits[ue_id][(frame_id % kFrameWnd) * mac_offset_perframe +
+                               symbol_id * max_packet_length +
+                               cb_id * num_bytes_per_cb];
+    }
+    return &info_bits[ue_id][(frame_id % kFrameWnd) * max_packet_length +
                              cb_id * num_bytes_per_cb];
   }
 
@@ -147,8 +155,8 @@ class MacUtils {
   size_t ctrl_ofdm_data_num_;
 
   bool prb_alloc_;
-  size_t ul_sc_per_prbg_;
-  size_t dl_sc_per_prbg_;
+  size_t ul_sc_per_cb_;
+  size_t dl_sc_per_cb_;
 
   nlohmann::json ul_mcs_json_;
   nlohmann::json dl_mcs_json_;

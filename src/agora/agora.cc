@@ -141,10 +141,59 @@ void Agora::ScheduleDownlinkProcessing(size_t frame_id) {
     }
   }
 
-  // Schedule data symbols encoding
-  for (size_t i = num_pilot_symbols; i < config_->Frame().NumDLSyms(); i++) {
-    ScheduleCodeblocks(EventType::kEncode, Direction::kDownlink, frame_id,
-                       config_->Frame().GetDLSymbol(i));
+  if (config_->SlotScheduling() == false) {
+    // Schedule data symbols encoding
+    for (size_t i = num_pilot_symbols; i < config_->Frame().NumDLSyms(); i++) {
+      ScheduleCodeblocks(EventType::kEncode, Direction::kDownlink, frame_id,
+                         config_->Frame().GetDLSymbol(i));
+    }
+  } else {
+    size_t num_cb = mac_sched_->Params()
+                        .LdpcConfig(Direction::kDownlink)
+                        .NumBlocksInSymbol();
+    for (size_t i = 0; i < num_cb; i++) {
+      ScheduleCodeblocks(EventType::kEncodeRb, Direction::kDownlink, frame_id,
+                         i);
+    }
+  }
+}
+
+void Agora::ScheduleDownlinkProcessing(size_t frame_id, size_t ue_id,
+                                       bool first_in_frame) {
+  if (first_in_frame) {
+    // Schedule broadcast symbols generation
+    if (config_->Frame().NumDlControlSyms() > 0) {
+      ScheduleBroadCastSymbols(EventType::kBroadcast, frame_id);
+    }
+
+    // Schedule beamformed pilot symbols mapping
+    const size_t num_pilot_symbols = config_->Frame().ClientDlPilotSymbols();
+    for (size_t i = 0; i < num_pilot_symbols; i++) {
+      if (beam_last_frame_ == frame_id) {
+        ScheduleSubcarriers(EventType::kPrecode, frame_id,
+                            config_->Frame().GetDLSymbol(i));
+      } else {
+        encode_cur_frame_for_symbol_.at(i) = frame_id;
+      }
+    }
+  }
+
+  size_t num_cb =
+      mac_sched_->Params().LdpcConfig(Direction::kDownlink).NumBlocksInSymbol();
+  for (size_t cb_id = 0; cb_id < num_cb; cb_id++) {
+    auto& prb_id = cb_id;
+    auto ue_map = mac_sched_->ScheduledUeList(frame_id, prb_id);
+    if (ue_map.at(ue_id) == 0) continue;
+    //auto base_tag = gen_tag_t::FrmCbUe(frame_id, cb_id, ue_id);
+    EventData event;
+    event.num_tags_ = 1;
+    event.event_type_ = EventType::kEncodeRb;
+    event.tags_[0] = gen_tag_t::FrmCbUe(frame_id, cb_id, ue_id).tag_;
+    size_t qid = frame_id & 0x1;
+    stats_->TryEnqueueLogStatsMaster(
+        message_->GetConq(EventType::kEncodeRb, qid),
+        message_->GetPtok(EventType::kEncodeRb, qid), event,
+        this->config_->FrameToProfile(), frame_id, cb_id);
   }
 }
 
@@ -250,9 +299,10 @@ void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
 }
 
 void Agora::ScheduleCodeblocks(EventType event_type, Direction dir,
-                               size_t frame_id, size_t symbol_idx) {
-  auto base_tag = gen_tag_t::FrmSymCb(frame_id, symbol_idx, 0);
+                               size_t frame_id, size_t symbol_or_cb_idx) {
+  //if (config_->SlotScheduling() == false) {
   auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0);
+  auto base_tag = gen_tag_t::FrmSymCb(frame_id, symbol_or_cb_idx, 0);
   const size_t num_tasks =
       ue_list.n_elem * mac_sched_->Params().LdpcConfig(dir).NumBlocksInSymbol();
   size_t num_blocks = num_tasks / config_->EncodeBlockSize();
@@ -274,8 +324,28 @@ void Agora::ScheduleCodeblocks(EventType event_type, Direction dir,
     }
     stats_->TryEnqueueLogStatsMaster(
         message_->GetConq(event_type, qid), message_->GetPtok(event_type, qid),
-        event, this->config_->FrameToProfile(), frame_id, symbol_idx);
+        event, this->config_->FrameToProfile(), frame_id, symbol_or_cb_idx);
   }
+  /*} else {
+    auto& prb_id = symbol_or_cb_idx;
+    auto ue_list = mac_sched_->ScheduledUeList(frame_id, prb_id);
+    auto base_tag = gen_tag_t::FrmCbUe(frame_id, symbol_or_cb_idx, 0);
+    const size_t num_tasks =
+        ue_list.n_elem *
+        mac_sched_->Params().LdpcConfig(dir).NumBlocksInSymbol();
+    EventData event;
+    event.num_tags_ = 1;
+    event.event_type_ = event_type;
+    size_t qid = frame_id & 0x1;
+    for (size_t i = 0; i < num_tasks; i++) {
+      event.tags_[0] = base_tag.tag_;
+      base_tag.ue_id_++;
+      stats_->TryEnqueueLogStatsMaster(message_->GetConq(event_type, qid),
+                                       message_->GetPtok(event_type, qid),
+                                       event, this->config_->FrameToProfile(),
+                                       frame_id, symbol_or_cb_idx);
+    }
+  }*/
 }
 
 void Agora::ScheduleUsers([[maybe_unused]] EventType event_type,
@@ -499,7 +569,7 @@ void Agora::Start() {
               this->demul_counters_.CompleteTask(frame_id, symbol_id);
 
           if (last_demul_task == true) {
-            if (kUplinkHardDemod == false) {
+            if (kUplinkHardDemod == false && cfg->SlotScheduling() == false) {
               /*  &&
                 symbol_id >= config_->Frame().GetULSymbol(
                                  config_->Frame().ClientUlPilotSymbols())) {*/
@@ -534,7 +604,7 @@ void Agora::Start() {
               this->mac_sched_->UpdateScheduler(frame_id);
 
               // skip Decode when hard demod is enabled
-              if (kUplinkHardDemod) {
+              if (kUplinkHardDemod == true) {
                 assert(frame_tracking_.cur_proc_frame_id_ == frame_id);
                 CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
                 const bool work_finished = this->CheckFrameComplete(frame_id);
@@ -543,18 +613,26 @@ void Agora::Start() {
                 }
               } else {
                 this->demul_counters_.Reset(frame_id);
-                if (cfg->BigstationMode() == false) {
-                  assert(frame_tracking_.cur_sche_frame_id_ == frame_id);
-                  CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
-                } else {
-                  ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
-                                     frame_id, symbol_id);
-                  /*if (symbol_id >=
+                if (cfg->SlotScheduling() == false) {
+                  if (cfg->BigstationMode() == false) {
+                    assert(frame_tracking_.cur_sche_frame_id_ == frame_id);
+                    CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
+                  } else {
+                    ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
+                                       frame_id, symbol_id);
+                    /*if (symbol_id >=
                       config_->Frame().GetULSymbol(
                           config_->Frame().ClientUlPilotSymbols())) {
                     ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
                                        frame_id, symbol_id);
                   }*/
+                  }
+                } else {
+                  // Simplest solution is to wait for all symbols of a frame
+                  // to finish before scheduling decode for all Codeblocks (PRBs)
+                  // Which Ironically makes it similar to BigStation
+                  ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
+                                     frame_id, symbol_id);
                 }
               }
             }
@@ -620,25 +698,32 @@ void Agora::Start() {
           auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
           RtAssert(arma::find(ue_list == ue_id).is_empty() == false,
                    "Indicated UE index is not scheduled in this frame!");
-          const bool last_ue = this->mac_to_phy_counters_.CompleteTask(
-              frame_id, 0, ue_list.n_elem);
-          if (last_ue == true) {
-            // schedule this frame's encoding
-            // Defer the schedule.  If frames are already deferred or the
-            // current received frame is too far off
-            if ((this->encode_deferral_.empty() == false) ||
-                (frame_id >=
-                 (frame_tracking_.cur_proc_frame_id_ + kScheduleQueues))) {
-              if (kDebugDeferral) {
-                AGORA_LOG_INFO("   +++ Deferring encoding of frame %zu\n",
-                               frame_id);
+          if (cfg->SlotScheduling() == false) {
+            const bool last_ue = this->mac_to_phy_counters_.CompleteTask(
+                frame_id, 0, ue_list.n_elem);
+            if (last_ue == true) {
+              // schedule this frame's encoding
+              // Defer the schedule.  If frames are already deferred or the
+              // current received frame is too far off
+              if ((this->encode_deferral_.empty() == false) ||
+                  (frame_id >=
+                   (frame_tracking_.cur_proc_frame_id_ + kScheduleQueues))) {
+                if (kDebugDeferral) {
+                  AGORA_LOG_INFO("   +++ Deferring encoding of frame %zu\n",
+                                 frame_id);
+                }
+                this->encode_deferral_.push(frame_id);
+              } else {
+                // TODO: Why not schedule each UE as it arrives
+                ScheduleDownlinkProcessing(frame_id);
               }
-              this->encode_deferral_.push(frame_id);
-            } else {
-              ScheduleDownlinkProcessing(frame_id);
+              this->mac_to_phy_counters_.Reset(frame_id);
+              stats_->PrintPerFrameDone(PrintType::kPacketFromMac, frame_id);
             }
-            this->mac_to_phy_counters_.Reset(frame_id);
-            stats_->PrintPerFrameDone(PrintType::kPacketFromMac, frame_id);
+          } else {
+            bool first_in_frame =
+                (this->mac_to_phy_counters_.GetSymbolCount(frame_id) == 0);
+            ScheduleDownlinkProcessing(frame_id, ue_id, first_in_frame);
           }
         } break;
 
@@ -664,6 +749,38 @@ void Agora::Start() {
               const bool last_encode_symbol =
                   this->encode_counters_.CompleteSymbol(frame_id);
               if (last_encode_symbol == true) {
+                this->encode_counters_.Reset(frame_id);
+                this->stats_->MasterSetTsc(TsType::kEncodeDone, frame_id);
+                stats_->PrintPerFrameDone(PrintType::kEncode, frame_id);
+              }
+            }
+          }
+        } break;
+
+        case EventType::kEncodeRb: {
+          for (size_t i = 0u; i < event.num_tags_; i++) {
+            const size_t frame_id = gen_tag_t(event.tags_[i]).frame_id_;
+            const size_t ue_id = gen_tag_t(event.tags_[i]).ue_id_;
+            const size_t cb_id = gen_tag_t(event.tags_[i]).cb_id_;
+
+            auto ue_list = mac_sched_->ScheduledUeList(frame_id, cb_id);
+            const bool last_encode_task =
+                encode_counters_.CompleteTask(frame_id, cb_id, ue_list.n_elem);
+            if (last_encode_task == true) {
+              // If precoder of the current frame exists
+              stats_->PrintPerSymbolDone(
+                  PrintType::kEncode, frame_id, ue_id,
+                  encode_counters_.GetSymbolCount(frame_id) + 1);
+
+              const bool last_encode_symbol =
+                  this->encode_counters_.CompleteSymbol(frame_id);
+              if (last_encode_symbol == true) {
+                if (beam_last_frame_ == frame_id) {
+                  for (size_t sym = 0; sym < cfg->Frame().NumDLSyms(); sym++) {
+                    ScheduleSubcarriers(EventType::kPrecode, frame_id,
+                                        cfg->Frame().GetDLSymbol(sym));
+                  }
+                }
                 this->encode_counters_.Reset(frame_id);
                 this->stats_->MasterSetTsc(TsType::kEncodeDone, frame_id);
                 stats_->PrintPerFrameDone(PrintType::kEncode, frame_id);
@@ -853,7 +970,8 @@ void Agora::Start() {
                 sysconf(_SC_NPROCESSORS_ONLN);  // Total cores available
             rsm.status_msg_2_ = kMinWorkers;
             AGORA_LOG_INFO(
-                "Agora: Sending cores details to RP of rest of alloc %zu, max "
+                "Agora: Sending cores details to RP of rest of alloc %zu, "
+                "max "
                 "cores %zu, min workers %zu\n",
                 rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_);
             TryEnqueueFallback(
@@ -1170,25 +1288,32 @@ void Agora::InitializeCounters() {
   rc_counters_.Init(cfg->BsAntNum());
 
   beam_counters_.Init(cfg->BeamEventsPerSymbol());
-
   demul_counters_.Init(cfg->Frame().NumULSyms(), cfg->DemulEventsPerSymbol());
 
   // \todo setting the first dim to NumUlDataSyms breaks the scheduler
   decode_counters_.Init(
-      cfg->Frame().NumULSyms(),
+      (cfg->SlotScheduling() == false) ? cfg->Frame().NumULSyms() : 1,
       cfg->MacParams().LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
           cfg->SpatialStreamsNum());
 
-  tomac_counters_.Init(cfg->Frame().NumULSyms(), cfg->SpatialStreamsNum());
+  tomac_counters_.Init(
+      (cfg->SlotScheduling() == false) ? cfg->Frame().NumULSyms() : 1,
+      cfg->SpatialStreamsNum());
 
   if (config_->Frame().NumDLSyms() > 0) {
     AGORA_LOG_TRACE("Agora: Initializing downlink buffers\n");
-
-    encode_counters_.Init(config_->Frame().NumDlDataSyms(),
-                          config_->MacParams()
-                                  .LdpcConfig(Direction::kDownlink)
-                                  .NumBlocksInSymbol() *
-                              config_->SpatialStreamsNum());
+    if (cfg->SlotScheduling() == false) {
+      encode_counters_.Init(config_->Frame().NumDlDataSyms(),
+                            config_->MacParams()
+                                    .LdpcConfig(Direction::kDownlink)
+                                    .NumBlocksInSymbol() *
+                                config_->SpatialStreamsNum());
+    } else {
+      encode_counters_.Init(config_->MacParams()
+                                .LdpcConfig(Direction::kDownlink)
+                                .NumBlocksInSymbol(),
+                            config_->SpatialStreamsNum());
+    }
     encode_cur_frame_for_symbol_ =
         std::vector<size_t>(config_->Frame().NumDLSyms(), SIZE_MAX);
     ifft_cur_frame_for_symbol_ =
@@ -1264,7 +1389,8 @@ void Agora::InitializeThreads() {
 
   if (config_->DynamicCoreAlloc() == false) {
     AGORA_LOG_INFO(
-        "Master thread core %zu, TX/RX thread cores %zu--%zu, MAC thread %zu, "
+        "Master thread core %zu, TX/RX thread cores %zu--%zu, MAC thread "
+        "%zu, "
         "worker thread cores %zu--%zu\n",
         config_->CoreOffset(), config_->CoreOffset() + 1,
         config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1,
@@ -1272,7 +1398,8 @@ void Agora::InitializeThreads() {
         base_worker_core_offset_ + config_->WorkerThreadNum() - 1);
   } else {
     AGORA_LOG_INFO(
-        "Master thread core %zu, TX/RX thread cores %zu--%zu, MAC thread %zu, "
+        "Master thread core %zu, TX/RX thread cores %zu--%zu, MAC thread "
+        "%zu, "
         "RP thread core %zu, worker thread cores %zu--%zu\n",
         config_->CoreOffset(), config_->CoreOffset() + 1,
         config_->CoreOffset() + 1 + config_->SocketThreadNum() - 1,
@@ -1286,6 +1413,8 @@ void Agora::SaveDecodeDataToFile(int frame_id) {
   const auto& cfg = config_;
   const size_t num_decoded_bytes =
       mac_sched_->Params().MacPacketLength(Direction::kUplink);
+  const size_t num_pkt_per_frame =
+      cfg->SlotScheduling() ? 1 : cfg->Frame().NumUlDataSyms();
   auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0 /*sc_id*/);
   AGORA_LOG_INFO("Saving decode data to %s\n", kDecodeDataFilename.c_str());
   auto* fp = std::fopen(kDecodeDataFilename.c_str(), "wb");
@@ -1293,7 +1422,7 @@ void Agora::SaveDecodeDataToFile(int frame_id) {
     AGORA_LOG_ERROR("SaveDecodeDataToFile error creating file pointer\n");
   } else {
     for (const auto& j : ue_list) {
-      for (size_t i = 0; i < cfg->Frame().NumUlDataSyms(); i++) {
+      for (size_t i = 0; i < num_pkt_per_frame; i++) {
         const int8_t* ptr =
             agora_memory_->GetDecod()[(frame_id % kFrameWnd)][i][j];
         const auto write_status =

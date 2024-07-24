@@ -79,6 +79,17 @@ union gen_tag_t {
     return ret;
   }
 
+  // Generate a tag with code block ID, frame ID, and user ID bits set and
+  // other fields blank
+  static gen_tag_t FrmCbUe(size_t frame_id, size_t cb_id, size_t ue_id) {
+    gen_tag_t ret(0);
+    ret.frame_id_ = frame_id;
+    ret.ue_id_ = ue_id;
+    ret.tag_type_ = TagType::kCodeblocks;
+    ret.cb_id_ = cb_id;
+    return ret;
+  }
+
   // Generate a tag with user ID, frame ID, and symbol ID bits set and
   // other fields blank
   static gen_tag_t FrmSymUe(size_t frame_id, size_t symbol_id, size_t ue_id) {

@@ -541,8 +541,6 @@ void PhyUe::Start() {
               demul_counters_.Reset(frame_id);
 
               auto ue_map = mac_sched_->ScheduledUeMap(frame_id, 0u);
-              auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
-
               this->phy_stats_->RecordEvm(frame_id, config_->LogScNum(),
                                           ue_map);
               this->phy_stats_->RecordEvmSnr(frame_id, ue_map);

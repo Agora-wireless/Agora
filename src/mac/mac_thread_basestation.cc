@@ -208,39 +208,71 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
   const size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
   const size_t symbol_array_index = cfg_->Frame().GetULSymbolIdx(symbol_id);
   const size_t num_pilot_symbols = cfg_->Frame().ClientUlPilotSymbols();
+  // TODO: This needs to go away. Events when symbol_id is invalid should never reach here
   if (symbol_array_index >= num_pilot_symbols) {
     const size_t data_symbol_idx_ul = symbol_array_index - num_pilot_symbols;
     const size_t frame_slot = frame_id % kFrameWnd;
+    // TODO: Make this a slot index
+    const size_t data_chunk_idx_ul =
+        cfg_->SlotScheduling() ? 0 : data_symbol_idx_ul;
     const int8_t* src_data =
-        decoded_buffer_[frame_slot][data_symbol_idx_ul][ue_id];
+        decoded_buffer_[frame_slot][data_chunk_idx_ul][ue_id];
 
     if (kEnableMac == false) {
       if (kPrintPhyStats == true) {
-        const size_t symbol_offset =
-            cfg_->GetTotalDataSymbolIdxUl(frame_id, data_symbol_idx_ul);
-        const size_t mac_packet_len =
-            mac_sched_->Params().MacPacketLength(Direction::kUplink);
-        phy_stats_->UpdateDecodedBits(ue_id, symbol_offset, frame_slot,
-                                      mac_packet_len * 8);
-        phy_stats_->IncrementDecodedBlocks(ue_id, symbol_offset, frame_slot);
         size_t sched_id = ue_id;
         if (cfg_->AdaptUes()) {
           mac_sched_->UpdateScheduler(frame_id);
           sched_id = mac_sched_->SelectedGroup() * cfg_->UeAntNum() + ue_id;
         }
-        size_t block_error(0);
-        for (size_t i = 0; i < mac_packet_len; i++) {
-          int8_t rx_byte = src_data[i];
-          int8_t tx_byte =
-              ul_mac_bytes_[sched_id][data_symbol_idx_ul * mac_packet_len + i];
-          phy_stats_->UpdateBitErrors(ue_id, symbol_offset, frame_slot, tx_byte,
-                                      rx_byte);
-          if (rx_byte != tx_byte) {
-            block_error++;
+        if (cfg_->SlotScheduling() == false) {
+          const size_t symbol_offset =
+              cfg_->GetTotalDataSymbolIdxUl(frame_id, data_symbol_idx_ul);
+          const size_t mac_packet_len =
+              mac_sched_->Params().MacPacketLength(Direction::kUplink);
+          phy_stats_->UpdateDecodedBits(ue_id, symbol_offset, frame_slot,
+                                        mac_packet_len * 8);
+          phy_stats_->IncrementDecodedBlocks(ue_id, symbol_offset, frame_slot);
+          size_t block_error(0);
+          for (size_t i = 0; i < mac_packet_len; i++) {
+            int8_t rx_byte = src_data[i];
+            int8_t tx_byte =
+                ul_mac_bytes_[sched_id][data_chunk_idx_ul * mac_packet_len + i];
+            phy_stats_->UpdateBitErrors(ue_id, symbol_offset, frame_slot,
+                                        tx_byte, rx_byte);
+            if (rx_byte != tx_byte) {
+              block_error++;
+            }
+          }
+          phy_stats_->UpdateBlockErrors(ue_id, symbol_offset, frame_slot,
+                                        block_error);
+        } else {
+          // MAC packet include all code blocks within a frame
+          const size_t num_bytes_per_cb =
+              mac_sched_->Params().NumBytesPerCb(Direction::kUplink);
+          size_t num_cb = mac_sched_->Params()
+                              .LdpcConfig(Direction::kUplink)
+                              .NumBlocksInSymbol();
+          for (size_t cb = 0; cb < num_cb; cb++) {
+            const size_t cb_offset = frame_slot * num_cb + cb;
+            phy_stats_->UpdateDecodedBits(ue_id, cb_offset, frame_slot,
+                                          num_bytes_per_cb * 8);
+            phy_stats_->IncrementDecodedBlocks(ue_id, cb_offset, frame_slot);
+            size_t block_error(0);
+            for (size_t i = 0; i < num_bytes_per_cb; i++) {
+              size_t byte_idx = cb * num_bytes_per_cb + i;
+              int8_t rx_byte = src_data[byte_idx];
+              int8_t tx_byte = ul_mac_bytes_[sched_id][byte_idx];
+              phy_stats_->UpdateBitErrors(ue_id, cb_offset, frame_slot, tx_byte,
+                                          rx_byte);
+              if (rx_byte != tx_byte) {
+                block_error++;
+              }
+            }
+            phy_stats_->UpdateBlockErrors(ue_id, cb_offset, frame_slot,
+                                          block_error);
           }
         }
-        phy_stats_->UpdateBlockErrors(ue_id, symbol_offset, frame_slot,
-                                      block_error);
       }
     } else {
       // The decoded symbol knows nothing about the padding / storage of the data

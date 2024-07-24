@@ -697,19 +697,34 @@ Config::Config(std::string jsonfilename)
 
   slot_scheduling_ = tdd_conf.value("slot_scheduling", false);
 
-  ul_num_prb_per_cb_ = tdd_conf.value("ul_num_prb_per_cb", 8);
-  ul_num_sc_per_cb_ = ul_num_prb_per_cb_ * kTransposeBlockSize;
+  ul_num_prb_per_cb_ = tdd_conf.value("ul_num_prb_per_cb", 1);
+  RtAssert(ul_num_prb_per_cb_ == 1,
+           "Only 1 PRB per Code block is supported for now!");
+  // ul_num_sc_per_cb_ = ul_num_prb_per_cb_ * kTransposeBlockSize;
+  ul_num_sc_per_prb_ = demul_block_size_;
+  ul_num_sc_per_cb_ =
+      slot_scheduling_
+          ? ul_num_sc_per_prb_ * ul_num_prb_per_cb_ * frame_.NumUlDataSyms()
+          : ofdm_data_num_;
 
-  dl_num_prb_per_cb_ = tdd_conf.value("dl_num_prb_per_cb", 8);
-  dl_num_sc_per_cb_ = dl_num_prb_per_cb_ * kTransposeBlockSize;
+  dl_num_prb_per_cb_ = tdd_conf.value("dl_num_prb_per_cb", 1);
+  RtAssert(ul_num_prb_per_cb_ == 1,
+           "Only 1 PRB per Code block is supported for now!");
+  // dl_num_sc_per_cb_ = dl_num_prb_per_cb_ * kTransposeBlockSize;
+  dl_num_sc_per_prb_ = demul_block_size_;
+  // TODO: Handle DMRS subcarriers
+  dl_num_sc_per_cb_ =
+      slot_scheduling_
+          ? dl_num_sc_per_prb_ * dl_num_prb_per_cb_ * frame_.NumDlDataSyms()
+          : GetOFDMDataNum();
 
   if (slot_scheduling_) {
     RtAssert(
-        ofdm_data_num_ % ul_num_sc_per_cb_ == 0,
+        ofdm_data_num_ % ul_num_sc_per_prb_ == 0,
         "Number of OFDM data subcarriers must be a multiple of subcarriers "
         "in an uplink code block");
     RtAssert(
-        ofdm_data_num_ % dl_num_sc_per_cb_ == 0,
+        ofdm_data_num_ % dl_num_sc_per_prb_ == 0,
         "Number of OFDM data subcarriers must be a multiple of subcarriers "
         "in an downlink code block");
   }
@@ -720,8 +735,24 @@ Config::Config(std::string jsonfilename)
   mac_params_ =
       MacUtils(this->frame_, this->GetFrameDurationSec(), ofdm_data_num_,
                this->GetOFDMDataNum(), GetOFDMCtrlNum(), slot_scheduling_,
-               ul_num_sc_per_cb_, dl_num_sc_per_cb_);
+               ul_num_sc_per_prb_ * ul_num_prb_per_cb_,
+               dl_num_sc_per_prb_ * dl_num_prb_per_cb_);
   mac_params_.SetMacParams(ul_mcs_params_, dl_mcs_params_, true);
+
+  // TODO: in a 5G frame, this value depends on the number of slots
+  ul_num_cb_per_frame_ =
+      slot_scheduling_ == true
+          ? mac_params_.LdpcConfig(Direction::kUplink).NumBlocksInSymbol()
+          : frame_.NumUlDataSyms();
+  dl_num_cb_per_frame_ =
+      slot_scheduling_ == true
+          ? mac_params_.LdpcConfig(Direction::kDownlink).NumBlocksInSymbol()
+          : frame_.NumDlDataSyms();
+  AGORA_LOG_INFO(
+      "Number of SCs per CB: Ul %zu, DL %zu\nNumber of CBs per Frame: UL %zu, "
+      "DL %zu\n",
+      ul_num_sc_per_cb_, dl_num_sc_per_cb_, ul_num_cb_per_frame_,
+      dl_num_cb_per_frame_);
 
   freq_domain_channel_ = tdd_conf.value("freq_domain_channel", false);
   scheduler_type_ =
@@ -944,8 +975,18 @@ void Config::GenPilots() {
 void Config::LoadUplinkData() {
   if (this->frame_.NumUlDataSyms() > 0) {
     // Uplink modulation input bits
-    ul_mod_bits_.Calloc(this->frame_.NumUlDataSyms(),
-                        Roundup<64>(this->ofdm_data_num_) * this->ue_ant_num_,
+    const size_t symbol_blocks =
+        mac_params_.LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
+    size_t num_ul_codeblocks =
+        (slot_scheduling_ == false)
+            ? this->Frame().NumUlDataSyms() * symbol_blocks
+            : symbol_blocks;
+    /*size_t num_subcr = 
+    slot_scheduling_ ? this->NumScPerCb(Direction::kUplink) *
+                                              this->Frame().NumUlDataSyms()
+                                        : this->ofdm_data_num_;*/
+    ul_mod_bits_.Calloc(num_ul_codeblocks,
+                        Roundup<64>(ul_num_sc_per_cb_) * this->ue_ant_num_,
                         Agora_memory::Alignment_t::kAlign32);
     const std::string ul_mod_data_file =
         kExperimentFilepath + kUlModDataPrefix +
@@ -954,17 +995,17 @@ void Config::LoadUplinkData() {
     // reset seek offset for new file read
     size_t seek_offset = 0;
     const size_t subcarr_i = 0u;
-    for (size_t i = 0; i < this->frame_.NumUlDataSyms(); i++) {
-      seek_offset += ofdm_data_num_ * this->ue_ant_offset_ * sizeof(int8_t);
+    for (size_t i = 0; i < num_ul_codeblocks; i++) {
+      seek_offset += ul_num_sc_per_cb_ * this->ue_ant_offset_ * sizeof(int8_t);
       for (size_t j = 0; j < this->ue_ant_num_; j++) {
         int8_t* ul_mod_data_ptr = this->GetModBitsBuf(
             ul_mod_bits_, Direction::kUplink, 0u, i, j, subcarr_i);
-        Utils::ReadBinaryFile(ul_mod_data_file, sizeof(int8_t), ofdm_data_num_,
-                              seek_offset, ul_mod_data_ptr);
-        seek_offset += ofdm_data_num_ * sizeof(int8_t);
+        Utils::ReadBinaryFile(ul_mod_data_file, sizeof(int8_t),
+                              ul_num_sc_per_cb_, seek_offset, ul_mod_data_ptr);
+        seek_offset += ul_num_sc_per_cb_ * sizeof(int8_t);
       }
       seek_offset +=
-          ofdm_data_num_ *
+          ul_num_sc_per_cb_ *
           (this->ue_ant_total_ - this->ue_ant_offset_ - this->ue_ant_num_) *
           sizeof(int8_t);
     }

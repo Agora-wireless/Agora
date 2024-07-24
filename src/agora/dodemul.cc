@@ -75,8 +75,10 @@ EventData DoDemul::Launch(size_t tag) {
   const size_t total_data_symbol_idx_ul =
       cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
 
-  auto ue_list = mac_sched_->ScheduledUeList(frame_id, base_sc_id);
+  size_t prb_id = base_sc_id / cfg_->NumScPerPrb(Direction::kUplink);
+  auto ue_list = mac_sched_->ScheduledUeList(frame_id, prb_id);
   size_t n_users = ue_list.n_elem;
+  size_t block_id = cfg_->SlotScheduling() ? prb_id : data_symbol_idx_ul;
   size_t start_tsc = GetTime::WorkerRdtsc();
 
   if (kDebugPrintInTask == true) {
@@ -353,9 +355,15 @@ EventData DoDemul::Launch(size_t tag) {
         equal_ptr += n_users * k_num_double_in_sim_d256 * 2;
       }
       equal_t_ptr = (float*)(equaled_buffer_temp_transposed_);
+      size_t demod_offset =
+          (cfg_->SlotScheduling()
+               ? data_symbol_idx_ul * cfg_->NumScPerPrb(Direction::kUplink) *
+                     cfg_->NumPrbPerCb(Direction::kUplink)
+               : base_sc_id) *
+          mac_sched_->Params().ModOrderBits(Direction::kUplink);
+
       int8_t* demod_ptr =
-          demod_buffers_[frame_slot][data_symbol_idx_ul][ss_id] +
-          (mac_sched_->Params().ModOrderBits(Direction::kUplink) * base_sc_id);
+          demod_buffers_[frame_slot][block_id][ss_id] + demod_offset;
       Demodulate(equal_t_ptr, demod_ptr, max_sc_ite,
                  mac_sched_->Params().ModOrderBits(Direction::kUplink),
                  kUplinkHardDemod);
@@ -372,7 +380,7 @@ EventData DoDemul::Launch(size_t tag) {
         size_t block_error(0);
         int8_t* tx_bytes =
             cfg_->GetModBitsBuf(cfg_->UlModBits(), Direction::kUplink, 0,
-                                data_symbol_idx_ul, ue_id, base_sc_id);
+                                block_id, ue_id, base_sc_id);
         for (size_t i = 0; i < max_sc_ite; i++) {
           uint8_t rx_byte = static_cast<uint8_t>(demod_ptr[i]);
           uint8_t tx_byte = static_cast<uint8_t>(tx_bytes[i]);

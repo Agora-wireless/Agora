@@ -238,15 +238,15 @@ std::vector<complex_float> DataGenerator::MapOFDMSymbol(
 
 std::vector<complex_float> DataGenerator::MapPRB(
     Config* cfg, const std::vector<complex_float>& modulated_codeword,
-    const complex_float* pilot_seq, Direction dir, size_t cb_id) {
+    const complex_float* pilot_seq, Direction dir, size_t prb_id) {
   std::vector<complex_float> prb_map;
-  size_t num_subcr = cfg->NumScPerCb(dir);
+  size_t num_subcr = cfg->NumScPerPrb(dir);
   size_t data_idx = 0;
   for (size_t i = 0; i < modulated_codeword.size(); i++) {
     if (dir == Direction::kUplink) {
       prb_map.push_back(modulated_codeword.at(i));
     } else {
-      size_t sc_id = cb_id * num_subcr + (i % num_subcr);
+      size_t sc_id = prb_id * num_subcr + (i % num_subcr);
       if (cfg->IsDataSubcarrier(sc_id) == true) {
         prb_map.push_back(modulated_codeword.at(data_idx++));
       } else {

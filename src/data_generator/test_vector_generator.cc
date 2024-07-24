@@ -239,8 +239,8 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
   MacUtils mac_params(cfg->Frame(), cfg->GetFrameDurationSec(),
                       cfg->OfdmDataNum(), cfg->GetOFDMDataNum(),
                       cfg->GetOFDMCtrlNum(), cfg->SlotScheduling(),
-                      cfg->NumScPerCb(Direction::kUplink),
-                      cfg->NumScPerCb(Direction::kDownlink));
+                      cfg->NumScPerPrb(Direction::kUplink),
+                      cfg->NumScPerPrb(Direction::kDownlink));
   mac_params.UpdateUlMcsParams(cfg->MacParams().McsIndex(Direction::kUplink));
   mac_params.UpdateDlMcsParams(cfg->MacParams().McsIndex(Direction::kDownlink));
 
@@ -249,14 +249,6 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
    * ------------------------------------------------ */
   AGORA_LOG_INFO("DataGenerator: Generating encoded and modulated data\n");
   const size_t num_ul_pilots = cfg->Frame().ClientUlPilotSymbols();
-  const size_t ul_pkt_per_frame =
-      mac_params.MacPacketsPerframe(Direction::kUplink);
-  const size_t num_ul_max_bytes =
-      mac_params.MaxPacketBytes(Direction::kUplink) * ul_pkt_per_frame;
-  const size_t dl_pkt_per_frame =
-      mac_params.MacPacketsPerframe(Direction::kDownlink);
-  const size_t num_dl_max_bytes =
-      mac_params.MaxPacketBytes(Direction::kDownlink) * dl_pkt_per_frame;
   for (size_t sched = 0; sched < sched_ue_set.size(); sched++) {
     auto sched_id = sched_ue_set.at(sched);
     auto ue_map = Utils::Int2Bits(sched_id, cfg->UeAntNum());
@@ -272,6 +264,10 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
       if (cfg->AdaptUes()) {
         mac_params.UpdateUlMcsParams(sched_ul_mcs.at(sched));
       }
+      const size_t ul_pkt_per_frame =
+          mac_params.MacPacketsPerframe(Direction::kUplink);
+      const size_t num_ul_max_bytes =
+          mac_params.MaxPacketBytes(Direction::kUplink) * ul_pkt_per_frame;
       const size_t ul_cb_bytes = mac_params.NumBytesPerCb(Direction::kUplink);
       LDPCconfig ul_ldpc_config = mac_params.LdpcConfig(Direction::kUplink);
       const size_t num_ul_mac_bytes =
@@ -286,7 +282,6 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
               pkt_id * mac_params.MacPacketLength(Direction::kUplink);
           auto* pkt = reinterpret_cast<MacPacketPacked*>(
               &ul_mac_info.at(ue_id).at(pkt_offset));
-
           pkt->Set(0, cfg->Frame().GetULSymbol(pkt_id + num_ul_pilots), ue_id,
                    mac_params.MacPayloadMaxLength(Direction::kUplink));
           data_generator->GenMacData(pkt, ue_id);
@@ -372,11 +367,8 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
           num_ul_codeblocks);
       std::vector<std::vector<complex_float>> ul_modulated_symbols(
           num_ul_codeblocks);
+      size_t num_subcr = cfg->NumScPerCb(Direction::kUplink);
       for (size_t i = 0; i < num_ul_codeblocks; i++) {
-        size_t num_subcr = cfg->SlotScheduling()
-                               ? cfg->NumScPerCb(Direction::kUplink) *
-                                     cfg->Frame().NumUlDataSyms()
-                               : cfg->OfdmDataNum();
         ul_modulated_codewords.at(i).resize(num_subcr, 0);
         auto ofdm_symbol = DataGenerator::GetModulation(
             &ul_encoded_codewords.at(i).at(0),
@@ -395,7 +387,8 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
       }
 
       // Place modulated uplink data codewords into central IFFT bins
-      RtAssert(ul_ldpc_config.NumBlocksInSymbol() == 1);  // TODO: Assumption
+      RtAssert(cfg->SlotScheduling() ||
+               ul_ldpc_config.NumBlocksInSymbol() == 1);  // TODO: Assumption
       std::vector<std::vector<complex_float>> pre_ifft_data_syms;
       pre_ifft_data_syms.resize(cfg->UeAntNum() * cfg->Frame().NumUlDataSyms());
       if (cfg->SlotScheduling() == false) {
@@ -406,15 +399,16 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
       } else {
         std::vector<std::vector<complex_float>> prb_to_ofdm(
             cfg->UeAntNum() * cfg->Frame().NumUlDataSyms());
+        size_t num_prb = ul_ldpc_config.NumBlocksInSymbol();
+        size_t sc_per_prb = cfg->NumScPerPrb(Direction::kUplink);
         for (size_t i = 0; i < prb_to_ofdm.size(); i++) {
           prb_to_ofdm.at(i).resize(cfg->OfdmDataNum());
           size_t ue = i % cfg->UeAntNum();
           size_t sym = i / cfg->UeAntNum();
           for (size_t j = 0; j < cfg->OfdmDataNum(); j++) {
-            size_t cb =
-                (j / ul_ldpc_config.NumBlocksInSymbol()) * cfg->UeAntNum() + ue;
-            size_t sc = sym * cfg->NumScPerCb(Direction::kUplink) +
-                        (j % ul_ldpc_config.NumBlocksInSymbol());
+            size_t cb = ue * num_prb + (j / sc_per_prb);
+            size_t sc = sym * sc_per_prb + (j % sc_per_prb);
+            std::printf("ue %zu, sym %zu, cb %zu, sc %zu\n", ue, sym, cb, sc);
             prb_to_ofdm.at(i).at(j) = ul_modulated_symbols.at(cb).at(sc);
           }
         }
@@ -464,7 +458,7 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
                        filename_modul.c_str());
         for (size_t i = 0; i < num_ul_codeblocks; i++) {
           Utils::WriteBinaryFile(
-              filename_modul, sizeof(uint8_t), cfg->OfdmDataNum(),
+              filename_modul, sizeof(uint8_t), num_subcr,
               ul_modulated_codewords.at(i).data(),
               i != 0 || sched != 0);  //Do not append in the first write
         }
@@ -562,6 +556,10 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
       if (cfg->AdaptUes()) {
         mac_params.UpdateDlMcsParams(sched_dl_mcs.at(sched));
       }
+      const size_t dl_pkt_per_frame =
+          mac_params.MacPacketsPerframe(Direction::kDownlink);
+      const size_t num_dl_max_bytes =
+          mac_params.MaxPacketBytes(Direction::kDownlink) * dl_pkt_per_frame;
       const LDPCconfig dl_ldpc_config =
           mac_params.LdpcConfig(Direction::kDownlink);
       const size_t dl_cb_bytes = mac_params.NumBytesPerCb(Direction::kDownlink);
@@ -660,7 +658,7 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
           num_dl_codeblocks);
       for (size_t i = 0; i < num_dl_codeblocks; i++) {
         size_t num_subcr = cfg->SlotScheduling()
-                               ? cfg->NumScPerCb(Direction::kDownlink) *
+                               ? cfg->NumScPerPrb(Direction::kDownlink) *
                                      cfg->Frame().NumDlDataSyms()
                                : cfg->GetOFDMDataNum();
         dl_modulated_codewords.at(i).resize(num_subcr, 0);
@@ -671,13 +669,15 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
             num_subcr, mac_params.ModOrderBits(Direction::kDownlink));
         if (cfg->SlotScheduling() == false) {
           const size_t sym_offset = i % (symbol_blocks);
-          const size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
+          const size_t ue_idx = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
           dl_modulated_symbols.at(i) = DataGenerator::MapOFDMSymbol(
-              cfg, ofdm_symbol, ue_specific_pilot[ue_id], SymbolType::kDL);
+              cfg, ofdm_symbol, ue_specific_pilot[ue_idx], SymbolType::kDL);
         } else {
-          dl_modulated_symbols.at(i) = DataGenerator::MapPRB(
-              cfg, ofdm_symbol, nullptr, Direction::kDownlink,
-              i % dl_ldpc_config.NumBlocksInSymbol());
+          const size_t ue_idx = i / dl_ldpc_config.NumBlocksInSymbol();
+          const size_t cb_idx = i % dl_ldpc_config.NumBlocksInSymbol();
+          dl_modulated_symbols.at(i) =
+              DataGenerator::MapPRB(cfg, ofdm_symbol, ue_specific_pilot[ue_idx],
+                                    Direction::kDownlink, cb_idx);
         }
       }
 
@@ -692,15 +692,19 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
       } else {
         std::vector<std::vector<complex_float>> prb_to_ofdm(
             cfg->UeAntNum() * cfg->Frame().NumDlDataSyms());
+        size_t num_prb = dl_ldpc_config.NumBlocksInSymbol();
+        size_t sc_per_cb = cfg->NumScPerPrb(Direction::kDownlink);
         for (size_t i = 0; i < prb_to_ofdm.size(); i++) {
           prb_to_ofdm.at(i).resize(cfg->OfdmDataNum());
           size_t ue = i % cfg->UeAntNum();
           size_t sym = i / cfg->UeAntNum();
           for (size_t j = 0; j < cfg->OfdmDataNum(); j++) {
-            size_t cb =
+            /*size_t cb =
                 (j / dl_ldpc_config.NumBlocksInSymbol()) * cfg->UeAntNum() + ue;
-            size_t sc = sym * cfg->NumScPerCb(Direction::kDownlink) +
-                        (j % dl_ldpc_config.NumBlocksInSymbol());
+            size_t sc = sym * cfg->NumScPerPrb(Direction::kDownlink) +
+                        (j % dl_ldpc_config.NumBlocksInSymbol());*/
+            size_t cb = ue * num_prb + (j / sc_per_cb);
+            size_t sc = sym * sc_per_cb + (j % num_prb);
             prb_to_ofdm.at(i).at(j) = dl_modulated_symbols.at(cb).at(sc);
           }
         }

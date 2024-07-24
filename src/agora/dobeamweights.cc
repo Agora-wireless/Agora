@@ -445,7 +445,9 @@ void DoBeamWeights::ComputeBeams(size_t tag) {
     const size_t start_tsc1 = GetTime::WorkerRdtsc();
 
     // Gather CSI matrices of each pilot from partially-transposed CSIs.
-    arma::uvec ue_list = mac_sched_->ScheduledUeList(frame_id, cur_sc_id);
+    // TODO: Are downlink and uplink the same?
+    size_t prb_id = cur_sc_id / cfg_->NumScPerPrb(Direction::kUplink);
+    arma::uvec ue_list = mac_sched_->ScheduledUeList(frame_id, prb_id);
     for (size_t selected_ue_idx = 0; selected_ue_idx < ue_list.n_elem;
          selected_ue_idx++) {
       size_t ue_idx = ue_list.at(selected_ue_idx);

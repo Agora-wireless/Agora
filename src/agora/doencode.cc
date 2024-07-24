@@ -61,35 +61,43 @@ DoEncode::~DoEncode() {
 EventData DoEncode::Launch(size_t tag) {
   const LDPCconfig& ldpc_config = mac_sched_->Params().LdpcConfig(dir_);
   const size_t frame_id = gen_tag_t(tag).frame_id_;
-  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t cb_id = gen_tag_t(tag).cb_id_;
-  const size_t cur_cb_id = cb_id % ldpc_config.NumBlocksInSymbol();
-  const size_t sched_ue_id = cb_id / ldpc_config.NumBlocksInSymbol();
+  size_t symbol_id, cur_cb_id, sched_ue_id;
+  size_t symbol_idx;
+  size_t data_symbol_idx = 0;
+  size_t ue_id;
+  if (cfg_->SlotScheduling() == false) {
+    symbol_id = gen_tag_t(tag).symbol_id_;
+    cur_cb_id = cb_id % ldpc_config.NumBlocksInSymbol();
+    sched_ue_id = cb_id / ldpc_config.NumBlocksInSymbol();
+    if (dir_ == Direction::kDownlink) {
+      symbol_idx = cfg_->Frame().GetDLSymbolIdx(symbol_id);
+      assert(symbol_idx >= cfg_->Frame().ClientDlPilotSymbols());
+      data_symbol_idx = symbol_idx - cfg_->Frame().ClientDlPilotSymbols();
+      ue_id = mac_sched_->ScheduledUeIndex(frame_id, 0u, sched_ue_id);
+    } else {
+      symbol_idx = cfg_->Frame().GetULSymbolIdx(symbol_id);
+      assert(symbol_idx >= cfg_->Frame().ClientUlPilotSymbols());
+      data_symbol_idx = symbol_idx - cfg_->Frame().ClientUlPilotSymbols();
+      ue_id = sched_ue_id;
+    }
+    if (kDebugPrintInTask) {
+      std::printf(
+          "In doEncode thread %d: frame: %zu, symbol: %zu:%zu:%zu, code block "
+          "%zu, ue_id: %zu\n",
+          tid_, frame_id, symbol_id, symbol_idx, data_symbol_idx, cur_cb_id,
+          ue_id);
+    }
+
+  } else {
+    sched_ue_id = gen_tag_t(tag).ue_id_;
+    ue_id = (dir_ == Direction::kDownlink)
+                ? mac_sched_->ScheduledUeIndex(frame_id, 0u, sched_ue_id)
+                : sched_ue_id;
+    cur_cb_id = cb_id;
+  }
 
   size_t start_tsc = GetTime::WorkerRdtsc();
-
-  size_t symbol_idx;
-  size_t data_symbol_idx;
-  size_t ue_id;
-  if (dir_ == Direction::kDownlink) {
-    symbol_idx = cfg_->Frame().GetDLSymbolIdx(symbol_id);
-    assert(symbol_idx >= cfg_->Frame().ClientDlPilotSymbols());
-    data_symbol_idx = symbol_idx - cfg_->Frame().ClientDlPilotSymbols();
-    ue_id = mac_sched_->ScheduledUeIndex(frame_id, 0u, sched_ue_id);
-  } else {
-    symbol_idx = cfg_->Frame().GetULSymbolIdx(symbol_id);
-    assert(symbol_idx >= cfg_->Frame().ClientUlPilotSymbols());
-    data_symbol_idx = symbol_idx - cfg_->Frame().ClientUlPilotSymbols();
-    ue_id = sched_ue_id;
-  }
-
-  if (kDebugPrintInTask) {
-    std::printf(
-        "In doEncode thread %d: frame: %zu, symbol: %zu:%zu:%zu, code block "
-        "%zu, ue_id: %zu\n",
-        tid_, frame_id, symbol_id, symbol_idx, data_symbol_idx, cur_cb_id,
-        ue_id);
-  }
 
   // All cb's per symbol are included in 1 mac packet
   int8_t* tx_data_ptr = mac_sched_->Params().GetMacBits(

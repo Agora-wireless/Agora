@@ -38,20 +38,24 @@ PhyStats::PhyStats(Config* const cfg, MacScheduler* const mac_sched,
     num_rx_symbols_ = cfg->Frame().NumULSyms();
     num_rxdata_symbols_ = cfg->Frame().NumUlDataSyms();
   }
+  num_codeblocks_ = cfg->MacParams().LdpcConfig(dir).NumBlocksInSymbol();
   const size_t task_buffer_symbol_num = num_rxdata_symbols_ * kFrameWnd;
+  const size_t task_buffer_item_num = (cfg->SlotScheduling() == true)
+                                          ? kFrameWnd * num_codeblocks_
+                                          : task_buffer_symbol_num;
 
-  decoded_bits_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
+  decoded_bits_count_.Calloc(cfg->UeAntNum(), task_buffer_item_num,
                              Agora_memory::Alignment_t::kAlign64);
-  bit_error_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
+  bit_error_count_.Calloc(cfg->UeAntNum(), task_buffer_item_num,
                           Agora_memory::Alignment_t::kAlign64);
   frame_decoded_bits_.Calloc(cfg->UeAntNum(), kFrameWnd,
                              Agora_memory::Alignment_t::kAlign64);
   frame_bit_errors_.Calloc(cfg->UeAntNum(), kFrameWnd,
                            Agora_memory::Alignment_t::kAlign64);
 
-  decoded_blocks_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
+  decoded_blocks_count_.Calloc(cfg->UeAntNum(), task_buffer_item_num,
                                Agora_memory::Alignment_t::kAlign64);
-  block_error_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
+  block_error_count_.Calloc(cfg->UeAntNum(), task_buffer_item_num,
                             Agora_memory::Alignment_t::kAlign64);
   frame_symbol_errors_.Calloc(cfg->UeAntNum(), kFrameWnd,
                               Agora_memory::Alignment_t::kAlign64);
@@ -139,7 +143,10 @@ void PhyStats::LoadGroundTruthIq() {
 }
 
 void PhyStats::PrintPhyStats() {
-  const size_t task_buffer_symbol_num = num_rxdata_symbols_ * kFrameWnd;
+  const size_t task_buffer_item_num =
+      ((config_->SlotScheduling() == true) ? num_codeblocks_
+                                           : num_rxdata_symbols_) *
+      kFrameWnd;
   std::string tx_type;
   if (dir_ == Direction::kDownlink) {
     tx_type = "Downlink";
@@ -154,7 +161,7 @@ void PhyStats::PrintPhyStats() {
       size_t total_decoded_blocks(0);
       size_t total_block_errors(0);
 
-      for (size_t i = 0u; i < task_buffer_symbol_num; i++) {
+      for (size_t i = 0u; i < task_buffer_item_num; i++) {
         total_decoded_bits += decoded_bits_count_[ue_id][i];
         total_bit_errors += bit_error_count_[ue_id][i];
         total_decoded_blocks += decoded_blocks_count_[ue_id][i];

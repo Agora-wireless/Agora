@@ -63,11 +63,12 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg, size_t offset,
                                        arma::uvec spatial_streams) {
   size_t bs_ant_num = cfg->BsAntNum();
   size_t ue_num = cfg->UeAntNum();
-  size_t num_uplink_syms = cfg->Frame().NumUlDataSyms();
+  size_t num_ul_syms = cfg->Frame().NumUlDataSyms();
   size_t ofdm_data_num = cfg->OfdmDataNum();
   size_t ul_pilot_syms = cfg->Frame().ClientUlPilotSymbols();
+  size_t num_pkt_per_frame = cfg->SlotScheduling() ? 1 : num_ul_syms;
   size_t raw_read_block =
-      cfg->MacParams().MaxPacketBytes(Direction::kUplink) * num_uplink_syms;
+      cfg->MacParams().MaxPacketBytes(Direction::kUplink) * num_pkt_per_frame;
   size_t spatial_streams_num = spatial_streams.n_elem;
 
   const std::string raw_data_filename = kUlCheckFilePrefix +
@@ -88,7 +89,7 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg, size_t offset,
       "check_correctness_ul: bs ant %zu, ues %zu, spatial streams (last frame) "
       "%zu, "
       "ul syms %zu, ofdm %zu, ul pilots %zu, bytes per UE %zu.\n",
-      bs_ant_num, ue_num, spatial_streams_num, num_uplink_syms, ofdm_data_num,
+      bs_ant_num, ue_num, spatial_streams_num, num_ul_syms, ofdm_data_num,
       ul_pilot_syms, num_bytes_per_ue);
 
   unsigned int error_cnt = 0;

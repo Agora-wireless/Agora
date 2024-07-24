@@ -14,8 +14,11 @@ AgoraBuffer::AgoraBuffer(Config* const cfg)
                       cfg->BsAntNum() * cfg->UeAntNum()),
       dl_beam_matrix_(kFrameWnd, cfg->OfdmDataNum(),
                       cfg->UeAntNum() * cfg->BsAntNum()),
-      demod_buffer_(kFrameWnd, cfg->Frame().NumUlDataSyms(), cfg->UeAntNum(),
-                    kMaxModType * cfg->OfdmDataNum()),
+      demod_buffer_(kFrameWnd, cfg->NumCbPerFrame(Direction::kUplink),
+                    cfg->UeAntNum(),
+                    kMaxModType * cfg->NumScPerCb(Direction::kUplink)),
+      // In SlotScheduling mode the 2nd dimension is not used
+      // TODO: Can be slots instead of symbols
       decoded_buffer_(kFrameWnd, cfg->Frame().NumUlDataSyms(), cfg->UeAntNum(),
                       cfg->MacParams().MaxPacketBytes(Direction::kUplink)) {
   AllocateTables();
@@ -65,7 +68,7 @@ void AgoraBuffer::AllocateTables() {
         kFrameWnd * config_->Frame().NumDlDataSyms();
 
     size_t dl_bits_buffer_size =
-        task_buffer_data_symbol_num *
+        (config_->SlotScheduling() ? kFrameWnd : task_buffer_data_symbol_num) *
         config_->MacParams().MaxPacketBytes(Direction::kDownlink);
     dl_bits_buffer_.Calloc(config_->UeAntNum(), dl_bits_buffer_size,
                            Agora_memory::Alignment_t::kAlign64);

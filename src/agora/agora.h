@@ -95,6 +95,8 @@ class Agora {
                         size_t symbol_id);
   void ScheduleAntennasTX(size_t frame_id, size_t symbol_id);
   void ScheduleDownlinkProcessing(size_t frame_id);
+  void ScheduleDownlinkProcessing(size_t frame_id, size_t ue_id,
+                                  bool first_in_frame);
   void ScheduleDownlinkMAC(size_t frame_id);
 
   /**

@@ -286,6 +286,16 @@ class Config {
                                      : this->dl_num_sc_per_cb_;
   }
 
+  inline size_t NumScPerPrb(Direction dir) const {
+    return dir == Direction::kUplink ? this->ul_num_sc_per_prb_
+                                     : this->dl_num_sc_per_prb_;
+  }
+
+  inline size_t NumCbPerFrame(Direction dir) const {
+    return dir == Direction::kUplink ? this->ul_num_cb_per_frame_
+                                     : this->dl_num_cb_per_frame_;
+  }
+
   inline bool FreqDomainChannel() const { return this->freq_domain_channel_; }
   inline uint16_t DpdkNumPorts() const { return this->dpdk_num_ports_; }
   inline uint16_t DpdkPortOffset() const { return this->dpdk_port_offset_; }
@@ -481,20 +491,26 @@ class Config {
 
   /// Get encoded_buffer for this frame, symbol, user and code block ID
   inline int8_t* GetModBitsBuf(Table<int8_t>& mod_bits_buffer, Direction dir,
-                               size_t frame_id, size_t symbol_id, size_t ue_id,
+                               size_t frame_id, size_t block_id, size_t ue_id,
                                size_t sc_id) const {
-    size_t total_data_symbol_id;
-    size_t ofdm_data_num;
-    if (dir == Direction::kDownlink) {
-      total_data_symbol_id = GetTotalDataSymbolIdxDl(frame_id, symbol_id);
-      ofdm_data_num = GetOFDMDataNum();
+    size_t dim1_id;
+    size_t dim2_id;
+    if (slot_scheduling_) {
+      dim1_id = block_id + (frame_id % kFrameWnd) *
+                               mac_params_.LdpcConfig(dir).NumBlocksInSymbol();
+      dim2_id =
+          (dir == Direction::kUplink) ? ul_num_sc_per_cb_ : dl_num_sc_per_cb_;
     } else {
-      total_data_symbol_id = GetTotalDataSymbolIdxUl(frame_id, symbol_id);
-      ofdm_data_num = this->ofdm_data_num_;
+      if (dir == Direction::kDownlink) {
+        dim1_id = GetTotalDataSymbolIdxDl(frame_id, block_id);
+        dim2_id = GetOFDMDataNum();
+      } else {
+        dim1_id = GetTotalDataSymbolIdxUl(frame_id, block_id);
+        dim2_id = this->ofdm_data_num_;
+      }
     }
 
-    return &mod_bits_buffer[total_data_symbol_id]
-                           [Roundup<64>(ofdm_data_num) * ue_id + sc_id];
+    return &mod_bits_buffer[dim1_id][Roundup<64>(dim2_id) * ue_id + sc_id];
   }
 
   // Returns the number of pilot subcarriers in downlink symbols used for
@@ -892,11 +908,23 @@ class Config {
   // The total number of subcarriers per uplink code block
   size_t ul_num_sc_per_cb_;
 
+  // The total number of uplink subcarriers prb in an OFDM symbol
+  size_t ul_num_sc_per_prb_;
+
+  // The total number of uplink codeblocks in a frame
+  size_t ul_num_cb_per_frame_;
+
   // The total number of downlink PRBs allocated per code bloack in a subframe
   size_t dl_num_prb_per_cb_;
 
   // The total number of subcarriers per downlink code block
   size_t dl_num_sc_per_cb_;
+
+  // The total number of downlink subcarriers prb in an OFDM symbol
+  size_t dl_num_sc_per_prb_;
+
+  // The total number of downlink codeblocks in a frame
+  size_t dl_num_cb_per_frame_;
 
   // IP address of the machine running the baseband processing for UE
   std::string ue_server_addr_;

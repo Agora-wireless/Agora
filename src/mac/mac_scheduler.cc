@@ -17,10 +17,10 @@ MacScheduler::MacScheduler(Config* const cfg)
 
 MacScheduler::~MacScheduler() {}
 
-size_t MacScheduler::ScheduledUeIndex(size_t frame_id, size_t sc_id,
+size_t MacScheduler::ScheduledUeIndex(size_t frame_id, size_t prb_id,
                                       size_t sched_ue_id) {
   return (size_t)scheduler_model_->ScheduledUeList(frame_id,
-                                                   sc_id)[sched_ue_id];
+                                                   prb_id)[sched_ue_id];
 }
 
 bool MacScheduler::IsUeScheduled(size_t frame_id, size_t prb_id, size_t ue_id) {

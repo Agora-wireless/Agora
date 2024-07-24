@@ -53,8 +53,8 @@ EventData DoPrecode::Launch(size_t tag) {
 
   size_t max_sc_ite =
       std::min(cfg_->DemulBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
-
-  auto ue_list = mac_sched_->ScheduledUeList(frame_id, base_sc_id);
+  size_t prb_id = base_sc_id / cfg_->NumScPerPrb(Direction::kDownlink);
+  auto ue_list = mac_sched_->ScheduledUeList(frame_id, prb_id);
   if (kUseSpatialLocality) {
     for (size_t i = 0; i < max_sc_ite; i = i + kSCsPerCacheline) {
       size_t start_tsc1 = GetTime::WorkerRdtsc();

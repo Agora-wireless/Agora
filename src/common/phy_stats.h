@@ -98,6 +98,7 @@ class PhyStats {
   arma::cx_fcube gt_cube_;
   size_t num_rx_symbols_;
   size_t num_rxdata_symbols_;
+  size_t num_codeblocks_;
 
   CsvLog::CsvLogger logger_plt_snr_;
   CsvLog::CsvLogger logger_plt_rssi_;
