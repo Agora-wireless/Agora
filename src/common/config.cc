@@ -701,7 +701,7 @@ Config::Config(std::string jsonfilename)
   RtAssert(ul_num_prb_per_cb_ == 1,
            "Only 1 PRB per Code block is supported for now!");
   // ul_num_sc_per_cb_ = ul_num_prb_per_cb_ * kTransposeBlockSize;
-  ul_num_sc_per_prb_ = demul_block_size_;
+  ul_num_sc_per_prb_ = slot_scheduling_ ? demul_block_size_ : ofdm_data_num_;
   ul_num_sc_per_cb_ =
       slot_scheduling_
           ? ul_num_sc_per_prb_ * ul_num_prb_per_cb_ * frame_.NumUlDataSyms()
@@ -711,7 +711,7 @@ Config::Config(std::string jsonfilename)
   RtAssert(ul_num_prb_per_cb_ == 1,
            "Only 1 PRB per Code block is supported for now!");
   // dl_num_sc_per_cb_ = dl_num_prb_per_cb_ * kTransposeBlockSize;
-  dl_num_sc_per_prb_ = demul_block_size_;
+  dl_num_sc_per_prb_ = slot_scheduling_ ? demul_block_size_ : ofdm_data_num_;
   // TODO: Handle DMRS subcarriers
   dl_num_sc_per_cb_ =
       slot_scheduling_
