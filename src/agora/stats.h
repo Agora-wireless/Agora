@@ -81,7 +81,8 @@ class Stats {
 
   /// From the master, set the RDTSC timestamp for a frame ID, symbol ID and
   /// timestamp type
-  void MasterSetTscSymbol(TsType timestamp_type, size_t frame_id, size_t symbol_id, size_t block_id) {
+  void MasterSetTscSymbol(TsType timestamp_type, size_t frame_id,
+                          size_t symbol_id, size_t block_id) {
     this->master_timestamps_symbols_.at(static_cast<size_t>(timestamp_type))
         .at(frame_id % kNumStatsFrames)
         .at(symbol_id % kNumSymbolsPerFrame)
@@ -90,8 +91,10 @@ class Stats {
 
   /// From the master, get the RDTSC timestamp for a frame ID and timestamp
   /// type
-  size_t MasterGetTscSymbol(TsType timestamp_type, size_t frame_id, size_t symbol_id, size_t block_id) const {
-    return this->master_timestamps_symbols_.at(static_cast<size_t>(timestamp_type))
+  size_t MasterGetTscSymbol(TsType timestamp_type, size_t frame_id,
+                            size_t symbol_id, size_t block_id) const {
+    return this->master_timestamps_symbols_
+        .at(static_cast<size_t>(timestamp_type))
         .at(frame_id % kNumStatsFrames)
         .at(symbol_id % kNumSymbolsPerFrame)
         .at(block_id % kMaxDataSCs);
@@ -136,7 +139,8 @@ class Stats {
                                   size_t symbol_id, size_t cb_id,
                                   size_t reference_tsc) const {
     return GetTime::CyclesToUs(
-        MasterGetTscSymbol(timestamp_type, frame_id, symbol_id, cb_id) - reference_tsc,
+        MasterGetTscSymbol(timestamp_type, frame_id, symbol_id, cb_id) -
+            reference_tsc,
         this->freq_ghz_);
   }
 
@@ -341,8 +345,9 @@ class Stats {
 
   /// Timestamps taken by the master thread at different points in a symbols's
   /// processing
-  std::array<std::array<std::array<std::array<double, kMaxDataSCs>, kNumSymbolsPerFrame>,
-             kNumStatsFrames>,
+  std::array<std::array<std::array<std::array<double, kMaxDataSCs>,
+                                   kNumSymbolsPerFrame>,
+                        kNumStatsFrames>,
              kNumTimestampTypes>
       master_timestamps_symbols_;
 

@@ -21,8 +21,8 @@ AgoraWorkerSet::AgoraWorkerSet(Config* cfg, MacScheduler* mac_sched,
                                Stats* stats, PhyStats* phy_stats,
                                MessageInfo* message, AgoraBuffer* buffer,
                                FrameInfo* frame)
-    : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum() + 1 +
-                               (cfg->DynamicCoreAlloc() ? 1 : 0)),
+    : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum() +
+                               1 + (cfg->DynamicCoreAlloc() ? 1 : 0)),
       config_(cfg),
       mac_sched_(mac_sched),
       stats_(stats),
@@ -78,14 +78,16 @@ void AgoraWorkerSet::UpdateCores(RPControlMsg rcm) {
       "[ALERTTTTTT]: CPU Layout Update!!! current_core_num: %zu, "
       "updated_core_num: %zu, base_worker_core_offset: %zu, max_core_num: "
       "%zu\n",
-      current_core_num, updated_core_num, base_worker_core_offset_, max_core_num);
+      current_core_num, updated_core_num, base_worker_core_offset_,
+      max_core_num);
 
   // Update workers
   if (workers_.size() < updated_core_num) {
     // Add workers
     updated_core_num = std::min(updated_core_num, max_core_num);
 
-    for (size_t core_i = current_core_num; core_i < updated_core_num; core_i++) {
+    for (size_t core_i = current_core_num; core_i < updated_core_num;
+         core_i++) {
       // Update info
       if (active_core_.at(core_i) == true) {
         std::runtime_error(
@@ -104,7 +106,8 @@ void AgoraWorkerSet::UpdateCores(RPControlMsg rcm) {
     // minimum core number?
     updated_core_num = std::max(updated_core_num, kMinWorkers);
     // Remove from back to front....
-    for (size_t core_i = current_core_num; core_i > updated_core_num; core_i--) {
+    for (size_t core_i = current_core_num; core_i > updated_core_num;
+         core_i--) {
       // \todo update the core numbers so we don't have to do this.
       const size_t core_index = core_i - 1;
       // Update info

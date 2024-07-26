@@ -151,8 +151,8 @@ int main(int argc, char* argv[]) {
       ret = EXIT_FAILURE;
     }
   }  // end context Config
-  delete[] (frame_start);
-  delete[] (frame_end);
+  delete[](frame_start);
+  delete[](frame_end);
   AGORA_LOG_INFO("Mac user application terminated!\n");
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();

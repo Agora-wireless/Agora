@@ -109,7 +109,7 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg,
         }
       }
     }  //  for (int ue = 0; ue < ue_num; ue++)
-  }  // for (int i = 0; i < num_uplink_syms; i++)
+  }    // for (int i = 0; i < num_uplink_syms; i++)
 
   raw_data.Free();
   output_data.Free();

@@ -246,7 +246,8 @@ void PhyStats::PrintUlSnrStats(size_t frame_id) {
     if (max_snr == FLT_MIN) {
       max_snr = -100;
     }
-    ss << "User " << i << ": [" << min_snr << "," << max_snr << "]" << " ";
+    ss << "User " << i << ": [" << min_snr << "," << max_snr << "]"
+       << " ";
     if (max_snr - min_snr > 20 && min_snr < 0) {
       ss << "(Possible bad antenna " << min_snr_id << ") ";
     }

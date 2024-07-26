@@ -147,7 +147,7 @@ void ResourceProvisionerThread::RunEventLoop() {
                       0 /* thread ID */);
 
   while (cfg_->Running() == true) {
-      ReceiveEventFromAgora();
-      ReceiveUdpPacketsFromRp();
+    ReceiveEventFromAgora();
+    ReceiveUdpPacketsFromRp();
   }
 }

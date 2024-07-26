@@ -490,7 +490,8 @@ void Agora::Start() {
           const size_t base_sc_id = gen_tag_t(event.tags_[0]).sc_id_;
 
           if (config_->DynamicCoreAlloc()) {
-            this->stats_->MasterSetTscSymbol(TsType::kDemulDone, frame_id, symbol_id, base_sc_id);
+            this->stats_->MasterSetTscSymbol(TsType::kDemulDone, frame_id,
+                                             symbol_id, base_sc_id);
           }
 
           stats_->PrintPerTaskDone(
@@ -569,7 +570,8 @@ void Agora::Start() {
           const size_t cb_id = gen_tag_t(event.tags_[0]).cb_id_;
 
           if (config_->DynamicCoreAlloc()) {
-            this->stats_->MasterSetTscSymbol(TsType::kDecodeDone, frame_id, symbol_id, cb_id);
+            this->stats_->MasterSetTscSymbol(TsType::kDecodeDone, frame_id,
+                                             symbol_id, cb_id);
           }
 
           const bool last_decode_task =
@@ -628,16 +630,15 @@ void Agora::Start() {
             rsm.status_msg_4_ = cfg->UeAntNum();
             AGORA_LOG_INFO(
                 "Agora: Sending cores details to RP of rest of alloc %zu, max "
-                "cores %zu, min workers %zu, max bs ants %zu, max spatial streams %zu\n",
-                rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_, rsm.status_msg_3_, rsm.status_msg_4_);
+                "cores %zu, min workers %zu, max bs ants %zu, max spatial "
+                "streams %zu\n",
+                rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_,
+                rsm.status_msg_3_, rsm.status_msg_4_);
             TryEnqueueFallback(
                 &rp_request_queue_,
-                EventData(EventType::kPacketToRp,
-                    rsm.status_msg_0_,
-                    rsm.status_msg_1_,
-                    rsm.status_msg_2_,
-                    rsm.status_msg_3_,
-                    rsm.status_msg_4_));
+                EventData(EventType::kPacketToRp, rsm.status_msg_0_,
+                          rsm.status_msg_1_, rsm.status_msg_2_,
+                          rsm.status_msg_3_, rsm.status_msg_4_));
           } else if (rcm.msg_type_ == 1) {
             // Current latency, cores, spatial streams and frame info to RP
             RPStatusMsg rsm;
@@ -645,19 +646,18 @@ void Agora::Start() {
             rsm.status_msg_1_ = worker_set_->GetCoresInfo();
             rsm.status_msg_2_ = cfg->SpatialStreamsNum();
             rsm.status_msg_3_ = this->stats_->LastFrameId();
-            rsm.status_msg_4_ = 0; // Only a place holder for now, can be used in future
+            // Only a place holder for now, can be used in future
+            rsm.status_msg_4_ = 0;
             AGORA_LOG_INFO(
                 "Agora: Sending status to RP of latency %zu, current workers "
                 "%zu, current spatial streams %zu, last frame id %zu\n",
-                rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_, rsm.status_msg_3_);
+                rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_,
+                rsm.status_msg_3_);
             TryEnqueueFallback(
                 &rp_request_queue_,
-                EventData(EventType::kPacketToRp,
-                    rsm.status_msg_0_,
-                    rsm.status_msg_1_,
-                    rsm.status_msg_2_,
-                    rsm.status_msg_3_,
-                    rsm.status_msg_4_));
+                EventData(EventType::kPacketToRp, rsm.status_msg_0_,
+                          rsm.status_msg_1_, rsm.status_msg_2_,
+                          rsm.status_msg_3_, rsm.status_msg_4_));
           } else {
             RtAssert(false, "Invalid msg type to RP\n");
           }
@@ -1069,7 +1069,8 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id, size_t ant_id) {
   auto symbol_type = config_->Frame().GetSymbolType(symbol_id);
 
   if (config_->DynamicCoreAlloc()) {
-    this->stats_->MasterSetTscSymbol(TsType::kSymbolRX, frame_id, symbol_id, ant_id);
+    this->stats_->MasterSetTscSymbol(TsType::kSymbolRX, frame_id, symbol_id,
+                                     ant_id);
   }
 
   if (symbol_type == SymbolType::kPilot) {

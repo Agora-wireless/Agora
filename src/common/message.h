@@ -186,7 +186,8 @@ struct EventData {
   }
 
   // Create an event with four tags
-  EventData(EventType event_type, size_t tag1, size_t tag2, size_t tag3, size_t tag4)
+  EventData(EventType event_type, size_t tag1, size_t tag2, size_t tag3,
+            size_t tag4)
       : event_type_(event_type), num_tags_(4) {
     tags_.fill(0);
     tags_.at(0) = tag1;
@@ -196,7 +197,8 @@ struct EventData {
   }
 
   // Create an event with five tags
-  EventData(EventType event_type, size_t tag1, size_t tag2, size_t tag3, size_t tag4, size_t tag5)
+  EventData(EventType event_type, size_t tag1, size_t tag2, size_t tag3,
+            size_t tag4, size_t tag5)
       : event_type_(event_type), num_tags_(4) {
     tags_.fill(0);
     tags_.at(0) = tag1;

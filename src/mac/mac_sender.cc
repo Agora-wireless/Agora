@@ -184,8 +184,8 @@ void MacSender::StartTx() {
   // Run the master thread (from current thread)
   MasterThread(kMasterThreadId);
 
-  delete[] (this->frame_start_);
-  delete[] (this->frame_end_);
+  delete[](this->frame_start_);
+  delete[](this->frame_end_);
 }
 
 void MacSender::StartTxfromMain(double* in_frame_start, double* in_frame_end) {
@@ -427,7 +427,7 @@ void* MacSender::WorkerThread(size_t tid) {
       RtAssert(completion_queue_.enqueue_bulk(tags.data(), num_tags),
                "Completion enqueue failed");
     }  // if (num_tags > 0)
-  }  // while (keep_running.load() == true)
+  }    // while (keep_running.load() == true)
   AGORA_LOG_FRAME("MacSender: worker thread %zu exit\n", tid);
   return nullptr;
 }

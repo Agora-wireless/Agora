@@ -519,9 +519,9 @@ void MacThreadBaseStation::SendCodeblocksToPhy(EventData event) {
       pkt->Set(frame_id, cfg_->Frame().GetDLSymbol(pkt_id + num_pilot_symbols),
                ue_id, mac_payload_length);
       // Insert CRC
-      pkt->Crc((uint16_t)(crc_obj_->CalculateCrc24(pkt->Data(),
-                                                   pkt->PayloadLength()) &
-                          0xFFFF));
+      pkt->Crc((uint16_t)(
+          crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) &
+          0xFFFF));
 #if ENABLE_RB_IND
       pkt->rb_indicator_ = ri;
 #endif
