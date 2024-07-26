@@ -948,7 +948,7 @@ void Agora::Start() {
         }
       }
     } /* End of for */
-  } /* End of while */
+  }   /* End of while */
 
 finish:
   AGORA_LOG_INFO("Agora: printing stats and saving to file\n");
@@ -1054,8 +1054,8 @@ void Agora::HandleEventFft(size_t tag) {
           phy_stats_->PrintCalibSnrStats(previous_cal_slot);
         }
       }  // kPrintPhyStats
-    }  // last_rc_task
-  }  // kCaLDL || kCalUl
+    }    // last_rc_task
+  }      // kCaLDL || kCalUl
 }
 
 void Agora::UpdateRanConfig(RanConfig rc) {
@@ -1448,7 +1448,7 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
           break;
         }
       }  // for each encodable frames in kScheduleQueues
-    }  // !finished
+    }    // !finished
   }
   return finished;
 }

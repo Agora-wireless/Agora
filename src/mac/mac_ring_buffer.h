@@ -9,7 +9,7 @@ static constexpr size_t kMacBuffSizeMax = 1024 * 1024 * 64;
 
 class MacMultiRingBuffer {
  public:
-  MacMultiRingBuffer() {}
+  MacMultiRingBuffer() = default;
   void Push(std::byte* item, size_t n_items, size_t buf_id) {
     if (IsFull(n_items, buf_id) == true) {
       AGORA_LOG_ERROR("Buffer Id %zu is full. Push failed!\n", buf_id);
