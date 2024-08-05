@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.11)
 project(spdlog_utests CXX)
 
 if(NOT TARGET spdlog)
@@ -19,7 +19,10 @@ if(Catch2_FOUND)
 else()
     message(STATUS "Bundled version of Catch will be downloaded and used.")
     include(FetchContent)
-    FetchContent_Declare(Catch2 GIT_REPOSITORY https://github.com/catchorg/Catch2.git GIT_TAG v3.3.2)
+    FetchContent_Declare(Catch2
+            GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+            GIT_TAG 53d0d913a422d356b23dd927547febdf69ee9081 # v3.5.0
+    )
     FetchContent_MakeAvailable(Catch2)
 endif()
 
@@ -44,7 +47,8 @@ set(SPDLOG_UTESTS_SOURCES
     test_custom_callbacks.cpp
     test_cfg.cpp
     test_time_point.cpp
-    test_stopwatch.cpp)
+    test_stopwatch.cpp
+    test_circular_q.cpp)
 
 if(NOT SPDLOG_NO_EXCEPTIONS)
     list(APPEND SPDLOG_UTESTS_SOURCES test_errors.cpp)

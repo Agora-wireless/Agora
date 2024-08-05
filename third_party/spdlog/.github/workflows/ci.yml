@@ -16,8 +16,6 @@ jobs:
           - { compiler: gcc, version: 9, build_type: Release, cppstd: 17 }
           - { compiler: gcc, version: 11, build_type: Debug, cppstd: 20 }
           - { compiler: gcc, version: 12, build_type: Release, cppstd: 20 }
-          - { compiler: clang, version: 10, build_type: Release, cppstd: 11 }
-          - { compiler: clang, version: 10, build_type: Debug, cppstd: 17, asan: OFF }
           - { compiler: clang, version: 12, build_type: Debug, cppstd: 17, asan: OFF }
           - { compiler: clang, version: 15, build_type: Release, cppstd: 20, asan: OFF }
     container:
@@ -27,7 +25,8 @@ jobs:
       - uses: actions/checkout@main
       - name: Setup
         run: |
-          apt-get update && apt-get install -y curl git pkg-config libsystemd-dev
+          apt-get update          
+          apt-get install -y curl git pkg-config libsystemd-dev
           CMAKE_VERSION="3.24.2"
           curl -sSL https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.sh -o install-cmake.sh
           chmod +x install-cmake.sh
