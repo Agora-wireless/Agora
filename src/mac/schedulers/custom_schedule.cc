@@ -35,9 +35,9 @@ CustomSchedule::CustomSchedule(Config* const cfg) : SchedulerModel(cfg) {
       ue_sched_id += static_cast<size_t>(sched_bit * std::pow(2, ue));
     }
     sched_id_vec.push_back(ue_sched_id);
-    if (ue_sched_set_.size() == 0)
+    if (ue_sched_set_.empty()) {
       ue_sched_set_.push_back(ue_sched_id);
-    else {
+    } else {
       std::vector<size_t>::iterator it;
       for (it = ue_sched_set_.begin(); it < ue_sched_set_.end(); it++) {
         if (ue_sched_id == *it) {  // dont's push this to keep vector unique
@@ -114,8 +114,8 @@ size_t CustomSchedule::UeScheduleIndex(size_t sched_id) {
   return it - ue_sched_set_.begin();
 }
 
-void CustomSchedule::Update(size_t frame_id, const arma::cx_fmat&,
-                            const std::vector<float>&) {
+void CustomSchedule::Update(size_t frame_id, const arma::cx_fmat& /*csi*/,
+                            const std::vector<float>& /*snr_per_ue*/) {
   selected_group_ = sched_id_array_.at(frame_id);
 }
 

@@ -184,7 +184,7 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
   Table<complex_float> dl_mod_data;
   Table<complex_float> dl_ifft_data;
   Table<short> dl_tx_data;
-  if (cfg->Frame().NumDLSyms()) {
+  if (cfg->Frame().NumDLSyms() != 0u) {
     dl_mod_data.Calloc(cfg->Frame().NumDLSyms(),
                        cfg->OfdmCaNum() * cfg->UeAntNum(),
                        Agora_memory::Alignment_t::kAlign64);
@@ -800,7 +800,7 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
   }
 
   /* Clean Up memory */
-  if (cfg->Frame().NumDLSyms()) {
+  if (cfg->Frame().NumDLSyms() != 0u) {
     dl_mod_data.Free();
     precoder.Free();
     dl_ifft_data.Free();

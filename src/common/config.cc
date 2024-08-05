@@ -1007,7 +1007,7 @@ void Config::LoadTestVectors() {
         uint8_t sched_bit = ue_map_array.at(fn * this->ue_ant_num_ + ue);
         ue_sched_id += static_cast<size_t>(sched_bit * std::pow(2, ue));
       }
-      if (ue_sched_set.size() == 0) {
+      if (ue_sched_set.empty()) {
         ue_sched_set.push_back(ue_sched_id);
       } else {
         std::vector<size_t>::iterator it;

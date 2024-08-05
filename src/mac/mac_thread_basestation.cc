@@ -47,7 +47,7 @@ MacThreadBaseStation::MacThreadBaseStation(
   client_.dl_bits_buffer_status_ = dl_bits_buffer_status;
 
   server_.n_filled_in_frame_.fill(0);
-  if (cfg->Frame().NumUlDataSyms()) {
+  if (cfg->Frame().NumUlDataSyms() != 0u) {
     for (size_t ue_ant = 0; ue_ant < cfg_->UeAntTotal(); ue_ant++) {
       server_.data_size_.emplace_back(
           std::vector<size_t>(cfg->Frame().NumUlDataSyms()));

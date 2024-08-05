@@ -94,7 +94,7 @@ class MacUtils {
                                      : this->dl_mcs_index_;
   }
 
-  inline const size_t MaxPacketBytes(Direction dir) const {
+  inline size_t MaxPacketBytes(Direction dir) const {
     size_t max_mod_bits = GetModOrderBits(kMaxMcsIndex);
     size_t max_code_rate = GetCodeRate(kMaxMcsIndex);
     size_t num_sc =
