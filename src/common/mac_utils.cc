@@ -1,11 +1,13 @@
 #include "mac_utils.h"
 
+#include <utility>
+
 #include "comms-constants.inc"
 #include "comms-lib.h"
 #include "logger.h"
 
 MacUtils::MacUtils(FrameStats frame)
-    : frame_(frame),
+    : frame_(std::move(frame)),
       ul_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_bcast_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0) {}
@@ -13,7 +15,7 @@ MacUtils::MacUtils(FrameStats frame)
 MacUtils::MacUtils(FrameStats frame, double frame_duration,
                    size_t ul_ofdm_data_num, size_t dl_ofdm_data_num,
                    size_t ctrl_ofdm_data_num)
-    : frame_(frame),
+    : frame_(std::move(frame)),
       frame_duration_(frame_duration),
       ul_ofdm_data_num_(ul_ofdm_data_num),
       dl_ofdm_data_num_(dl_ofdm_data_num),

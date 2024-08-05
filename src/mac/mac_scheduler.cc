@@ -15,7 +15,7 @@ MacScheduler::MacScheduler(Config* const cfg)
   scheduler_model_ = std::move(SchedulerModel::CreateSchedulerModel(cfg_));
 }
 
-MacScheduler::~MacScheduler() {}
+MacScheduler::~MacScheduler() = default;
 
 size_t MacScheduler::ScheduledUeIndex(size_t frame_id, size_t sc_id,
                                       size_t sched_ue_id) {

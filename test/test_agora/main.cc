@@ -44,8 +44,7 @@ static void ReadFromFile(const std::string& filename, Table<TableType>& data,
 }
 
 static void ReadFromFileUl(const std::string& filename, Table<uint8_t>& data,
-                           int offset, int ue_num, int num_bytes_per_ue,
-                           Config const* const cfg) {
+                           int offset, int ue_num, int num_bytes_per_ue) {
   ReadFromFile(filename, data, offset, ue_num, num_bytes_per_ue,
                sizeof(uint8_t));
 }
@@ -80,14 +79,12 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg, size_t offset,
   output_data.Calloc(spatial_streams_num, num_bytes_per_ue,
                      Agora_memory::Alignment_t::kAlign64);
 
-  ReadFromFileUl(raw_data_filename, raw_data, offset, ue_num, raw_read_block,
-                 cfg);
+  ReadFromFileUl(raw_data_filename, raw_data, offset, ue_num, raw_read_block);
   ReadFromFileUl(kDecodedFilename, output_data, 0, spatial_streams_num,
-                 num_bytes_per_ue, cfg);
+                 num_bytes_per_ue);
   std::printf(
       "check_correctness_ul: bs ant %zu, ues %zu, spatial streams (last frame) "
-      "%zu, "
-      "ul syms %zu, ofdm %zu, ul pilots %zu, bytes per UE %zu.\n",
+      "%zu, ul syms %zu, ofdm %zu, ul pilots %zu, bytes per UE %zu.\n",
       bs_ant_num, ue_num, spatial_streams_num, num_uplink_syms, ofdm_data_num,
       ul_pilot_syms, num_bytes_per_ue);
 

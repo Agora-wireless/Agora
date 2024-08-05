@@ -39,8 +39,8 @@ class SchedulerModel {
     return {};
   }
 
-  virtual size_t SelectedUlMcs(size_t frame_id, size_t ue_id) { return 0; }
-  virtual size_t SelectedDlMcs(size_t frame_id, size_t ue_id) { return 0; }
+  virtual size_t SelectedUlMcs(size_t  /*frame_id*/, size_t  /*ue_id*/) { return 0; }
+  virtual size_t SelectedDlMcs(size_t  /*frame_id*/, size_t  /*ue_id*/) { return 0; }
 
   static std::unique_ptr<SchedulerModel> CreateSchedulerModel(
       Config* const cfg);
