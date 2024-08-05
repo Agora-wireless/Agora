@@ -17,13 +17,15 @@
 // is the frame window that we track in Agora.
 static constexpr size_t kFrameWnd = 40;
 
+// Fixed number of 14 symbols per frame from 3GPP
+static constexpr size_t kNumSymbolsPerFrame = 14;
+
 #define TX_FRAME_DELTA (4)
 #define SETTLE_TIME_MS (1)
 
 // Just-in-time optimization for MKL cgemm is available only after MKL 2019
 // update 3. Disable this on systems with an older MKL version.
 #if __INTEL_MKL__ >= 2020 || (__INTEL_MKL__ == 2019 && __INTEL_MKL_UPDATE__ > 3)
-#define USE_MKL_JIT (1)
 #define USE_MKL_CBLAS (1)
 #else
 #undef USE_MKL_JIT
@@ -356,7 +358,7 @@ static constexpr bool kIsWorkerTimingEnabled = true;
 static constexpr size_t kMaxStatsBreakdown = 4;
 
 // Minimum number of workers
-static constexpr size_t kMinWorkers = 2;
+static constexpr size_t kMinWorkers = 1;
 
 // Maximum number of hardware threads on one machine
 static constexpr size_t kMaxThreads = 128;

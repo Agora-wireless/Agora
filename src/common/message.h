@@ -185,6 +185,29 @@ struct EventData {
     tags_.at(2) = tag3;
   }
 
+  // Create an event with four tags
+  EventData(EventType event_type, size_t tag1, size_t tag2, size_t tag3,
+            size_t tag4)
+      : event_type_(event_type), num_tags_(4) {
+    tags_.fill(0);
+    tags_.at(0) = tag1;
+    tags_.at(1) = tag2;
+    tags_.at(2) = tag3;
+    tags_.at(3) = tag4;
+  }
+
+  // Create an event with five tags
+  EventData(EventType event_type, size_t tag1, size_t tag2, size_t tag3,
+            size_t tag4, size_t tag5)
+      : event_type_(event_type), num_tags_(4) {
+    tags_.fill(0);
+    tags_.at(0) = tag1;
+    tags_.at(1) = tag2;
+    tags_.at(2) = tag3;
+    tags_.at(3) = tag4;
+    tags_.at(4) = tag5;
+  }
+
   EventData() = default;
 };
 static_assert(sizeof(EventData) == 64);

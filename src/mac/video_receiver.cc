@@ -7,6 +7,7 @@
 
 #include <cstring>
 #include <string>
+#include <utility>
 
 #include "logger.h"
 
@@ -15,7 +16,7 @@ static constexpr size_t kMaxRxAttempts = 25u;
 static const std::string kRxAddress = "";
 
 VideoReceiver::VideoReceiver(std::string addr, uint16_t port)
-    : udp_video_receiver_(addr, port,
+    : udp_video_receiver_(std::move(addr), port,
                           VideoReceiver::kVideoStreamSocketRxBufSize) {}
 
 size_t VideoReceiver::Load(unsigned char *destination, size_t requested_bytes) {

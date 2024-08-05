@@ -67,8 +67,8 @@ void ResourceProvisionerThread::SendEventToAgora(const char* payload) {
   if (pkt->msg_type_ == 0) {
     // request cores data
     AGORA_LOG_INFO(
-        "ResourceProvisionerThread: Requesting initial cores allocation "
-        "details from Agora\n");
+        "ResourceProvisionerThread: Requesting initial cores and users "
+        "allocation details from Agora\n");
     RequestEventFromAgora(pkt->msg_type_);
   } else if (pkt->msg_type_ == 1) {
     if (pkt->msg_arg_1_ == 0 && pkt->msg_arg_2_ == 0) {
@@ -116,12 +116,11 @@ void ResourceProvisionerThread::ReceiveEventFromAgora() {
   if (rx_queue_->try_dequeue(event) == false) {
     return;
   }
-
   if (event.event_type_ == EventType::kPacketToRp) {
     AGORA_LOG_INFO(
         "ResourceProvisionerThread: Received status from Agora of latency %zu, "
-        "core_num %zu, frame %zu\n",
-        event.tags_[0], event.tags_[1], event.tags_[2]);
+        "current cores %zu, current spatial streams %zu, frame %zu\n",
+        event.tags_[0], event.tags_[1], event.tags_[2], event.tags_[3]);
     SendUdpPacketsToRp(event);
   }
 }
@@ -132,6 +131,8 @@ void ResourceProvisionerThread::SendUdpPacketsToRp(EventData event) {
   msg.status_msg_0_ = event.tags_[0];
   msg.status_msg_1_ = event.tags_[1];
   msg.status_msg_2_ = event.tags_[2];
+  msg.status_msg_3_ = event.tags_[3];
+  msg.status_msg_4_ = event.tags_[4];
   udp_comm_->Send(cfg_->RpRemoteHostName(), cfg_->RpTxPort(), (std::byte*)&msg,
                   sizeof(RPStatusMsg));
 }
@@ -144,14 +145,9 @@ void ResourceProvisionerThread::RunEventLoop() {
 
   PinToCoreWithOffset(ThreadType::kWorkerRpTXRX, core_offset_,
                       0 /* thread ID */);
-  // keep the frequency of function call
-  size_t last_frame_tx_tsc = 0;
 
   while (cfg_->Running() == true) {
-    if ((GetTime::Rdtsc() - last_frame_tx_tsc) > tsc_delta_) {
-      ReceiveEventFromAgora();
-      ReceiveUdpPacketsFromRp();
-      last_frame_tx_tsc = GetTime::Rdtsc();
-    }
+    ReceiveEventFromAgora();
+    ReceiveUdpPacketsFromRp();
   }
 }

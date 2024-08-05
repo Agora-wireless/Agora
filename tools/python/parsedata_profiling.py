@@ -1,0 +1,659 @@
+"""
+ parsedata_profiling.py
+ Print profiling statistics and generate task time graphs
+ 
+"""
+
+import numpy as np
+import re
+import os
+from copy import deepcopy as dpcopy
+import matplotlib.pyplot as plt
+import matplotlib.patheffects as pe
+from matplotlib.lines import Line2D
+from matplotlib.ticker import FuncFormatter
+
+# Flag to add symbol number above task bars
+ADD_TEXT = True
+# Flag to generate scatter plot with enqueue/dequeue worker times 
+SCATTER = False
+# Flag to include master thread's enqueue/dequeue timestamps
+Master = True
+
+def micro_to_milli(micro, _):
+    """
+    Converts microseconds to milliseconds
+    Used with matplotlib's FuncFormatter to 
+    format x-axis ticks for readability
+
+    Parameters
+    ------------
+        micro: number
+            Microsecond value
+    """
+    return '{:.2f}'.format(micro / 1000)
+
+def read_agora_config(file_path):
+    """
+    Reads agora_config.txt generated file,
+    which contains cpu and radio configuration
+    parameters for the performed profiling
+
+    Parameters
+    ------------
+        file_path: str
+            Absolute path to agora_config.txt
+    """
+    
+    with open(file_path, 'r') as f:
+        # Skip header line
+        next(f)
+        data = np.loadtxt(f)
+    
+    config = {
+        'freq_ghz' : float(data[0]),
+        'freq_mhz' : float(data[0]) * 1000,
+        'rate' : int(data[1]),
+        'fft_size' : int(data[2]),
+        'ofdm_data_num' : int(data[3]),
+        'samps_per_symbol' : int(data[4]),
+        'demul_block_size' : int(data[5]),
+        'bs_radio_num' : int(data[6]),
+        'ue_radio_num' : int(data[7]),
+        'worker_thread_num' : int(data[8]),
+        'pilot_symbol_num_perframe' : int(data[9]),
+        'ul_symbol_num_perframe' : int(data[10]),
+        'dl_symbol_num_perframe' : int(data[11]),
+        'total_symbol_num_perframe' : int(data[12]),
+        'max_frame' : int(data[13]),
+        'profiling_frame' : int(data[14]),
+    }
+
+    return config
+
+
+def master_worker_dicts(task_types, total_symbol_num_perframe, worker_thread_num):
+    """
+    Initializes dictionaries to store timestamps
+    from timestamps_master.txt and timestamps_workers.txt
+
+    Parameters
+    ------------
+        task_types: list
+            List with task types, 
+            e.g. ['FFT', 'Beam', 'Demul', 'Decode']
+
+        total_symbol_num_perframe: int
+            Total number of symbols per frame
+
+        worker_thread_num: int
+            Number of worker threads used
+    """
+
+    ## Master
+    task_symbol_dict = { 
+        task: { 
+            symbol: [] 
+            for symbol in range(total_symbol_num_perframe)
+            } 
+        for task in task_types
+    }
+
+    master_dict = {
+        'eq_id': {task: [0] * total_symbol_num_perframe for task in task_types},
+        'eq_start': dpcopy(task_symbol_dict),
+        'eq_end': dpcopy(task_symbol_dict),
+        'eq_duration': dpcopy(task_symbol_dict),
+        'dq_id': {task: 0 for task in task_types},
+        'dq_start': {task: [] for task in task_types},
+        'dq_end': {task: [] for task in task_types},
+        'dq_duration': {task: [] for task in task_types},
+        'min': [],
+        'ref_tsc': 0,
+    }
+
+    # Workers
+    worker_list = list(range(worker_thread_num))
+    worker_task_symbol_dict = {
+        worker: {
+            task: {
+                symbol: [] 
+                for symbol in range(total_symbol_num_perframe)
+                } 
+            for task in task_types
+            } 
+        for worker in worker_list
+    }
+
+    worker_dict = {
+        'eq_id': {worker: {task: [0] * total_symbol_num_perframe for task in task_types} 
+                        for worker in range(worker_thread_num)},
+        'eq_start': dpcopy(worker_task_symbol_dict),
+        'eq_end': dpcopy(worker_task_symbol_dict),
+        'eq_duration': dpcopy(worker_task_symbol_dict),
+        'dq_id': {worker: {task: [0] * total_symbol_num_perframe for task in task_types} 
+                        for worker in range(worker_thread_num)},
+        'dq_start': dpcopy(worker_task_symbol_dict),
+        'dq_end': dpcopy(worker_task_symbol_dict),
+        'dq_duration': dpcopy(worker_task_symbol_dict),
+        'enqueue_time': {worker: 0 for worker in range(worker_thread_num)},
+        'dequeue_time': {worker: 0 for worker in range(worker_thread_num)},
+        'worker_min': [],
+        'worker_max': [],
+        'symbols': set(),
+    }
+
+    return master_dict, worker_dict
+
+def read_timestamps_master(file_path, master_dict):
+    """
+    Parse timestamps_master.txt file and populate 
+    master_dict with enqueue and dequeue timestamps
+
+    The file contains lines with the following format:
+
+    Master frame {fr_num}: dequeue {task_num} tasks, start: {ref_tsc}
+    Master frame {fr_num} symbol {symbol_id}: {eq/dq} task {task_type} tsc [{tsc_end}-{tsc_st}] = {duration}
+
+    Parameters
+    ------------
+        file_path: str
+            Absolute path to timestamps_master.txt
+
+        master_dict: dict
+            Dictionary generated by master_worker_dicts()
+    """
+
+    with open(file_path, 'r') as f:
+        for line in f:
+            delimiters = r'[ :\[\]-]'
+            tline_split = re.split(delimiters, line)
+            tline_split[-1] = tline_split[-1].strip()
+            
+            if len(tline_split) not in [16, 14]:
+                print(line)
+                if len(tline_split) == 10:
+                    master_dict['ref_tsc'] = int(tline_split[9])
+            
+            elif len(tline_split) == 16:
+                task_type = str(tline_split[8])
+                symbol_id = int(tline_split[4])
+                task_start = int(tline_split[12])
+                task_end = int(tline_split[11])
+                duration = float(tline_split[15])
+                if tline_split[6] == "enqueue":
+                    master_dict['eq_id'][task_type][symbol_id] += 1
+                    # collect data for event no master_dict['eq_id'][task_type][symbol_id]
+                    master_dict['eq_start'][task_type][symbol_id].append(task_start)
+                    master_dict['min'].append(task_start)
+                    master_dict['eq_end'][task_type][symbol_id].append(task_end)
+                    master_dict['eq_duration'][task_type][symbol_id].append(duration)
+            
+            elif len(tline_split) == 14:
+                task_type = str(tline_split[6])
+                task_start = int(tline_split[10])
+                task_end = int(tline_split[9])
+                duration = float(tline_split[13])
+
+                master_dict['dq_id'][task_type] += 1
+                master_dict['dq_start'][task_type].append(task_start)
+                master_dict['dq_end'][task_type].append(task_end)
+                master_dict['dq_duration'][task_type].append(duration)
+
+    master_dict['dq_id']["PacketTX"] = 0  # Ignoring PacketTX Dq events since PacketTX Eq events are not logged
+
+def read_timestamps_workers(file_path, worker_dict):
+    """
+    Parse timestamps_workers.txt file and populate 
+    worker_dict with enqueue and dequeue timestamps
+
+    The file contains lines with the following format:
+
+    Worker {id} frame {fr_num}: {num_eq/dq} enqueue takes {time} us, dequeue takes {time} us (non-empty: {time})
+    Worker {id} frame {fr_num} symbol {symbol_id}: enqueue task {task_type} tsc [{tsc_end}-{tsc_st}] = {duration}
+
+    Parameters
+    ------------
+        file_path: str
+            Absolute path to timestamps_workers.txt
+
+        worker_dict: dict
+            Dictionary generated by master_worker_dicts()
+    """
+    with open(file_path, 'r') as f:
+        for line in f:
+            delimiters = r'[ :\[\]\-\(\)]'
+            tline_split = re.split(delimiters, line)
+            tline_split[-1] = tline_split[-1].strip()
+            if len(tline_split) != 17:
+                print(line)
+                if len(tline_split) == 20:
+                    worker_id = int(tline_split[1])
+                    worker_dict['enqueue_time'][worker_id] = float(tline_split[8])
+                    worker_dict['dequeue_time'][worker_id] = float(tline_split[18])
+            else:
+                worker_id = int(tline_split[1])
+                symbol_id = int(tline_split[5])
+                worker_dict['symbols'].add(symbol_id)
+                task_type = str(tline_split[9])
+                task_start = int(tline_split[13])
+                task_end = int(tline_split[12])
+                duration = float(tline_split[16])
+                if tline_split[7] == "enqueue":
+                    worker_dict['eq_id'][worker_id][task_type][symbol_id] += 1
+                    worker_dict['eq_start'][worker_id][task_type][symbol_id].append(task_start)
+                    worker_dict['eq_end'][worker_id][task_type][symbol_id].append(task_end)
+                    worker_dict['worker_max'].append(task_end)
+                    worker_dict['eq_duration'][worker_id][task_type][symbol_id].append(duration)
+                else:
+                    worker_dict['dq_id'][worker_id][task_type][symbol_id] += 1
+                    worker_dict['dq_start'][worker_id][task_type][symbol_id].append(task_start)
+                    worker_dict['worker_min'].append(task_start)
+                    worker_dict['dq_end'][worker_id][task_type][symbol_id].append(task_end)
+                    worker_dict['dq_duration'][worker_id][task_type][symbol_id].append(duration)
+
+def adjust_timestamps(config, master_dict, worker_dict, task_types):
+    """
+    Parse populated dictionaries and adjust times 
+    based on reference timestamp and CPU frequency
+
+    As a reference timestamp we use the master's ref_tsc
+    which is the timestamp when the first packet is received
+
+    Parameters
+    ------------
+        config: dict
+            Configuration dictionary
+
+        master_dict: dict
+            Dictionary generated by master_worker_dicts()
+
+        worker_dict: dict
+            Dictionary generated by master_worker_dicts()
+
+        task_types: list
+            List with task types
+    """
+
+    # Find average enqueue time
+    avg_enqueue = np.average([worker_dict['enqueue_time'][time] for time in range(config['worker_thread_num'])])
+    avg_dequeue = np.average([worker_dict['dequeue_time'][time] for time in range(config['worker_thread_num'])])
+
+    print(f"Worker enqueue {avg_enqueue:.2f} us per thread, dequeue {avg_dequeue:.2f} us per thread\n")
+
+    ref_tsc = master_dict['ref_tsc']
+
+    master_min_tsc = (min(master_dict['min']) - ref_tsc)/config['freq_mhz']
+    master_dict['min'] = master_min_tsc
+
+    worker_max_tsc = max(worker_dict['worker_max'])
+    worker_max_tsc = (worker_max_tsc - ref_tsc)/config['freq_mhz']
+    worker_dict['worker_max'] = worker_max_tsc
+
+    worker_min_tsc = min(worker_dict['worker_min'])
+    worker_min_tsc = (worker_min_tsc - ref_tsc)/config['freq_mhz']
+    worker_dict['worker_min'] = worker_min_tsc
+
+    # Adjust master and worker timestamps
+    for task in task_types:
+        master_dict['dq_start'][task] = [ (x - ref_tsc)/config['freq_mhz'] for x in master_dict['dq_start'][task]]
+        master_dict['dq_end'][task] = [ (x - ref_tsc)/config['freq_mhz'] for x in master_dict['dq_end'][task]]
+        for symbol in range(config['total_symbol_num_perframe']):
+            master_dict['eq_start'][task][symbol] = [ (x - ref_tsc)/config['freq_mhz'] for x in master_dict['eq_start'][task][symbol]]
+            master_dict['eq_end'][task][symbol] = [ (x - ref_tsc)/config['freq_mhz'] for x in master_dict['eq_end'][task][symbol]]
+
+    for worker in range(config['worker_thread_num']):
+        for task in task_types:
+            for symbol in range(config['total_symbol_num_perframe']):
+                worker_dict['dq_start'][worker][task][symbol] = [ (x - ref_tsc)/config['freq_mhz'] for x in worker_dict['dq_start'][worker][task][symbol]]
+                worker_dict['dq_end'][worker][task][symbol] = [ (x - ref_tsc)/config['freq_mhz'] for x in worker_dict['dq_end'][worker][task][symbol]]
+                worker_dict['eq_start'][worker][task][symbol] = [ (x - ref_tsc)/config['freq_mhz'] for x in worker_dict['eq_start'][worker][task][symbol]]
+                worker_dict['eq_end'][worker][task][symbol] = [ (x - ref_tsc)/config['freq_mhz'] for x in worker_dict['eq_end'][worker][task][symbol]]
+
+
+def profile_stats(config, worker_dict, task_types):
+    """
+    Parse worker dictionaries and calculate statistics
+
+    Parameters
+    ------------
+        config: dict
+            Configuration dictionary
+
+        worker_dict: dict
+            Dictionary generated by master_worker_dicts()
+
+        task_types: list
+            List with task types
+    """
+
+    worker_thread_num = config['worker_thread_num']
+    num_worker_types = len(task_types)
+    total_symbol_num_perframe = config['total_symbol_num_perframe']
+
+
+    worker_avg_task_duration = {worker: {task_type: 0 for task_type in task_types} for worker in range(worker_thread_num)}
+    worker_total_num_tasks = {worker: {task_type: 0 for task_type in task_types} for worker in range(worker_thread_num)}
+    sum_task_duration = {task_type: 0 for task_type in task_types}
+    sum_task_duration_per_symbol = {task_type: {symbol: 0 for symbol in range(total_symbol_num_perframe)} for task_type in task_types}
+    sum_task_num = {task_type: 0 for task_type in task_types}
+    sum_task_num_per_symbol = {task_type: {symbol: 0 for symbol in range(total_symbol_num_perframe)} for task_type in task_types}
+
+    # Calculate task durations and print results
+    for worker in range(worker_thread_num):
+        task_duration = {task_type: 0 for task_type in task_types}
+        eq_duration = {task_type: 0 for task_type in task_types}
+        dq_duration = {task_type: 0 for task_type in task_types}
+        num_tasks = {task_type: 0 for task_type in task_types}
+        
+        for task_type in task_types:
+            for symbol in range(total_symbol_num_perframe):
+
+                task_durations_this_symbol = [eq_start - dq_end for eq_start, dq_end in zip(
+                    worker_dict['eq_start'][worker][task_type][symbol], worker_dict['dq_end'][worker][task_type][symbol])]
+                
+                task_duration_this_symbol = sum(task_durations_this_symbol)
+                
+                sum_task_duration_per_symbol[task_type][symbol] += task_duration_this_symbol
+                sum_task_num_per_symbol[task_type][symbol] += worker_dict['dq_id'][worker][task_type][symbol]
+                num_tasks[task_type] += worker_dict['dq_id'][worker][task_type][symbol]
+                task_duration[task_type] += task_duration_this_symbol
+                
+                eq_duration[task_type] += sum( [eq_end - eq_start for eq_start, eq_end in zip(
+                worker_dict['eq_end'][worker][task_type][symbol], worker_dict['eq_start'][worker][task_type][symbol])])
+                
+                dq_duration[task_type] += sum( [dq_end - dq_start for dq_start, dq_end in zip(
+                    worker_dict['dq_end'][worker][task_type][symbol], worker_dict['dq_start'][worker][task_type][symbol])])
+
+            sum_task_duration[task_type] += task_duration[task_type]
+            sum_task_num[task_type] += num_tasks[task_type]
+            
+            if num_tasks[task_type] != 0:
+                task_duration[task_type] /= num_tasks[task_type]
+                dq_duration[task_type] /= num_tasks[task_type]
+                eq_duration[task_type] /= num_tasks[task_type]
+            
+            worker_avg_task_duration[worker][task_type] = task_duration[task_type]
+            worker_total_num_tasks[worker][task_type] = num_tasks[task_type]
+        
+        print(f"Worker {worker}: ",
+        f"{num_tasks['FFT']} FFTs: {task_duration['FFT']:.2f} us,",
+        f"{num_tasks['Beam']} Beams: {task_duration['Beam']:.2f} us,",
+        f"{num_tasks['Demul']} Demuls: {task_duration['Demul']:.2f} us,",
+        f"{num_tasks['Decode']} Decodes: {task_duration['Decode']:.2f} us,",
+        f"{num_tasks['Encode']} Encodes: {task_duration['Encode']:.2f} us,",
+        f"{num_tasks['Precode']} Precodes: {task_duration['Precode']:.2f} us,",
+        f"{num_tasks['IFFT']} IFFTs: {task_duration['IFFT']:.2f} us")
+
+        print("Total time: ",
+          f"{sum_task_num['FFT']} FFTs: {sum_task_duration['FFT']:.2f} us,",
+            f"{sum_task_num['Beam']} Beams: {sum_task_duration['Beam']:.2f} us,",
+            f"{sum_task_num['Demul']} Demuls: {sum_task_duration['Demul']:.2f} us,",
+            f"{sum_task_num['Decode']} Decodes: {sum_task_duration['Decode']:.2f} us,",
+            f"{sum_task_num['Encode']} Encodes: {sum_task_duration['Encode']:.2f} us,",
+            f"{sum_task_num['Precode']} Precodes: {sum_task_duration['Precode']:.2f} us,",
+            f"{sum_task_num['IFFT']} IFFTs: {sum_task_duration['IFFT']:.2f} us")
+
+
+def plot_graphs(config, master_dict, worker_dict, task_types, agora_dir):
+    """
+    Generate graphs 
+
+    Parameters
+    ------------
+        config: dict
+            Configuration dictionary
+
+        master_dict: dict
+            Dictionary generated by master_worker_dicts()
+
+        worker_dict: dict
+            Dictionary generated by master_worker_dicts()
+
+        task_types: list
+            List with task types
+
+        agora_dir: str
+            Path to Agora directory
+    """
+
+    worker_thread_num = config['worker_thread_num']
+    worker_min_tsc = worker_dict['worker_min']
+    worker_max_tsc = worker_dict['worker_max']
+    master_min_tsc = master_dict['min']
+    num_worker_types = len(task_types)
+    total_symbol_num_perframe = config['total_symbol_num_perframe']
+    bs_no = config['bs_radio_num']
+    ue_no = config['ue_radio_num']
+    rate = config['rate']
+
+    # Define task colors
+    type_subset = ['FFT', 'Beam', 'Demul', 'Decode']
+    colors = {
+        'PacketRX': (0.0000, 0.4470, 0.7410),
+        'FFT': (0.8500, 0.3250, 0.0980),
+        'Beam': (0.9290, 0.6940, 0.1250),
+        'Demul': (0.4940, 0.1840, 0.5560),
+        'IFFT': (0.4660, 0.6740, 0.1880),
+        'Precode': (0.3010, 0.7450, 0.9330),
+        'PacketTX': (0.6350, 0.0780, 0.1840),
+        'Decode': (0.2136, 0.8934, 0.4327),
+        'Encode': (0.9873, 0.3091, 0.7263),
+        'PacketToMac': (0.1, 0.6, 0.1),
+        'SNRReport': (0.9, 0.2, 0.5),
+        'Broadcast': (0.3, 0.7, 0.9),
+    }
+
+    # Create figure and axis for task graph
+    fig, ax = plt.subplots(figsize=(15, 10))
+
+    # Create scatterplot figure
+    fig_sc, ax_sc = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
+
+
+    # Plot worker timestamps
+    tasks_used = set()
+    for worker in range(worker_thread_num):
+        for task in task_types:
+            for symbol in range(total_symbol_num_perframe):
+
+                dq_timestamps = worker_dict['dq_start'][worker][task][symbol]
+
+                if len(dq_timestamps) == 0:
+                    continue
+                tasks_used.add(task)
+                ax_sc[0].scatter(dq_timestamps, [worker] * len(dq_timestamps), alpha=0.6, color = colors[task])
+
+                eq_timestamps = worker_dict['eq_end'][worker][task][symbol]
+                ax_sc[1].scatter(eq_timestamps, [worker] * len(eq_timestamps), alpha=0.6, color = colors[task])
+
+                for dq_start, eq_end in zip(dq_timestamps, eq_timestamps):
+
+                    # Plot the task horizontal bar
+                    ax.plot(
+                        [dq_start, eq_end],
+                        [worker, worker],
+                        color=colors[task],
+                        linewidth=4,
+                        path_effects=[pe.Stroke(linewidth=6, foreground='black'), pe.Normal()]
+                    )
+
+                    if ADD_TEXT:
+                        # Calculate the midpoint to add text 
+                        midpoint = (dq_start + eq_end) / 2
+
+                        # Add text on top of the horizontal bar
+                        ax.text(
+                            midpoint, worker + 0.3, f"S{symbol}", 
+                            color='black', fontsize=7, ha='center', va='center',
+                            bbox=dict(facecolor='white', alpha=0.5, edgecolor='none', boxstyle='round,pad=0.2')
+                        )
+    tasks_used = list(tasks_used)
+
+    # Plot master timestamps
+    if Master:
+        master_dqs = []
+        master_eqs = []
+
+
+        for task in tasks_used:
+
+            dq_start_timestamps = master_dict['dq_start'][task]
+            dq_end_timestamps = master_dict['dq_end'][task]
+
+            for dq_start, dq_end in zip(dq_start_timestamps, dq_end_timestamps):
+
+                    master_dqs.append(dq_end)
+
+                    # Plot the colored line
+                    ax.scatter(
+                        dq_start, worker_thread_num + 2, 
+                        color=colors[task],
+                        linewidth=4,
+                        path_effects=[pe.Stroke(linewidth=6, foreground='black'), pe.Normal()]
+                    )
+            
+            for symbol in range(total_symbol_num_perframe):
+                
+                eq_start_timestamps = master_dict['eq_start'][task][symbol]
+                eq_end_timestamps = master_dict['eq_end'][task][symbol]
+
+                for eq_start, eq_end in zip(eq_start_timestamps, eq_end_timestamps):
+
+                    master_eqs.append(eq_start)
+
+                    # Plot the colored line
+                    ax.scatter(
+                        eq_start, worker_thread_num + 3, 
+                        color=colors[task],
+                        linewidth=4,
+                        path_effects=[pe.Stroke(linewidth=6, foreground='black'), pe.Normal()]
+                    )
+
+                    if ADD_TEXT and eq_start == master_min_tsc:
+                        # Add text on top enqueue start for master thread
+                        ax.text(
+                            eq_start, worker_thread_num + 3.3, f"{master_min_tsc/1000:.2f} ms", 
+                            color='black', fontsize=7, ha='center', va='center',
+                            bbox=dict(facecolor='white', alpha=0.5, edgecolor='none', boxstyle='round,pad=0.2')
+                        )
+
+    # Customize plot
+
+    y_axis_start = 0
+    if Master:
+        y_axis_end = worker_thread_num + 4
+    else:
+        y_axis_end = worker_thread_num
+
+    ax.set_xlabel('Time (ms)', fontsize=14)
+    ax.set_ylabel('Thread ID', fontsize=14)
+
+    lim = worker_min_tsc/20
+    xmin = worker_min_tsc
+    xmax = worker_max_tsc
+
+    x_ticks = np.linspace(xmin, xmax, num=10)
+    ax.set_xticks(x_ticks)
+    ax.set_xlim(xmin-lim, xmax + lim)
+    ax.xaxis.set_major_formatter(FuncFormatter(micro_to_milli))
+
+    y_ticks = np.arange(y_axis_start, y_axis_end)
+    ax.set_yticks(y_ticks)
+    ax.set_ylim(y_axis_start-0.5, y_axis_end) 
+    
+
+    ax.grid(True)
+
+
+    title = f'Profiling for {bs_no}x{ue_no} MIMO'
+    subtitle = f'Workers: {worker_thread_num},\
+    P: {config["pilot_symbol_num_perframe"]}, UL: {config["ul_symbol_num_perframe"]}, DL: {config["dl_symbol_num_perframe"]},\n\
+    Total Duration: {(worker_max_tsc - worker_min_tsc)/1000:.2f} msec, Rate: {config["rate"]/1e6} MHz'
+
+    fig.suptitle(title, fontsize=24, fontweight='bold')
+    ax.set_title(subtitle, fontsize=18)
+
+
+    if Master:
+        # Add master text
+        if len(master_dqs) > 0:
+            ax.text(1.01, (worker_thread_num + 2)/y_axis_end, 'Master DQ', 
+            transform=ax.transAxes, fontsize=11, verticalalignment='center')
+        if len(master_eqs) > 0:
+            ax.text(1.01, (worker_thread_num + 3)/y_axis_end, 'Master EQ', 
+            transform=ax.transAxes, fontsize=11, verticalalignment='center')
+
+    # Create legend
+    legend_tasks  = []
+    for task in task_types:
+        if task in tasks_used:
+            legend_tasks.append(task)
+
+    custom_lines = [ Line2D([0], [0], color=colors[task], lw=4) for task in legend_tasks]
+    ax.legend(custom_lines, legend_tasks, loc='upper center', ncol=len(legend_tasks), fontsize=12)
+    ax.grid(True)
+
+
+    # Save Figure
+
+    fig.savefig(f'{agora_dir}/files/experiment/task_time_{bs_no}x{ue_no}_{worker_thread_num}_{rate}.png')
+    print(f"\nSaved {agora_dir}/files/experiment/task_time_{bs_no}x{ue_no}_{worker_thread_num}_{rate}.png")
+
+    # Scatter plot 
+    if SCATTER:
+
+        ax_sc[0].set_title(f'DQ Start Timestamps for {worker_thread_num} workers')
+        ax_sc[0].set_ylabel('Worker ID')
+        ax_sc[0].set_ylim(y_axis_start, y_axis_end)
+        ax_sc[0].grid(True)
+
+        ax_sc[1].set_title('EQ End Timestamps')
+        ax_sc[1].set_xlabel('Time (us)')
+        ax_sc[1].set_ylabel('Worker ID')
+        ax_sc[1].grid(True)
+        fig_sc.legend(custom_lines, tasks_used, loc='upper center', ncol=len(tasks_used))
+        fig_sc.savefig(f'{agora_dir}/files/experiment/scatterplot_{bs_no}x{ue_no}_{worker_thread_num}_{rate}.png')
+        print(f"\nSaved {agora_dir}/files/experiment/scatterplot_{bs_no}x{ue_no}_{worker_thread_num}_{rate}.png")
+
+
+
+
+
+if __name__ == "__main__":
+
+    # Get the file's absolute path
+    current_file_path = os.path.abspath(__file__)
+
+    # Go up 2 directories to reach Agora directory
+    agora_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_file_path)))
+
+    results_path = "files/experiment"
+
+    agora_config_path = f'{agora_dir}/{results_path}/agora_config.txt'
+    
+    config = read_agora_config(agora_config_path)
+
+    task_types = ['PacketRX', 'FFT', 'Beam', 'Demul', 'IFFT', 'Precode', 
+    'PacketTX', 'Decode', 'Encode', 'PacketToMac', 'SNRReport', 'Broadcast']
+
+    # Initailize dicts
+    master_dict, worker_dict = master_worker_dicts(
+        task_types, config['total_symbol_num_perframe'], config['worker_thread_num'])
+
+    # Read master timestamps
+    timestamps_master_path = f'{agora_dir}/{results_path}/timestamps_master.txt'
+    read_timestamps_master(timestamps_master_path, master_dict)
+
+    # Read worker timestamps
+    timestamps_workers_path = f'{agora_dir}/{results_path}/timestamps_workers.txt'
+    read_timestamps_workers(timestamps_workers_path, worker_dict)
+
+    # Adjust timestamps
+    adjust_timestamps(config, master_dict, worker_dict, task_types)
+
+    # Print Profile Statistics
+    profile_stats(config, worker_dict, task_types)
+
+    # Generate and Save Graphs
+    plot_graphs(config, master_dict, worker_dict, task_types, agora_dir)

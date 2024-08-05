@@ -23,20 +23,21 @@ class AgoraWorker {
  public:
   explicit AgoraWorker(Config* cfg, MacScheduler* mac_sched, Stats* stats,
                        PhyStats* phy_stats, MessageInfo* message,
-                       AgoraBuffer* buffer, FrameInfo* frame,
-                       size_t worker_core_offset);
+                       AgoraBuffer* buffer, FrameInfo* frame, size_t worker_id,
+                       size_t core_id);
   ~AgoraWorker();
-  void UpdateCores(RPControlMsg rcm);
-  size_t GetCoresInfo();
+
+  inline void Disable() { enabled_.store(false); }
 
  private:
-  void WorkerThread(int tid);
-  void CreateThreads();
+  void WorkLoop();
 
   Config* const config_;
+  std::atomic<bool> enabled_;
 
-  std::vector<std::thread> workers_;
-  std::vector<bool> active_core_;
+  std::thread thread_;
+  const size_t worker_id_;
+  const size_t core_id_;
 
   MacScheduler* mac_sched_;
   Stats* stats_;
@@ -44,8 +45,6 @@ class AgoraWorker {
   MessageInfo* message_;
   AgoraBuffer* buffer_;
   FrameInfo* frame_;
-
-  const size_t base_worker_core_offset_;
 };
 
 #endif  // AGORA_WORKER_H_

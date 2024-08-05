@@ -15,7 +15,7 @@
 #include <vector>
 
 #include "agora_buffer.h"
-#include "agora_worker.h"
+#include "agora_worker_set.h"
 #include "concurrentqueue.h"
 #include "mac_scheduler.h"
 #include "mac_thread_basestation.h"
@@ -84,7 +84,7 @@ class Agora {
   void SaveTxDataToFile(int frame_id);
 
   void HandleEventFft(size_t tag);
-  void UpdateRxCounters(size_t frame_id, size_t symbol_id);
+  void UpdateRxCounters(size_t frame_id, size_t symbol_id, size_t ant_id);
 
   /// Update Agora's RAN config parameters
   void UpdateRanConfig(RanConfig rc);
@@ -133,7 +133,7 @@ class Agora {
   std::unique_ptr<MacScheduler> mac_sched_;
   std::unique_ptr<Stats> stats_;
   std::unique_ptr<PhyStats> phy_stats_;
-  std::unique_ptr<AgoraWorker> worker_set_;
+  std::unique_ptr<AgoraWorkerSet> worker_set_;
 
   //Agora Buffer containment
   std::unique_ptr<AgoraBuffer> agora_memory_;

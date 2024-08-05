@@ -439,7 +439,7 @@ void Agora::Start() {
             break;
           }
 
-          UpdateRxCounters(pkt->frame_id_, pkt->symbol_id_);
+          UpdateRxCounters(pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
           fft_queue_arr_.at(pkt->frame_id_ % kFrameWnd)
               .push(fft_req_tag_t(event.tags_[0]));
         } break;
@@ -490,6 +490,11 @@ void Agora::Start() {
           const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
           const size_t base_sc_id = gen_tag_t(event.tags_[0]).sc_id_;
+
+          if (config_->DynamicCoreAlloc()) {
+            this->stats_->MasterSetTscSymbol(TsType::kDemulDone, frame_id,
+                                             symbol_id, base_sc_id);
+          }
 
           stats_->PrintPerTaskDone(
               PrintType::kDemul, frame_id, symbol_id, base_sc_id,
@@ -564,12 +569,19 @@ void Agora::Start() {
         case EventType::kDecode: {
           const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
-          size_t n_code_blk_per_sym = mac_sched_->Params()
-                                          .LdpcConfig(Direction::kUplink)
-                                          .NumBlocksInSymbol();
+
+          if (config_->DynamicCoreAlloc()) {
+            const size_t cb_id = gen_tag_t(event.tags_[0]).cb_id_;
+            this->stats_->MasterSetTscSymbol(TsType::kDecodeDone, frame_id,
+                                             symbol_id, cb_id);
+          }
+          const auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+          const size_t n_code_blk_per_sym = mac_sched_->Params()
+                                                .LdpcConfig(Direction::kUplink)
+                                                .NumBlocksInSymbol();
           const bool last_decode_task = this->decode_counters_.CompleteTask(
               frame_id, symbol_id, ue_list.n_elem * n_code_blk_per_sym);
+
           if (last_decode_task == true) {
             ScheduleUsers(EventType::kPacketToMac, frame_id, symbol_id);
             stats_->PrintPerSymbolDone(
@@ -585,6 +597,83 @@ void Agora::Start() {
               this->phy_stats_->RecordSer(frame_id, ue_map);
             }
           }
+        } break;
+
+        case EventType::kPacketFromRp: {
+          // Control message from RP
+          RPControlMsg rcm;
+          rcm.msg_type_ = event.tags_[0];
+          rcm.msg_arg_1_ = event.tags_[1];
+          rcm.msg_arg_2_ = event.tags_[2];
+
+          if (rcm.msg_type_ == 1) {
+            AGORA_LOG_INFO(
+                "Agora: Received cores update data from RP of add cores %zu, "
+                "remove cores %zu\n",
+                rcm.msg_arg_1_, rcm.msg_arg_2_);
+            worker_set_->UpdateCores(rcm);
+          } else {
+            RtAssert(false, "Invalid msg type from RP\n");
+          }
+        } break;
+
+        case EventType::kPacketToRp: {
+          // Control message from RP
+          RPControlMsg rcm;
+          rcm.msg_type_ = event.tags_[0];
+
+          if (rcm.msg_type_ == 0) {
+            // Initial cores and spatial streams info to RP
+            RPStatusMsg rsm;
+            rsm.status_msg_0_ =
+                cfg->CoreOffset() + 1 + cfg->SocketThreadNum() +
+                (cfg->DynamicCoreAlloc() ? 1 : 0);  // Cores allocated for rest
+            rsm.status_msg_1_ =
+                sysconf(_SC_NPROCESSORS_ONLN);  // Total cores available
+            rsm.status_msg_2_ = kMinWorkers;
+            rsm.status_msg_3_ = cfg->BsAntNum();
+            rsm.status_msg_4_ = cfg->UeAntNum();
+            AGORA_LOG_INFO(
+                "Agora: Sending cores details to RP of rest of alloc %zu, max "
+                "cores %zu, min workers %zu, max bs ants %zu, max spatial "
+                "streams %zu\n",
+                rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_,
+                rsm.status_msg_3_, rsm.status_msg_4_);
+            TryEnqueueFallback(
+                &rp_request_queue_,
+                EventData(EventType::kPacketToRp, rsm.status_msg_0_,
+                          rsm.status_msg_1_, rsm.status_msg_2_,
+                          rsm.status_msg_3_, rsm.status_msg_4_));
+          } else if (rcm.msg_type_ == 1) {
+            // Current latency, cores, spatial streams and frame info to RP
+            RPStatusMsg rsm;
+            rsm.status_msg_0_ = this->stats_->MeasureLastFrameLatency();
+            rsm.status_msg_1_ = worker_set_->GetCoresInfo();
+            rsm.status_msg_2_ = cfg->SpatialStreamsNum();
+            rsm.status_msg_3_ = this->stats_->LastFrameId();
+            // Only a place holder for now, can be used in future
+            rsm.status_msg_4_ = 0;
+            AGORA_LOG_INFO(
+                "Agora: Sending status to RP of latency %zu, current workers "
+                "%zu, current spatial streams %zu, last frame id %zu\n",
+                rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_,
+                rsm.status_msg_3_);
+            TryEnqueueFallback(
+                &rp_request_queue_,
+                EventData(EventType::kPacketToRp, rsm.status_msg_0_,
+                          rsm.status_msg_1_, rsm.status_msg_2_,
+                          rsm.status_msg_3_, rsm.status_msg_4_));
+          } else {
+            RtAssert(false, "Invalid msg type to RP\n");
+          }
+        } break;
+
+        case EventType::kRANUpdate: {
+          RanConfig rc;
+          rc.n_antennas_ = event.tags_[0];
+          rc.mcs_index_ = event.tags_[1];
+          rc.frame_id_ = event.tags_[2];
+          UpdateRanConfig(rc);
         } break;
 
         case EventType::kPacketToMac: {
@@ -820,73 +909,6 @@ void Agora::Start() {
           }
         } break;
 
-        case EventType::kPacketFromRp: {
-          // Control message from RP
-          RPControlMsg rcm;
-          rcm.msg_type_ = event.tags_[0];
-          rcm.msg_arg_1_ = event.tags_[1];
-          rcm.msg_arg_2_ = event.tags_[2];
-
-          if (rcm.msg_type_ == 1) {
-            AGORA_LOG_INFO(
-                "Agora: Received cores update data from RP of add cores %zu,"
-                "remove cores %zu\n",
-                rcm.msg_arg_1_, rcm.msg_arg_2_);
-            worker_set_->UpdateCores(rcm);
-          } else {
-            RtAssert(false, "Invalid msg type from RP\n");
-          }
-        } break;
-
-        case EventType::kPacketToRp: {
-          // Control message from RP
-          RPControlMsg rcm;
-          rcm.msg_type_ = event.tags_[0];
-
-          if (rcm.msg_type_ == 0) {
-            // Initial cores info to RP
-            RPStatusMsg rsm;
-            rsm.status_msg_0_ =
-                cfg->CoreOffset() + 1 + cfg->SocketThreadNum() +
-                (cfg->DynamicCoreAlloc() ? 1 : 0);  // Cores allocated for rest
-            rsm.status_msg_1_ =
-                sysconf(_SC_NPROCESSORS_ONLN);  // Total cores available
-            rsm.status_msg_2_ = kMinWorkers;
-            AGORA_LOG_INFO(
-                "Agora: Sending cores details to RP of rest of alloc %zu, max "
-                "cores %zu, min workers %zu\n",
-                rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_);
-            TryEnqueueFallback(
-                &rp_request_queue_,
-                EventData(EventType::kPacketToRp, rsm.status_msg_0_,
-                          rsm.status_msg_1_, rsm.status_msg_2_));
-          } else if (rcm.msg_type_ == 1) {
-            // Current cores, latency and frame info to RP
-            RPStatusMsg rsm;
-            rsm.status_msg_0_ = this->stats_->MeasureLastFrameLatency();
-            rsm.status_msg_1_ = worker_set_->GetCoresInfo();
-            rsm.status_msg_2_ = this->stats_->LastFrameId();
-            AGORA_LOG_INFO(
-                "Agora: Sending status to RP of latency %zu, current workers "
-                "%zu, last frame id %zu\n",
-                rsm.status_msg_0_, rsm.status_msg_1_, rsm.status_msg_2_);
-            TryEnqueueFallback(
-                &rp_request_queue_,
-                EventData(EventType::kPacketToRp, rsm.status_msg_0_,
-                          rsm.status_msg_1_, rsm.status_msg_2_));
-          } else {
-            RtAssert(false, "Invalid msg type to RP\n");
-          }
-        } break;
-
-        case EventType::kRANUpdate: {
-          RanConfig rc;
-          rc.n_antennas_ = event.tags_[0];
-          rc.mcs_index_ = event.tags_[1];
-          rc.frame_id_ = event.tags_[2];
-          UpdateRanConfig(rc);
-        } break;
-
         default:
           AGORA_LOG_ERROR("Wrong event type in message queue!");
           std::exit(0);
@@ -934,7 +956,7 @@ void Agora::Start() {
         }
       }
     } /* End of for */
-  }   /* End of while */
+  } /* End of while */
 
 finish:
   AGORA_LOG_INFO("Agora: printing stats and saving to file\n");
@@ -1040,8 +1062,8 @@ void Agora::HandleEventFft(size_t tag) {
           phy_stats_->PrintCalibSnrStats(previous_cal_slot);
         }
       }  // kPrintPhyStats
-    }    // last_rc_task
-  }      // kCaLDL || kCalUl
+    }  // last_rc_task
+  }  // kCaLDL || kCalUl
 }
 
 void Agora::UpdateRanConfig(RanConfig rc) {
@@ -1050,9 +1072,15 @@ void Agora::UpdateRanConfig(RanConfig rc) {
   mac_sched_->Params().UpdateUlMcsParams(ul_mcs_params);
 }
 
-void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
+void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id, size_t ant_id) {
   const size_t frame_slot = frame_id % kFrameWnd;
   auto symbol_type = config_->Frame().GetSymbolType(symbol_id);
+
+  if (config_->DynamicCoreAlloc()) {
+    this->stats_->MasterSetTscSymbol(TsType::kSymbolRX, frame_id, symbol_id,
+                                     ant_id);
+  }
+
   if (symbol_type == SymbolType::kPilot) {
     rx_counters_.num_pilot_pkts_[frame_slot]++;
     if (rx_counters_.num_pilot_pkts_.at(frame_slot) ==
@@ -1152,6 +1180,9 @@ void Agora::InitializeCounters() {
   rx_counters_.num_reciprocity_pkts_per_frame_ =
       (cfg->Frame().NumULCalSyms() * num_rx_ul_cal_antennas) +
       (cfg->Frame().NumDLCalSyms() * num_rx_dl_cal_antennas);
+
+  AGORA_LOG_INFO("Agora: Total pilot packets per frame: %zu\n",
+                 rx_counters_.num_pilot_pkts_per_frame_);
 
   AGORA_LOG_INFO("Agora: Total recip cal receive symbols per frame: %zu\n",
                  rx_counters_.num_reciprocity_pkts_per_frame_);
@@ -1257,10 +1288,9 @@ void Agora::InitializeThreads() {
   }
 
   // Create workers
-  ///\todo convert unique ptr to shared
-  worker_set_ = std::make_unique<AgoraWorker>(
+  worker_set_ = std::make_unique<AgoraWorkerSet>(
       config_, mac_sched_.get(), stats_.get(), phy_stats_.get(), message_.get(),
-      agora_memory_.get(), &frame_tracking_, base_worker_core_offset_);
+      agora_memory_.get(), &frame_tracking_);
 
   if (config_->DynamicCoreAlloc() == false) {
     AGORA_LOG_INFO(
@@ -1429,7 +1459,7 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
           break;
         }
       }  // for each encodable frames in kScheduleQueues
-    }    // !finished
+    }  // !finished
   }
   return finished;
 }
