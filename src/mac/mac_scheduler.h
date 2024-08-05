@@ -20,11 +20,15 @@ class MacScheduler {
   explicit MacScheduler(Config* const cfg);
   ~MacScheduler();
 
-  bool IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id);
+  bool IsUeScheduled(size_t frame_id, size_t ue_id);
+  bool IsUeScheduled(size_t frame_id, size_t prb_id, size_t ue_id);
   size_t ScheduledUeIndex(size_t frame_id, size_t prb_id, size_t sched_ue_id);
   arma::uvec ScheduledUeList(size_t frame_id, size_t prb_id);
   arma::uvec ScheduledUeMap(size_t frame_id, size_t prb_id);
   arma::uvec SchedulePrbList(size_t frame_id, size_t ue_id);
+  arma::uvec ScheduledPrbMap(size_t frame_id, size_t ue_id);
+  size_t NumScheduledPrbs(size_t frame_id, size_t ue_id);
+  size_t NumScheduledUes(size_t frame_id);
   size_t UeScheduleIndex(size_t sched_id);
   size_t SelectedUlMcs(size_t frame_id, size_t ue_id);
   size_t SelectedDlMcs(size_t frame_id, size_t ue_id);

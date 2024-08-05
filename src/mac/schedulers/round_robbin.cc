@@ -6,12 +6,12 @@ RoundRobbin::RoundRobbin(Config* const cfg) : SchedulerModel(cfg) {
   num_groups_ =
       (cfg_->SpatialStreamsNum() == cfg_->UeAntNum()) ? 1 : cfg_->UeAntNum();
   // num_prbs are currently the same for uplink and downlink
-  size_t num_prbs =
+  num_prbs_ =
       cfg_->MacParams().LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
-  schedule_buffer_.Calloc(num_groups_, cfg_->UeAntNum() * num_prbs,
+  schedule_buffer_.Calloc(num_groups_, cfg_->UeAntNum() * num_prbs_,
                           Agora_memory::Alignment_t::kAlign64);
   schedule_buffer_index_.Calloc(num_groups_,
-                                cfg_->SpatialStreamsNum() * num_prbs,
+                                cfg_->SpatialStreamsNum() * num_prbs_,
                                 Agora_memory::Alignment_t::kAlign64);
   ul_mcs_buffer_.Calloc(num_groups_, cfg_->UeAntNum(),
                         Agora_memory::Alignment_t::kAlign64);
@@ -20,7 +20,7 @@ RoundRobbin::RoundRobbin(Config* const cfg) : SchedulerModel(cfg) {
   //Round Robbin Schedule Buffer Process
   for (size_t gp = 0u; gp < num_groups_; gp++) {
     for (size_t ue = gp; ue < gp + cfg_->SpatialStreamsNum(); ue++) {
-      for (size_t prb = 0; prb < num_prbs; prb++) {
+      for (size_t prb = 0; prb < num_prbs_; prb++) {
         size_t cur_ue = ue % cfg_->UeAntNum();
         schedule_buffer_[gp][cur_ue + cfg_->UeAntNum() * prb] = 1;
         schedule_buffer_index_[gp][(ue - gp) +

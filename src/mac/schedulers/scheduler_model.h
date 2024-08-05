@@ -38,6 +38,27 @@ class SchedulerModel {
   virtual arma::uvec SchedulePrbList(size_t frame_id, size_t ue_id) {
     return {};
   }
+  arma::uvec ScheduledPrbMap(size_t frame_id, size_t ue_id) {
+    const size_t gp = frame_id % num_groups_;
+    auto sched_mat =
+        arma::umat(reinterpret_cast<unsigned long long*>(schedule_buffer_[gp]),
+                   cfg_->UeAntNum(), num_prbs_, false);
+    return sched_mat.row(ue_id).st();
+  }
+  size_t NumScheduledUes(size_t frame_id) {
+    const size_t gp = frame_id % num_groups_;
+    auto sched_mat =
+        arma::umat(reinterpret_cast<unsigned long long*>(schedule_buffer_[gp]),
+                   cfg_->UeAntNum(), num_prbs_, false);
+    arma::uvec scheduled_ues = arma::find(arma::sum(sched_mat, 1) > 0);
+    return scheduled_ues.n_elem;
+    /*
+     * num_sched_ues = function NumScheduledUes(num_ues, num_prbs)
+     * A = randn(num_ues, num_prbs);
+     * num_sched_ues = length(find(sum(A, 2) > 0));
+     * end
+     */
+  }
   virtual size_t UeScheduleIndex([[maybe_unused]] size_t sched_id) {
     return {};
   }
@@ -62,6 +83,7 @@ class SchedulerModel {
 
   size_t selected_group_{0};
   size_t num_groups_;
+  size_t num_prbs_;
 };
 
 #endif  //SCHEDULER_MODEL_H_

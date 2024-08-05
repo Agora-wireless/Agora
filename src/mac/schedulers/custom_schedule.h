@@ -32,8 +32,6 @@ class CustomSchedule : public SchedulerModel {
   std::vector<uint8_t> ue_num_array_;
   std::vector<size_t> ue_sched_set_;
   std::vector<size_t> sched_id_array_;
-
-  size_t num_prbs_;
 };
 
 #endif  //CUSTOM_SCHEDULE_H_
