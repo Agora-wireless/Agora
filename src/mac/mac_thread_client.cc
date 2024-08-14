@@ -46,14 +46,16 @@ MacThreadClient::MacThreadClient(
   client_.ul_bits_buffer_status_ = ul_bits_buffer_status;
 
   server_.n_filled_in_frame_.fill(0);
-  for (size_t ue_ant = 0; ue_ant < cfg_->UeAntTotal(); ue_ant++) {
-    server_.data_size_.emplace_back(
-        std::vector<size_t>(cfg->Frame().NumDlDataSyms()));
-  }
+  if (cfg->Frame().NumDlDataSyms() > 0) {
+    for (size_t ue_ant = 0; ue_ant < cfg_->UeAntTotal(); ue_ant++) {
+      server_.data_size_.emplace_back(
+          std::vector<size_t>(cfg->Frame().NumDlDataSyms()));
+    }
 
-  // The frame data will hold the data comming from the Phy (Received)
-  for (auto& v : server_.frame_data_) {
-    v.resize(cfg_->MacParams().MacDataBytesNumPerframe(Direction::kDownlink));
+    // The frame data will hold the data comming from the Phy (Received)
+    for (auto& v : server_.frame_data_) {
+      v.resize(cfg_->MacParams().MacDataBytesNumPerframe(Direction::kDownlink));
+    }
   }
 
   const size_t udp_control_len = sizeof(RBIndicator);

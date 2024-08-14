@@ -20,7 +20,9 @@ AgoraBuffer::AgoraBuffer(Config* const cfg)
       // In SlotScheduling mode the 2nd dimension is not used
       // TODO: Can be slots instead of symbols
       decoded_buffer_(kFrameWnd, cfg->Frame().NumUlDataSyms(), cfg->UeAntNum(),
-                      cfg->MacParams().MaxPacketBytes(Direction::kUplink)) {
+                      cfg->NumCbPerFrame(Direction::kUplink) *
+                          Roundup<64>(cfg->MacParams().MaxCodeblockBytes(
+                              Direction::kUplink))) {
   AllocateTables();
 }
 

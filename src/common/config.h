@@ -509,7 +509,6 @@ class Config {
         dim2_id = this->ofdm_data_num_;
       }
     }
-
     return &mod_bits_buffer[dim1_id][Roundup<64>(dim2_id) * ue_id + sc_id];
   }
 

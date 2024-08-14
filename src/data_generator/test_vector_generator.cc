@@ -408,7 +408,6 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
           for (size_t j = 0; j < cfg->OfdmDataNum(); j++) {
             size_t cb = ue * num_prb + (j / sc_per_prb);
             size_t sc = sym * sc_per_prb + (j % sc_per_prb);
-            std::printf("ue %zu, sym %zu, cb %zu, sc %zu\n", ue, sym, cb, sc);
             prb_to_ofdm.at(i).at(j) = ul_modulated_symbols.at(cb).at(sc);
           }
         }

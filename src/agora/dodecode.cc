@@ -35,15 +35,16 @@ EventData DoDecode::Launch(size_t tag) {
   const LDPCconfig& ldpc_config =
       mac_sched_->Params().LdpcConfig(Direction::kUplink);
   const size_t frame_id = gen_tag_t(tag).frame_id_;
-  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  const size_t cb_id = gen_tag_t(tag).cb_id_;
-  const size_t cur_cb_id = (cb_id % ldpc_config.NumBlocksInSymbol());
-  const size_t stream_id = (cb_id / ldpc_config.NumBlocksInSymbol());
-  const size_t ue_id = mac_sched_->ScheduledUeIndex(frame_id, 0, stream_id);
+  size_t symbol_id, cb_id, cur_cb_id, ue_id, stream_id;
   size_t data_symbol_idx_ul = 0;
   size_t symbol_offset = 0;
-
   if (cfg_->SlotScheduling() == false) {
+    symbol_id = gen_tag_t(tag).symbol_id_;
+    cb_id = gen_tag_t(tag).cb_id_;
+    cur_cb_id = (cb_id % ldpc_config.NumBlocksInSymbol());
+    stream_id = (cb_id / ldpc_config.NumBlocksInSymbol());
+    ue_id = mac_sched_->ScheduledUeIndex(frame_id, 0, stream_id);
+
     if (symbol_id <
         cfg_->Frame().GetULSymbol(cfg_->Frame().ClientUlPilotSymbols())) {
       return {EventType::kDecode, tag};
@@ -62,6 +63,10 @@ EventData DoDecode::Launch(size_t tag) {
           tid_, frame_id, symbol_id, cur_cb_id, cb_id, ue_id, symbol_offset);
     }
   } else {
+    cb_id = gen_tag_t(tag).symbol_id_;
+    cur_cb_id = cb_id;
+    stream_id = gen_tag_t(tag).ue_id_;
+    ue_id = mac_sched_->ScheduledUeIndex(frame_id, cb_id, stream_id);
     if (kDebugPrintInTask == true) {
       std::printf(
           "In doDecode thread %d: frame: %zu, cur cb: "
@@ -106,8 +111,8 @@ EventData DoDecode::Launch(size_t tag) {
   size_t decode_block = cfg_->SlotScheduling() ? 0 : data_symbol_idx_ul;
   uint8_t* decoded_buffer_ptr =
       (uint8_t*)decoded_buffers_[frame_slot][decode_block][ue_id] +
-      (cur_cb_id * num_bytes_per_cb);
-  //(cur_cb_id * Roundup<64>(num_bytes_per_cb));
+      (cur_cb_id *
+       Roundup<64>(num_bytes_per_cb));  // alignment is necessary here
 
   ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
   ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer_ptr;
@@ -134,11 +139,13 @@ EventData DoDecode::Launch(size_t tag) {
   }
 
   if (kPrintDecodedData) {
-    std::printf("Decoded data\n");
-    for (size_t i = 0; i < (ldpc_config.NumCbLen() >> 3); i++) {
-      std::printf("%u ", *(decoded_buffer_ptr + i));
+    std::stringstream dataprint;
+    dataprint << std::setfill('0') << std::hex;
+    for (size_t i = 0; i < num_bytes_per_cb; i++) {
+      dataprint << " " << std::setw(2) << (int)(*(decoded_buffer_ptr + i));
     }
-    std::printf("\n");
+    std::printf("Decoded data ue %zu cb %zu, \nData: %s\n", ue_id, cb_id,
+                dataprint.str().c_str());
   }
 
   size_t duration = GetTime::WorkerRdtsc() - start_tsc;
@@ -149,5 +156,6 @@ EventData DoDecode::Launch(size_t tag) {
                 GetTime::CyclesToUs(duration, cfg_->FreqGhz()));
   }
 
-  return {EventType::kDecode, tag};
+  return {cfg_->SlotScheduling() ? EventType::kDecodeRb : EventType::kDecode,
+          tag};
 }

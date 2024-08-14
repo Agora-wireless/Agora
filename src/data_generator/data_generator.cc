@@ -182,7 +182,8 @@ std::vector<complex_float> DataGenerator::GetModulation(
   AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
                   &mod_input[0], BitsToBytes(num_bits), mod_order_bits);
 
-  for (size_t i = 0; i < num_subcarriers; i++) {
+  size_t filled_scs = num_bits / mod_order_bits;
+  for (size_t i = 0; i < filled_scs; i++) {
     modulated_codeword[i] = ModSingleUint8(mod_input[i], mod_table);
   }
   return modulated_codeword;
@@ -198,7 +199,8 @@ std::vector<complex_float> DataGenerator::GetModulation(
   AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
                   modulation_data, BitsToBytes(num_bits), mod_order_bits);
 
-  for (size_t i = 0; i < num_subcarriers; i++) {
+  size_t filled_scs = num_bits / mod_order_bits;
+  for (size_t i = 0; i < filled_scs; i++) {
     modulated_codeword[i] = ModSingleUint8(modulation_data[i], mod_table);
   }
   return modulated_codeword;

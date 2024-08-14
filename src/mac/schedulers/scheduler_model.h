@@ -76,7 +76,7 @@ class SchedulerModel {
   Config* const cfg_;
 
   Table<size_t> schedule_buffer_index_;
-  Table<int> schedule_buffer_;
+  Table<size_t> schedule_buffer_;
 
   Table<size_t> ul_mcs_buffer_;
   Table<size_t> dl_mcs_buffer_;

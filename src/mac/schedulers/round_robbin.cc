@@ -2,6 +2,8 @@
 
 #include "logger.h"
 
+static constexpr bool kPrintUeSchedule = false;
+
 RoundRobbin::RoundRobbin(Config* const cfg) : SchedulerModel(cfg) {
   num_groups_ =
       (cfg_->SpatialStreamsNum() == cfg_->UeAntNum()) ? 1 : cfg_->UeAntNum();
@@ -30,9 +32,25 @@ RoundRobbin::RoundRobbin(Config* const cfg) : SchedulerModel(cfg) {
     for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
       ul_mcs_buffer_[gp][ue] = cfg->MacParams().McsIndex(Direction::kUplink);
       dl_mcs_buffer_[gp][ue] = cfg->MacParams().McsIndex(Direction::kDownlink);
-      AGORA_LOG_INFO("UL MCS Init: gp %zu, ue %zu, mcs %zu\n", gp, ue,
-                     ul_mcs_buffer_[gp][ue]);
+      AGORA_LOG_TRACE("UL MCS Init: gp %zu, ue %zu, mcs %zu\n", gp, ue,
+                      ul_mcs_buffer_[gp][ue]);
     }
+  }
+
+  if (kPrintUeSchedule) {
+    std::stringstream dataprint;
+    for (size_t gp = 0u; gp < num_groups_; gp++) {
+      dataprint << "Group " << gp << ":\n";
+      for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
+        for (size_t prb = 0; prb < num_prbs_; prb++) {
+          std::printf("%zu ",
+                      schedule_buffer_[gp][ue + prb * cfg_->UeAntNum()]);
+          dataprint << schedule_buffer_[gp][ue + prb * cfg_->UeAntNum()] << " ";
+        }
+        dataprint << "\n";
+      }
+    }
+    AGORA_LOG_INFO("%s", dataprint.str());
   }
 }
 

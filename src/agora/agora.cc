@@ -299,53 +299,58 @@ void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
 }
 
 void Agora::ScheduleCodeblocks(EventType event_type, Direction dir,
-                               size_t frame_id, size_t symbol_or_cb_idx) {
-  //if (config_->SlotScheduling() == false) {
-  auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0);
-  auto base_tag = gen_tag_t::FrmSymCb(frame_id, symbol_or_cb_idx, 0);
-  const size_t num_tasks =
-      ue_list.n_elem * mac_sched_->Params().LdpcConfig(dir).NumBlocksInSymbol();
-  size_t num_blocks = num_tasks / config_->EncodeBlockSize();
-  const size_t num_remainder = num_tasks % config_->EncodeBlockSize();
-  if (num_remainder > 0) {
-    num_blocks++;
-  }
-  EventData event;
-  event.num_tags_ = config_->EncodeBlockSize();
-  event.event_type_ = event_type;
-  size_t qid = frame_id & 0x1;
-  for (size_t i = 0; i < num_blocks; i++) {
-    if ((i == num_blocks - 1) && num_remainder > 0) {
-      event.num_tags_ = num_remainder;
-    }
-    for (size_t j = 0; j < event.num_tags_; j++) {
-      event.tags_[j] = base_tag.tag_;
-      base_tag.cb_id_++;
-    }
-    stats_->TryEnqueueLogStatsMaster(
-        message_->GetConq(event_type, qid), message_->GetPtok(event_type, qid),
-        event, this->config_->FrameToProfile(), frame_id, symbol_or_cb_idx);
-  }
-  /*} else {
-    auto& prb_id = symbol_or_cb_idx;
-    auto ue_list = mac_sched_->ScheduledUeList(frame_id, prb_id);
-    auto base_tag = gen_tag_t::FrmCbUe(frame_id, symbol_or_cb_idx, 0);
+                               size_t frame_id, size_t symbol_idx) {
+  if (config_->SlotScheduling() == false) {
+    auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0);
+    auto base_tag = gen_tag_t::FrmSymCb(frame_id, symbol_idx, 0);
     const size_t num_tasks =
         ue_list.n_elem *
         mac_sched_->Params().LdpcConfig(dir).NumBlocksInSymbol();
+    size_t num_blocks = num_tasks / config_->EncodeBlockSize();
+    const size_t num_remainder = num_tasks % config_->EncodeBlockSize();
+    if (num_remainder > 0) {
+      num_blocks++;
+    }
+    EventData event;
+    event.num_tags_ = config_->EncodeBlockSize();
+    event.event_type_ = event_type;
+    size_t qid = frame_id & 0x1;
+    for (size_t i = 0; i < num_blocks; i++) {
+      if ((i == num_blocks - 1) && num_remainder > 0) {
+        event.num_tags_ = num_remainder;
+      }
+      for (size_t j = 0; j < event.num_tags_; j++) {
+        event.tags_[j] = base_tag.tag_;
+        base_tag.cb_id_++;
+      }
+      stats_->TryEnqueueLogStatsMaster(message_->GetConq(event_type, qid),
+                                       message_->GetPtok(event_type, qid),
+                                       event, this->config_->FrameToProfile(),
+                                       frame_id, symbol_idx);
+    }
+  } else {
+    size_t num_blocks = config_->NumCbPerFrame(dir);
     EventData event;
     event.num_tags_ = 1;
     event.event_type_ = event_type;
     size_t qid = frame_id & 0x1;
-    for (size_t i = 0; i < num_tasks; i++) {
-      event.tags_[0] = base_tag.tag_;
-      base_tag.ue_id_++;
-      stats_->TryEnqueueLogStatsMaster(message_->GetConq(event_type, qid),
-                                       message_->GetPtok(event_type, qid),
-                                       event, this->config_->FrameToProfile(),
-                                       frame_id, symbol_or_cb_idx);
+    size_t stream_id = 0;
+    for (size_t ue = 0; ue < config_->UeAntNum(); ue++) {
+      if (mac_sched_->IsUeScheduled(frame_id, ue)) {
+        for (size_t i = 0; i < num_blocks; i++) {
+          if (mac_sched_->IsUeScheduled(frame_id, i, ue)) {
+            auto base_tag = gen_tag_t::FrmSymUe(frame_id, i, stream_id);
+            event.tags_[0] = base_tag.tag_;
+            stats_->TryEnqueueLogStatsMaster(
+                message_->GetConq(event_type, qid),
+                message_->GetPtok(event_type, qid), event,
+                this->config_->FrameToProfile(), frame_id, symbol_idx);
+          }
+        }
+        stream_id++;
+      }
     }
-  }*/
+  }
 }
 
 void Agora::ScheduleUsers([[maybe_unused]] EventType event_type,
@@ -631,8 +636,10 @@ void Agora::Start() {
                   // Simplest solution is to wait for all symbols of a frame
                   // to finish before scheduling decode for all Codeblocks (PRBs)
                   // Which Ironically makes it similar to BigStation
-                  ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
+                  ScheduleCodeblocks(EventType::kDecodeRb, Direction::kUplink,
                                      frame_id, symbol_id);
+                  assert(frame_tracking_.cur_sche_frame_id_ == frame_id);
+                  CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
                 }
               }
             }
@@ -665,12 +672,43 @@ void Agora::Start() {
           }
         } break;
 
+        case EventType::kDecodeRb: {
+          const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+          const size_t cb_id = gen_tag_t(event.tags_[0]).symbol_id_;
+          const size_t stream_id = gen_tag_t(event.tags_[0]).ue_id_;
+          const size_t ue_id =
+              mac_sched_->ScheduledUeIndex(frame_id, cb_id, stream_id);
+          size_t num_cb = mac_sched_->NumScheduledPrbs(frame_id, ue_id);
+          const bool last_decode_task =
+              this->decode_counters_.CompleteTask(frame_id, ue_id, num_cb);
+          if (last_decode_task == true) {
+            auto base_tag = gen_tag_t::FrmSymUe(frame_id, 0, ue_id);
+            TryEnqueueFallback(
+                &mac_request_queue_,
+                EventData(EventType::kPacketToMac, base_tag.tag_));
+            stats_->PrintPerSymbolDone(
+                PrintType::kDecode, frame_id, cb_id,
+                decode_counters_.GetTaskCount(frame_id) + 1);
+
+            size_t num_sched_ues = mac_sched_->NumScheduledUes(frame_id);
+            if (this->decode_counters_.GetTaskCount(frame_id) ==
+                num_sched_ues) {
+              this->stats_->MasterSetTsc(TsType::kDecodeDone, frame_id);
+              stats_->PrintPerFrameDone(PrintType::kDecode, frame_id);
+              auto ue_map = mac_sched_->ScheduledUeMap(frame_id, 0u);
+              this->phy_stats_->RecordBer(frame_id, ue_map);
+              this->phy_stats_->RecordSer(frame_id, ue_map);
+            }
+          }
+        } break;
+
         case EventType::kPacketToMac: {
           const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+          //auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+          size_t num_sched_ues = mac_sched_->NumScheduledUes(frame_id);
           const bool last_tomac_task = this->tomac_counters_.CompleteTask(
-              frame_id, symbol_id, ue_list.n_elem);
+              frame_id, symbol_id, num_sched_ues);
           if (last_tomac_task == true) {
             stats_->PrintPerSymbolDone(
                 PrintType::kPacketToMac, frame_id, symbol_id,
@@ -1291,10 +1329,16 @@ void Agora::InitializeCounters() {
   demul_counters_.Init(cfg->Frame().NumULSyms(), cfg->DemulEventsPerSymbol());
 
   // \todo setting the first dim to NumUlDataSyms breaks the scheduler
-  decode_counters_.Init(
-      (cfg->SlotScheduling() == false) ? cfg->Frame().NumULSyms() : 1,
-      cfg->MacParams().LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
-          cfg->SpatialStreamsNum());
+  if (cfg->SlotScheduling() == false) {
+    decode_counters_.Init(
+        cfg->Frame().NumULSyms(),
+        cfg->MacParams().LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
+            cfg->SpatialStreamsNum());
+  } else {
+    decode_counters_.Init(
+        cfg->UeAntNum(),
+        cfg->MacParams().LdpcConfig(Direction::kUplink).NumBlocksInSymbol());
+  }
 
   tomac_counters_.Init(
       (cfg->SlotScheduling() == false) ? cfg->Frame().NumULSyms() : 1,

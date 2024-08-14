@@ -741,13 +741,11 @@ Config::Config(std::string jsonfilename)
 
   // TODO: in a 5G frame, this value depends on the number of slots
   ul_num_cb_per_frame_ =
-      slot_scheduling_ == true
-          ? mac_params_.LdpcConfig(Direction::kUplink).NumBlocksInSymbol()
-          : frame_.NumUlDataSyms();
+      (slot_scheduling_ == true ? 1 : frame_.NumUlDataSyms()) *
+      mac_params_.LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
   dl_num_cb_per_frame_ =
-      slot_scheduling_ == true
-          ? mac_params_.LdpcConfig(Direction::kDownlink).NumBlocksInSymbol()
-          : frame_.NumDlDataSyms();
+      (slot_scheduling_ == true ? 1 : frame_.NumDlDataSyms()) *
+      mac_params_.LdpcConfig(Direction::kDownlink).NumBlocksInSymbol();
   AGORA_LOG_INFO(
       "Number of SCs per CB: Ul %zu, DL %zu\nNumber of CBs per Frame: UL %zu, "
       "DL %zu\n",
@@ -975,12 +973,7 @@ void Config::GenPilots() {
 void Config::LoadUplinkData() {
   if (this->frame_.NumUlDataSyms() > 0) {
     // Uplink modulation input bits
-    const size_t symbol_blocks =
-        mac_params_.LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
-    size_t num_ul_codeblocks =
-        (slot_scheduling_ == false)
-            ? this->Frame().NumUlDataSyms() * symbol_blocks
-            : symbol_blocks;
+    size_t num_ul_codeblocks = this->ul_num_cb_per_frame_;
     /*size_t num_subcr = 
     slot_scheduling_ ? this->NumScPerCb(Direction::kUplink) *
                                               this->Frame().NumUlDataSyms()
@@ -994,12 +987,12 @@ void Config::LoadUplinkData() {
         std::to_string(this->ue_ant_total_) + ".bin";
     // reset seek offset for new file read
     size_t seek_offset = 0;
-    const size_t subcarr_i = 0u;
+    const size_t sc_id = 0u;
     for (size_t i = 0; i < num_ul_codeblocks; i++) {
       seek_offset += ul_num_sc_per_cb_ * this->ue_ant_offset_ * sizeof(int8_t);
-      for (size_t j = 0; j < this->ue_ant_num_; j++) {
+      for (size_t ue_id = 0; ue_id < this->ue_ant_num_; ue_id++) {
         int8_t* ul_mod_data_ptr = this->GetModBitsBuf(
-            ul_mod_bits_, Direction::kUplink, 0u, i, j, subcarr_i);
+            ul_mod_bits_, Direction::kUplink, 0u, i, ue_id, sc_id);
         Utils::ReadBinaryFile(ul_mod_data_file, sizeof(int8_t),
                               ul_num_sc_per_cb_, seek_offset, ul_mod_data_ptr);
         seek_offset += ul_num_sc_per_cb_ * sizeof(int8_t);

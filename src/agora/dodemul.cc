@@ -280,7 +280,7 @@ EventData DoDemul::Launch(size_t tag) {
           // Reset previous frame
           arma::cx_float* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
               ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
-          arma::cx_fmat mat_phase_shift(phase_shift_ptr, n_users,
+          arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(),
                                         cfg_->Frame().ClientUlPilotSymbols(),
                                         false);
           mat_phase_shift.fill(0);

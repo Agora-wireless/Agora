@@ -126,6 +126,9 @@ void UeWorker::TaskThread(size_t core_offset) {
           // DoIfftUe(iffter.get(), event.tags_[0]);
           DoIfft(event.tags_[0]);
         } break;
+        case EventType::kEncodeRb: {
+          DoEncodeUe(encoder.get(), event.tags_[0]);
+        } break;
         case EventType::kEncode: {
           DoEncodeUe(encoder.get(), event.tags_[0]);
         } break;
@@ -499,33 +502,41 @@ void UeWorker::DoDecodeUe(DoDecodeClient* decoder, size_t tag) {
 //                   UPLINK Operations                //
 //////////////////////////////////////////////////////////
 void UeWorker::DoEncodeUe(DoEncode* encoder, size_t tag) {
-  const size_t frame_id = gen_tag_t(tag).frame_id_;
-  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  const size_t ant_id = gen_tag_t(tag).ue_id_;
-  const LDPCconfig& ldpc_config =
-      mac_sched_.Params().LdpcConfig(Direction::kUplink);
+  if (config_.SlotScheduling() == false) {
+    const size_t frame_id = gen_tag_t(tag).frame_id_;
+    const size_t symbol_id = gen_tag_t(tag).symbol_id_;
+    const size_t ant_id = gen_tag_t(tag).ue_id_;
+    const LDPCconfig& ldpc_config =
+        mac_sched_.Params().LdpcConfig(Direction::kUplink);
 
-  // For now, call for each cb
-  for (size_t cb_id = 0; cb_id < ldpc_config.NumBlocksInSymbol(); cb_id++) {
     // For now, call for each cb
-    encoder->Launch(
-        gen_tag_t::FrmSymCb(frame_id, symbol_id,
-                            cb_id + (ant_id * ldpc_config.NumBlocksInSymbol()))
-            .tag_);
-  }
+    for (size_t cb_id = 0; cb_id < ldpc_config.NumBlocksInSymbol(); cb_id++) {
+      // For now, call for each cb
+      encoder->Launch(gen_tag_t::FrmSymCb(
+                          frame_id, symbol_id,
+                          cb_id + (ant_id * ldpc_config.NumBlocksInSymbol()))
+                          .tag_);
+    }
 
-  // Post the completion event (symbol)
-  const size_t completion_tag =
-      gen_tag_t::FrmSymUe(frame_id, symbol_id, ant_id).tag_;
-  RtAssert(notify_queue_.enqueue(*ptok_.get(),
-                                 EventData(EventType::kEncode, completion_tag)),
-           "Encoded Symbol message enqueue failed");
+    // Post the completion event (symbol)
+    const size_t completion_tag =
+        gen_tag_t::FrmSymUe(frame_id, symbol_id, ant_id).tag_;
+    RtAssert(notify_queue_.enqueue(
+                 *ptok_.get(), EventData(EventType::kEncode, completion_tag)),
+             "Encoded Symbol message enqueue failed");
+  } else {
+    encoder->Launch(tag);
+    RtAssert(notify_queue_.enqueue(*ptok_.get(),
+                                   EventData(EventType::kEncodeRb, tag)),
+             "Encoded Symbol message enqueue failed");
+  }
 }
 
 // This functions accepts non pilot - UL symbols
 void UeWorker::DoModul(size_t tag) {
   size_t start_tsc = GetTime::Rdtsc();
   const size_t frame_id = gen_tag_t(tag).frame_id_;
+  // This is cb_id when slot_schedling is enabled
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ant_id = gen_tag_t(tag).ue_id_;
   if (kDebugPrintInTask || kDebugPrintModul) {
@@ -533,13 +544,19 @@ void UeWorker::DoModul(size_t tag) {
                    tid_, frame_id, symbol_id, ant_id);
   }
 
-  const size_t ul_data_symbol_idx = config_.Frame().GetULSymbolIdx(symbol_id) -
-                                    config_.Frame().ClientUlPilotSymbols();
+  const size_t ul_data_symbol_idx =
+      config_.SlotScheduling() ? symbol_id
+                               : config_.Frame().GetULSymbolIdx(symbol_id) -
+                                     config_.Frame().ClientUlPilotSymbols();
   const size_t total_ul_data_symbol_id =
-      config_.GetTotalDataSymbolIdxUl(frame_id, ul_data_symbol_idx);
+      config_.SlotScheduling()
+          ? (frame_id % kFrameWnd) * config_.NumCbPerFrame(Direction::kUplink) +
+                symbol_id
+          : config_.GetTotalDataSymbolIdxUl(frame_id, ul_data_symbol_idx);
+  const size_t num_subcarrier = config_.NumScPerCb(Direction::kUplink);
 
   complex_float* modul_buf =
-      &modul_buffer_[total_ul_data_symbol_id][ant_id * config_.OfdmDataNum()];
+      &modul_buffer_[total_ul_data_symbol_id][ant_id * num_subcarrier];
 
   auto* ul_bits = config_.GetModBitsBuf(
       kDebugBypassEncode ? config_.UlModBits() : encoded_buffer_,
@@ -558,9 +575,13 @@ void UeWorker::DoModul(size_t tag) {
   // TODO place directly into the correct location of the fft buffer
   Table<complex_float> mod_table =
       mac_sched_.Params().ModTable(Direction::kUplink);
-  for (size_t sc = 0; sc < config_.OfdmDataNum(); sc++) {
-    modul_buf[sc] =
-        ModSingleUint8(static_cast<uint8_t>(ul_bits[sc]), mod_table);
+  for (size_t sc = 0; sc < num_subcarrier; sc++) {
+    if (sc < mac_sched_.Params().SubcarrierPerCodeBlock(Direction::kUplink)) {
+      modul_buf[sc] =
+          ModSingleUint8(static_cast<uint8_t>(ul_bits[sc]), mod_table);
+    } else {
+      modul_buf[sc] = {0.f, 0.f};
+    }
   }
 
   if ((kDebugPrintPerTaskDone == true) || (kDebugPrintModul == true)) {
@@ -580,30 +601,49 @@ void UeWorker::DoIfftUe(DoIFFTClient* iffter, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ant_id = gen_tag_t(tag).ue_id_;
-  if (mac_sched_.IsUeScheduled(frame_id, 0u, ant_id)) {
+  if (mac_sched_.IsUeScheduled(frame_id, ant_id)) {
     // TODO Remove this copy
-    {
-      complex_float const* source_data = nullptr;
-      const size_t ul_symbol_idx = config_.Frame().GetULSymbolIdx(symbol_id);
-      const size_t ul_data_symbol_idx =
-          config_.Frame().GetULSymbolIdx(symbol_id) -
-          config_.Frame().ClientUlPilotSymbols();
-      const size_t total_ul_symbol_id =
-          config_.GetTotalSymbolIdxUl(frame_id, ul_symbol_idx);
-      const size_t total_ul_data_symbol_id =
-          config_.GetTotalDataSymbolIdxUl(frame_id, ul_data_symbol_idx);
-      if (ul_symbol_idx < config_.Frame().ClientUlPilotSymbols()) {
-        source_data = config_.UeSpecificPilot()[ant_id];
-      } else {
+    complex_float const* source_data = nullptr;
+    const size_t ul_symbol_idx = config_.Frame().GetULSymbolIdx(symbol_id);
+    const size_t ul_data_symbol_idx =
+        config_.Frame().GetULSymbolIdx(symbol_id) -
+        config_.Frame().ClientUlPilotSymbols();
+    const size_t total_ul_symbol_id =
+        config_.GetTotalSymbolIdxUl(frame_id, ul_symbol_idx);
+    const size_t buff_offset =
+        (total_ul_symbol_id * config_.UeAntNum()) + ant_id;
+    complex_float* dest_loc =
+        ifft_buffer_[buff_offset] + (config_.OfdmDataStart());
+    if (ul_symbol_idx < config_.Frame().ClientUlPilotSymbols()) {
+      std::memcpy(dest_loc, config_.UeSpecificPilot()[ant_id],
+                  sizeof(complex_float) * config_.OfdmDataNum());
+    } else {
+      if (config_.SlotScheduling() == false) {
+        const size_t total_ul_data_symbol_id =
+            config_.GetTotalDataSymbolIdxUl(frame_id, ul_data_symbol_idx);
         source_data = &modul_buffer_[total_ul_data_symbol_id]
                                     [ant_id * config_.OfdmDataNum()];
+        std::memcpy(dest_loc, source_data,
+                    sizeof(complex_float) * config_.OfdmDataNum());
+      } else {
+        size_t ul_blocks_perframe = config_.NumCbPerFrame(Direction::kUplink);
+        for (size_t i = 0; i < ul_blocks_perframe; i++) {
+          const size_t sc_per_prb = config_.NumScPerPrb(Direction::kUplink);
+          if (mac_sched_.IsUeScheduled(frame_id, i, ant_id)) {
+            const size_t total_ul_cb_id =
+                (frame_id % kFrameWnd) * ul_blocks_perframe + i;
+            source_data =
+                &modul_buffer_[total_ul_cb_id]
+                              [ant_id * config_.NumScPerCb(Direction::kUplink)];
+            std::memcpy(dest_loc + i * sc_per_prb,
+                        source_data + ul_data_symbol_idx * sc_per_prb,
+                        sizeof(complex_float) * sc_per_prb);
+          } else {
+            std::memset(dest_loc + i * sc_per_prb, 0,
+                        sizeof(complex_float) * sc_per_prb);
+          }
+        }
       }
-      const size_t buff_offset =
-          (total_ul_symbol_id * config_.UeAntNum()) + ant_id;
-      complex_float* dest_loc =
-          ifft_buffer_[buff_offset] + (config_.OfdmDataStart());
-      std::memcpy(dest_loc, source_data,
-                  sizeof(complex_float) * config_.OfdmDataNum());
     }
     iffter->Launch(gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_);
   }
@@ -630,7 +670,7 @@ void UeWorker::DoIfft(size_t tag) {
   char* cur_tx_buffer = &tx_buffer_[tx_offset];
   auto* pkt = reinterpret_cast<Packet*>(cur_tx_buffer);
   auto* tx_data_ptr = reinterpret_cast<std::complex<short>*>(pkt->data_);
-  if (mac_sched_.IsUeScheduled(frame_id, 0u, ant_id)) {
+  if (mac_sched_.IsUeScheduled(frame_id, ant_id)) {
     if (kDebugPrintInTask) {
       AGORA_LOG_INFO(
           "User Task[%zu]: iFFT   (frame %zu, symbol %zu, user %zu)\n", tid_,
@@ -643,21 +683,42 @@ void UeWorker::DoIfft(size_t tag) {
     } else {
       const size_t ul_data_symbol_idx =
           ul_symbol_idx - config_.Frame().ClientUlPilotSymbols();
-      const size_t total_ul_data_symbol_id =
-          config_.GetTotalDataSymbolIdxUl(frame_id, ul_data_symbol_idx);
-      complex_float* modul_buff =
-          &modul_buffer_[total_ul_data_symbol_id]
-                        [ant_id * config_.OfdmDataNum()];
-      complex_float* ifft_buff = ifft_buffer_[buff_offset];
-      std::memset(ifft_buff, 0u,
+      std::memset(ifft_buffer_[buff_offset], 0u,
                   sizeof(complex_float) * config_.OfdmDataStart());
-      std::memcpy(ifft_buff + config_.OfdmDataStart(), modul_buff,
-                  config_.OfdmDataNum() * sizeof(complex_float));
+      complex_float* ifft_buff =
+          ifft_buffer_[buff_offset] + config_.OfdmDataStart();
+      if (config_.SlotScheduling() == false) {
+        const size_t total_ul_data_symbol_id =
+            config_.GetTotalDataSymbolIdxUl(frame_id, ul_data_symbol_idx);
+        complex_float* modul_buff =
+            &modul_buffer_[total_ul_data_symbol_id]
+                          [ant_id * config_.OfdmDataNum()];
+        std::memcpy(ifft_buff, modul_buff,
+                    sizeof(complex_float) * config_.OfdmDataNum());
+      } else {
+        size_t ul_blocks_perframe = config_.NumCbPerFrame(Direction::kUplink);
+        for (size_t i = 0; i < ul_blocks_perframe; i++) {
+          const size_t sc_per_prb = config_.NumScPerPrb(Direction::kUplink);
+          if (mac_sched_.IsUeScheduled(frame_id, i, ant_id)) {
+            const size_t total_ul_cb_id =
+                (frame_id % kFrameWnd) * ul_blocks_perframe + i;
+            complex_float* modul_buff =
+                &modul_buffer_[total_ul_cb_id]
+                              [ant_id * config_.NumScPerCb(Direction::kUplink)];
+            std::memcpy(ifft_buff + i * sc_per_prb,
+                        modul_buff + ul_data_symbol_idx * sc_per_prb,
+                        sizeof(complex_float) * sc_per_prb);
+          } else {
+            std::memset(ifft_buff + i * sc_per_prb, 0,
+                        sizeof(complex_float) * sc_per_prb);
+          }
+        }
+      }
       if (kDebugTxData) {
         const complex_float* data_truth =
             &config_
                  .UlIqF()[ul_data_symbol_idx][ant_id * config_.OfdmDataNum()];
-        if (memcmp(data_truth, modul_buff,
+        if (memcmp(data_truth, ifft_buff,
                    config_.OfdmDataNum() * sizeof(complex_float)) == 0) {
           AGORA_LOG_INFO(
               "Uplink iFFT: (frame %zu, symbol %zu, user %zu) Data SC values "
@@ -666,8 +727,8 @@ void UeWorker::DoIfft(size_t tag) {
         } else {
           size_t cnt_sc_mismatch = 0;
           for (size_t i = 0; i < config_.OfdmDataNum(); i++) {
-            if (data_truth[i].re != modul_buff[i].re ||
-                data_truth[i].im != modul_buff[i].im) {
+            if (data_truth[i].re != ifft_buff[i].re ||
+                data_truth[i].im != ifft_buff[i].im) {
               cnt_sc_mismatch++;
             }
           }
@@ -678,12 +739,12 @@ void UeWorker::DoIfft(size_t tag) {
               config_.OfdmDataNum());
         }
       }
-      std::memset(ifft_buff + config_.OfdmDataStop(), 0,
+      std::memset(ifft_buff + config_.OfdmDataNum(), 0,
                   sizeof(complex_float) * config_.OfdmDataStart());
 
       if (bypass_ifft == false) {
-        CommsLib::FFTShift(ifft_buff, config_.OfdmCaNum());
-        CommsLib::IFFT(ifft_buff, config_.OfdmCaNum(), false);
+        CommsLib::FFTShift(ifft_buffer_[buff_offset], config_.OfdmCaNum());
+        CommsLib::IFFT(ifft_buffer_[buff_offset], config_.OfdmCaNum(), false);
       }
 
       if (kDebugTxMemory) {
@@ -694,9 +755,9 @@ void UeWorker::DoIfft(size_t tag) {
             (intptr_t)cur_tx_buffer);
       }
 
-      CommsLib::Ifft2tx(ifft_buff, tx_data_ptr, config_.OfdmCaNum(),
-                        config_.OfdmTxZeroPrefix(), config_.CpLen(),
-                        config_.Scale());
+      CommsLib::Ifft2tx(ifft_buffer_[buff_offset], tx_data_ptr,
+                        config_.OfdmCaNum(), config_.OfdmTxZeroPrefix(),
+                        config_.CpLen(), config_.Scale());
     }
   } else {
     std::memset(pkt->data_, 0, 2 * sizeof(short) * config_.SampsPerSymbol());

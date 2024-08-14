@@ -162,7 +162,11 @@ void AgoraWorker::WorkerThread(int tid) {
   if (config_->Frame().NumULSyms() > 0) {
     computers_vec.push_back(compute_decoding.get());
     computers_vec.push_back(compute_demul.get());
-    events_vec.push_back(EventType::kDecode);
+    if (config_->SlotScheduling() == false) {
+      events_vec.push_back(EventType::kDecode);
+    } else {
+      events_vec.push_back(EventType::kDecodeRb);
+    }
     events_vec.push_back(EventType::kDemul);
   }
 

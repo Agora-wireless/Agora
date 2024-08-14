@@ -61,13 +61,13 @@ DoEncode::~DoEncode() {
 EventData DoEncode::Launch(size_t tag) {
   const LDPCconfig& ldpc_config = mac_sched_->Params().LdpcConfig(dir_);
   const size_t frame_id = gen_tag_t(tag).frame_id_;
-  const size_t cb_id = gen_tag_t(tag).cb_id_;
-  size_t symbol_id, cur_cb_id, sched_ue_id;
+  size_t symbol_id, cb_id, cur_cb_id, sched_ue_id;
   size_t symbol_idx;
   size_t data_symbol_idx = 0;
   size_t ue_id;
   if (cfg_->SlotScheduling() == false) {
     symbol_id = gen_tag_t(tag).symbol_id_;
+    cb_id = gen_tag_t(tag).cb_id_;
     cur_cb_id = cb_id % ldpc_config.NumBlocksInSymbol();
     sched_ue_id = cb_id / ldpc_config.NumBlocksInSymbol();
     if (dir_ == Direction::kDownlink) {
@@ -90,9 +90,10 @@ EventData DoEncode::Launch(size_t tag) {
     }
 
   } else {
+    cb_id = gen_tag_t(tag).symbol_id_;
     sched_ue_id = gen_tag_t(tag).ue_id_;
     ue_id = (dir_ == Direction::kDownlink)
-                ? mac_sched_->ScheduledUeIndex(frame_id, 0u, sched_ue_id)
+                ? mac_sched_->ScheduledUeIndex(frame_id, cb_id, sched_ue_id)
                 : sched_ue_id;
     cur_cb_id = cb_id;
   }
@@ -102,26 +103,26 @@ EventData DoEncode::Launch(size_t tag) {
   // All cb's per symbol are included in 1 mac packet
   int8_t* tx_data_ptr = mac_sched_->Params().GetMacBits(
       raw_data_buffer_, dir_, frame_id, data_symbol_idx, ue_id, cur_cb_id);
+  const size_t num_bytes_per_cb = mac_sched_->Params().NumBytesPerCb(dir_);
 
   if (kPrintRawMacData) {
     auto* pkt = reinterpret_cast<MacPacketPacked*>(tx_data_ptr);
+    std::stringstream dataprint;
+    dataprint << std::setfill('0') << std::hex;
+    for (size_t i = 0; i < num_bytes_per_cb; i++) {
+      dataprint << " " << std::setw(2)
+                << std::to_integer<int>(
+                       (reinterpret_cast<std::byte*>(tx_data_ptr))[i]);
+    }
     std::printf(
         "In doEncode [%d] mac packet frame: %d, symbol: %zu:%d, ue_id: %d, "
-        "data length %d, crc %d size %zu:%zu\n",
+        "pkt data length %d/%zu, code block size %zu, crc %4x, \nData: %s\n",
         tid_, pkt->Frame(), data_symbol_idx, pkt->Symbol(), pkt->Ue(),
-        pkt->PayloadLength(), pkt->Crc(),
-        mac_sched_->Params().MacPacketLength(dir_),
-        mac_sched_->Params().NumBytesPerCb(dir_));
-    std::printf("Data: ");
-    for (size_t i = 0; i < mac_sched_->Params().MacPayloadMaxLength(dir_);
-         i++) {
-      std::printf(" %02x", (uint8_t)(pkt->Data()[i]));
-    }
-    std::printf("\n");
+        pkt->PayloadLength(), mac_sched_->Params().MacPacketLength(dir_),
+        num_bytes_per_cb, pkt->Crc(), dataprint.str().c_str());
   }
 
   int8_t* ldpc_input = tx_data_ptr;
-  const size_t num_bytes_per_cb = mac_sched_->Params().NumBytesPerCb(dir_);
 
   if (this->cfg_->ScrambleEnabled()) {
     scrambler_->Scramble(scrambler_buffer_, ldpc_input, num_bytes_per_cb);
@@ -140,8 +141,8 @@ EventData DoEncode::Launch(size_t tag) {
                 << std::to_integer<int>(
                        reinterpret_cast<std::byte*>(ldpc_input)[i]);
     }
-    AGORA_LOG_INFO("ldpc input (%zu %zu %zu): %s\n", frame_id, symbol_idx,
-                   ue_id, dataprint.str().c_str());
+    AGORA_LOG_INFO("scrambled ldpc input (%zu %zu %zu): %s\n", frame_id,
+                   symbol_idx, ue_id, dataprint.str().c_str());
   }
 
   LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
@@ -159,10 +160,18 @@ EventData DoEncode::Launch(size_t tag) {
     AGORA_LOG_INFO("ldpc output (%zu %zu %zu): %s\n", frame_id, symbol_idx,
                    ue_id, dataprint.str().c_str());
   }
-  int8_t* mod_buffer_ptr = cfg_->GetModBitsBuf(
-      mod_bits_buffer_, dir_, frame_id, data_symbol_idx, ue_id, cur_cb_id);
 
-  if (kPrintRawMacData && dir_ == Direction::kUplink) {
+  int8_t* mod_buffer_ptr = nullptr;
+  if (cfg_->SlotScheduling() == false) {
+    mod_buffer_ptr = cfg_->GetModBitsBuf(
+        mod_bits_buffer_, dir_, frame_id, data_symbol_idx, ue_id,
+        cur_cb_id * cfg_->NumPrbPerCb(dir_) * cfg_->NumScPerPrb(dir_));
+  } else {
+    mod_buffer_ptr = cfg_->GetModBitsBuf(mod_bits_buffer_, dir_, frame_id,
+                                         cur_cb_id, ue_id, 0u);
+  }
+
+  if (kPrintModulatedData && dir_ == Direction::kUplink) {
     std::printf("Encoded data - placed at location (%zu %zu %zu) %zu\n",
                 frame_id, symbol_idx, ue_id,
                 reinterpret_cast<intptr_t>(mod_buffer_ptr));
@@ -188,5 +197,6 @@ EventData DoEncode::Launch(size_t tag) {
     std::printf("Thread %d Encode takes %.2f\n", tid_,
                 GetTime::CyclesToUs(duration, cfg_->FreqGhz()));
   }
-  return {EventType::kEncode, tag};
+  return {cfg_->SlotScheduling() ? EventType::kEncodeRb : EventType::kEncode,
+          tag};
 }

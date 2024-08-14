@@ -109,6 +109,22 @@ class MacUtils {
            8;
   }
 
+  inline const size_t MaxCodeblockBytes(Direction dir) const {
+    size_t max_mod_bits = GetModOrderBits(kMaxMcsIndex);
+    size_t max_code_rate = GetCodeRate(kMaxMcsIndex);
+    size_t n_sc =
+        (dir == Direction::kUplink) ? ul_ofdm_data_num_ : dl_ofdm_data_num_;
+    size_t n_syms = (dir == Direction::kUplink) ? frame_.NumUlDataSyms()
+                                                : frame_.NumDlDataSyms();
+    size_t sc_per_cb =
+        (dir == Direction::kUplink) ? ul_sc_per_cb_ : dl_sc_per_cb_;
+    size_t total_sc = prb_alloc_ ? sc_per_cb * n_syms : n_sc;
+    return (static_cast<size_t>(total_sc * max_code_rate * max_mod_bits /
+                                1024.0) +
+            7) /
+           8;
+  }
+
   /// Get mac bits for this frame, symbol, user and code block ID
   inline int8_t* GetMacBits(Table<int8_t>& info_bits, Direction dir,
                             size_t frame_id, [[maybe_unused]] size_t symbol_id,

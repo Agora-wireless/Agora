@@ -97,6 +97,8 @@ class PhyUe {
   size_t dl_data_symbol_perframe_;
   size_t ul_symbol_perframe_;
   size_t dl_symbol_perframe_;
+  size_t ul_blocks_perframe_;
+  size_t dl_blocks_perframe_;
   size_t rx_thread_num_;
 
   std::array<std::uint8_t, kFrameWnd> frame_tasks_;
