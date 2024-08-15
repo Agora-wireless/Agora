@@ -70,7 +70,7 @@ for i in `seq 1 $num_iters`; do
     echo -e "===========================================\n"
     # We sleep before starting the sender to allow the Agora server to start
     ./build/test_agora --conf_file ${input_filepath}/tddconfig-correctness-test-ul.json &
-    sleep 1; ./build/sender --num_threads 1 --core_offset 10 --conf_file ${input_filepath}/tddconfig-correctness-test-ul.json
+    sleep 2; ./build/sender --num_threads 1 --core_offset 10 --conf_file ${input_filepath}/tddconfig-correctness-test-ul.json
     wait
 
     echo "==========================================="

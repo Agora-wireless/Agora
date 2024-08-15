@@ -682,7 +682,8 @@ void Agora::Start() {
           const bool last_decode_task =
               this->decode_counters_.CompleteTask(frame_id, ue_id, num_cb);
           if (last_decode_task == true) {
-            auto base_tag = gen_tag_t::FrmSymUe(frame_id, 0, ue_id);
+            // Sym will be unused in this case
+            auto base_tag = gen_tag_t::FrmSymUe(frame_id, 0u, ue_id);
             TryEnqueueFallback(
                 &mac_request_queue_,
                 EventData(EventType::kPacketToMac, base_tag.tag_));
