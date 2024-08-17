@@ -4,6 +4,8 @@
 #include "logger.h"
 #include "utils.h"
 
+static constexpr bool kPrintUeSchedule = false;
+
 CustomSchedule::CustomSchedule(Config* const cfg) : SchedulerModel(cfg) {
   size_t n_items = cfg->FramesToTest() * cfg_->UeAntNum();
   ue_map_array_.resize(n_items);
@@ -57,7 +59,8 @@ CustomSchedule::CustomSchedule(Config* const cfg) : SchedulerModel(cfg) {
   }
   num_groups_ = ue_sched_set_.size();
   for (size_t fn = 0u; fn < cfg->FramesToTest(); fn++) {
-    sched_id_array_.push_back(this->UeScheduleIndex(sched_id_vec.at(fn)));
+    size_t ue_sched_id = this->UeScheduleIndex(sched_id_vec.at(fn));
+    sched_id_array_.push_back(ue_sched_id);
   }
   // num_prbs are currently the same for uplink and downlink
   num_prbs_ =
@@ -73,6 +76,7 @@ CustomSchedule::CustomSchedule(Config* const cfg) : SchedulerModel(cfg) {
   for (size_t gp = 0u; gp < num_groups_; gp++) {
     size_t cnt = 0;
     for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
+      // TODO: this will cause overflows for UeAntNum > 64
       uint8_t sched_bit = (ue_sched_set_.at(gp) >> ue) & 1;
       for (size_t prb = 0; prb < num_prbs_; prb++) {
         schedule_buffer_[gp][ue + cfg_->UeAntNum() * prb] = sched_bit;
@@ -85,23 +89,36 @@ CustomSchedule::CustomSchedule(Config* const cfg) : SchedulerModel(cfg) {
       dl_mcs_buffer_[gp][ue] = dl_mcs.at(gp);
     }
   }
+  if (kPrintUeSchedule) {
+    std::stringstream dataprint;
+    for (size_t gp = 0u; gp < num_groups_; gp++) {
+      dataprint << "Group " << gp << ":\n";
+      for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
+        for (size_t prb = 0; prb < num_prbs_; prb++) {
+          dataprint << schedule_buffer_[gp][ue + prb * cfg_->UeAntNum()] << " ";
+        }
+        dataprint << "\n";
+      }
+    }
+    AGORA_LOG_INFO("%s", dataprint.str());
+  }
 }
 
 bool CustomSchedule::IsUeScheduled(size_t frame_id, size_t prb_id,
                                    size_t ue_id) {
-  size_t sched_id = sched_id_array_.at(frame_id);
+  const size_t sched_id = sched_id_array_.at(frame_id);
   return (schedule_buffer_[sched_id][ue_id + cfg_->UeAntNum() * prb_id] != 0);
 }
 
 arma::uvec CustomSchedule::ScheduledUeMap(size_t frame_id, size_t prb_id) {
-  size_t sched_id = sched_id_array_.at(frame_id);
+  const size_t sched_id = sched_id_array_.at(frame_id);
   return arma::uvec(reinterpret_cast<unsigned long long*>(
                         &schedule_buffer_[sched_id][cfg_->UeAntNum() * prb_id]),
                     cfg_->UeAntNum(), false);
 }
 
 arma::uvec CustomSchedule::ScheduledUeList(size_t frame_id, size_t prb_id) {
-  size_t sched_id = sched_id_array_.at(frame_id);
+  const size_t sched_id = sched_id_array_.at(frame_id);
   return arma::uvec(
       reinterpret_cast<unsigned long long*>(
           &schedule_buffer_index_[sched_id][cfg_->UeAntNum() * prb_id]),
@@ -109,7 +126,7 @@ arma::uvec CustomSchedule::ScheduledUeList(size_t frame_id, size_t prb_id) {
 }
 
 arma::uvec CustomSchedule::SchedulePrbList(size_t frame_id, size_t ue_id) {
-  size_t sched_id = sched_id_array_.at(frame_id);
+  const size_t sched_id = sched_id_array_.at(frame_id);
   arma::Mat prb_map(schedule_buffer_[sched_id], cfg_->UeAntNum(), num_prbs_,
                     false);
   return arma::find(prb_map.row(ue_id));
@@ -128,12 +145,16 @@ void CustomSchedule::Update(size_t frame_id, const arma::cx_fmat&,
   selected_group_ = sched_id_array_.at(frame_id);
 }
 
+size_t CustomSchedule::GetGroup(size_t frame_id) {
+  return sched_id_array_.at(frame_id);
+}
+
 size_t CustomSchedule::SelectedUlMcs(size_t frame_id, size_t ue_id) {
-  size_t sched_id = sched_id_array_.at(frame_id);
+  const size_t sched_id = sched_id_array_.at(frame_id);
   return ul_mcs_buffer_[sched_id][ue_id];
 }
 
 size_t CustomSchedule::SelectedDlMcs(size_t frame_id, size_t ue_id) {
-  size_t sched_id = sched_id_array_.at(frame_id);
+  const size_t sched_id = sched_id_array_.at(frame_id);
   return dl_mcs_buffer_[sched_id][ue_id];
 }

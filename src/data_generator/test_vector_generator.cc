@@ -82,6 +82,7 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
   std::vector<uint8_t> sched_ul_mcs;
   std::vector<uint8_t> sched_dl_mcs;
   if (cfg->AdaptUes() == true) {
+    //if (cfg->SlotScheduling() == false) {
     sched_ue_map.resize(cfg->FramesToTest() * cfg->UeAntNum(), 1);
     for (size_t i = 0; i < cfg->FramesToTest(); ++i) {
       size_t max_ue_num = 0;
@@ -120,13 +121,6 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
         }
       }
     }
-    const std::string filename_sched = directory + kUeSchedulePrefix +
-                                       std::to_string(cfg->UeAntNum()) +
-                                       "ue.bin";
-    AGORA_LOG_INFO("Saving scheduled number of UEs across frames to %s\n",
-                   filename_sched.c_str());
-    Utils::WriteBinaryFile(filename_sched, sizeof(uint8_t), sched_ue_map.size(),
-                           sched_ue_map.data(), false);
     if (kPrintUeSchedule) {
       for (size_t i = 0; i < cfg->FramesToTest(); i++) {
         std::printf("Scheduled UEs at frame %zu:\n", i);
@@ -136,6 +130,56 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
         std::printf("\n");
       }
     }
+    /*} else {
+      sched_ue_map.resize(
+          cfg->FramesToTest() * cfg->UeAntNum() * cfg->NumCbPerFrame(), 1);
+      for (size_t i = 0; i < cfg->FramesToTest(); ++i) {
+        size_t max_ue_num = 0;
+        size_t ue_sched_id = 0;
+        for (size_t u = 0; u < cfg->UeAntNum(); ++u) {
+          for (size_t cb = 0; cb < cfg->NumCbPerFrame(); ++cb) {
+            uint8_t val = distribution(gen);
+            sched_ue_map[i * cfg->UeAntNum() + u] = val;
+            max_ue_num += val;  // count the schedule UE
+            ue_sched_id += static_cast<size_t>(val * std::pow(2, u));
+          }
+        }
+        sched_ul_mcs.push_back(mcs_distribution(gen));
+        sched_dl_mcs.push_back(mcs_distribution(gen));
+        // if no UE was scheduled in this frame, schedule UE 0
+        if (max_ue_num == 0) {
+          sched_ue_map[i * cfg->UeAntNum()] = 1;
+          ue_sched_id = 1;  // schedule UE 0
+        }
+        if (sched_ue_set.empty()) {
+          sched_ue_set.push_back(ue_sched_id);
+        } else {
+          // search for an existing schedule before inserting into a sorted list
+          std::vector<size_t>::iterator it;
+          for (it = sched_ue_set.begin(); it < sched_ue_set.end(); it++) {
+            if (ue_sched_id == *it) {  // dont's push this to keep vector unique
+              break;
+            } else if (ue_sched_id > *it && (it + 1) == sched_ue_set.end()) {
+              sched_ue_set.push_back(ue_sched_id);
+              break;
+            } else if (ue_sched_id < *it && it == sched_ue_set.begin()) {
+              sched_ue_set.insert(it, ue_sched_id);
+              break;
+            } else if (ue_sched_id > *it && ue_sched_id < *(it + 1)) {
+              sched_ue_set.insert(it + 1, ue_sched_id);
+              break;
+            }
+          }
+        }
+      }
+    }*/
+    const std::string filename_sched = directory + kUeSchedulePrefix +
+                                       std::to_string(cfg->UeAntNum()) +
+                                       "ue.bin";
+    AGORA_LOG_INFO("Saving scheduled number of UEs across frames to %s\n",
+                   filename_sched.c_str());
+    Utils::WriteBinaryFile(filename_sched, sizeof(uint8_t), sched_ue_map.size(),
+                           sched_ue_map.data(), false);
     const std::string filename_ul_mcs = directory + kUeSchedulePrefix +
                                         std::to_string(cfg->UeAntNum()) +
                                         "ue_ul_mcs.bin";

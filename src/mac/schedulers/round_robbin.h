@@ -22,6 +22,9 @@ class RoundRobbin : public SchedulerModel {
   arma::uvec ScheduledUeMap(size_t frame_id, size_t prb_id) final;
   size_t SelectedUlMcs(size_t frame_id, size_t ue_id) final;
   size_t SelectedDlMcs(size_t frame_id, size_t ue_id) final;
+  void Update(size_t frame_id, const arma::cx_fmat&,
+              const std::vector<float>&) final;
+  size_t GetGroup(size_t frame_id) final;
 };
 
 #endif  //ROUND_ROBBIN_H_

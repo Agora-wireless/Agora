@@ -717,14 +717,6 @@ void PhyUe::Start() {
               encode_counter_.CompleteTask(frame_id, ue_id, num_prbs);
           if (user_complete == true) {
             PrintPerSymbolDone(PrintType::kEncode, frame_id, cb_id);
-            AGORA_LOG_INFO(
-                "PhyUe [frame %zu ue %zu + %.3f ms]: Data Encode complete "
-                "for %zu/%zu prbs\n",
-                frame_id, ue_id,
-                this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX,
-                                               frame_id),
-                encode_counter_.GetTaskCount(frame_id, ue_id),
-                ul_blocks_perframe_);
             encode_counter_.CompleteTask(frame_id);
 
             size_t num_sched_ues = mac_sched_->NumScheduledUes(frame_id);

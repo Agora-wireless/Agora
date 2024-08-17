@@ -43,8 +43,6 @@ RoundRobbin::RoundRobbin(Config* const cfg) : SchedulerModel(cfg) {
       dataprint << "Group " << gp << ":\n";
       for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
         for (size_t prb = 0; prb < num_prbs_; prb++) {
-          std::printf("%zu ",
-                      schedule_buffer_[gp][ue + prb * cfg_->UeAntNum()]);
           dataprint << schedule_buffer_[gp][ue + prb * cfg_->UeAntNum()] << " ";
         }
         dataprint << "\n";
@@ -73,6 +71,13 @@ arma::uvec RoundRobbin::ScheduledUeList(size_t frame_id, size_t prb_id) {
           &schedule_buffer_index_[gp][cfg_->SpatialStreamsNum() * prb_id]),
       cfg_->SpatialStreamsNum(), false));
 }
+
+void RoundRobbin::Update(size_t frame_id, const arma::cx_fmat&,
+                         const std::vector<float>&) {
+  selected_group_ = frame_id % num_groups_;
+}
+
+size_t RoundRobbin::GetGroup(size_t frame_id) { return frame_id % num_groups_; }
 
 size_t RoundRobbin::SelectedUlMcs(size_t frame_id, size_t ue_id) {
   return ul_mcs_buffer_[frame_id % num_groups_][ue_id];
