@@ -81,7 +81,6 @@ void MacUtils::UpdateUlMacParams() {
       (frame_.NumUlDataSyms() > 0) ? (ul_ldpc_config_.NumCbLen() / 8) : 0;
   ul_num_padding_bytes_per_cb_ =
       Roundup<64>(ul_num_bytes_per_cb_) - ul_num_bytes_per_cb_;
-  // TODO: mac packet size can change based on allocated PRBs
   ul_data_bytes_num_persymbol_ =
       ul_num_bytes_per_cb_ * ul_ldpc_config_.NumBlocksInSymbol();
   ul_mac_packet_length_ = ul_data_bytes_num_persymbol_;
@@ -127,7 +126,6 @@ void MacUtils::UpdateDlMacParams() {
       (frame_.NumDlDataSyms() > 0) ? (dl_ldpc_config_.NumCbLen() / 8) : 0;
   dl_num_padding_bytes_per_cb_ =
       Roundup<64>(dl_num_bytes_per_cb_) - dl_num_bytes_per_cb_;
-  // TODO: mac packet size could change based on allocated PRBs
   dl_data_bytes_num_persymbol_ =
       dl_num_bytes_per_cb_ * dl_ldpc_config_.NumBlocksInSymbol();
   dl_mac_packet_length_ = dl_data_bytes_num_persymbol_;

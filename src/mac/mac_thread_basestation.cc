@@ -258,24 +258,26 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
             mac_sched_->Params().NumBytesPerCb(Direction::kUplink);
         size_t num_cb = cfg_->NumCbPerFrame(Direction::kUplink);
         for (size_t cb = 0; cb < num_cb; cb++) {
-          const size_t cb_offset = frame_slot * num_cb + cb;
-          phy_stats_->UpdateDecodedBits(ue_id, cb_offset, frame_slot,
-                                        num_bytes_per_cb * 8);
-          phy_stats_->IncrementDecodedBlocks(ue_id, cb_offset, frame_slot);
-          size_t block_error(0);
-          for (size_t i = 0; i < num_bytes_per_cb; i++) {
-            size_t rx_byte_idx = cb * Roundup<64>(num_bytes_per_cb) + i;
-            size_t tx_byte_idx = cb * num_bytes_per_cb + i;
-            int8_t rx_byte = src_data[rx_byte_idx];
-            int8_t tx_byte = ul_mac_bytes_[sched_id][tx_byte_idx];
-            phy_stats_->UpdateBitErrors(ue_id, cb_offset, frame_slot, tx_byte,
-                                        rx_byte);
-            if (rx_byte != tx_byte) {
-              block_error++;
+          if (mac_sched_->IsUeScheduled(frame_id, cb, ue_id)) {
+            const size_t cb_offset = frame_slot * num_cb + cb;
+            phy_stats_->UpdateDecodedBits(ue_id, cb_offset, frame_slot,
+                                          num_bytes_per_cb * 8);
+            phy_stats_->IncrementDecodedBlocks(ue_id, cb_offset, frame_slot);
+            size_t block_error(0);
+            for (size_t i = 0; i < num_bytes_per_cb; i++) {
+              size_t rx_byte_idx = cb * Roundup<64>(num_bytes_per_cb) + i;
+              size_t tx_byte_idx = cb * num_bytes_per_cb + i;
+              int8_t rx_byte = src_data[rx_byte_idx];
+              int8_t tx_byte = ul_mac_bytes_[sched_id][tx_byte_idx];
+              phy_stats_->UpdateBitErrors(ue_id, cb_offset, frame_slot, tx_byte,
+                                          rx_byte);
+              if (rx_byte != tx_byte) {
+                block_error++;
+              }
             }
+            phy_stats_->UpdateBlockErrors(ue_id, cb_offset, frame_slot,
+                                          block_error);
           }
-          phy_stats_->UpdateBlockErrors(ue_id, cb_offset, frame_slot,
-                                        block_error);
         }
       }
     }

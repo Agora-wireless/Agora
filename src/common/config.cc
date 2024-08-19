@@ -746,6 +746,10 @@ Config::Config(std::string jsonfilename)
   dl_num_cb_per_frame_ =
       (slot_scheduling_ == true ? 1 : frame_.NumDlDataSyms()) *
       mac_params_.LdpcConfig(Direction::kDownlink).NumBlocksInSymbol();
+  RtAssert(slot_scheduling_ == false || (ul_num_cb_per_frame_ < kMaxPrbs &&
+                                         dl_num_cb_per_frame_ < kMaxPrbs),
+           "Max number of CB/PRBs per frame is exceeded!");
+
   AGORA_LOG_INFO(
       "Number of SCs per CB: Ul %zu, DL %zu\nNumber of CBs per Frame: UL %zu, "
       "DL %zu\n",
@@ -1042,41 +1046,45 @@ void Config::LoadTestVectors() {
 
   size_t n_frames = 1;
   if (this->adapt_ues_) {
-    static const std::string kFilename = kExperimentFilepath +
-                                         kUeSchedulePrefix +
-                                         std::to_string(this->ue_ant_num_);
-    std::vector<uint8_t> ue_map_array(frames_to_test_ * ue_ant_num_);
-    Utils::ReadBinaryFile(kFilename + "ue.bin", sizeof(uint8_t),
-                          frames_to_test_ * ue_ant_num_, 0,
-                          ue_map_array.data());
-    std::vector<size_t> ue_sched_set;
-    for (size_t fn = 0u; fn < this->frames_to_test_; fn++) {
-      size_t ue_sched_id = 0;
-      for (size_t ue = 0; ue < this->ue_ant_num_; ue++) {
-        uint8_t sched_bit = ue_map_array.at(fn * this->ue_ant_num_ + ue);
-        ue_sched_id += static_cast<size_t>(sched_bit * std::pow(2, ue));
-      }
-      if (ue_sched_set.size() == 0) {
-        ue_sched_set.push_back(ue_sched_id);
-      } else {
-        std::vector<size_t>::iterator it;
-        for (it = ue_sched_set.begin(); it < ue_sched_set.end(); it++) {
-          if (ue_sched_id == *it) {  // dont's push this to keep vector unique
-            break;
-          } else if (ue_sched_id > *it && (it + 1) == ue_sched_set.end()) {
-            ue_sched_set.push_back(ue_sched_id);
-            break;
-          } else if (ue_sched_id < *it && it == ue_sched_set.begin()) {
-            ue_sched_set.insert(it, ue_sched_id);
-            break;
-          } else if (ue_sched_id > *it && ue_sched_id < *(it + 1)) {
-            ue_sched_set.insert(it + 1, ue_sched_id);
-            break;
+    if (this->slot_scheduling_) {
+      n_frames = frames_to_test_;
+    } else {
+      static const std::string kFilename = kExperimentFilepath +
+                                           kUeSchedulePrefix +
+                                           std::to_string(this->ue_ant_num_);
+      std::vector<uint8_t> ue_map_array(frames_to_test_ * ue_ant_num_);
+      Utils::ReadBinaryFile(kFilename + "ue.bin", sizeof(size_t),
+                            frames_to_test_ * ue_ant_num_, 0,
+                            ue_map_array.data());
+      std::vector<size_t> ue_sched_set;
+      for (size_t fn = 0u; fn < this->frames_to_test_; fn++) {
+        size_t ue_sched_id = 0;
+        for (size_t ue = 0; ue < this->ue_ant_num_; ue++) {
+          uint8_t sched_bit = ue_map_array.at(fn * this->ue_ant_num_ + ue);
+          ue_sched_id += static_cast<size_t>(sched_bit * std::pow(2, ue));
+        }
+        if (ue_sched_set.size() == 0) {
+          ue_sched_set.push_back(ue_sched_id);
+        } else {
+          std::vector<size_t>::iterator it;
+          for (it = ue_sched_set.begin(); it < ue_sched_set.end(); it++) {
+            if (ue_sched_id == *it) {  // dont's push this to keep vector unique
+              break;
+            } else if (ue_sched_id > *it && (it + 1) == ue_sched_set.end()) {
+              ue_sched_set.push_back(ue_sched_id);
+              break;
+            } else if (ue_sched_id < *it && it == ue_sched_set.begin()) {
+              ue_sched_set.insert(it, ue_sched_id);
+              break;
+            } else if (ue_sched_id > *it && ue_sched_id < *(it + 1)) {
+              ue_sched_set.insert(it + 1, ue_sched_id);
+              break;
+            }
           }
         }
       }
+      n_frames = ue_sched_set.size();
     }
-    n_frames = ue_sched_set.size();
   }
   AGORA_LOG_INFO("Loading data for %zu schedules\n", n_frames);
   // Freq-domain uplink symbols

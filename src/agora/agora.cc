@@ -334,20 +334,18 @@ void Agora::ScheduleCodeblocks(EventType event_type, Direction dir,
     event.num_tags_ = 1;
     event.event_type_ = event_type;
     size_t qid = frame_id & 0x1;
-    size_t stream_id = 0;
+    std::vector<size_t> stream_id(num_blocks, 0);
     for (size_t ue = 0; ue < config_->UeAntNum(); ue++) {
-      if (mac_sched_->IsUeScheduled(frame_id, ue)) {
-        for (size_t i = 0; i < num_blocks; i++) {
-          if (mac_sched_->IsUeScheduled(frame_id, i, ue)) {
-            auto base_tag = gen_tag_t::FrmSymUe(frame_id, i, stream_id);
-            event.tags_[0] = base_tag.tag_;
-            stats_->TryEnqueueLogStatsMaster(
-                message_->GetConq(event_type, qid),
-                message_->GetPtok(event_type, qid), event,
-                this->config_->FrameToProfile(), frame_id, symbol_idx);
-          }
+      for (size_t i = 0; i < num_blocks; i++) {
+        if (mac_sched_->IsUeScheduled(frame_id, i, ue)) {
+          auto base_tag = gen_tag_t::FrmSymUe(frame_id, i, stream_id.at(i));
+          event.tags_[0] = base_tag.tag_;
+          stats_->TryEnqueueLogStatsMaster(
+              message_->GetConq(event_type, qid),
+              message_->GetPtok(event_type, qid), event,
+              this->config_->FrameToProfile(), frame_id, symbol_idx);
+          stream_id.at(i)++;
         }
-        stream_id++;
       }
     }
   }

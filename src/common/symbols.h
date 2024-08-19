@@ -325,7 +325,7 @@ static constexpr size_t kMaxLoggingEventsMaster = 100000;
 static constexpr size_t kMaxLoggingEventsWorker = 1024;
 
 // Maximum number of PRBs per frame allowed by Agora
-static constexpr size_t kMaxPrbs = 256;
+static constexpr size_t kMaxPrbs = 64;
 
 // Maximum number of symbols per frame allowed by Agora
 static constexpr size_t kMaxSymbols = 140;

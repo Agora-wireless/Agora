@@ -70,79 +70,31 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
   // Generating an array of cfg->FramesToTest() * cfg->UeAntNum() elements
   // containing a bitmap of scheduled UEs across frames
   size_t n_sched = static_cast<size_t>(std::pow(2, cfg->UeAntNum())) - 1;
+  size_t n_cbs = cfg->NumCbPerFrame(Direction::kUplink);
   // Set seed for the random number generator
   std::random_device rd;
   std::mt19937 gen(rd());
 
   // Define the binary distribution for bitmap of scheduled UEs
   std::uniform_int_distribution<> distribution(0, 1);
-  std::vector<uint8_t> sched_ue_map;
+  std::uniform_int_distribution<size_t> prb_distribution(
+      1, static_cast<size_t>((1 << n_cbs) - 1));
+  std::vector<size_t> sched_ue_map;
   std::vector<size_t> sched_ue_set;  // a condensed and sorted set of schedules
   std::uniform_int_distribution<> mcs_distribution(10, 25);
   std::vector<uint8_t> sched_ul_mcs;
   std::vector<uint8_t> sched_dl_mcs;
   if (cfg->AdaptUes() == true) {
-    //if (cfg->SlotScheduling() == false) {
-    sched_ue_map.resize(cfg->FramesToTest() * cfg->UeAntNum(), 1);
-    for (size_t i = 0; i < cfg->FramesToTest(); ++i) {
-      size_t max_ue_num = 0;
-      size_t ue_sched_id = 0;
-      for (size_t u = 0; u < cfg->UeAntNum(); ++u) {
-        uint8_t val = distribution(gen);
-        sched_ue_map[i * cfg->UeAntNum() + u] = val;
-        max_ue_num += val;  // count the schedule UE
-        ue_sched_id += static_cast<size_t>(val * std::pow(2, u));
-      }
-      sched_ul_mcs.push_back(mcs_distribution(gen));
-      sched_dl_mcs.push_back(mcs_distribution(gen));
-      // if no UE was scheduled in this frame, schedule UE 0
-      if (max_ue_num == 0) {
-        sched_ue_map[i * cfg->UeAntNum()] = 1;
-        ue_sched_id = 1;  // schedule UE 0
-      }
-      if (sched_ue_set.empty()) {
-        sched_ue_set.push_back(ue_sched_id);
-      } else {
-        // search for an existing schedule before inserting into a sorted list
-        std::vector<size_t>::iterator it;
-        for (it = sched_ue_set.begin(); it < sched_ue_set.end(); it++) {
-          if (ue_sched_id == *it) {  // dont's push this to keep vector unique
-            break;
-          } else if (ue_sched_id > *it && (it + 1) == sched_ue_set.end()) {
-            sched_ue_set.push_back(ue_sched_id);
-            break;
-          } else if (ue_sched_id < *it && it == sched_ue_set.begin()) {
-            sched_ue_set.insert(it, ue_sched_id);
-            break;
-          } else if (ue_sched_id > *it && ue_sched_id < *(it + 1)) {
-            sched_ue_set.insert(it + 1, ue_sched_id);
-            break;
-          }
-        }
-      }
-    }
-    if (kPrintUeSchedule) {
-      for (size_t i = 0; i < cfg->FramesToTest(); i++) {
-        std::printf("Scheduled UEs at frame %zu:\n", i);
-        for (size_t u = 0; u < cfg->UeAntNum(); u++) {
-          std::printf("%u ", sched_ue_map.at(i * cfg->UeAntNum() + u));
-        }
-        std::printf("\n");
-      }
-    }
-    /*} else {
-      sched_ue_map.resize(
-          cfg->FramesToTest() * cfg->UeAntNum() * cfg->NumCbPerFrame(), 1);
+    if (cfg->SlotScheduling() == false) {
+      sched_ue_map.resize(cfg->FramesToTest() * cfg->UeAntNum(), 1);
       for (size_t i = 0; i < cfg->FramesToTest(); ++i) {
         size_t max_ue_num = 0;
         size_t ue_sched_id = 0;
         for (size_t u = 0; u < cfg->UeAntNum(); ++u) {
-          for (size_t cb = 0; cb < cfg->NumCbPerFrame(); ++cb) {
-            uint8_t val = distribution(gen);
-            sched_ue_map[i * cfg->UeAntNum() + u] = val;
-            max_ue_num += val;  // count the schedule UE
-            ue_sched_id += static_cast<size_t>(val * std::pow(2, u));
-          }
+          uint8_t val = distribution(gen);
+          sched_ue_map[i * cfg->UeAntNum() + u] = val;
+          max_ue_num += val;  // count the schedule UE
+          ue_sched_id += static_cast<size_t>(val * std::pow(2, u));
         }
         sched_ul_mcs.push_back(mcs_distribution(gen));
         sched_dl_mcs.push_back(mcs_distribution(gen));
@@ -172,13 +124,49 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
           }
         }
       }
-    }*/
+    } else {
+      size_t n_frames = cfg->FramesToTest();
+      size_t n_ues = cfg->UeAntNum();
+      sched_ue_map.resize(n_frames * n_ues, 1);
+      for (size_t i = 0; i < cfg->FramesToTest(); ++i) {
+        size_t max_ue_num = 1;
+        for (size_t u = 0; u < n_ues; ++u) {
+          if (i % n_ues == u) {
+            // making sure we always schedule something on every PRB
+            sched_ue_map[i * cfg->UeAntNum() + u] = (1 << n_cbs) - 1;
+          } else {
+            uint8_t val = distribution(gen);
+            size_t prb_map = 0;
+            if (val == 1) prb_map = prb_distribution(gen);
+            sched_ue_map[i * cfg->UeAntNum() + u] = prb_map;
+            max_ue_num += val;  // count the schedule UE
+          }
+        }
+        /*// if no UE was scheduled in this frame, schedule UE 0
+        if (max_ue_num == 0) {
+          sched_ue_map[i * cfg->UeAntNum()] = (1 << n_cbs) - 1;
+          max_ue_num = 1;  // schedule UE 0 on all PRBs
+        }*/
+        sched_ue_set.push_back(max_ue_num);
+        sched_ul_mcs.push_back(mcs_distribution(gen));
+        sched_dl_mcs.push_back(mcs_distribution(gen));
+      }
+    }
+    if (kPrintUeSchedule) {
+      for (size_t i = 0; i < cfg->FramesToTest(); i++) {
+        std::printf("Scheduled UEs at frame %zu:\n", i);
+        for (size_t u = 0; u < cfg->UeAntNum(); u++) {
+          std::printf("%zu ", sched_ue_map.at(i * cfg->UeAntNum() + u));
+        }
+        std::printf("\n");
+      }
+    }
     const std::string filename_sched = directory + kUeSchedulePrefix +
                                        std::to_string(cfg->UeAntNum()) +
                                        "ue.bin";
     AGORA_LOG_INFO("Saving scheduled number of UEs across frames to %s\n",
                    filename_sched.c_str());
-    Utils::WriteBinaryFile(filename_sched, sizeof(uint8_t), sched_ue_map.size(),
+    Utils::WriteBinaryFile(filename_sched, sizeof(size_t), sched_ue_map.size(),
                            sched_ue_map.data(), false);
     const std::string filename_ul_mcs = directory + kUeSchedulePrefix +
                                         std::to_string(cfg->UeAntNum()) +
@@ -295,35 +283,46 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
   const size_t num_ul_pilots = cfg->Frame().ClientUlPilotSymbols();
   for (size_t sched = 0; sched < sched_ue_set.size(); sched++) {
     auto sched_id = sched_ue_set.at(sched);
-    auto ue_map = Utils::Int2Bits(sched_id, cfg->UeAntNum());
-    AGORA_LOG_INFO(
-        "Frame Schedule %zu: Generating data for %zu UEs with UL MCS %zu & DL "
-        "MCS %zu\n",
-        sched, ue_map.n_elem, sched_ul_mcs.at(sched), sched_dl_mcs.at(sched));
-    if (kPrintUeSchedule) {
-      std::cout << ue_map << std::endl;
+    if (cfg->SlotScheduling() == false) {
+      auto ue_map = Utils::Int2Bits(sched_id, cfg->UeAntNum());
+      AGORA_LOG_INFO(
+          "Frame Schedule %zu: Generating data for %zu UEs with UL MCS %zu & "
+          "DL "
+          "MCS %zu\n",
+          sched, ue_map.n_elem, sched_ul_mcs.at(sched), sched_dl_mcs.at(sched));
+      if (kPrintUeSchedule) {
+        std::cout << ue_map << std::endl;
+      }
+    } else {
+      AGORA_LOG_INFO(
+          "Frame Schedule %zu: Generating data for %zu UEs with UL MCS %zu & "
+          "DL "
+          "MCS %zu\n",
+          sched, sched_id, sched_ul_mcs.at(sched), sched_dl_mcs.at(sched));
     }
     // Generate the information buffers (MAC Packets) and LDPC-encoded buffers
     if (cfg->Frame().NumULSyms() != 0) {
       if (cfg->AdaptUes()) {
         mac_params.UpdateUlMcsParams(sched_ul_mcs.at(sched));
       }
+      // do this after mac_params is updated
+      LDPCconfig ul_ldpc_config = mac_params.LdpcConfig(Direction::kUplink);
       const size_t ul_pkt_per_frame =
           mac_params.MacPacketsPerframe(Direction::kUplink);
       const size_t num_ul_max_bytes =
           mac_params.MaxPacketBytes(Direction::kUplink) * ul_pkt_per_frame;
       const size_t ul_cb_bytes = mac_params.NumBytesPerCb(Direction::kUplink);
-      LDPCconfig ul_ldpc_config = mac_params.LdpcConfig(Direction::kUplink);
+      std::vector<std::vector<int8_t>> ul_mac_info(cfg->UeAntNum());
       const size_t num_ul_mac_bytes =
           mac_params.MacBytesNumPerframe(Direction::kUplink);
-      std::vector<std::vector<int8_t>> ul_mac_info(cfg->UeAntNum());
-      AGORA_LOG_FRAME("Total number of uplink MAC bytes: %zu\n",
-                      num_ul_mac_bytes);
+      const size_t mac_packet_bytes =
+          mac_params.MacPacketLength(Direction::kUplink);
+      AGORA_LOG_FRAME("Total number of uplink MAC bytes for ue %zu: %zu\n",
+                      ue_id, num_ul_mac_bytes);
       for (size_t ue_id = 0; ue_id < cfg->UeAntNum(); ue_id++) {
         ul_mac_info.at(ue_id).resize(num_ul_mac_bytes);
         for (size_t pkt_id = 0; pkt_id < ul_pkt_per_frame; pkt_id++) {
-          size_t pkt_offset =
-              pkt_id * mac_params.MacPacketLength(Direction::kUplink);
+          size_t pkt_offset = pkt_id * mac_packet_bytes;
           auto* pkt = reinterpret_cast<MacPacketPacked*>(
               &ul_mac_info.at(ue_id).at(pkt_offset));
           pkt->Set(0, cfg->Frame().GetULSymbol(pkt_id + num_ul_pilots), ue_id,
@@ -483,8 +482,8 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
             "_ue" + std::to_string(cfg->UeAntNum()) + ".bin";
         AGORA_LOG_INFO("Saving uplink data bits (encoder input) to %s\n",
                        filename_ldpc.c_str());
-        std::vector<uint8_t> ul_padding(num_ul_max_bytes - num_ul_mac_bytes);
         for (size_t i = 0; i < cfg->UeAntNum(); i++) {
+          std::vector<uint8_t> ul_padding(num_ul_max_bytes - num_ul_mac_bytes);
           Utils::WriteBinaryFile(
               filename_ldpc, sizeof(uint8_t), num_ul_mac_bytes,
               ul_mac_info.at(i).data(),
@@ -544,7 +543,6 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
         std::to_string(cfg->BsAntNum()) + "_ueant" +
         std::to_string(cfg->UeAntNum()) + ".bin";
     AGORA_LOG_INFO("Saving uplink rx samples to %s\n", filename_rx.c_str());
-    auto ue_map_mat = arma::repmat(ue_map, cfg->BsAntNum(), 1);
     for (size_t i = 0; i < cfg->Frame().NumTotalSyms(); i++) {
       arma::cx_fmat mat_input_data(
           reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
@@ -557,8 +555,37 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
         arma::cx_fmat mat_csi(
             reinterpret_cast<arma::cx_float*>(csi_matrices[j]), cfg->BsAntNum(),
             cfg->UeAntNum(), false);
-        mat_output.row(j) =
-            (mat_input_data.row(j) % ue_map) * (mat_csi % ue_map_mat).st();
+        if (cfg->SlotScheduling() == true) {
+          if (j < cfg->OfdmDataStart() || j >= cfg->OfdmDataStop()) {
+            arma::cx_frowvec ue_map(cfg->UeAntNum(), arma::fill::zeros);
+            auto ue_map_mat = arma::repmat(ue_map, cfg->BsAntNum(), 1);
+            mat_output.row(j) =
+                (mat_input_data.row(j) % ue_map) * (mat_csi % ue_map_mat).st();
+          } else {
+            size_t prb = (j - cfg->OfdmDataStart()) /
+                         cfg->NumScPerPrb(Direction::kUplink);
+            arma::cx_frowvec ue_map(cfg->UeAntNum(), arma::fill::zeros);
+            for (size_t u = 0; u < cfg->UeAntNum(); u++) {
+              auto prb_map = Utils::Int2Bits(
+                  sched_ue_map[sched * cfg->UeAntNum() + u], n_cbs);
+              AGORA_LOG_TRACE(
+                  "Frame %zu Symbol %zu: Setting UE map for Subcarrier(data) "
+                  "%zu/%zu "
+                  "(PRB %zu/%zu) for UE %zu -> %2.2f+j*%2.2f\n",
+                  sched, i, j, (j - cfg->OfdmDataStart()), prb, n_cbs, u,
+                  prb_map.at(prb).real(), prb_map.at(prb).imag());
+              ue_map.at(u) = prb_map.at(prb);
+            }
+            auto ue_map_mat = arma::repmat(ue_map, cfg->BsAntNum(), 1);
+            mat_output.row(j) =
+                (mat_input_data.row(j) % ue_map) * (mat_csi % ue_map_mat).st();
+          }
+        } else {
+          auto ue_map = Utils::Int2Bits(sched_id, cfg->UeAntNum());
+          auto ue_map_mat = arma::repmat(ue_map, cfg->BsAntNum(), 1);
+          mat_output.row(j) =
+              (mat_input_data.row(j) % ue_map) * (mat_csi % ue_map_mat).st();
+        }
       }
       arma::cx_fmat noise_mat(size(mat_output));
       noise_mat.set_real(arma::randn<arma::fmat>(size(real(mat_output))));
@@ -841,6 +868,7 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
                                    std::to_string(cfg->BsAntNum()) + "_ueant" +
                                    std::to_string(cfg->UeAntNum()) + ".bin";
       AGORA_LOG_INFO("Saving downlink tx data to %s\n", filename_dl_tx.c_str());
+      // TODO: Add support for SlotScheduling mode
       auto sched_ues = Utils::BitOneIndices(sched_id, cfg->UeAntNum());
       for (size_t i = 0; i < cfg->Frame().NumDLSyms(); i++) {
         arma::cx_fmat mat_input_data(cfg->OfdmCaNum(), sched_ues.n_elem,

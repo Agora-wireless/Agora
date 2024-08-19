@@ -32,4 +32,6 @@ SchedulerModel::SchedulerModel(Config* const cfg) : cfg_(cfg) {}
 SchedulerModel::~SchedulerModel() {
   schedule_buffer_index_.Free();
   schedule_buffer_.Free();
+  ul_mcs_buffer_.Free();
+  dl_mcs_buffer_.Free();
 }

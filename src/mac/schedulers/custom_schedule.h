@@ -29,8 +29,8 @@ class CustomSchedule : public SchedulerModel {
   size_t GetGroup(size_t frame_id) final;
 
  private:
-  std::vector<uint8_t> ue_map_array_;
-  std::vector<uint8_t> ue_num_array_;
+  std::vector<size_t> ue_map_array_;
+  std::vector<size_t> ue_num_array_;
   std::vector<size_t> ue_sched_set_;
   std::vector<size_t> sched_id_array_;
 };
