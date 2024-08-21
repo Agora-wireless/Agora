@@ -74,9 +74,9 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
   // Second element is index of data to read
   std::vector<size_t> init_vec(2, 0);
   sched_map_array_.resize(cfg->FramesToTest(), init_vec);
-  adapt_ues_array_.resize(cfg->FramesToTest(), cfg->UeAntNum());
+  num_ues_array_.resize(cfg->FramesToTest(), 0);
   max_ue_sched_num_ = 1;
-  if (cfg->AdaptUes()) {
+  if (cfg->SchedulerType() == "custom") {
     InitUesFromFile();
   }
 
@@ -441,7 +441,7 @@ void* Sender::WorkerThread(int tid) {
               "symbol type %d, adapt ue(s) %zu\n",
               tid, tag.frame_id_, tag.symbol_id_, tag.ant_id_,
               static_cast<int>(cfg_->Frame().GetSymbolType(tag.symbol_id_)),
-              adapt_ues_array_.at(tag.frame_id_));
+              num_ues_array_.at(tag.frame_id_));
         }
 
         // Update the TX buffer
@@ -488,9 +488,8 @@ void* Sender::WorkerThread(int tid) {
               "adapt ue(s) %zu, pkt size %zu, dest port %zu, TX time: %.3f "
               "us\n",
               tid, gen_tag_t(tag).ToString().c_str(), pkt->frame_id_,
-              pkt->symbol_id_, pkt->ant_id_,
-              adapt_ues_array_.at(pkt->frame_id_), cfg_->PacketLength(),
-              dest_port,
+              pkt->symbol_id_, pkt->ant_id_, num_ues_array_.at(pkt->frame_id_),
+              cfg_->PacketLength(), dest_port,
               GetTime::CyclesToUs(GetTime::Rdtsc() - start_tsc_send,
                                   freq_ghz_));
         }
@@ -597,7 +596,7 @@ void Sender::InitUesFromFile() {
     }
     for (size_t u = 0; u < ue_map_array.size(); u++) {
       if (ue_map_array.at(u) == 1) {
-        adapt_ues_array_.at(i)++;
+        num_ues_array_.at(i)++;
         if (kPrintUeSchedule == true) {
           std::printf("%zu ", u);
         }

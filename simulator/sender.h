@@ -75,7 +75,7 @@ class Sender {
   void* WorkerThread(int tid);
 
   /**
-   * @brief Read adapting UEs across frames and populate adapt_ues_array_
+   * @brief Read UE schedules across frames and populate sched_map_array_
   */
   void InitUesFromFile();
 
@@ -138,7 +138,7 @@ class Sender {
       moodycamel::ConcurrentQueue<size_t>(1024);
   moodycamel::ProducerToken** task_ptok_;
 
-  std::vector<uint8_t> adapt_ues_array_;
+  std::vector<size_t> num_ues_array_;
   std::vector<std::vector<size_t>> sched_map_array_;
   size_t max_ue_sched_num_;
 

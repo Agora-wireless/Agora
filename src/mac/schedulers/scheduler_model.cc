@@ -27,7 +27,11 @@ std::unique_ptr<SchedulerModel> SchedulerModel::CreateSchedulerModel(
   }
 }
 
-SchedulerModel::SchedulerModel(Config* const cfg) : cfg_(cfg) {}
+SchedulerModel::SchedulerModel(Config* const cfg) : cfg_(cfg) {
+  // num_prbs are currently the same for uplink and downlink
+  num_prbs_ =
+      cfg_->MacParams().LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
+}
 
 SchedulerModel::~SchedulerModel() {
   schedule_buffer_index_.Free();

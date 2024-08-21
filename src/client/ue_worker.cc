@@ -330,7 +330,7 @@ void UeWorker::DoFftData(size_t tag) {
   auto phc = exp(arma::cx_float(0, -theta));
   float evms = 0;
   size_t sched_id = dl_data_symbol_id;
-  if (config_.AdaptUes()) {
+  if (config_.SchedulerType() == "custom") {
     mac_sched_.UpdateScheduler(frame_id);
     sched_id += mac_sched_.SelectedGroup() * config_.Frame().NumDlDataSyms();
   }

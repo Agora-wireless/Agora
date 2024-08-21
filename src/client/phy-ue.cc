@@ -390,8 +390,9 @@ void PhyUe::Start() {
                                                  frame_id, frame_id - 1),
                   rx_counters_.num_pkts_.at(prev_frame_slot));
             }
-            if (config_->AdaptUes()) {
+            if (config_->SchedulerType() == "custom") {
               // Update MCS parameters for this frame (should be done once per frame)
+              // TODO: not limited to custom scheduler, but anything changing MCS
               mac_sched_->UpdateMcsParams(frame_id);
             }
           }

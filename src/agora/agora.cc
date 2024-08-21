@@ -19,7 +19,6 @@
 #include "packet_txrx_sim.h"
 #include "signal_handler.h"
 
-static const bool kPrintAdaptUes = false;
 static const bool kDebugDeferral = true;
 
 static const std::string kProjectDirectory = TOSTRING(PROJECT_DIRECTORY);

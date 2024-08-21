@@ -7,9 +7,6 @@ static constexpr bool kPrintUeSchedule = false;
 RoundRobbin::RoundRobbin(Config* const cfg) : SchedulerModel(cfg) {
   num_groups_ =
       (cfg_->SpatialStreamsNum() == cfg_->UeAntNum()) ? 1 : cfg_->UeAntNum();
-  // num_prbs are currently the same for uplink and downlink
-  num_prbs_ =
-      cfg_->MacParams().LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
   schedule_buffer_.Calloc(num_groups_, cfg_->UeAntNum() * num_prbs_,
                           Agora_memory::Alignment_t::kAlign64);
   schedule_buffer_index_.Calloc(num_groups_,

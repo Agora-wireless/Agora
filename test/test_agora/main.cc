@@ -234,7 +234,7 @@ int main(int argc, char* argv[]) {
     size_t num_bytes_per_ue =
         cfg->MacParams().MacBytesNumPerframe(Direction::kUplink);
     size_t offset = 0;
-    if (cfg->AdaptUes()) {
+    if (cfg->SchedulerType() == "custom") {
       sched_set_id = mac_sched->UeScheduleIndex(Utils::BitIndices2Int(ue_list));
       mac_sched->UpdateMcsParams(cfg->FramesToTest() - 1);
       const size_t ul_pkt_per_frame =

@@ -125,7 +125,7 @@ PhyStats::~PhyStats() {
 void PhyStats::LoadGroundTruthIq() {
   if (num_rxdata_symbols_ > 0) {
     size_t n_frames = 1;
-    if (config_->AdaptUes()) {
+    if (config_->SchedulerType() == "custom") {
       n_frames = mac_sched_->NumGroups();
     }
     gt_cube_ =
@@ -582,7 +582,7 @@ void PhyStats::UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t sc_id,
                          const arma::cx_fvec& eq_vec,
                          const arma::uvec& ue_list) {
   size_t sched_id = data_symbol_id;
-  if (config_->AdaptUes()) {
+  if (config_->SchedulerType() == "custom") {
     mac_sched_->UpdateScheduler(frame_id);
     sched_id += mac_sched_->SelectedGroup() * num_rxdata_symbols_;
   }
@@ -603,7 +603,7 @@ void PhyStats::UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t sc_id,
 void PhyStats::UpdateEvm(size_t frame_id, size_t data_symbol_id, size_t sc_id,
                          size_t tx_ue_id, size_t rx_ue_id, arma::cx_float eq) {
   size_t sched_id = data_symbol_id;
-  if (config_->AdaptUes()) {
+  if (config_->SchedulerType() == "custom") {
     mac_sched_->UpdateScheduler(frame_id);
     sched_id += mac_sched_->SelectedGroup() * num_rxdata_symbols_;
   }

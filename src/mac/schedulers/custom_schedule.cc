@@ -7,9 +7,6 @@
 static constexpr bool kPrintUeSchedule = false;
 
 CustomSchedule::CustomSchedule(Config* const cfg) : SchedulerModel(cfg) {
-  // num_prbs are currently the same for uplink and downlink
-  num_prbs_ =
-      cfg_->MacParams().LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
   size_t n_items = cfg->FramesToTest() * cfg_->UeAntNum();
   ue_map_array_.resize(n_items);
   const std::string directory =

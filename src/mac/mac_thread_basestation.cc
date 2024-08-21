@@ -78,7 +78,7 @@ MacThreadBaseStation::MacThreadBaseStation(
                                   udp_pkt_len * kMaxUEs * kMaxPktsPerUE, 0);
   } else {
     size_t sched_size = 1;
-    if (cfg->AdaptUes() == true) {
+    if (cfg->SchedulerType() == "custom") {
       sched_size = mac_sched_->NumGroups();
     }
     num_dl_mac_bytes_ =
@@ -227,7 +227,8 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
   if (kEnableMac == false) {
     if (kPrintPhyStats == true) {
       size_t sched_id = ue_id;
-      if (cfg_->AdaptUes()) {
+      if (cfg_->SchedulerType() == "custom") {
+        // TODO: Is this only for custom scheduler?
         mac_sched_->UpdateScheduler(frame_id);
         sched_id = mac_sched_->SelectedGroup() * cfg_->UeAntNum() + ue_id;
       }
@@ -619,7 +620,7 @@ void MacThreadBaseStation::SendCodeblocksToPhy(EventData event) {
       }
     } else {
       size_t sched_id = ue_id;
-      if (cfg_->AdaptUes()) {
+      if (cfg_->SchedulerType() == "custom") {
         mac_sched_->UpdateScheduler(frame_id);
         sched_id = mac_sched_->SelectedGroup() * cfg_->UeAntNum() + ue_id;
       }

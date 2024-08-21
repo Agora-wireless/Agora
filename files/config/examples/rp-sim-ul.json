@@ -4,7 +4,7 @@
     "demul_block_size": 40,
     "bs_radio_num": 8,
     "ue_radio_num": 8,
-    "adapt_ues": true,
+    "scheduler_type": "custom",
     "ul_mcs" : {
       "mcs_index" : 17 /* 64QAM, 466/1024 from Table 6.1.4.1-1 of 3GPP TS 38.214 */
     },

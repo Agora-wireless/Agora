@@ -187,7 +187,6 @@ Config::Config(std::string jsonfilename)
   num_ue_channels_ = std::min(ue_channel_.size(), kMaxChannels);
   bs_ant_num_ = num_channels_ * num_radios_;
   ue_ant_num_ = ue_num_ * num_ue_channels_;
-  adapt_ues_ = tdd_conf.value("adapt_ues", false);
 
   bf_ant_num_ = bs_ant_num_;
   for (size_t i = 0; i < num_cells_; i++) {
@@ -757,8 +756,7 @@ Config::Config(std::string jsonfilename)
       dl_num_cb_per_frame_);
 
   freq_domain_channel_ = tdd_conf.value("freq_domain_channel", false);
-  scheduler_type_ =
-      tdd_conf.value("scheduler_type", adapt_ues_ ? "custom" : "round_robbin");
+  scheduler_type_ = tdd_conf.value("scheduler_type", "round_robbin");
 
   samps_per_symbol_ =
       ofdm_tx_zero_prefix_ + ofdm_ca_num_ + cp_len_ + ofdm_tx_zero_postfix_;
@@ -1045,7 +1043,7 @@ void Config::LoadTestVectors() {
   this->GenPilots();
 
   size_t n_frames = 1;
-  if (this->adapt_ues_) {
+  if (this->scheduler_type_ == "custom") {
     if (this->slot_scheduling_) {
       n_frames = frames_to_test_;
     } else {

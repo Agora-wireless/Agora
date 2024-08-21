@@ -43,7 +43,6 @@ class Config {
   inline size_t BfAntNum() const { return this->bf_ant_num_; }
   inline size_t UeNum() const { return this->ue_num_; }
   inline size_t UeAntNum() const { return this->ue_ant_num_; }
-  inline bool AdaptUes() const { return this->adapt_ues_; }
   inline size_t UeAntOffset() const { return this->ue_ant_offset_; }
   inline size_t UeAntTotal() const { return this->ue_ant_total_; }
 
@@ -679,9 +678,6 @@ class Config {
   size_t ue_num_;
   // The count of ue antennas an instance is responsable for
   size_t ue_ant_num_;
-  // Feature to adapt the number of ues from 1 to ue_ant_num_
-  // across frames_to_test_ frames
-  bool adapt_ues_;
 
   // Total number of us antennas in this experiment including the ones
   // instantiated on other runs/machines.

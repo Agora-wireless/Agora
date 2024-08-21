@@ -92,7 +92,8 @@ MacThreadClient::MacThreadClient(
     next_tx_frame_id_ = 0;
   } else {
     size_t sched_size = 1;
-    if (cfg->AdaptUes() == true) {
+    if (cfg->SchedulerType() == "custom") {
+      // TODO: Is this only for Custom scheduler
       sched_size = mac_sched_->NumGroups();
     }
     num_dl_mac_bytes_ =
@@ -220,7 +221,8 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
                                       dest_packet_size * 8);
         phy_stats_->IncrementDecodedBlocks(ue_id, symbol_offset, frame_slot);
         size_t sched_id = ue_id;
-        if (cfg_->AdaptUes()) {
+        if (cfg_->SchedulerType() == "custom") {
+          // TODO: Is this only for custom scheduler
           mac_sched_->UpdateScheduler(frame_id);
           sched_id += mac_sched_->SelectedGroup() * cfg_->UeAntNum();
         }
@@ -614,7 +616,7 @@ void MacThreadClient::SendCodeblocksToPhy(EventData event) {
       }
     } else {
       size_t sched_id = ue_id;
-      if (cfg_->AdaptUes()) {
+      if (cfg_->SchedulerType() == "custom") {
         // we are using custom scheduler here
         mac_sched_->UpdateScheduler(frame_id);
         sched_id = mac_sched_->SelectedGroup() * cfg_->UeAntNum() + ue_id;
