@@ -79,6 +79,7 @@ class Utils {
   static size_t Bits2Int(arma::uvec in);
   static size_t BitIndices2Int(arma::uvec in);
   static arma::cx_frowvec Int2Bits(size_t in, size_t num_bits);
+  static arma::uvec Int2BitVector(size_t in, size_t num_bits);
   static arma::uvec BitOneIndices(size_t in, size_t num_bits);
 
   static std::vector<std::vector<size_t>> LoadSymbols(

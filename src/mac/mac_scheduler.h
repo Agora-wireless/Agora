@@ -17,7 +17,7 @@
 
 class MacScheduler {
  public:
-  explicit MacScheduler(Config* const cfg);
+  explicit MacScheduler(Config* const cfg, bool client = false);
   ~MacScheduler();
 
   bool IsUeScheduled(size_t frame_id, size_t ue_id);

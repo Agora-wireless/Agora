@@ -357,6 +357,17 @@ arma::cx_frowvec Utils::Int2Bits(size_t in, size_t num_bits) {
   return out;
 }
 
+arma::uvec Utils::Int2BitVector(size_t in, size_t num_bits) {
+  arma::uvec out(num_bits, arma::fill::zeros);
+  for (size_t i = 0; i < num_bits; i++) {
+    if ((in & 1) != 0u) {
+      out(i) = 1;
+    }
+    in >>= 1;
+  }
+  return out;
+}
+
 arma::uvec Utils::BitOneIndices(size_t in, size_t num_bits) {
   arma::uvec out;
   for (size_t i = 0; i < num_bits; i++) {

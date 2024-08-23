@@ -10,9 +10,10 @@
 
 static constexpr size_t kCsiSubcarrierIdx = 0;
 
-MacScheduler::MacScheduler(Config* const cfg)
+MacScheduler::MacScheduler(Config* const cfg, bool client)
     : cfg_(cfg), params_(cfg->MacParams()) {
-  scheduler_model_ = std::move(SchedulerModel::CreateSchedulerModel(cfg_));
+  scheduler_model_ =
+      std::move(SchedulerModel::CreateSchedulerModel(cfg_, client));
 }
 
 MacScheduler::~MacScheduler() {}

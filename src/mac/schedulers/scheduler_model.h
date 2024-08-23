@@ -22,6 +22,11 @@ class SchedulerModel {
                       [[maybe_unused]] const arma::cx_fmat& csi,
                       [[maybe_unused]] const std::vector<float>& snr_per_ue) {}
 
+  virtual void Update([[maybe_unused]] size_t frame_id,
+                      [[maybe_unused]] const std::vector<size_t> prb_map,
+                      [[maybe_unused]] const std::vector<size_t> ul_mcs,
+                      [[maybe_unused]] const std::vector<size_t> dl_mcs) {}
+
   virtual bool IsUeScheduled([[maybe_unused]] size_t frame_id,
                              [[maybe_unused]] size_t prb_id,
                              [[maybe_unused]] size_t ue_id) {
@@ -67,8 +72,8 @@ class SchedulerModel {
   virtual size_t SelectedUlMcs(size_t frame_id, size_t ue_id) { return 0; }
   virtual size_t SelectedDlMcs(size_t frame_id, size_t ue_id) { return 0; }
 
-  static std::unique_ptr<SchedulerModel> CreateSchedulerModel(
-      Config* const cfg);
+  static std::unique_ptr<SchedulerModel> CreateSchedulerModel(Config* const cfg,
+                                                              bool client);
 
   inline size_t SelectedGroup() const { return selected_group_; }
   inline size_t NumGroups() const { return num_groups_; }
