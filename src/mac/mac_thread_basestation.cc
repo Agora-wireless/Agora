@@ -65,18 +65,21 @@ MacThreadBaseStation::MacThreadBaseStation(
     udp_pkt_buf_.resize(udp_pkt_len + kUdpRxBufferPadding);
   }
 
-  if (kEnableMac == true) {
-    // TODO: See if it makes more sense to split up the UE's by port here for
-    // client mode.
-    size_t udp_server_port = cfg_->BsMacRxPort();
-    AGORA_LOG_INFO(
-        "MacThreadBaseStation: setting up udp server for mac data at port "
-        "%zu\n",
-        udp_server_port);
-    udp_comm_ =
-        std::make_unique<UDPComm>(cfg_->BsServerAddr(), udp_server_port,
-                                  udp_pkt_len * kMaxUEs * kMaxPktsPerUE, 0);
-  } else {
+  // TODO: See if it makes more sense to split up the UE's by port here for
+  // client mode.
+  size_t udp_server_port = cfg_->BsMacRxPort();
+  AGORA_LOG_INFO(
+      "MacThreadBaseStation: setting up udp server for mac data at port "
+      "%zu\n",
+      udp_server_port);
+  udp_comm_ =
+      std::make_unique<UDPComm>(cfg_->BsServerAddr(), udp_server_port,
+                                udp_pkt_len * kMaxUEs * kMaxPktsPerUE, 0);
+  for (size_t u = 0; u < cfg_->UeAntNum(); u++) {
+    this->SendControlInformation(0u, u);
+  }
+
+  if (kEnableMac == false) {
     size_t sched_size = 1;
     if (cfg->SchedulerType() == "custom") {
       sched_size = mac_sched_->NumGroups();
@@ -133,7 +136,6 @@ MacThreadBaseStation::MacThreadBaseStation(
         seek_offset += num_ul_max_bytes * sizeof(int8_t);
       }
     }
-    next_radio_id_ = 0;
   }
   crc_obj_ = std::make_unique<DoCRC>();
 }
@@ -198,6 +200,33 @@ void MacThreadBaseStation::SendRanConfigUpdate(EventData /*event*/) {
            "MAC thread: failed to send RAN update to Agora");
 
   scheduler_next_frame_id_++;
+}
+
+void MacThreadBaseStation::SendControlInformation(size_t frame_id,
+                                                  size_t ue_id) {
+  if (cfg_->SchedulerType() != "round_robbin") {
+    // calculate the schedule for frame_id
+    mac_sched_->UpdateScheduler(scheduler_next_frame_id_);
+    // send RAN control information UE
+    RBIndicator ri;
+    ri.current_frame_ = frame_id;
+    ri.frame_id_ = scheduler_next_frame_id_;
+    ri.ue_id_ = ue_id;
+    ri.prb_map_ = Utils::Bits2Int(
+        mac_sched_->ScheduledPrbMap(scheduler_next_frame_id_, ue_id));
+    ri.ul_mcs_index_ = mac_sched_->Params().McsIndex(Direction::kUplink);
+    ri.dl_mcs_index_ = mac_sched_->Params().McsIndex(Direction::kDownlink);
+    next_radio_id_++;
+    if (next_radio_id_ == cfg_->UeAntNum()) {
+      scheduler_next_frame_id_++;
+      next_radio_id_ = 0;
+    }
+    udp_comm_->Send(cfg_->UeServerAddr(), kMacBaseClientPort + ri.ue_id_,
+                    reinterpret_cast<std::byte*>(&ri), sizeof(RBIndicator));
+
+    // update RAN config within Agora
+    //SendRanConfigUpdate(EventData(EventType::kRANUpdate));
+  }
 }
 
 void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
@@ -411,18 +440,6 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
       "Socket message enqueue failed\n");
 }
 
-void MacThreadBaseStation::SendControlInformation() {
-  // send RAN control information UE
-  RBIndicator ri;
-  ri.ue_id_ = next_radio_id_;
-  ri.mcs_index_ = mac_sched_->Params().McsIndex(Direction::kUplink);
-  udp_comm_->Send(cfg_->UeServerAddr(), kMacBaseClientPort + ri.ue_id_,
-                  reinterpret_cast<std::byte*>(&ri), sizeof(RBIndicator));
-
-  // update RAN config within Agora
-  SendRanConfigUpdate(EventData(EventType::kRANUpdate));
-}
-
 void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
   const size_t max_data_bytes_per_frame =
       mac_sched_->Params().MacDataBytesNumPerframe(Direction::kDownlink);
@@ -555,7 +572,7 @@ void MacThreadBaseStation::SendCodeblocksToPhy(EventData event) {
     return;
   }
 
-  next_radio_id_ = ue_id;
+  SendControlInformation(frame_id, ue_id);
 
 #if defined(ENABLE_RB_IND)
   RBIndicator ri;
@@ -621,7 +638,6 @@ void MacThreadBaseStation::SendCodeblocksToPhy(EventData event) {
     } else {
       size_t sched_id = ue_id;
       if (cfg_->SchedulerType() == "custom") {
-        mac_sched_->UpdateScheduler(frame_id);
         sched_id = mac_sched_->SelectedGroup() * cfg_->UeAntNum() + ue_id;
       }
       std::memmove(&(*client_.dl_bits_buffer_)[ue_id][dest_pkt_offset],
@@ -654,12 +670,12 @@ void MacThreadBaseStation::RunEventLoop() {
       ProcessUdpPacketsFromApps();
     }
     ProcessRxFromPhy();
-    if constexpr (kEnableMac) {
+    /*if constexpr (kEnableMac) {
       if ((GetTime::Rdtsc() - last_frame_tx_tsc) > tsc_delta_) {
         SendControlInformation();
         last_frame_tx_tsc = GetTime::Rdtsc();
       }
-    }
+    }*/
   }
 }
 

@@ -41,7 +41,7 @@ static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
 #endif
 
 PhyUe::PhyUe(Config* config)
-    : mac_sched_(std::make_unique<MacScheduler>(config)),
+    : mac_sched_(std::make_unique<MacScheduler>(config, true)),
       stats_(std::make_unique<Stats>(config)),
       demod_buffer_(kFrameWnd, config->Frame().NumDlDataSyms(),
                     config->UeAntNum(),

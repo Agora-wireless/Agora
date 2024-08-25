@@ -29,8 +29,14 @@ class RanConfig {
  */
 class RBIndicator {
  public:
-  size_t ue_id_;      /// UE ID
-  size_t mcs_index_;  /// MCS Index
+  uint32_t current_frame_;   /// current frame index at the BS
+  uint32_t frame_id_;        /// frame_id for the indicated schedule
+  uint8_t total_sched_ues_;  /// total number of scheduled UEs in frame_id
+  uint8_t ul_mcs_index_;     /// MCS Index
+  uint8_t dl_mcs_index_;     /// MCS Index
+  uint8_t ue_id_;            /// UE ID
+  size_t prb_map_;  /// resource block (or ofdm symbol) map - 0:rb_num-1
+  uint32_t rsvd_;
 };
 
 #endif  // RAN_CONFIG_H_

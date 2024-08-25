@@ -14,21 +14,23 @@
 ///Factory function
 std::unique_ptr<SchedulerModel> SchedulerModel::CreateSchedulerModel(
     Config* const cfg, bool client) {
-  if (client == true) {
-    std::string scheduler_type = cfg->SchedulerType();
-    if (scheduler_type == "round_robbin") {
-      return std::make_unique<RoundRobbin>(cfg);
-    } else if (scheduler_type == "proportional_fairness") {
-      return std::make_unique<ProportionalFairness>(cfg);
-    } else if (scheduler_type == "custom") {
-      return std::make_unique<CustomSchedule>(cfg);
+  std::string scheduler_type = cfg->SchedulerType();
+  if (scheduler_type == "round_robbin") {
+    return std::make_unique<RoundRobbin>(cfg);
+  } else {  // all the dynamic schedulers
+    if (client == true) {
+      return std::make_unique<UeScheduler>(cfg);
     } else {
-      AGORA_LOG_WARN("Invalid scheduler type (%s), using Round Robbin... \n",
-                     scheduler_type.c_str());
-      return std::make_unique<RoundRobbin>(cfg);
+      if (scheduler_type == "proportional_fairness") {
+        return std::make_unique<ProportionalFairness>(cfg);
+      } else if (scheduler_type == "custom") {
+        return std::make_unique<CustomSchedule>(cfg);
+      } else {
+        AGORA_LOG_WARN("Invalid scheduler type (%s), using Round Robbin... \n",
+                       scheduler_type.c_str());
+        return std::make_unique<RoundRobbin>(cfg);
+      }
     }
-  } else {
-    return std::make_unique<UeScheduler>(cfg);
   }
 }
 

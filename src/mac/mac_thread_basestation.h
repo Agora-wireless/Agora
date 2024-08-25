@@ -74,7 +74,7 @@ class MacThreadBaseStation {
 
   // Send control information over (out-of-band) control channel
   // from server to client
-  void SendControlInformation();
+  void SendControlInformation(size_t frame_id, size_t ue_id);
 
   // Receive user data bits (downlink bits at the MAC thread running at the
   // server, uplink bits at the MAC thread running at the client) and

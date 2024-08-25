@@ -77,31 +77,33 @@ void UeScheduler::Update(size_t frame_id, const std::vector<size_t> prb_ue_map,
                     prb_ue_map.size(), num_prbs_);
     return;
   }
-  if (ul_mcs.size() == cfg_->UeAntNum() && dl_mcs.size() == cfg_->UeAntNum()) {
+  /*if (ul_mcs.size() == cfg_->UeAntNum() && dl_mcs.size() == cfg_->UeAntNum()) {
     AGORA_LOG_ERROR(
         "UeScheduler Update: Invalid MCS vector size UL: %zu, DL %zu, expected "
         "%zu\n",
         ul_mcs.size(), dl_mcs.size(), cfg_->UeAntNum());
     return;
-  }
+  }*/
   const size_t gp = frame_id % num_groups_;
+  arma::umat sched_mat(num_prbs_, cfg_->UeAntNum(), arma::fill::zeros);
+  for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
+    auto ue_map = Utils::Int2BitVector(prb_ue_map.at(ue), num_prbs_);
+    sched_mat.col(ue) = ue_map;
+  }
   for (size_t prb = 0; prb < num_prbs_; prb++) {
-    auto ue_list = Utils::BitOneIndices(prb_ue_map.at(prb), cfg_->UeAntNum());
-    auto ue_map = Utils::Int2BitVector(prb_ue_map.at(prb), cfg_->UeAntNum());
-    ue_num_array_.at(gp * num_prbs_ + prb) = ue_list.size();
-    for (size_t ue = 0; ue < ue_map.size(); ue++) {
-      schedule_buffer_[gp][ue + cfg_->UeAntNum() * prb] = ue_map.at(ue);
-      if (ue < ue_list.size()) {
-        schedule_buffer_index_[gp][ue + cfg_->UeAntNum() * prb] = ue_map.at(ue);
-      } else {
-        schedule_buffer_index_[gp][ue + cfg_->UeAntNum() * prb] = 0;
+    size_t cnt = 0;
+    for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
+      schedule_buffer_[gp][ue + cfg_->UeAntNum() * prb] = sched_mat.at(prb, ue);
+      if (sched_mat.at(prb, ue) == 1) {
+        schedule_buffer_index_[gp][cnt++ + cfg_->UeAntNum() * prb] = ue;
       }
     }
+    ue_num_array_.at(gp * num_prbs_ + prb) = cnt;
   }
-  for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
+  /*for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
     ul_mcs_buffer_[gp][ue] = ul_mcs.at(ue);
     dl_mcs_buffer_[gp][ue] = dl_mcs.at(ue);
-  }
+  }*/
   mtx.unlock();
 }
 

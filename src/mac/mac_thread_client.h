@@ -169,6 +169,10 @@ class MacThreadClient {
   // CRC
   std::unique_ptr<DoCRC> crc_obj_;
 
+  size_t num_prbs_;
+  std::array<size_t, kFrameWnd> rx_sched_status_;
+  std::array<std::vector<size_t>, kFrameWnd> rx_sched_;
+
   RBIndicator* ri_;
   MacMultiRingBuffer mac_ring_;
 };

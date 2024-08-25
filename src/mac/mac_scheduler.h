@@ -38,6 +38,8 @@ class MacScheduler {
   void UpdateCSI(size_t cur_sc_id, const arma::cx_fmat& csi_in);
   void UpdateSNR(std::vector<float> snr_per_ue);
   void UpdateScheduler(size_t frame_id);
+  void UpdateScheduler(size_t frame_id, std::vector<size_t> prb_map,
+                       std::vector<size_t> ul_mcs, std::vector<size_t> dl_mcs);
 
   void UpdateMcsParams(size_t frame_id);
   inline MacUtils& Params() { return this->params_; }

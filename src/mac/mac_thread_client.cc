@@ -77,6 +77,9 @@ MacThreadClient::MacThreadClient(
   }
 
   crc_obj_ = std::make_unique<DoCRC>();
+  for (size_t i = 0; i < kFrameWnd; i++) {
+    rx_sched_.at(i).resize(cfg_->UeAntNum(), 0);
+  }
 
   if (kEnableMac == true) {
     // TODO: See if it makes more sense to split up the UE's by port here for
@@ -392,6 +395,21 @@ void MacThreadClient::ProcessControlInformation() {
 
   RtAssert(static_cast<size_t>(ret) == sizeof(RBIndicator));
   ri_ = reinterpret_cast<RBIndicator*>(&udp_control_buf_[0]);
+  RtAssert(ri_->frame_id_ == scheduler_next_frame_id_, "Invalid frame_id");
+  AGORA_LOG_INFO(
+      "Received schedule at current frame %zu for frame %zu and UE %zu\n",
+      ri_->frame_id_, ri_->current_frame_, ri_->ue_id_);
+  size_t frm_idx = ri_->frame_id_ % kFrameWnd;
+  rx_sched_.at(frm_idx).at(ri_->ue_id_) = ri_->prb_map_;
+  // TODO: populate the mcs vectors
+  std::vector<size_t> ul_mcs, dl_mcs;
+  if (++rx_sched_status_.at(frm_idx) == cfg_->UeAntNum()) {
+    // update the scheduler
+    mac_sched_->UpdateScheduler(ri_->frame_id_, rx_sched_.at(frm_idx), ul_mcs,
+                                dl_mcs);
+    rx_sched_status_.at(frm_idx) = 0;
+    scheduler_next_frame_id_++;
+  }
 }
 
 void MacThreadClient::ProcessUdpPacketsFromApps() {
@@ -542,6 +560,7 @@ void MacThreadClient::SendCodeblocksToPhy(EventData event) {
   const size_t num_pilot_symbols = cfg_->Frame().ClientUlPilotSymbols();
 
   next_radio_id_ = ue_id;
+  ProcessControlInformation();
 
   // We've received bits for the uplink.
   size_t radio_buf_id = frame_id % kFrameWnd;
