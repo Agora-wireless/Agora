@@ -13,7 +13,6 @@
 #include "logger.h"
 #include "message.h"
 
-static constexpr bool kEnableSlowStart = true;
 static constexpr size_t kSocketRxBufferSize = (1024 * 1024 * 64 * 8) - 1;
 
 TxRxWorkerClientSim::TxRxWorkerClientSim(
@@ -94,7 +93,7 @@ void TxRxWorkerClientSim::DoTxRx() {
         thread_local_interface = 0;
       }
     }  // end if -1 == send_result
-  }  // end while
+  }    // end while
   running_ = false;
 }
 

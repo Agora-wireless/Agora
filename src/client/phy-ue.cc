@@ -777,9 +777,10 @@ void PhyUe::Start() {
                 ScheduleWork(do_ifft_task);
               }
 
-              const bool mod_complete =
-                  modulation_counters_.CompleteTask(frame_id);
-              if (mod_complete == true) {
+              modulation_counters_.CompleteTask(frame_id);
+              size_t num_sched_ues = mac_sched_->NumScheduledUes(frame_id);
+              if (modulation_counters_.GetTaskCount(frame_id) ==
+                  num_sched_ues) {
                 stats_->MasterSetTsc(TsType::kModulDone, frame_id);
                 PrintPerFrameDone(PrintType::kModul, frame_id);
                 modulation_counters_.Reset(frame_id);

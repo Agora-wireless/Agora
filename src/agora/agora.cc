@@ -113,13 +113,11 @@ void Agora::Stop() {
 }
 
 void Agora::ScheduleDownlinkMAC(size_t frame_id) {
-  if (config_->Frame().NumDLSyms() > 0) {
-    auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
-    for (const auto& ue : ue_list) {
-      auto base_tag = gen_tag_t::FrmUe(frame_id, ue);
-      EventData mac_event(EventType::kPacketFromMac, base_tag.tag_);
-      TryEnqueueFallback(&mac_request_queue_, mac_event);
-    }
+  // We send this for all UEs to handle control messages in the MAC
+  for (size_t ue = 0; ue < config_->UeAntNum(); ue++) {
+    auto base_tag = gen_tag_t::FrmUe(frame_id, ue);
+    EventData mac_event(EventType::kPacketFromMac, base_tag.tag_);
+    TryEnqueueFallback(&mac_request_queue_, mac_event);
   }
 }
 

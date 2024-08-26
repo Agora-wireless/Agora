@@ -206,26 +206,34 @@ void MacThreadBaseStation::SendControlInformation(size_t frame_id,
                                                   size_t ue_id) {
   if (cfg_->SchedulerType() != "round_robbin") {
     // calculate the schedule for frame_id
-    mac_sched_->UpdateScheduler(scheduler_next_frame_id_);
+    //mac_sched_->UpdateScheduler(scheduler_next_frame_id_);
+    // We may have to run this once per frame
+    mac_sched_->UpdateScheduler(frame_id);
     // send RAN control information UE
-    RBIndicator ri;
-    ri.current_frame_ = frame_id;
-    ri.frame_id_ = scheduler_next_frame_id_;
-    ri.ue_id_ = ue_id;
-    ri.prb_map_ = Utils::Bits2Int(
-        mac_sched_->ScheduledPrbMap(scheduler_next_frame_id_, ue_id));
-    ri.ul_mcs_index_ = mac_sched_->Params().McsIndex(Direction::kUplink);
-    ri.dl_mcs_index_ = mac_sched_->Params().McsIndex(Direction::kDownlink);
-    next_radio_id_++;
-    if (next_radio_id_ == cfg_->UeAntNum()) {
-      scheduler_next_frame_id_++;
-      next_radio_id_ = 0;
-    }
-    udp_comm_->Send(cfg_->UeServerAddr(), kMacBaseClientPort + ri.ue_id_,
-                    reinterpret_cast<std::byte*>(&ri), sizeof(RBIndicator));
+    if (scheduler_next_frame_id_ < cfg_->FramesToTest()) {
+      RBIndicator ri;
+      ri.current_frame_ = frame_id;
+      ri.frame_id_ = scheduler_next_frame_id_;
+      ri.ue_id_ = ue_id;
+      ri.prb_map_ = Utils::Bits2Int(
+          mac_sched_->ScheduledPrbMap(scheduler_next_frame_id_, ue_id));
+      ri.ul_mcs_index_ =
+          mac_sched_->SelectedUlMcs(scheduler_next_frame_id_, ue_id);
+      ri.dl_mcs_index_ =
+          mac_sched_->SelectedDlMcs(scheduler_next_frame_id_, ue_id);
+      AGORA_LOG_INFO("Sending scheduling message for frame %zu, ue %zu\n",
+                     scheduler_next_frame_id_, next_radio_id_);
+      udp_comm_->Send(cfg_->UeServerAddr(), kMacBaseClientPort,
+                      reinterpret_cast<std::byte*>(&ri), sizeof(RBIndicator));
+      next_radio_id_++;
+      if (next_radio_id_ == cfg_->UeAntNum()) {
+        scheduler_next_frame_id_++;
+        next_radio_id_ = 0;
+      }
 
-    // update RAN config within Agora
-    //SendRanConfigUpdate(EventData(EventType::kRANUpdate));
+      // update RAN config within Agora
+      //SendRanConfigUpdate(EventData(EventType::kRANUpdate));
+    }
   }
 }
 
@@ -256,9 +264,9 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
   if (kEnableMac == false) {
     if (kPrintPhyStats == true) {
       size_t sched_id = ue_id;
-      if (cfg_->SchedulerType() == "custom") {
+      if (cfg_->SchedulerType() != "round_robbin") {
         // TODO: Is this only for custom scheduler?
-        mac_sched_->UpdateScheduler(frame_id);
+        //mac_sched_->UpdateScheduler(frame_id);
         sched_id = mac_sched_->SelectedGroup() * cfg_->UeAntNum() + ue_id;
       }
       if (cfg_->SlotScheduling() == false) {
@@ -568,11 +576,13 @@ void MacThreadBaseStation::SendCodeblocksToPhy(EventData event) {
   const size_t num_mac_packets_per_frame =
       mac_sched_->Params().MacPacketsPerframe(Direction::kDownlink);
   const size_t num_pilot_symbols = cfg_->Frame().ClientDlPilotSymbols();
-  if (0 == mac_payload_length) {
+  // This function is run for all UEs in every frame
+  // when the first pilots are received
+  SendControlInformation(frame_id, ue_id);
+  if (0 == mac_packet_length ||
+      mac_sched_->IsUeScheduled(frame_id, ue_id) == false) {
     return;
   }
-
-  SendControlInformation(frame_id, ue_id);
 
 #if defined(ENABLE_RB_IND)
   RBIndicator ri;
@@ -666,6 +676,13 @@ void MacThreadBaseStation::RunEventLoop() {
   size_t last_frame_tx_tsc = 0;
 
   while (cfg_->Running() == true) {
+    /*if (scheduler_next_frame_id_ < cfg_->FramesToTest() &&
+        (GetTime::Rdtsc() - last_frame_tx_tsc) > tsc_delta_) {
+      for (size_t u = 0; u < cfg_->UeAntNum(); u++) {
+        SendControlInformation();
+      }
+      last_frame_tx_tsc = GetTime::Rdtsc();
+    }*/
     if (kEnableMac) {
       ProcessUdpPacketsFromApps();
     }

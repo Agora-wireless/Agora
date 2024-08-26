@@ -172,6 +172,8 @@ class MacThreadClient {
   size_t num_prbs_;
   std::array<size_t, kFrameWnd> rx_sched_status_;
   std::array<std::vector<size_t>, kFrameWnd> rx_sched_;
+  std::array<std::vector<size_t>, kFrameWnd> rx_ul_mcs_;
+  std::array<std::vector<size_t>, kFrameWnd> rx_dl_mcs_;
 
   RBIndicator* ri_;
   MacMultiRingBuffer mac_ring_;

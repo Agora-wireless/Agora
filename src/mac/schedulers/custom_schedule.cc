@@ -4,7 +4,7 @@
 #include "logger.h"
 #include "utils.h"
 
-static constexpr bool kPrintUeSchedule = false;
+static constexpr bool kPrintUeSchedule = true;
 
 CustomSchedule::CustomSchedule(Config* const cfg) : SchedulerModel(cfg) {
   size_t n_items = cfg->FramesToTest() * cfg_->UeAntNum();

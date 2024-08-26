@@ -2,7 +2,7 @@
 
 #include "logger.h"
 
-static constexpr bool kPrintUeSchedule = false;
+static constexpr bool kPrintUeSchedule = true;
 
 UeScheduler::UeScheduler(Config* const cfg) : SchedulerModel(cfg) {
   num_groups_ = kFrameWnd;
@@ -15,6 +15,7 @@ UeScheduler::UeScheduler(Config* const cfg) : SchedulerModel(cfg) {
   dl_mcs_buffer_.Calloc(num_groups_, cfg_->UeAntNum(),
                         Agora_memory::Alignment_t::kAlign64);
   ue_num_array_.resize(num_groups_ * num_prbs_, cfg_->SpatialStreamsNum());
+  AGORA_LOG_INFO("Initializing UE MAC Scheduler\n");
   //Round Robbin Schedule Buffer Process
   for (size_t gp = 0u; gp < num_groups_; gp++) {
     for (size_t ue = gp; ue < gp + cfg_->SpatialStreamsNum(); ue++) {
@@ -68,23 +69,29 @@ arma::uvec UeScheduler::ScheduledUeList(size_t frame_id, size_t prb_id) {
                  ue_num_array_.at(gp * num_prbs_ + prb_id), false));
 }
 
+void UeScheduler::Update(size_t frame_id, const arma::cx_fmat&,
+                         const std::vector<float>&) {
+  selected_group_ = this->GetGroup(frame_id);
+}
+
 void UeScheduler::Update(size_t frame_id, const std::vector<size_t> prb_ue_map,
                          const std::vector<size_t> ul_mcs,
                          const std::vector<size_t> dl_mcs) {
   mtx.lock();
-  if (prb_ue_map.size() == num_prbs_) {
+  AGORA_LOG_INFO("UeScheduler Update: Frame %zu\n", frame_id);
+  if (prb_ue_map.size() != cfg_->UeAntNum()) {
     AGORA_LOG_ERROR("UeScheduler Update: Invalid PRB map size %zu/%zu\n",
-                    prb_ue_map.size(), num_prbs_);
+                    prb_ue_map.size(), cfg_->UeAntNum());
     return;
   }
-  /*if (ul_mcs.size() == cfg_->UeAntNum() && dl_mcs.size() == cfg_->UeAntNum()) {
+  if (ul_mcs.size() != cfg_->UeAntNum() || dl_mcs.size() != cfg_->UeAntNum()) {
     AGORA_LOG_ERROR(
         "UeScheduler Update: Invalid MCS vector size UL: %zu, DL %zu, expected "
         "%zu\n",
         ul_mcs.size(), dl_mcs.size(), cfg_->UeAntNum());
     return;
-  }*/
-  const size_t gp = frame_id % num_groups_;
+  }
+  const size_t gp = this->GetGroup(frame_id);
   arma::umat sched_mat(num_prbs_, cfg_->UeAntNum(), arma::fill::zeros);
   for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
     auto ue_map = Utils::Int2BitVector(prb_ue_map.at(ue), num_prbs_);
@@ -95,15 +102,28 @@ void UeScheduler::Update(size_t frame_id, const std::vector<size_t> prb_ue_map,
     for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
       schedule_buffer_[gp][ue + cfg_->UeAntNum() * prb] = sched_mat.at(prb, ue);
       if (sched_mat.at(prb, ue) == 1) {
-        schedule_buffer_index_[gp][cnt++ + cfg_->UeAntNum() * prb] = ue;
+        schedule_buffer_index_[gp][cnt + cfg_->UeAntNum() * prb] = ue;
+        cnt++;
       }
     }
     ue_num_array_.at(gp * num_prbs_ + prb) = cnt;
   }
-  /*for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
+  for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
     ul_mcs_buffer_[gp][ue] = ul_mcs.at(ue);
     dl_mcs_buffer_[gp][ue] = dl_mcs.at(ue);
-  }*/
+  }
+  if (kPrintUeSchedule) {
+    std::stringstream dataprint;
+    dataprint << "Group " << gp << ":\n";
+    for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
+      for (size_t prb = 0; prb < num_prbs_; prb++) {
+        dataprint << schedule_buffer_[gp][ue + prb * cfg_->UeAntNum()] << " ";
+      }
+      dataprint << "\n";
+    }
+    AGORA_LOG_INFO("%s", dataprint.str());
+  }
+
   mtx.unlock();
 }
 

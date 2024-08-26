@@ -16,6 +16,7 @@ RoundRobbin::RoundRobbin(Config* const cfg) : SchedulerModel(cfg) {
                         Agora_memory::Alignment_t::kAlign64);
   dl_mcs_buffer_.Calloc(num_groups_, cfg_->UeAntNum(),
                         Agora_memory::Alignment_t::kAlign64);
+  AGORA_LOG_INFO("Initializing Round-Robin MAC Scheduler\n");
   //Round Robbin Schedule Buffer Process
   for (size_t gp = 0u; gp < num_groups_; gp++) {
     for (size_t ue = gp; ue < gp + cfg_->SpatialStreamsNum(); ue++) {
