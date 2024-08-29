@@ -61,7 +61,7 @@ enum class EventType : int {
   kPacketFromRp,
   kPacketToRp,
   kFFTPilot,
-  kSNRReport,    // Signal new SNR measurement from PHY to MAC
+  kCsiReport,    // Signal new Csi measurement from PHY to MAC
   kRANUpdate,    // Signal new RAN config to Agora
   kRBIndicator,  // Signal RB schedule to UEs
   kBroadcast,    // Signal generation of new broadcast symbols

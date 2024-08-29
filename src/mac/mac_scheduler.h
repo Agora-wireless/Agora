@@ -35,11 +35,13 @@ class MacScheduler {
   size_t MacPacketLength(Direction dir, size_t frame_id, size_t ue_id);
 
   //Used for Proportional Fairness Algorithm
-  void UpdateCSI(size_t cur_sc_id, const arma::cx_fmat& csi_in);
-  void UpdateSNR(std::vector<float> snr_per_ue);
+  //void UpdateCSI(size_t cur_sc_id, const arma::cx_fmat& csi_in);
+  //void UpdateSNR(std::vector<float> snr_per_ue);
   void UpdateScheduler(size_t frame_id);
   void UpdateScheduler(size_t frame_id, std::vector<size_t> prb_map,
                        std::vector<size_t> ul_mcs, std::vector<size_t> dl_mcs);
+  void UpdateScheduler(size_t frame_id, std::vector<arma::cx_fmat>& csi_mat,
+                       std::vector<float> snr_per_ue);
 
   void UpdateMcsParams(size_t frame_id);
   inline MacUtils& Params() { return this->params_; }
@@ -49,8 +51,8 @@ class MacScheduler {
  private:
   Config* const cfg_;
 
-  std::vector<float> snr_per_ue_;
-  arma::cx_fmat csi_;
+  /*std::vector<float> snr_per_ue_;
+  arma::cx_fmat csi_;*/
 
   std::unique_ptr<SchedulerModel> scheduler_model_;
   MacUtils params_;

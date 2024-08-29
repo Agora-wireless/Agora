@@ -45,6 +45,7 @@ class MacThreadBaseStation {
       Config* const cfg, size_t core_offset,
       PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
       Table<int8_t>* dl_bits_buffer, Table<int8_t>* dl_bits_buffer_status,
+      PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
       moodycamel::ConcurrentQueue<EventData>* rx_queue,
       moodycamel::ConcurrentQueue<EventData>* tx_queue, MacScheduler* mac_sched,
       PhyStats* in_phy_stats, const std::string& log_filename = "");
@@ -65,9 +66,8 @@ class MacThreadBaseStation {
   // fully-received frames for UE #i to kRemoteHostname::(kBaseRemotePort + i)
   void ProcessCodeblocksFromPhy(EventData event);
 
-  // Receive SNR report from PHY master thread. Use for RB scheduling.
-  // TODO: process CQI report here as well.
-  void ProcessSnrReportFromPhy(EventData event);
+  // Receive CSI report from PHY master thread. Use for RB scheduling.
+  void ProcessCsiReportFromPhy(EventData event);
 
   // Push RAN config update to PHY master thread.
   void SendRanConfigUpdate(EventData event);
@@ -147,6 +147,9 @@ class MacThreadBaseStation {
     Table<int8_t>* dl_bits_buffer_;
     Table<int8_t>* dl_bits_buffer_status_;
   } client_;
+
+  // csi buffers to use in scheduling
+  PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
 
   // FIFO queue for receiving messages from the master thread
   moodycamel::ConcurrentQueue<EventData>* rx_queue_;

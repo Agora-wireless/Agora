@@ -20,7 +20,7 @@ class ProportionalFairness : public SchedulerModel {
 
   size_t UpdateScheduler(size_t frame_id, std::vector<float> ues_capacity);
 
-  void Update(size_t frame_id, const arma::cx_fmat& csi,
+  void Update(size_t frame_id, const std::vector<arma::cx_fmat>& csi,
               const std::vector<float>& snr_per_ue) final;
 
   bool IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id) final;
@@ -33,6 +33,7 @@ class ProportionalFairness : public SchedulerModel {
 
   std::vector<bool> ues_flags_;
   std::vector<float> pf_ues_history_;
+  std::vector<size_t> selected_group_vec_;
 
   //Vector of possible scheduling options
   std::vector<std::vector<size_t>> groups_vector_;
@@ -41,7 +42,7 @@ class ProportionalFairness : public SchedulerModel {
 
   std::vector<float> capacities_per_ue_;
   arma::cx_fcube channel_covariance_matrices_;
-  std::vector<float> UEsCapacity(const arma::cx_fmat& csi,
+  std::vector<float> UEsCapacity(const std::vector<arma::cx_fmat>& csi,
                                  const std::vector<float>& snr_per_ue);
 
   void Schedule(size_t frame, const std::vector<float>& ues_capacity);

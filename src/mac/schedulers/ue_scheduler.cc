@@ -69,8 +69,7 @@ arma::uvec UeScheduler::ScheduledUeList(size_t frame_id, size_t prb_id) {
                  ue_num_array_.at(gp * num_prbs_ + prb_id), false));
 }
 
-void UeScheduler::Update(size_t frame_id, const arma::cx_fmat&,
-                         const std::vector<float>&) {
+void UeScheduler::Update(size_t frame_id) {
   selected_group_ = this->GetGroup(frame_id);
 }
 

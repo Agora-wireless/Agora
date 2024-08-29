@@ -14,6 +14,7 @@ MacThreadBaseStation::MacThreadBaseStation(
     Config* cfg, size_t core_offset,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
     Table<int8_t>* dl_bits_buffer, Table<int8_t>* dl_bits_buffer_status,
+    PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
     moodycamel::ConcurrentQueue<EventData>* rx_queue,
     moodycamel::ConcurrentQueue<EventData>* tx_queue, MacScheduler* mac_sched,
     PhyStats* in_phy_stats, const std::string& log_filename)
@@ -22,6 +23,7 @@ MacThreadBaseStation::MacThreadBaseStation(
       tsc_delta_((cfg_->GetFrameDurationSec() * 1e9) / freq_ghz_),
       core_offset_(core_offset),
       decoded_buffer_(decoded_buffer),
+      csi_buffers_(csi_buffers),
       rx_queue_(rx_queue),
       tx_queue_(tx_queue),
       mac_sched_(mac_sched),
@@ -165,21 +167,37 @@ void MacThreadBaseStation::ProcessRxFromPhy() {
   } else if (event.event_type_ == EventType::kPacketFromMac) {
     AGORA_LOG_TRACE("MacThreadBaseStation: MAC thread event kPacketFromMac\n");
     SendCodeblocksToPhy(event);
-  } else if (event.event_type_ == EventType::kSNRReport) {
+  } else if (event.event_type_ == EventType::kCsiReport) {
     AGORA_LOG_TRACE("MacThreadBaseStation: MAC thread event kSNRReport\n");
-    ProcessSnrReportFromPhy(event);
+    ProcessCsiReportFromPhy(event);
   }
 }
 
-void MacThreadBaseStation::ProcessSnrReportFromPhy(EventData event) {
-  const size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
-  if (server_.snr_[ue_id].size() == kSNRWindowSize) {
-    server_.snr_[ue_id].pop();
+void MacThreadBaseStation::ProcessCsiReportFromPhy(EventData event) {
+  const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+  if (cfg_->SchedulerType() != "pf") {
+    // prepare csi vector
+    std::vector<arma::cx_fmat> csi_mat;
+    size_t num_block_per_prb =
+        cfg_->NumScPerPrb(Direction::kUplink) / kTransposeBlockSize;
+    size_t num_blocks = cfg_->OfdmDataNum() / kTransposeBlockSize;
+    for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
+      arma::cx_fcube csi_cube(reinterpret_cast<arma::cx_float*>(
+                                  csi_buffers_[frame_id % kFrameWnd][ue]),
+                              kTransposeBlockSize, cfg_->BsAntNum(), num_blocks,
+                              false);
+      // TODO: Does this work for freq_orthogonal mode?
+      arma::cx_fmat csi_mat_trim = csi_cube.row_as_mat(
+          ue);  // this will return num_blocks x bs_ant_num matrix
+      arma::uvec idx = arma::linspace<arma::uvec>(
+          0u, num_blocks, num_blocks / num_block_per_prb);
+      arma::cx_fmat csi_mat_trim2 = csi_mat_trim.rows(idx);
+      csi_mat.push_back(csi_mat_trim2);
+    }
+    std::vector<float> max_snr_per_ue =
+        this->phy_stats_->GetMaxSnrPerUes(frame_id);
+    mac_sched_->UpdateScheduler(frame_id, csi_mat, max_snr_per_ue);
   }
-
-  float snr;
-  std::memcpy(&snr, &event.tags_[1], sizeof(float));
-  server_.snr_[ue_id].push(snr);
 }
 
 void MacThreadBaseStation::SendRanConfigUpdate(EventData /*event*/) {
@@ -207,8 +225,6 @@ void MacThreadBaseStation::SendControlInformation(size_t frame_id,
   if (cfg_->SchedulerType() != "round_robbin") {
     // calculate the schedule for frame_id
     //mac_sched_->UpdateScheduler(scheduler_next_frame_id_);
-    // We may have to run this once per frame
-    mac_sched_->UpdateScheduler(frame_id);
     // send RAN control information UE
     if (scheduler_next_frame_id_ < cfg_->FramesToTest()) {
       RBIndicator ri;
@@ -673,7 +689,7 @@ void MacThreadBaseStation::RunEventLoop() {
   PinToCoreWithOffset(ThreadType::kWorkerMacTXRX, core_offset_,
                       0 /* thread ID */);
 
-  size_t last_frame_tx_tsc = 0;
+  //size_t last_frame_tx_tsc = 0;
 
   while (cfg_->Running() == true) {
     /*if (scheduler_next_frame_id_ < cfg_->FramesToTest() &&

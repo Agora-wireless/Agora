@@ -68,14 +68,20 @@ size_t MacScheduler::SelectedDlMcs(size_t frame_id, size_t ue_id) {
   return scheduler_model_->SelectedDlMcs(frame_id, ue_id);
 }
 
+void MacScheduler::UpdateScheduler(size_t frame_id) {
+  scheduler_model_->Update(frame_id);
+}
+
 void MacScheduler::UpdateScheduler(size_t frame_id, std::vector<size_t> prb_map,
                                    std::vector<size_t> ul_mcs,
                                    std::vector<size_t> dl_mcs) {
   scheduler_model_->Update(frame_id, prb_map, ul_mcs, dl_mcs);
 }
 
-void MacScheduler::UpdateScheduler(size_t frame_id) {
-  scheduler_model_->Update(frame_id, csi_, snr_per_ue_);
+void MacScheduler::UpdateScheduler(size_t frame_id,
+                                   std::vector<arma::cx_fmat>& csi,
+                                   std::vector<float> snr_per_ue) {
+  scheduler_model_->Update(frame_id, csi, snr_per_ue);
 }
 
 size_t MacScheduler::NumGroups() { return scheduler_model_->NumGroups(); }
@@ -84,7 +90,7 @@ size_t MacScheduler::SelectedGroup() {
   return scheduler_model_->SelectedGroup();
 }
 
-void MacScheduler::UpdateSNR(std::vector<float> snr_per_ue) {
+/*void MacScheduler::UpdateSNR(std::vector<float> snr_per_ue) {
   snr_per_ue_ = std::move(snr_per_ue);
 }
 
@@ -92,7 +98,7 @@ void MacScheduler::UpdateCSI(size_t cur_sc_id, const arma::cx_fmat& csi_in) {
   if (cur_sc_id == kCsiSubcarrierIdx) {
     csi_ = csi_in;
   }
-}
+}*/
 
 void MacScheduler::UpdateMcsParams(size_t frame_id) {
   // TODO: MCS should be assigned per user

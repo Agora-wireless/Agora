@@ -21,7 +21,7 @@ std::unique_ptr<SchedulerModel> SchedulerModel::CreateSchedulerModel(
     if (client == true) {
       return std::make_unique<UeScheduler>(cfg);
     } else {
-      if (scheduler_type == "proportional_fairness") {
+      if (scheduler_type == "pf") {
         return std::make_unique<ProportionalFairness>(cfg);
       } else if (scheduler_type == "custom") {
         return std::make_unique<CustomSchedule>(cfg);

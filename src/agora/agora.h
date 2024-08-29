@@ -112,8 +112,8 @@ class Agora {
   void ScheduleUsers(EventType event_type, size_t frame_id, size_t symbol_id);
   void ScheduleBroadCastSymbols(EventType event_type, size_t frame_id);
 
-  // Send current frame's SNR measurements from PHY to MAC
-  void SendSnrReport(EventType event_type, size_t frame_id, size_t symbol_id);
+  // Send current frame's Csi measurements from PHY to MAC
+  void SendCsiReport(EventType event_type, size_t frame_id);
 
   // Worker thread i runs on core base_worker_core_offset + i
   const size_t base_worker_core_offset_;

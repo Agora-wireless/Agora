@@ -70,8 +70,7 @@ arma::uvec RoundRobbin::ScheduledUeList(size_t frame_id, size_t prb_id) {
       cfg_->SpatialStreamsNum(), false));
 }
 
-void RoundRobbin::Update(size_t frame_id, const arma::cx_fmat&,
-                         const std::vector<float>&) {
+void RoundRobbin::Update(size_t frame_id) {
   selected_group_ = frame_id % num_groups_;
 }
 

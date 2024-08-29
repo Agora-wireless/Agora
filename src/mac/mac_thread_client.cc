@@ -182,7 +182,7 @@ void MacThreadClient::ProcessRxFromPhy() {
   } else if (event.event_type_ == EventType::kPacketFromMac) {
     AGORA_LOG_TRACE("MacThreadClient: MAC thread event kPacketFromMac\n");
     SendCodeblocksToPhy(event);
-  } else if (event.event_type_ == EventType::kSNRReport) {
+  } else if (event.event_type_ == EventType::kCsiReport) {
     AGORA_LOG_TRACE("MacThreadClient: MAC thread event kSNRReport\n");
     ProcessSnrReportFromPhy(event);
   }

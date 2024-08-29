@@ -360,19 +360,13 @@ void Agora::ScheduleUsers([[maybe_unused]] EventType event_type,
   }
 }
 
-void Agora::SendSnrReport(EventType event_type, size_t frame_id,
-                          size_t symbol_id) {
-  assert(event_type == EventType::kSNRReport);
+void Agora::SendCsiReport(EventType event_type, size_t frame_id) {
+  assert(event_type == EventType::kCsiReport);
   unused(event_type);
-  auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
-  for (size_t i = 0; i < config_->UeAntNum(); i++) {
-    EventData snr_report(event_type, base_tag.tag_);
-    snr_report.num_tags_ = 2;
-    const float snr = this->phy_stats_->GetEvmSnr(frame_id, i);
-    std::memcpy(&snr_report.tags_[1], &snr, sizeof(float));
-    TryEnqueueFallback(&mac_request_queue_, snr_report);
-    base_tag.ue_id_++;
-  }
+  // this message is sent when data of all UEs are ready
+  auto base_tag = gen_tag_t::FrmUe(frame_id, 0);
+  EventData csi_report(event_type, base_tag.tag_);
+  TryEnqueueFallback(&mac_request_queue_, csi_report);
 }
 
 void Agora::ScheduleBroadCastSymbols(EventType event_type, size_t frame_id) {
@@ -1135,14 +1129,10 @@ void Agora::HandleEventFft(size_t tag) {
             this->phy_stats_->PrintUlSnrStats(frame_id);
           }
 
-          std::vector<float> max_snr_per_ue =
-              this->phy_stats_->GetMaxSnrPerUes(frame_id);
-          this->mac_sched_->UpdateSNR(max_snr_per_ue);
-
           this->phy_stats_->RecordPilotSnr(frame_id);
-          if constexpr (kEnableMac) {
-            SendSnrReport(EventType::kSNRReport, frame_id, symbol_id);
-          }
+          // Send request to MAC to update its scheduler
+          // based on most recent pilots
+          SendCsiReport(EventType::kCsiReport, frame_id);
           ScheduleSubcarriers(EventType::kBeam, frame_id, 0);
         }
       }
@@ -1404,8 +1394,8 @@ void Agora::InitializeThreads() {
   mac_thread_ = std::make_unique<MacThreadBaseStation>(
       config_, mac_cpu_core, agora_memory_->GetDecod(),
       &agora_memory_->GetDlBits(), &agora_memory_->GetDlBitsStatus(),
-      &mac_request_queue_, &mac_response_queue_, mac_sched_.get(),
-      phy_stats_.get());
+      agora_memory_->GetCsi(), &mac_request_queue_, &mac_response_queue_,
+      mac_sched_.get(), phy_stats_.get());
 
   mac_std_thread_ =
       std::thread(&MacThreadBaseStation::RunEventLoop, mac_thread_.get());

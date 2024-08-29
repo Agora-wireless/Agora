@@ -18,8 +18,10 @@ class SchedulerModel {
   explicit SchedulerModel(Config* const cfg);
   virtual ~SchedulerModel();
 
+  virtual void Update([[maybe_unused]] size_t frame_id) {}
+
   virtual void Update([[maybe_unused]] size_t frame_id,
-                      [[maybe_unused]] const arma::cx_fmat& csi,
+                      [[maybe_unused]] const std::vector<arma::cx_fmat>& csi,
                       [[maybe_unused]] const std::vector<float>& snr_per_ue) {}
 
   virtual void Update([[maybe_unused]] size_t frame_id,

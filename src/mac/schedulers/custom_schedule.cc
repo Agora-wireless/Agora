@@ -165,8 +165,7 @@ size_t CustomSchedule::UeScheduleIndex(size_t sched_id) {
   return it - ue_sched_set_.begin();
 }
 
-void CustomSchedule::Update(size_t frame_id, const arma::cx_fmat&,
-                            const std::vector<float>&) {
+void CustomSchedule::Update(size_t frame_id) {
   selected_group_ = sched_id_array_.at(frame_id);
 }
 
