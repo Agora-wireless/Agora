@@ -32,6 +32,6 @@
   "ue_worker_thread_num": 2,
   "ue_socket_thread_num": 1,
   "max_frame": 40,
-  "scheduler_type" : "custom",
+  "scheduler_type" : "pf",
   "slot_scheduling" : true
 }

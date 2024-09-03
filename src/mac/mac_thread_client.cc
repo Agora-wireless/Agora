@@ -636,7 +636,7 @@ void MacThreadClient::SendCodeblocksToPhy(EventData event) {
       }
     } else {
       size_t sched_id = ue_id;
-      if (cfg_->SchedulerType() != "round_robbin") {
+      if (cfg_->SchedulerType() == "custom") {
         mac_sched_->UpdateScheduler(frame_id);
         sched_id = mac_sched_->SelectedGroup() * cfg_->UeAntNum() + ue_id;
       }

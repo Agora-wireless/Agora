@@ -175,12 +175,12 @@ void MacThreadBaseStation::ProcessRxFromPhy() {
 
 void MacThreadBaseStation::ProcessCsiReportFromPhy(EventData event) {
   const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-  if (cfg_->SchedulerType() != "pf") {
+  if (cfg_->SchedulerType() == "pf") {
     // prepare csi vector
     std::vector<arma::cx_fmat> csi_mat;
-    size_t num_block_per_prb =
-        cfg_->NumScPerPrb(Direction::kUplink) / kTransposeBlockSize;
     size_t num_blocks = cfg_->OfdmDataNum() / kTransposeBlockSize;
+    size_t num_prbs =
+        cfg_->OfdmDataNum() / cfg_->NumScPerPrb(Direction::kUplink);
     for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
       arma::cx_fcube csi_cube(reinterpret_cast<arma::cx_float*>(
                                   csi_buffers_[frame_id % kFrameWnd][ue]),
@@ -189,9 +189,8 @@ void MacThreadBaseStation::ProcessCsiReportFromPhy(EventData event) {
       // TODO: Does this work for freq_orthogonal mode?
       arma::cx_fmat csi_mat_trim = csi_cube.row_as_mat(
           ue);  // this will return num_blocks x bs_ant_num matrix
-      arma::uvec idx = arma::linspace<arma::uvec>(
-          0u, num_blocks, num_blocks / num_block_per_prb);
-      arma::cx_fmat csi_mat_trim2 = csi_mat_trim.rows(idx);
+      arma::uvec idx = arma::linspace<arma::uvec>(0u, num_blocks - 1, num_prbs);
+      arma::cx_fmat csi_mat_trim2 = csi_mat_trim.rows(idx).st();
       csi_mat.push_back(csi_mat_trim2);
     }
     std::vector<float> max_snr_per_ue =
@@ -280,7 +279,7 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
   if (kEnableMac == false) {
     if (kPrintPhyStats == true) {
       size_t sched_id = ue_id;
-      if (cfg_->SchedulerType() != "round_robbin") {
+      if (cfg_->SchedulerType() == "custom") {
         // TODO: Is this only for custom scheduler?
         //mac_sched_->UpdateScheduler(frame_id);
         sched_id = mac_sched_->SelectedGroup() * cfg_->UeAntNum() + ue_id;

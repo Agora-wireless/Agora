@@ -9,7 +9,6 @@
 static constexpr bool kPrintSchedulingBuffers = true;
 static constexpr bool kPrintSchedulingGroups = true;
 static constexpr bool kPrintSelectedGroup = true;
-static constexpr size_t kCalibFrames = 50;
 static constexpr float kLamda = 0.5;
 
 ProportionalFairness::ProportionalFairness(Config* const cfg)
@@ -34,47 +33,54 @@ ProportionalFairness::ProportionalFairness(Config* const cfg)
   schedule_buffer_index_.Calloc(num_groups_,
                                 cfg_->SpatialStreamsNum() * num_prbs_,
                                 Agora_memory::Alignment_t::kAlign64);
+  ul_mcs_buffer_.Calloc(num_groups_, cfg_->UeAntNum(),
+                        Agora_memory::Alignment_t::kAlign64);
+  dl_mcs_buffer_.Calloc(num_groups_, cfg_->UeAntNum(),
+                        Agora_memory::Alignment_t::kAlign64);
+  selected_group_vec_.resize(num_prbs_, 0);
 
   //Proportional Fairness Schedule Buffer Process
   for (size_t gp = 0; gp < num_groups_; gp++) {
-    for (size_t sc = 0; sc < num_prbs_; sc++) {
+    for (size_t prb = 0; prb < num_prbs_; prb++) {
       std::vector<size_t> u_es_idx = groups_vector_[gp];
       for (size_t ue_idx = 0; ue_idx < cfg_->SpatialStreamsNum(); ue_idx++) {
-        schedule_buffer_[gp][u_es_idx[ue_idx] + cfg_->UeAntNum() * sc] = 1;
+        schedule_buffer_[gp][u_es_idx[ue_idx] + cfg_->UeAntNum() * prb] = 1;
+        schedule_buffer_index_[gp][ue_idx + cfg_->SpatialStreamsNum() * prb] =
+            u_es_idx[ue_idx];
       }
-      for (size_t ue = gp; ue < gp + cfg_->SpatialStreamsNum(); ue++) {
-        schedule_buffer_index_[gp][(ue - gp) + cfg_->SpatialStreamsNum() * sc] =
-            u_es_idx[ue - gp];
-      }
+    }
+    for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
+      ul_mcs_buffer_[gp][ue] = cfg->MacParams().McsIndex(Direction::kUplink);
+      dl_mcs_buffer_[gp][ue] = cfg->MacParams().McsIndex(Direction::kDownlink);
+      AGORA_LOG_TRACE("UL MCS Init: gp %zu, ue %zu, mcs %zu\n", gp, ue,
+                      ul_mcs_buffer_[gp][ue]);
     }
   }
 
-  std::stringstream ss;
   if (kPrintSchedulingBuffers) {
+    std::stringstream ss;
     for (size_t row = 0; row < num_groups_; row++) {
       ss << "schedule_PF_index_buffer_" << row << " \n\n";
-      for (size_t col = 0; col < cfg_->SpatialStreamsNum() * num_prbs_; col++) {
-        ss << schedule_buffer_index_[row][col] << " ";
+      for (size_t prb = 0; prb < num_prbs_; prb++) {
+        for (size_t col = 0; col < cfg_->SpatialStreamsNum(); col++) {
+          ss << schedule_buffer_index_[row]
+                                      [col + prb * cfg_->SpatialStreamsNum()]
+             << " ";
+        }
+        ss << "\n";
       }
       ss << "\n\n";
       ss << "schedule_PF_SC_buffer_" << row << " \n\n";
-      for (size_t col = 0; col < cfg_->SpatialStreamsNum() * num_prbs_; col++) {
-        ss << schedule_buffer_[row][col] << " ";
+      for (size_t prb = 0; prb < num_prbs_; prb++) {
+        for (size_t col = 0; col < cfg_->UeAntNum(); col++) {
+          ss << schedule_buffer_[row][col + prb * cfg_->UeAntNum()] << " ";
+        }
+        ss << "\n";
       }
       ss << "\n\n";
     }
+    AGORA_LOG_INFO(ss.str());
   }
-  if (kPrintSchedulingGroups) {
-    ss << "Proportional Fairness Scheduling Groups \n\n";
-    for (size_t gp = 0; gp < num_groups_; gp++) {
-      ss << "Group " << gp << " = [ ";
-      for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
-        ss << schedule_buffer_[gp][ue] << " ";
-      }
-      ss << "]\n\n";
-    }
-  }
-  AGORA_LOG_INFO(ss.str());
 }
 
 void ProportionalFairness::Combination(int k, int offset) {
@@ -93,30 +99,37 @@ void ProportionalFairness::Update(size_t frame_id,
                                   const std::vector<arma::cx_fmat>& csi,
                                   const std::vector<float>& snr_per_ue) {
   std::vector<float> ues_capacity = UEsCapacity(csi, snr_per_ue);
-
-  if (frame_id < kCalibFrames) {
-    selected_group_ = frame_id % num_groups_;
-    if (kPrintSelectedGroup) {
-      std::stringstream s;
-      s << "Proportional Fairness Calibration " << frame_id << "/"
-        << kCalibFrames << "\n";
-      AGORA_LOG_INFO(s.str());
+  Schedule(frame_id + 1, ues_capacity);
+  UpdatePF(frame_id + 1, ues_capacity);
+  if (kPrintSelectedGroup) {
+    std::stringstream s;
+    std::stringstream ss;
+    /*s << "Proportional Fairness Scheduled Frame " << frame_id << " Groups: ";
+    for (size_t prb = 0; prb < num_prbs_; prb++) {
+      s << selected_group_vec_.at(prb) << " ";
     }
-  } else if (current_frame_ != frame_id) {
-    current_frame_ = frame_id;
-    Schedule(frame_id, ues_capacity);
-    UpdatePF(frame_id, ues_capacity);
-    if (kPrintSelectedGroup) {
-      std::stringstream s;
-      s << "Proportional Fairness Scheduled Frame " << frame_id << " Group "
-        << selected_group_ << " = [ ";
+    s << "\n Selected UEs over all PRBs = [ ";
+    for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
+      std::string a = (ues_flags_[i]) ? "1 " : "0 ";
+      s << a;
+    }
+    s << "] \n ";*/
+    size_t row = this->GetGroup(frame_id + 1);
+    ss << "schedule_PF_SC_buffer_" << row << " \n\n";
+    for (size_t prb = 0; prb < num_prbs_; prb++) {
+      //auto selected_ues = groups_vector_[selected_group_vec_.at(prb)];
       for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
-        std::string a = (ues_flags_[i]) ? "1 " : "0 ";
-        s << a;
+        //size_t col = selected_ues.at(i);
+        ss << schedule_buffer_[row][i + prb * cfg_->UeAntNum()] << " ";
+        s << ues_capacity.at(i * num_prbs_ + prb) << " ";
       }
-      s << "] \n ";
-      AGORA_LOG_INFO(s.str());
+      ss << "\n";
+      s << "\n";
     }
+    ss << "\n";
+    s << "\n";
+    AGORA_LOG_INFO(ss.str());
+    AGORA_LOG_INFO(s.str());
   }
 }
 
@@ -124,9 +137,8 @@ std::vector<float> ProportionalFairness::UEsCapacity(
     const std::vector<arma::cx_fmat>& csi,
     const std::vector<float>& snr_per_ue) {
   // Calculate the channel covariance matrices for each UE
-  std::vector<size_t> selected_ues = groups_vector_[selected_group_];
-  for (size_t ue = 0; ue < cfg_->SpatialStreamsNum(); ue++) {
-    size_t ue_idx = selected_ues[ue];
+  // TODO: Technically we should compute the joint rate for each user group
+  for (size_t ue_idx = 0; ue_idx < cfg_->UeAntNum(); ue_idx++) {
     arma::cx_fmat csi_mat = csi.at(ue_idx);
     for (size_t prb = 0; prb < num_prbs_; prb++) {
       channel_covariance_matrices_.slice(ue_idx * num_prbs_ + prb) =
@@ -164,7 +176,7 @@ void ProportionalFairness::Schedule(size_t frame,
           pf[action + prb * num_groups_] +=
               ues_capacity[ue_idx * num_prbs_ + prb] / tp_history;
           if (pf[action + prb * num_groups_] >= max_pf) {
-            max_pf = pf[action * prb * num_groups_];
+            max_pf = pf[action + prb * num_groups_];
             selected_group_vec_.at(prb) = action;
           }
         }
@@ -172,9 +184,9 @@ void ProportionalFairness::Schedule(size_t frame,
     }
     auto selected_ues = groups_vector_[selected_group_vec_.at(prb)];
     for (size_t i = 0; i < selected_ues.size(); i++) {
-      schedule_buffer_index_[gp][i + cfg_->SpatialStreamsNum() + prb] =
+      schedule_buffer_index_[gp][i + cfg_->SpatialStreamsNum() * prb] =
           selected_ues.at(i);
-      schedule_buffer_[gp][selected_ues.at(i) + cfg_->UeAntNum() + prb] = 1;
+      schedule_buffer_[gp][selected_ues.at(i) + cfg_->UeAntNum() * prb] = 1;
     }
   }
 }
@@ -218,4 +230,20 @@ arma::uvec ProportionalFairness::ScheduledUeList(size_t frame_id,
       reinterpret_cast<unsigned long long*>(
           &schedule_buffer_index_[gp][cfg_->SpatialStreamsNum() * prb_id]),
       cfg_->SpatialStreamsNum(), false));
+}
+
+void ProportionalFairness::Update(size_t frame_id) {
+  selected_group_ = frame_id % num_groups_;
+}
+
+size_t ProportionalFairness::GetGroup(size_t frame_id) {
+  return frame_id % num_groups_;
+}
+
+size_t ProportionalFairness::SelectedUlMcs(size_t frame_id, size_t ue_id) {
+  return ul_mcs_buffer_[frame_id % num_groups_][ue_id];
+}
+
+size_t ProportionalFairness::SelectedDlMcs(size_t frame_id, size_t ue_id) {
+  return dl_mcs_buffer_[frame_id % num_groups_][ue_id];
 }
