@@ -195,7 +195,7 @@ void MacThreadBaseStation::ProcessCsiReportFromPhy(EventData event) {
     }
     std::vector<float> max_snr_per_ue =
         this->phy_stats_->GetMaxSnrPerUes(frame_id);
-    mac_sched_->UpdateScheduler(frame_id, csi_mat, max_snr_per_ue);
+    mac_sched_->UpdateScheduler(frame_id + 1, csi_mat, max_snr_per_ue);
   }
 }
 
