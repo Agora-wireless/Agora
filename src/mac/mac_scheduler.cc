@@ -80,8 +80,9 @@ void MacScheduler::UpdateScheduler(size_t frame_id, std::vector<size_t> prb_map,
 
 void MacScheduler::UpdateScheduler(size_t frame_id,
                                    std::vector<arma::cx_fmat>& csi,
-                                   std::vector<float> snr_per_ue) {
-  scheduler_model_->Update(frame_id, csi, snr_per_ue);
+                                   std::vector<float> snr_per_ue,
+                                   std::vector<float> last_throughput) {
+  scheduler_model_->Update(frame_id, csi, snr_per_ue, last_throughput);
 }
 
 size_t MacScheduler::NumGroups() { return scheduler_model_->NumGroups(); }

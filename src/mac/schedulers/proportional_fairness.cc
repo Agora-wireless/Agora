@@ -97,10 +97,11 @@ void ProportionalFairness::Combination(int k, int offset) {
 
 void ProportionalFairness::Update(size_t frame_id,
                                   const std::vector<arma::cx_fmat>& csi,
-                                  const std::vector<float>& snr_per_ue) {
+                                  const std::vector<float>& snr_per_ue,
+                                  const std::vector<float>& last_throughput) {
   std::vector<float> ues_capacity = UEsCapacity(csi, snr_per_ue);
   Schedule(frame_id + 1, ues_capacity);
-  UpdatePF(frame_id + 1, ues_capacity);
+  UpdatePF(frame_id + 1, last_throughput);
   if (kPrintSelectedGroup) {
     std::stringstream s;
     std::stringstream ss;
@@ -192,7 +193,7 @@ void ProportionalFairness::Schedule(size_t frame,
 }
 
 void ProportionalFairness::UpdatePF(size_t /*frame*/,
-                                    const std::vector<float>& ues_capacity) {
+                                    const std::vector<float>& last_throughput) {
   for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
     ues_flags_[ue] = false;
     last_se_[ue] = 0.0F;
@@ -201,10 +202,13 @@ void ProportionalFairness::UpdatePF(size_t /*frame*/,
       if (std::find(selected_ues.begin(), selected_ues.end(), ue) !=
           selected_ues.end()) {
         ues_flags_[ue] = true;
-        last_se_[ue] += ues_capacity[ue * num_prbs_ + prb];
-        // TODO: history should be based on actualy received rate
-        pf_ues_history_[ue] += ues_capacity[ue * num_prbs_ + prb];
+        /*last_se_[ue] += ues_capacity_[ue * num_prbs_ + prb];
+        pf_ues_history_[ue] += ues_capacity_[ue * num_prbs_ + prb];*/
       }
+    }
+    if (ues_flags_[ue] == true) {
+      last_se_[ue] += last_throughput[ue];
+      pf_ues_history_[ue] += last_throughput[ue];
     }
   }
 }

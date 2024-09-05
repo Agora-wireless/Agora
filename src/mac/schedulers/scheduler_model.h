@@ -18,16 +18,15 @@ class SchedulerModel {
   explicit SchedulerModel(Config* const cfg);
   virtual ~SchedulerModel();
 
-  virtual void Update([[maybe_unused]] size_t frame_id) {}
+  virtual void Update(size_t frame_id) {}
 
-  virtual void Update([[maybe_unused]] size_t frame_id,
-                      [[maybe_unused]] const std::vector<arma::cx_fmat>& csi,
-                      [[maybe_unused]] const std::vector<float>& snr_per_ue) {}
+  virtual void Update(size_t frame_id, const std::vector<arma::cx_fmat>& csi,
+                      const std::vector<float>& snr_per_ue,
+                      const std::vector<float>& last_throughput) {}
 
-  virtual void Update([[maybe_unused]] size_t frame_id,
-                      [[maybe_unused]] const std::vector<size_t> prb_map,
-                      [[maybe_unused]] const std::vector<size_t> ul_mcs,
-                      [[maybe_unused]] const std::vector<size_t> dl_mcs) {}
+  virtual void Update(size_t frame_id, const std::vector<size_t> prb_map,
+                      const std::vector<size_t> ul_mcs,
+                      const std::vector<size_t> dl_mcs) {}
 
   virtual bool IsUeScheduled([[maybe_unused]] size_t frame_id,
                              [[maybe_unused]] size_t prb_id,

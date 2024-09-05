@@ -21,7 +21,8 @@ class ProportionalFairness : public SchedulerModel {
   size_t UpdateScheduler(size_t frame_id, std::vector<float> ues_capacity);
 
   void Update(size_t frame_id, const std::vector<arma::cx_fmat>& csi,
-              const std::vector<float>& snr_per_ue) final;
+              const std::vector<float>& snr_per_ue,
+              const std::vector<float>& last_throughout) final;
 
   bool IsUeScheduled(size_t frame_id, size_t sc_id, size_t ue_id) final;
   arma::uvec ScheduledUeList(size_t frame_id, size_t sc_id) final;
@@ -50,7 +51,7 @@ class ProportionalFairness : public SchedulerModel {
                                  const std::vector<float>& snr_per_ue);
 
   void Schedule(size_t frame, const std::vector<float>& ues_capacity);
-  void UpdatePF(size_t frame, const std::vector<float>& ues_capacity);
+  void UpdatePF(size_t frame, const std::vector<float>& past_throughput);
   void Combination(int k, int offset = 0);
 };
 

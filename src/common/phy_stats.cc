@@ -66,7 +66,8 @@ PhyStats::PhyStats(Config* const cfg, MacScheduler* const mac_sched,
                              Agora_memory::Alignment_t::kAlign64);
   uncoded_bit_error_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                                   Agora_memory::Alignment_t::kAlign64);
-
+  goodput_.Calloc(kFrameWnd, cfg->UeAntNum(),
+                  Agora_memory::Alignment_t::kAlign64);
   evm_buffer_.Calloc(kFrameWnd, cfg->UeAntNum(),
                      Agora_memory::Alignment_t::kAlign64);
   evm_sc_buffer_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->OfdmDataNum(),
@@ -633,6 +634,22 @@ void PhyStats::UpdateDecodedBits(size_t ue_id, size_t offset, size_t frame_slot,
                                  size_t new_bits_num) {
   decoded_bits_count_[ue_id][offset] += new_bits_num;
   frame_decoded_bits_[ue_id][frame_slot] += new_bits_num;
+}
+
+void PhyStats::UpdateGoodput(size_t ue_id, size_t frame_id, float new_goodput) {
+  size_t frame_slot = frame_id % kFrameWnd;
+  goodput_[frame_slot][ue_id] = new_goodput;
+}
+
+float PhyStats::GetGoodput(size_t ue_id, size_t frame_id) {
+  return goodput_[frame_id % kFrameWnd][ue_id];
+}
+
+std::vector<float> PhyStats::GetGoodput(size_t frame_id) {
+  size_t frame_slot = frame_id % kFrameWnd;
+  std::vector<float> goodput(goodput_[frame_slot],
+                             goodput_[frame_slot] + config_->UeAntNum());
+  return goodput;
 }
 
 void PhyStats::UpdateBlockErrors(size_t ue_id, size_t offset, size_t frame_slot,

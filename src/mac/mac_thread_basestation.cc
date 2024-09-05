@@ -195,7 +195,11 @@ void MacThreadBaseStation::ProcessCsiReportFromPhy(EventData event) {
     }
     std::vector<float> max_snr_per_ue =
         this->phy_stats_->GetMaxSnrPerUes(frame_id);
-    mac_sched_->UpdateScheduler(frame_id + 1, csi_mat, max_snr_per_ue);
+    // TODO: Will previous frame be up-to-date if the receive processing falls behind?
+    std::vector<float> last_throughput =
+        this->phy_stats_->GetGoodput(frame_id - 1);
+    mac_sched_->UpdateScheduler(frame_id + 1, csi_mat, max_snr_per_ue,
+                                last_throughput);
   }
 }
 
@@ -310,13 +314,14 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
         const size_t num_bytes_per_cb =
             mac_sched_->Params().NumBytesPerCb(Direction::kUplink);
         size_t num_cb = cfg_->NumCbPerFrame(Direction::kUplink);
+        size_t block_error(0);
         for (size_t cb = 0; cb < num_cb; cb++) {
           if (mac_sched_->IsUeScheduled(frame_id, cb, ue_id)) {
             const size_t cb_offset = frame_slot * num_cb + cb;
             phy_stats_->UpdateDecodedBits(ue_id, cb_offset, frame_slot,
                                           num_bytes_per_cb * 8);
             phy_stats_->IncrementDecodedBlocks(ue_id, cb_offset, frame_slot);
-            size_t block_error(0);
+            size_t num_err_bytes(0);
             for (size_t i = 0; i < num_bytes_per_cb; i++) {
               size_t rx_byte_idx = cb * Roundup<64>(num_bytes_per_cb) + i;
               size_t tx_byte_idx = cb * num_bytes_per_cb + i;
@@ -325,13 +330,18 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
               phy_stats_->UpdateBitErrors(ue_id, cb_offset, frame_slot, tx_byte,
                                           rx_byte);
               if (rx_byte != tx_byte) {
-                block_error++;
+                num_err_bytes++;
               }
             }
             phy_stats_->UpdateBlockErrors(ue_id, cb_offset, frame_slot,
-                                          block_error);
+                                          num_err_bytes);
+            block_error += (num_err_bytes > 0);
           }
         }
+        float goodput =
+            (num_cb - block_error) * num_bytes_per_cb /
+            (cfg_->Frame().NumUlDataSyms() * cfg_->GetSymbolDurationSec());
+        phy_stats_->UpdateGoodput(ue_id, frame_id, goodput);
       }
     }
   } else {

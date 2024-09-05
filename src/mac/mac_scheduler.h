@@ -41,7 +41,8 @@ class MacScheduler {
   void UpdateScheduler(size_t frame_id, std::vector<size_t> prb_map,
                        std::vector<size_t> ul_mcs, std::vector<size_t> dl_mcs);
   void UpdateScheduler(size_t frame_id, std::vector<arma::cx_fmat>& csi_mat,
-                       std::vector<float> snr_per_ue);
+                       std::vector<float> snr_per_ue,
+                       std::vector<float> last_throughput);
 
   void UpdateMcsParams(size_t frame_id);
   inline MacUtils& Params() { return this->params_; }
