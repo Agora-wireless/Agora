@@ -225,7 +225,7 @@ void MacThreadBaseStation::SendRanConfigUpdate(EventData /*event*/) {
 
 void MacThreadBaseStation::SendControlInformation(size_t frame_id,
                                                   size_t ue_id) {
-  if (cfg_->SchedulerType() != "round_robbin") {
+  if (cfg_->SchedulerType() != "rr") {
     // calculate the schedule for frame_id
     //mac_sched_->UpdateScheduler(scheduler_next_frame_id_);
     // send RAN control information UE

@@ -69,38 +69,50 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
 
   // Generating an array of cfg->FramesToTest() * cfg->UeAntNum() elements
   // containing a bitmap of scheduled UEs across frames
-  size_t n_sched = static_cast<size_t>(std::pow(2, cfg->UeAntNum())) - 1;
+  size_t n_sched =
+      (cfg->UeAntNum() >= 64) ? SIZE_MAX : (1ul << cfg->UeAntNum()) - 1;
   size_t n_cbs = cfg->NumCbPerFrame(Direction::kUplink);
+  size_t n_prb_comb = (n_cbs >= 64) ? SIZE_MAX : (1ul << n_cbs) - 1;
   // Set seed for the random number generator
   std::random_device rd;
   std::mt19937 gen(rd());
 
+  /* Notes
+   * Max UE Num in slot_scheduling = false: 64
+   * Max PRB num is slot_scheduling = true: 64
+   */
+
   // Define the binary distribution for bitmap of scheduled UEs
   std::uniform_int_distribution<> distribution(0, 1);
-  size_t n_prb_comb = static_cast<size_t>((1 << n_cbs) - 1);
   std::uniform_int_distribution<size_t> prb_distribution(1, n_prb_comb);
   std::vector<size_t> sched_ue_map;
   std::vector<size_t> sched_ue_set;  // a condensed and sorted set of schedules
+  // TODO: MCS < 10 and > 25 are buggy
   std::uniform_int_distribution<> mcs_distribution(10, 25);
   std::vector<uint8_t> sched_ul_mcs;
   std::vector<uint8_t> sched_dl_mcs;
   if (cfg->SchedulerType() == "custom") {
+    if (cfg->UeAntNum() > 16) {
+      AGORA_LOG_WARN("Too many UEs will lead to large data file sizes!")
+    }
+    size_t n_frames = cfg->FramesToTest();
+    size_t n_ues = cfg->UeAntNum();
+    sched_ue_map.resize(n_frames * n_ues, 1);
     if (cfg->SlotScheduling() == false) {
-      sched_ue_map.resize(cfg->FramesToTest() * cfg->UeAntNum(), 1);
-      for (size_t i = 0; i < cfg->FramesToTest(); ++i) {
+      for (size_t i = 0; i < n_frames; ++i) {
         size_t max_ue_num = 0;
         size_t ue_sched_id = 0;
-        for (size_t u = 0; u < cfg->UeAntNum(); ++u) {
+        for (size_t u = 0; u < n_ues; ++u) {
           uint8_t val = distribution(gen);
-          sched_ue_map[i * cfg->UeAntNum() + u] = val;
+          sched_ue_map[i * n_ues + u] = val;
           max_ue_num += val;  // count the schedule UE
-          ue_sched_id += static_cast<size_t>(val * std::pow(2, u));
+          ue_sched_id += static_cast<size_t>(val * (1 << u));
         }
         sched_ul_mcs.push_back(mcs_distribution(gen));
         sched_dl_mcs.push_back(mcs_distribution(gen));
         // if no UE was scheduled in this frame, schedule UE 0
         if (max_ue_num == 0) {
-          sched_ue_map[i * cfg->UeAntNum()] = 1;
+          sched_ue_map[i * n_ues] = 1;
           ue_sched_id = 1;  // schedule UE 0
         }
         if (sched_ue_set.empty()) {
@@ -125,22 +137,17 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
         }
       }
     } else {
-      // TODO: this is also for custom scheduling.
-      // We need to add a Round-Robin mode here too.
-      size_t n_frames = cfg->FramesToTest();
-      size_t n_ues = cfg->UeAntNum();
-      sched_ue_map.resize(n_frames * n_ues, 1);
-      for (size_t i = 0; i < cfg->FramesToTest(); ++i) {
+      for (size_t i = 0; i < n_frames; ++i) {
         size_t max_ue_num = 1;
         for (size_t u = 0; u < n_ues; ++u) {
           if (i % n_ues == u) {
             // making sure we always schedule something on every PRB
-            sched_ue_map[i * cfg->UeAntNum() + u] = (1 << n_cbs) - 1;
+            sched_ue_map[i * n_ues + u] = n_prb_comb;
           } else {
             uint8_t val = distribution(gen);
             size_t prb_map = 0;
             if (val == 1) prb_map = prb_distribution(gen);
-            sched_ue_map[i * cfg->UeAntNum() + u] = prb_map;
+            sched_ue_map[i * n_ues + u] = prb_map;
             max_ue_num += val;  // count the schedule UE
           }
         }
@@ -232,19 +239,21 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
   AGORA_LOG_INFO("DataGenerator: Using %s-orthogonal pilots\n",
                  cfg->FreqOrthogonalPilot() ? "frequency" : "time");
   if (cfg->FreqOrthogonalPilot()) {
-    const size_t pilot_sym_idx = cfg->Frame().GetPilotSymbol(0);
-    RtAssert(cfg->Frame().NumPilotSyms() == 1,
-             "Number of pilot symbols must be 1");
-    for (size_t i = 0; i < cfg->UeAntNum(); i++) {
-      std::vector<complex_float> pilots_f_ue(cfg->OfdmCaNum());  // Zeroed
-      for (size_t j = cfg->OfdmDataStart(); j < cfg->OfdmDataStop();
-           j += cfg->PilotScGroupSize()) {
-        pilots_f_ue.at(i + j) = pilot_fd.at(i + j);
+    for (size_t pilot_sym_idx = 0; pilot_sym_idx < cfg->Frame().NumPilotSyms();
+         pilot_sym_idx++) {
+      for (size_t ue = 0; ue < cfg->UeAntNum(); ue++) {
+        std::vector<complex_float> pilots_f_ue(cfg->OfdmCaNum());  // Zeroed
+        if (ue / cfg->PilotScGroupSize() == pilot_sym_idx) {
+          for (size_t j = cfg->OfdmDataStart(); j < cfg->OfdmDataStop();
+               j += cfg->PilotScGroupSize()) {
+            pilots_f_ue.at(j + ue) = pilot_fd.at(j + ue);
+          }
+        }
+        // Load pilots
+        std::memcpy(
+            tx_data_all_symbols[pilot_sym_idx] + (ue * cfg->OfdmCaNum()),
+            &pilots_f_ue.at(0), (cfg->OfdmCaNum() * sizeof(complex_float)));
       }
-      // Load pilots
-      std::memcpy(tx_data_all_symbols[pilot_sym_idx] + (i * cfg->OfdmCaNum()),
-                  &pilots_f_ue.at(0),
-                  (cfg->OfdmCaNum() * sizeof(complex_float)));
     }
   } else {
     for (size_t i = 0; i < cfg->UeAntNum(); i++) {
@@ -295,10 +304,12 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
       }
     } else {
       AGORA_LOG_INFO(
-          "Frame Schedule %zu: Generating data for %zu UEs with UL MCS %zu & "
+          "Frame Schedule %zu: Generating data for %zu UEs and %zu PRBs with "
+          "UL MCS %zu & "
           "DL "
           "MCS %zu\n",
-          sched, sched_id, sched_ul_mcs.at(sched), sched_dl_mcs.at(sched));
+          sched, cfg->UeAntNum(), n_cbs, sched_ul_mcs.at(sched),
+          sched_dl_mcs.at(sched));
     }
     // Generate the information buffers (MAC Packets) and LDPC-encoded buffers
     if (cfg->Frame().NumULSyms() != 0) {
