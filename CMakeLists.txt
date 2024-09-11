@@ -116,7 +116,7 @@ set(USE_AVX2_ENCODER False CACHE BOOL "Use Agora's AVX2 encoder instead of FlexR
 message(STATUS "USE_AVX2_ENCODER: ${USE_AVX2_ENCODER}")
 set(ENABLE_DPDK False CACHE BOOL "ENABLE_DPDK set to true to enable dpdk support")
 message(STATUS "ENABLE_DPDK:      ${ENABLE_DPDK}")
-set(ENABLE_HDF5 False CACHE BOOL "ENABLE_HDF5 defaulting to 'False'")
+set(ENABLE_HDF5 True CACHE BOOL "ENABLE_HDF5 defaulting to 'False'")
 message(STATUS "ENABLE_HDF5:      ${ENABLE_HDF5}")
 set(ENABLE_DATA_REC False CACHE BOOL "ENABLE_DATA_REC defaulting to 'False'")
 message(STATUS "ENABLE_DATA_REC:      ${ENABLE_DATA_REC}")
@@ -435,6 +435,8 @@ set(COMMON_SOURCES
   src/mac/schedulers/custom_schedule.cc
   src/mac/schedulers/round_robbin.cc
   src/mac/schedulers/proportional_fairness.cc
+  src/mac/schedulers/helix_share.cc
+  src/mac/schedulers/helix_orth.cc
   src/common/ipc/udp_comm.cc
   src/common/ipc/network_utils.cc
   src/common/loggers/csv_logger.cc
@@ -468,6 +470,9 @@ if (${ENABLE_HDF5})
   set(COMMON_SOURCES
 	  ${COMMON_SOURCES}
       src/mac/schedulers/helix_share.cc)
+  set(COMMON_SOURCES
+    ${COMMON_SOURCES}
+      src/mac/schedulers/helix_orth.cc)
 endif()
 add_library(recorder_sources_lib OBJECT ${RECORDER_SOURCES})
 

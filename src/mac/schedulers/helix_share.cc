@@ -71,7 +71,7 @@ RB_Share::RB_Share(Config* const cfg)  // Initialization
   }
 
   //************************************************** Load Channel Gain and USER Groups *******************************************************************
-  H5File file_2("Path to agora_cg_ug.hdf5", H5F_ACC_RDONLY);
+  H5File file_2("/space/qing/agora_cg_ug.hdf5", H5F_ACC_RDONLY);
 
   // Try to open the dataset
   DataSet dataset = file_2.openDataSet("var_length_lists");
@@ -149,17 +149,17 @@ void RB_Share::Update(size_t frame, const std::vector<arma::cx_fmat>& csi,
   for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
     if (ue < 9) {
       total_slice_tp_[0] += last_throughput[ue];
-    } else if (ue < 21) {
+    } else if (ue < 20) {
       total_slice_tp_[1] += last_throughput[ue];
-    } else if (ue < 39) {
+    } else if (ue < 37) {
       total_slice_tp_[2] += last_throughput[ue];
-    } else if (ue < 59) {
+    } else if (ue < 56) {
       total_slice_tp_[3] += last_throughput[ue];
-    } else if (ue < 84) {
+    } else if (ue < 80) {
       total_slice_tp_[4] += last_throughput[ue];
-    } else if (ue < 117) {
+    } else if (ue < 112) {
       total_slice_tp_[5] += last_throughput[ue];
-    } else if (ue < 162) {
+    } else if (ue < 156) {
       total_slice_tp_[6] += last_throughput[ue];
     } else {
       total_slice_tp_[7] += last_throughput[ue];
@@ -332,17 +332,17 @@ void RB_Share::Update(size_t frame, const std::vector<arma::cx_fmat>& csi,
         int ue = sel_UE_list[i];
         if (ue < 9) {
           est_slice_tp_[0] += cap_per_ue[i];
-        } else if (ue < 21) {
+        } else if (ue < 20) {
           est_slice_tp_[1] += cap_per_ue[i];
-        } else if (ue < 39) {
+        } else if (ue < 37) {
           est_slice_tp_[2] += cap_per_ue[i];
-        } else if (ue < 59) {
+        } else if (ue < 56) {
           est_slice_tp_[3] += cap_per_ue[i];
-        } else if (ue < 84) {
+        } else if (ue < 80) {
           est_slice_tp_[4] += cap_per_ue[i];
-        } else if (ue < 117) {
+        } else if (ue < 112) {
           est_slice_tp_[5] += cap_per_ue[i];
-        } else if (ue < 162) {
+        } else if (ue < 156) {
           est_slice_tp_[6] += cap_per_ue[i];
         } else {
           est_slice_tp_[7] += cap_per_ue[i];
@@ -444,17 +444,17 @@ void RB_Share::Update(size_t frame, const std::vector<arma::cx_fmat>& csi,
           int ue = sel_UE_list[i];
           if (ue < 9) {
             est_slice_tp_[0] += cap_per_ue[i];
-          } else if (ue < 21) {
+          } else if (ue < 20) {
             est_slice_tp_[1] += cap_per_ue[i];
-          } else if (ue < 39) {
+          } else if (ue < 37) {
             est_slice_tp_[2] += cap_per_ue[i];
-          } else if (ue < 59) {
+          } else if (ue < 56) {
             est_slice_tp_[3] += cap_per_ue[i];
-          } else if (ue < 84) {
+          } else if (ue < 80) {
             est_slice_tp_[4] += cap_per_ue[i];
-          } else if (ue < 117) {
+          } else if (ue < 112) {
             est_slice_tp_[5] += cap_per_ue[i];
-          } else if (ue < 162) {
+          } else if (ue < 156) {
             est_slice_tp_[6] += cap_per_ue[i];
           } else {
             est_slice_tp_[7] += cap_per_ue[i];
