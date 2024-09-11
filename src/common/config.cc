@@ -363,9 +363,6 @@ Config::Config(std::string jsonfilename)
     RtAssert(ofdm_data_num_ % pilot_sc_group_size_ == 0,
              "ofdm_data_num must be evenly divided by pilot_sc_group_size " +
                  std::to_string(pilot_sc_group_size_));
-    RtAssert(ue_ant_num_ <= pilot_sc_group_size_,
-             "user antennas must be no more than pilot_sc_group_size " +
-                 std::to_string(pilot_sc_group_size_));
   }
 
   hw_framer_ = tdd_conf.value("hw_framer", true);
@@ -395,7 +392,9 @@ Config::Config(std::string jsonfilename)
         tdd_conf.value("symbol_num_perframe", kDefaultSymbolNumPerFrame);
     size_t pilot_symbol_num_perframe = tdd_conf.value(
         "pilot_num",
-        freq_orthogonal_pilot_ ? kDefaultFreqOrthPilotSymbolNum : ue_ant_num_);
+        freq_orthogonal_pilot_
+            ? std::max((size_t)1, ue_ant_num_ / pilot_sc_group_size_)
+            : ue_ant_num_);
 
     size_t beacon_symbol_position = tdd_conf.value("beacon_position", SIZE_MAX);
 
@@ -589,6 +588,12 @@ Config::Config(std::string jsonfilename)
     ue_num_ = frame_.NumPilotSyms();
     ue_ant_num_ = ue_num_ * num_ue_channels_;
   }
+  if (freq_orthogonal_pilot_ == true) {
+    RtAssert(this->frame_.NumPilotSyms() ==
+                 std::max((size_t)1, ue_ant_num_ / pilot_sc_group_size_),
+             "Number of P symbols must equal max(1, ue_ant_num divided by "
+             "pilot_sc_group_size)");
+  }
   ue_ant_offset_ = tdd_conf.value("ue_ant_offset", 0);
   ue_ant_total_ = tdd_conf.value("ue_ant_total", ue_ant_num_);
 
@@ -756,7 +761,7 @@ Config::Config(std::string jsonfilename)
       dl_num_cb_per_frame_);
 
   freq_domain_channel_ = tdd_conf.value("freq_domain_channel", false);
-  scheduler_type_ = tdd_conf.value("scheduler_type", "round_robbin");
+  scheduler_type_ = tdd_conf.value("scheduler_type", "rr");
 
   samps_per_symbol_ =
       ofdm_tx_zero_prefix_ + ofdm_ca_num_ + cp_len_ + ofdm_tx_zero_postfix_;
@@ -1259,13 +1264,15 @@ void Config::LoadTestVectors() {
     for (size_t pilot_idx = 0; pilot_idx < this->frame_.NumPilotSyms();
          pilot_idx++) {
       this->pilot_ue_ci16_.at(ue_id).at(pilot_idx).resize(samps_per_symbol_, 0);
-      if (this->freq_orthogonal_pilot_ || ue_id == pilot_idx) {
+      if ((this->freq_orthogonal_pilot_ == true &&
+           ue_id / this->pilot_sc_group_size_ == pilot_idx) ||
+          (this->freq_orthogonal_pilot_ == false && ue_id == pilot_idx)) {
         std::vector<arma::uword> pilot_sc_list;
-
         for (size_t sc_id = 0; sc_id < ofdm_data_num_; sc_id++) {
           const size_t org_sc = sc_id + ofdm_data_start_;
           if (this->freq_orthogonal_pilot_ == false ||
-              sc_id % this->pilot_sc_group_size_ == ue_id) {
+              sc_id % this->pilot_sc_group_size_ ==
+                  ue_id % this->pilot_sc_group_size_) {
             pilot_ifft_[org_sc] = this->pilots_[sc_id];
             pilot_sc_list.push_back(org_sc);
           } else {

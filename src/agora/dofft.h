@@ -102,6 +102,7 @@ class DoFFT : public Doer {
   DFTI_DESCRIPTOR_HANDLE mkl_handle_;
   complex_float* fft_inout_;      // Buffer for both FFT input and output
   complex_float* fft_shift_tmp_;  // Buffer for both FFT input and output
+  complex_float* fft_tp_tmp_;     // Buffer for transposed result of FFT
 
   // Buffer for store 16-bit IQ converted from 12-bit IQ
   uint16_t* temp_16bits_iq_;

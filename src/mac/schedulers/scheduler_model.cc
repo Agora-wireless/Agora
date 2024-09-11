@@ -15,7 +15,7 @@
 std::unique_ptr<SchedulerModel> SchedulerModel::CreateSchedulerModel(
     Config* const cfg, bool client) {
   std::string scheduler_type = cfg->SchedulerType();
-  if (scheduler_type == "round_robbin") {
+  if (scheduler_type == "rr") {
     return std::make_unique<RoundRobbin>(cfg);
   } else {  // all the dynamic schedulers
     if (client == true) {

@@ -38,6 +38,9 @@ DoFFT::DoFFT(Config* config, size_t tid, Table<complex_float>& data_buffer,
   fft_shift_tmp_ = static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64,
       cfg_->OfdmCaNum() * sizeof(complex_float)));
+  fft_tp_tmp_ = static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
+      Agora_memory::Alignment_t::kAlign64,
+      cfg_->BsAntNum() * cfg_->OfdmDataNum() * sizeof(complex_float)));
   temp_16bits_iq_ = static_cast<uint16_t*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64, 32 * sizeof(uint16_t)));
   rx_samps_tmp_ =
@@ -50,6 +53,7 @@ DoFFT::~DoFFT() {
   DftiFreeDescriptor(&mkl_handle_);
   std::free(fft_inout_);
   std::free(fft_shift_tmp_);
+  std::free(fft_tp_tmp_);
   std::free(rx_samps_tmp_);
   std::free(temp_16bits_iq_);
 }
@@ -198,22 +202,21 @@ EventData DoFFT::Launch(size_t tag) {
     if (kCollectPhyStats) {
       if (cfg_->FreqOrthogonalPilot()) {
         for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
-          phy_stats_->UpdatePilotSnr(frame_id, ue_id, ant_id, fft_inout_);
+          if (ue_id / cfg_->PilotScGroupSize() == pilot_symbol_id) {
+            phy_stats_->UpdatePilotSnr(frame_id, ue_id, ant_id, fft_inout_);
+          }
         }
       } else {
         phy_stats_->UpdatePilotSnr(frame_id, pilot_symbol_id, ant_id,
                                    fft_inout_);
       }
     }
-    PartialTranspose(csi_buffers_[frame_slot][pilot_symbol_id], ant_id,
-                     SymbolType::kPilot);
 
     // Expand partial CSI from freq-orth pilot to full CSI per UE
     // TODO 1. allow pilot sc group size different than kTransposeBlockSize
-    // TODO 2. potential use of multiple pilot symbols
-    // TODO 3. interpolation of CSI in gap subcarriers
-    if (cfg_->FreqOrthogonalPilot() &&
-        pilot_symbol_id == cfg_->Frame().NumPilotSyms() - 1) {
+    // TODO 2. interpolation of CSI in gap subcarriers
+    if (cfg_->FreqOrthogonalPilot()) {
+      PartialTranspose(fft_tp_tmp_, ant_id, SymbolType::kPilot);
       const size_t num_blocks = cfg_->OfdmDataNum() / kTransposeBlockSize;
       for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
         const size_t block_base_offset =
@@ -223,14 +226,19 @@ EventData DoFFT::Launch(size_t tag) {
                 ? block_base_offset + (ant_id * kTransposeBlockSize)
                 : (cfg_->OfdmDataNum() * ant_id) +
                       (block_idx * kTransposeBlockSize);
-        complex_float* src = &csi_buffers_[frame_slot][0][block_offset];
-        for (ssize_t ue_id = cfg_->UeAntNum() - 1; ue_id >= 0; ue_id--) {
+        complex_float* src = &fft_tp_tmp_[block_offset];
+        size_t ue_start = pilot_symbol_id * cfg_->PilotScGroupSize();
+        size_t ue_stop = (pilot_symbol_id + 1) * cfg_->PilotScGroupSize();
+        for (size_t ue_id = ue_start; ue_id < ue_stop; ue_id++) {
           complex_float* dst = &csi_buffers_[frame_slot][ue_id][block_offset];
           for (size_t sc_idx = 0; sc_idx < kTransposeBlockSize; sc_idx++) {
-            dst[sc_idx] = src[ue_id];
+            dst[sc_idx] = src[ue_id - ue_start];
           }
         }
       }
+    } else {
+      PartialTranspose(csi_buffers_[frame_slot][pilot_symbol_id], ant_id,
+                       SymbolType::kPilot);
     }
   } else if (sym_type == SymbolType::kUL) {
     PartialTranspose(cfg_->GetDataBuf(data_buffer_, frame_id, symbol_id),
