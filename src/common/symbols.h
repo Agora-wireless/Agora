@@ -337,7 +337,10 @@ static constexpr size_t kMaxDataSCs = 3300;
 static constexpr size_t kMaxAntennas = 64;
 
 // Maximum number of UEs supported by Agora
-static constexpr size_t kMaxUEs = 64;
+static constexpr size_t kMaxUEs = 192;
+
+// Maximum number of Tasks in FrameCounters
+static constexpr size_t kMaxTasks = 256;
 
 // Maximum number of transceiver channels per radio
 static constexpr size_t kMaxChannels = 2;
@@ -396,11 +399,11 @@ static constexpr size_t kAppBaseLocalPort = 1450u;
 // Agora sends control information over an out-of-band control channel
 // to each UE #i, at port kBaseClientPort + i
 /// \todo need to generalize for hostname, port pairs for each client
-static constexpr size_t kMacBaseClientPort = 7070;
+static constexpr size_t kMacBaseClientPort = 7270;
 
 // Number of subcarriers in a partial transpose block
-static constexpr size_t kTransposeBlockSize = 8;
-static_assert(IsPowerOfTwo(kTransposeBlockSize));  // For cheap modulo
+static constexpr size_t kTransposeBlockSize = 24;
+//static_assert(IsPowerOfTwo(kTransposeBlockSize));  // For cheap modulo
 static_assert(kTransposeBlockSize % kSCsPerCacheline == 0);
 
 static constexpr size_t kCalibScGroupSize = 8;
@@ -415,11 +418,7 @@ static constexpr bool kUseAVX2Encoder = false;
 // Enable debugging for sender and receiver applications
 static constexpr bool kDebugSenderReceiver = false;
 
-#if defined(ENABLE_HDF5)
-static constexpr bool kOutputUlScData = true;
-#else
 static constexpr bool kOutputUlScData = false;
-#endif
 
 static constexpr size_t kOfdmSymbolPerSlot = 1;
 static constexpr size_t kOutputFrameNum = 1;

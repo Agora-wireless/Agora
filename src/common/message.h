@@ -523,7 +523,7 @@ class FrameCounters {
  private:
   // task_count[i][j] is the number of tasks completed for
   // frame (i % kFrameWnd) and symbol j
-  std::array<std::array<size_t, kMaxSymbols>, kFrameWnd> task_count_;
+  std::array<std::array<size_t, kMaxTasks>, kFrameWnd> task_count_;
   // symbol_count[i] is the number of symbols completed for
   // frame (i % kFrameWnd)
   std::array<size_t, kFrameWnd> symbol_count_;
