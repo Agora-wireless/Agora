@@ -118,6 +118,8 @@ set(ENABLE_DPDK False CACHE BOOL "ENABLE_DPDK set to true to enable dpdk support
 message(STATUS "ENABLE_DPDK:      ${ENABLE_DPDK}")
 set(ENABLE_HDF5 False CACHE BOOL "ENABLE_HDF5 defaulting to 'False'")
 message(STATUS "ENABLE_HDF5:      ${ENABLE_HDF5}")
+set(ENABLE_DATA_REC False CACHE BOOL "ENABLE_DATA_REC defaulting to 'False'")
+message(STATUS "ENABLE_DATA_REC:      ${ENABLE_DATA_REC}")
 message(STATUS "--------------------------------\n--")
 
 if(RADIO_TYPE STREQUAL SOAPY_IRIS)
@@ -408,22 +410,6 @@ include_directories(
   src/client/txrx/workers
   src/data_generator)
 
-set(RECORDER_SOURCES
-  src/recorder/recorder_thread.cc
-  src/recorder/recorder_worker.cc
-  src/recorder/recorder_worker_multifile.cc)
-
-if (${ENABLE_HDF5})
-  set(RECORDER_SOURCES
-      ${RECORDER_SOURCES}
-      src/recorder/hdf5_lib.cc
-      src/recorder/recorder_worker_hdf5.cc)
-  set(CHSIM_SOURCES
-      ${CHSIM_SOURCES}
-      simulator/channel_models/dataset_model.cc)
-endif()
-add_library(recorder_sources_lib OBJECT ${RECORDER_SOURCES})
-
 set(COMMON_SOURCES
   ${RADIO_SOURCES}
   src/agora/stats.cc
@@ -463,6 +449,27 @@ set(SHARED_TXRX_SOURCES
   src/agora/txrx/packet_txrx.cc
   src/agora/txrx/workers/txrx_worker.cc)
 add_library(shared_txrx_sources_lib OBJECT ${SHARED_TXRX_SOURCES})
+
+set(RECORDER_SOURCES
+  src/recorder/recorder_thread.cc
+  src/recorder/recorder_worker.cc
+  src/recorder/recorder_worker_multifile.cc)
+
+if (${ENABLE_HDF5})
+  if (${ENABLE_DATA_REC})
+    set(RECORDER_SOURCES
+        ${RECORDER_SOURCES}
+        src/recorder/hdf5_lib.cc
+        src/recorder/recorder_worker_hdf5.cc)
+  endif()
+  set(CHSIM_SOURCES
+      ${CHSIM_SOURCES}
+      simulator/channel_models/dataset_model.cc)
+  set(COMMON_SOURCES
+	  ${COMMON_SOURCES}
+      src/mac/schedulers/helix_share.cc)
+endif()
+add_library(recorder_sources_lib OBJECT ${RECORDER_SOURCES})
 
 if(${USE_DPDK})
   add_definitions(-DUSE_DPDK)

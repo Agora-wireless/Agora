@@ -4,7 +4,7 @@
  */
 #include "recorder_worker.h"
 
-#if defined(ENABLE_HDF5)
+#if defined(ENABLE_DATA_REC)
 #include "recorder_worker_hdf5.h"
 #endif
 #include "recorder_worker_multifile.h"
@@ -20,7 +20,7 @@ std::unique_ptr<RecorderWorker> RecorderWorker::Create(
       return std::make_unique<RecorderWorkerMultiFile>(
           in_cfg, antenna_offset, num_antennas, record_interval, rx_direction);
     }
-#if defined(ENABLE_HDF5)
+#if defined(ENABLE_DATA_REC)
     case RecorderWorker::RecorderWorkerTypes::kRecorderWorkerHdf5: {
       return std::make_unique<RecorderWorkerHDF5>(
           in_cfg, antenna_offset, num_antennas, record_interval, rx_direction);

@@ -24,7 +24,7 @@ static constexpr size_t kDefaultQueueSize = 36;
 
 //Recording parameters
 static constexpr size_t kRecordFrameInterval = 1;
-#if defined(ENABLE_HDF5)
+#if defined(ENABLE_DATA_REC)
 static constexpr bool kRecordDownlinkFrame = true;
 
 //set the recording types, can add multiple
@@ -42,13 +42,14 @@ static const std::vector<Agora_recorder::RecorderWorker::RecorderWorkerTypes>
 
 PhyUe::PhyUe(Config* config)
     : mac_sched_(std::make_unique<MacScheduler>(config, true)),
-      stats_(std::make_unique<Stats>(config)),
-      demod_buffer_(kFrameWnd, config->Frame().NumDlDataSyms(),
+      stats_(std::make_unique<Stats>(config)) /*,
+      demod_buffer_(kFrameWnd, config->Frame().NumDlDataSyms() + 1,
                     config->UeAntNum(),
                     kMaxModType * Roundup<64>(config->GetOFDMDataNum())),
       decoded_buffer_(
-          kFrameWnd, config->Frame().NumDlDataSyms(), config->UeAntNum(),
-          config->MacParams().MaxPacketBytes(Direction::kDownlink)) {
+          kFrameWnd, config->Frame().NumDlDataSyms() + 1, config->UeAntNum(),
+          config->MacParams().MaxPacketBytes(Direction::kDownlink))*/
+{
   srand(time(nullptr));
   // TODO take into account the UeAntOffset to allow for multiple PhyUe
   // instances

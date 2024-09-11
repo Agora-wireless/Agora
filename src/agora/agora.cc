@@ -31,7 +31,7 @@ static const std::string kDecodeDataFilename =
 //Recording parameters
 static constexpr size_t kRecordFrameInterval = 1;
 static constexpr size_t kDefaultQueueSize = 36;
-#if defined(ENABLE_HDF5)
+#if defined(ENABLE_DATA_REC)
 static constexpr bool kRecordUplinkFrame = true;
 
 //set the recording types, can add multiple
