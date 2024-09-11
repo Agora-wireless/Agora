@@ -6,6 +6,8 @@
 
 //scheduler models
 #include "custom_schedule.h"
+#include "helix_orth.h"
+#include "helix_share.h"
 #include "logger.h"
 #include "proportional_fairness.h"
 #include "round_robbin.h"
@@ -23,6 +25,10 @@ std::unique_ptr<SchedulerModel> SchedulerModel::CreateSchedulerModel(
     } else {
       if (scheduler_type == "pf") {
         return std::make_unique<ProportionalFairness>(cfg);
+      } else if (scheduler_type == "helix_share") {
+        return std::make_unique<RB_Share>(cfg);
+      } else if (scheduler_type == "helix_orth") {
+        return std::make_unique<RB_Orth>(cfg);
       } else if (scheduler_type == "custom") {
         return std::make_unique<CustomSchedule>(cfg);
       } else {

@@ -175,7 +175,8 @@ void MacThreadBaseStation::ProcessRxFromPhy() {
 
 void MacThreadBaseStation::ProcessCsiReportFromPhy(EventData event) {
   const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-  if (cfg_->SchedulerType() == "pf") {
+  if (cfg_->SchedulerType() == "pf" || cfg_->SchedulerType() == "helix_share" ||
+      cfg_->SchedulerType() == "helix_orth") {
     // prepare csi vector
     std::vector<arma::cx_fmat> csi_mat;
     size_t num_blocks = cfg_->OfdmDataNum() / kTransposeBlockSize;
@@ -186,9 +187,8 @@ void MacThreadBaseStation::ProcessCsiReportFromPhy(EventData event) {
                                   csi_buffers_[frame_id % kFrameWnd][ue]),
                               kTransposeBlockSize, cfg_->BsAntNum(), num_blocks,
                               false);
-      // TODO: Does this work for freq_orthogonal mode?
       arma::cx_fmat csi_mat_trim = csi_cube.row_as_mat(
-          ue);  // this will return num_blocks x bs_ant_num matrix
+          0u);  // this will return num_blocks x bs_ant_num matrix
       arma::uvec idx = arma::linspace<arma::uvec>(0u, num_blocks - 1, num_prbs);
       arma::cx_fmat csi_mat_trim2 = csi_mat_trim.rows(idx).st();
       csi_mat.push_back(csi_mat_trim2);
