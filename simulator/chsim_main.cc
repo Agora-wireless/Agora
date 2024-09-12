@@ -22,7 +22,8 @@ DEFINE_string(
     conf_file,
     TOSTRING(PROJECT_DIRECTORY) "/files/config/ci/tddconfig-sim-both.json",
     "Config filename");
-DEFINE_string(chan_model, "RAYLEIGH", "Simulator Channel Type: RAYLEIGH/AWGN");
+DEFINE_string(chan_model, "RAYLEIGH",
+              "Simulator Channel Type: RAYLEIGH/AWGN/DATASET");
 DEFINE_string(chan_dataset, "", "Dataset source");
 
 int main(int argc, char* argv[]) {

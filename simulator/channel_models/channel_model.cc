@@ -21,12 +21,10 @@ std::unique_ptr<ChannelModel> ChannelModel::CreateChannelModel(
   } else if (channel_type == "RAYLEIGH") {
     return std::make_unique<RayleighModel>(
         config->BsAntNum(), config->UeAntNum(), config->SampsPerSymbol());
-#if defined(ENABLE_HDF5)
   } else if (channel_type == "DATASET") {
     return std::make_unique<DatasetModel>(
         config->BsAntNum(), config->UeAntNum(), config->SampsPerSymbol(),
         dataset_path);
-#endif
   } else {
     AGORA_LOG_WARN(
         "Invalid channel model (%s) at CHSim, assuming AWGN Model... \n",
