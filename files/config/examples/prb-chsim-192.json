@@ -11,7 +11,7 @@
   },
   /* set sample rate to 1Ms
   to make sure tests pass*/
-  "sample_rate" : 1e6,
+  "sample_rate" : 1e5,
   "spatial_streams" : 4,
   "ue_radio_num": 192,
   "bs_radio_num": 64,
@@ -31,8 +31,9 @@
   "ue_core_offset": 1,
   "ue_worker_thread_num": 2,
   "ue_socket_thread_num": 1,
-  "max_frame": 160,
+  "max_frame": 100,
   "freq_orthogonal_pilot" : true,
-  "scheduler_type" : "rr",
+  "freq_domain_channel" : true,
+  "scheduler_type" : "helix_orth",
   "slot_scheduling" : true
 }
