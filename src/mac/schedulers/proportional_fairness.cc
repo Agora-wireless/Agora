@@ -6,8 +6,7 @@
 
 #include "logger.h"
 
-static constexpr bool kPrintSchedulingBuffers = true;
-static constexpr bool kPrintSchedulingGroups = true;
+static constexpr bool kPrintSchedulingBuffers = false;
 static constexpr bool kPrintSelectedGroup = true;
 static constexpr float kLamda = 0.5;
 
