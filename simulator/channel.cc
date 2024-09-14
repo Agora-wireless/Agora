@@ -51,9 +51,10 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
         if (cfg_->FreqDomainChannel()) {
           if (h_index < cfg_->OfdmDataStart() ||
               h_index >= cfg_->OfdmDataStop()) {
-            const size_t new_dim =
+            /*const size_t new_dim =
                 (is_downlink) ? cfg_->BsAntNum() : cfg_->UeAntNum();
-            H = arma::zeros<arma::cx_fmat>(new_dim, n_cols);
+            /H = arma::zeros<arma::cx_fmat>(new_dim, n_cols);*/
+            H = channel_model_->GetMatrix(is_downlink, 0u);
           } else {
             H = channel_model_->GetMatrix(is_downlink,
                                           h_index - cfg_->OfdmDataStart());

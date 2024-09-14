@@ -11,11 +11,11 @@
   },
   /* set sample rate to 1Ms
   to make sure tests pass*/
-  "sample_rate" : 1e5,
-  "spatial_streams" : 4,
+  "sample_rate" : 1e6,
+  "spatial_streams" : 2,
   "ue_radio_num": 192,
   "bs_radio_num": 64,
-  "symbol_num_perframe": 18,
+  "symbol_num_perframe": 28,
   "client_ul_pilot_syms": 0,
   "ul_data_symbol_start": 9,
   "ul_symbol_num_perframe": 9,
@@ -31,9 +31,9 @@
   "ue_core_offset": 1,
   "ue_worker_thread_num": 2,
   "ue_socket_thread_num": 1,
-  "max_frame": 100,
+  "max_frame": 40,
   "freq_orthogonal_pilot" : true,
   "freq_domain_channel" : true,
-  "scheduler_type" : "helix_orth",
+  "scheduler_type" : "pf",
   "slot_scheduling" : true
 }

@@ -2,7 +2,7 @@
 
 #include "logger.h"
 
-static constexpr bool kPrintUeSchedule = true;
+static constexpr bool kPrintUeSchedule = false;
 
 UeScheduler::UeScheduler(Config* const cfg) : SchedulerModel(cfg) {
   num_groups_ = kFrameWnd;

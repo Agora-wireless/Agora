@@ -177,6 +177,7 @@ void MacThreadBaseStation::ProcessCsiReportFromPhy(EventData event) {
   const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
   if (cfg_->SchedulerType() == "pf" || cfg_->SchedulerType() == "helix_share" ||
       cfg_->SchedulerType() == "helix_orth") {
+    size_t start_tsc = GetTime::WorkerRdtsc();
     // prepare csi vector
     std::vector<arma::cx_fmat> csi_mat;
     size_t num_blocks = cfg_->OfdmDataNum() / kTransposeBlockSize;
@@ -200,6 +201,12 @@ void MacThreadBaseStation::ProcessCsiReportFromPhy(EventData event) {
         this->phy_stats_->GetGoodput(frame_id - 1);
     mac_sched_->UpdateScheduler(frame_id + 1, csi_mat, max_snr_per_ue,
                                 last_throughput);
+    size_t stop_tsc = GetTime::WorkerRdtsc();
+    std::printf("Frame %zu: Schedule update takes %.2f us\n", frame_id,
+                GetTime::CyclesToUs(stop_tsc - start_tsc, cfg_->FreqGhz()));
+  }
+  for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
+    SendControlInformation(frame_id, ue_id);
   }
 }
 
@@ -603,7 +610,7 @@ void MacThreadBaseStation::SendCodeblocksToPhy(EventData event) {
   const size_t num_pilot_symbols = cfg_->Frame().ClientDlPilotSymbols();
   // This function is run for all UEs in every frame
   // when the first pilots are received
-  SendControlInformation(frame_id, ue_id);
+  //SendControlInformation(frame_id, ue_id);
   if (0 == mac_packet_length ||
       mac_sched_->IsUeScheduled(frame_id, ue_id) == false) {
     return;
