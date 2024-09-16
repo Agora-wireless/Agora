@@ -114,10 +114,12 @@ void Agora::Stop() {
 
 void Agora::ScheduleDownlinkMAC(size_t frame_id) {
   // We send this for all UEs to handle control messages in the MAC
-  for (size_t ue = 0; ue < config_->UeAntNum(); ue++) {
-    auto base_tag = gen_tag_t::FrmUe(frame_id, ue);
-    EventData mac_event(EventType::kPacketFromMac, base_tag.tag_);
-    TryEnqueueFallback(&mac_request_queue_, mac_event);
+  if (config_->Frame().NumDLSyms() > 0) {
+    for (size_t ue = 0; ue < config_->UeAntNum(); ue++) {
+      auto base_tag = gen_tag_t::FrmUe(frame_id, ue);
+      EventData mac_event(EventType::kPacketFromMac, base_tag.tag_);
+      TryEnqueueFallback(&mac_request_queue_, mac_event);
+    }
   }
 }
 
@@ -629,6 +631,23 @@ void Agora::Start() {
                                      frame_id, symbol_id);
                   assert(frame_tracking_.cur_sche_frame_id_ == frame_id);
                   CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
+                  size_t num_sched_ues = mac_sched_->NumScheduledUes(frame_id);
+                  if (0 == num_sched_ues) {
+                    this->stats_->MasterSetTsc(TsType::kDecodeDone, frame_id);
+                    stats_->PrintPerFrameDone(PrintType::kDecode, frame_id);
+                    assert(frame_tracking_.cur_proc_frame_id_ == frame_id);
+                    stats_->PrintPerFrameDone(PrintType::kPacketToMac,
+                                              frame_id);
+                    for (size_t i = 0; i < cfg->SpatialStreamsNum(); i++) {
+                      this->tomac_counters_.CompleteTask(frame_id, i);
+                    }
+                    this->tomac_counters_.CompleteSymbol(frame_id);
+                    const bool work_finished =
+                        this->CheckFrameComplete(frame_id);
+                    if (work_finished == true) {
+                      goto finish;
+                    }
+                  }
                 }
               }
             }

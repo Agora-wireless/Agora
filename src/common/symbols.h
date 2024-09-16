@@ -213,6 +213,12 @@ static constexpr bool kEnableMatLog = true;
 static constexpr bool kEnableMatLog = false;
 #endif
 
+static constexpr bool kEnableSlowStart = true;
+static constexpr size_t kSlowStartThresh1 = kFrameWnd;
+static constexpr size_t kSlowStartThresh2 = (kFrameWnd * 4);
+static constexpr size_t kSlowStartMulStage1 = 32;
+static constexpr size_t kSlowStartMulStage2 = 8;
+
 // Use 12-bit IQ sample to reduce network throughput
 static constexpr bool kUse12BitIQ = false;
 static constexpr bool kDebug12BitIQ = false;

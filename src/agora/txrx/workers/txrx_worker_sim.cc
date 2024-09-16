@@ -12,13 +12,7 @@
 #include "logger.h"
 #include "message.h"
 
-static constexpr bool kEnableSlowStart = true;
 static constexpr bool kDebugPrintBeacon = false;
-
-static constexpr size_t kSlowStartThresh1 = kFrameWnd;
-static constexpr size_t kSlowStartThresh2 = (kFrameWnd * 4);
-static constexpr size_t kSlowStartMulStage1 = 32;
-static constexpr size_t kSlowStartMulStage2 = 8;
 
 static constexpr size_t kSocketRxBufferSize = (1024 * 1024 * 64 * 8) - 1;
 
@@ -136,7 +130,7 @@ void TxRxWorkerSim::DoTxRx() {
         thread_local_interface = 0;
       }
     }  // end if -1 == send_result
-  }  // end while
+  }    // end while
   running_ = false;
 }
 

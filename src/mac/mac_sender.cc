@@ -25,10 +25,6 @@ static constexpr size_t kFrameLoadAdvance = 10;
 static constexpr size_t kBufferInit = 10;
 static constexpr size_t kTxBufferElementAlignment = 64;
 
-static constexpr size_t kSlowStartThresh1 = kFrameWnd;
-static constexpr size_t kSlowStartThresh2 = (kFrameWnd * 4);
-static constexpr size_t kSlowStartMulStage1 = 32;
-static constexpr size_t kSlowStartMulStage2 = 8;
 static constexpr size_t kMasterThreadId = 0;
 
 static_assert(kFrameLoadAdvance >= kBufferInit);
@@ -184,8 +180,8 @@ void MacSender::StartTx() {
   // Run the master thread (from current thread)
   MasterThread(kMasterThreadId);
 
-  delete[] (this->frame_start_);
-  delete[] (this->frame_end_);
+  delete[](this->frame_start_);
+  delete[](this->frame_end_);
 }
 
 void MacSender::StartTxfromMain(double* in_frame_start, double* in_frame_end) {
@@ -427,7 +423,7 @@ void* MacSender::WorkerThread(size_t tid) {
       RtAssert(completion_queue_.enqueue_bulk(tags.data(), num_tags),
                "Completion enqueue failed");
     }  // if (num_tags > 0)
-  }  // while (keep_running.load() == true)
+  }    // while (keep_running.load() == true)
   AGORA_LOG_FRAME("MacSender: worker thread %zu exit\n", tid);
   return nullptr;
 }

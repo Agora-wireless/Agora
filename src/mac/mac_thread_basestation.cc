@@ -202,8 +202,38 @@ void MacThreadBaseStation::ProcessCsiReportFromPhy(EventData event) {
     mac_sched_->UpdateScheduler(frame_id + 1, csi_mat, max_snr_per_ue,
                                 last_throughput);
     size_t stop_tsc = GetTime::WorkerRdtsc();
-    std::printf("Frame %zu: Schedule update takes %.2f us\n", frame_id,
-                GetTime::CyclesToUs(stop_tsc - start_tsc, cfg_->FreqGhz()));
+    AGORA_LOG_INFO("Frame %zu: Schedule update takes %.2f us\n", frame_id,
+                   GetTime::CyclesToUs(stop_tsc - start_tsc, cfg_->FreqGhz()));
+    const double rdtsc_freq = GetTime::MeasureRdtscFreq();
+    const size_t frame_tsc_delta =
+        cfg_->GetFrameDurationSec() * 1e9f * rdtsc_freq;
+    const size_t two_hundred_ms_ticks = (0.2f /* 200 ms */ * 1e9f * rdtsc_freq);
+
+    const size_t slow_start_tsc1 =
+        std::max(kSlowStartMulStage1 * frame_tsc_delta, two_hundred_ms_ticks);
+
+    const size_t slow_start_tsc2 = kSlowStartMulStage2 * frame_tsc_delta;
+    size_t delay_tsc = frame_tsc_delta;
+
+    if (kEnableSlowStart) {
+      if (frame_id < kSlowStartThresh1) {
+        delay_tsc = slow_start_tsc1;
+      } else if (frame_id >= kSlowStartThresh1 &&
+                 frame_id < kSlowStartThresh2) {
+        delay_tsc = slow_start_tsc2;
+      }
+    }
+    if (stop_tsc - start_tsc > 0.5 * delay_tsc) {
+      AGORA_LOG_WARN(
+          "Scheduler update function takes more than half of the frame "
+          "time!\n");
+      if (stop_tsc - start_tsc > delay_tsc) {
+        AGORA_LOG_ERROR(
+            "Scheduler update function is too slow and takes longer than a "
+            "frame time. Stopping...\n");
+        cfg_->Running(false);
+      }
+    }
   }
   for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
     SendControlInformation(frame_id, ue_id);
@@ -608,9 +638,6 @@ void MacThreadBaseStation::SendCodeblocksToPhy(EventData event) {
   const size_t num_mac_packets_per_frame =
       mac_sched_->Params().MacPacketsPerframe(Direction::kDownlink);
   const size_t num_pilot_symbols = cfg_->Frame().ClientDlPilotSymbols();
-  // This function is run for all UEs in every frame
-  // when the first pilots are received
-  //SendControlInformation(frame_id, ue_id);
   if (0 == mac_packet_length ||
       mac_sched_->IsUeScheduled(frame_id, ue_id) == false) {
     return;
