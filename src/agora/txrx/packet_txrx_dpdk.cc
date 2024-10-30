@@ -106,9 +106,8 @@ PacketTxRxDpdk::~PacketTxRxDpdk() {
         // All workers should have exited, shutdown the resources nicely
         auto ret_status = rte_flow_flush(eth_port, &flow_error);
         if (ret_status != 0) {
-          AGORA_LOG_ERROR(
-              "Flow cannot be flushed %d message: %s\n", flow_error.type,
-              flow_error.message ? flow_error.message : "(no stated reason)");
+          AGORA_LOG_ERROR("Flow cannot be flushed %d message: %s\n",
+                          flow_error.type, flow_error.message);
         }
 
         ret_status = rte_eth_dev_stop(eth_port);

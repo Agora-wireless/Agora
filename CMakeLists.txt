@@ -457,18 +457,17 @@ set(COMMON_SOURCES
   src/data_generator/data_generator.cc)
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
-set(SHARED_TXRX_SOURCES
-  src/agora/txrx/packet_txrx.cc
-  src/agora/txrx/workers/txrx_worker.cc)
-add_library(shared_txrx_sources_lib OBJECT ${SHARED_TXRX_SOURCES})
-
-if(${USE_DPDK})
-  add_definitions(-DUSE_DPDK)
-  set(AGORA_SOURCES
+if(${ENABLE_DPDK})
+  set(SHARED_TXRX_SOURCES
     src/common/dpdk_transport.cc
     src/agora/txrx/packet_txrx_dpdk.cc
     src/agora/txrx/workers/txrx_worker_dpdk.cc)
 endif()
+
+set(SHARED_TXRX_SOURCES ${SHARED_TXRX_SOURCES}
+  src/agora/txrx/packet_txrx.cc
+  src/agora/txrx/workers/txrx_worker.cc)
+add_library(shared_txrx_sources_lib OBJECT ${SHARED_TXRX_SOURCES})
 
 set(AGORA_SOURCES ${AGORA_SOURCES}
   ${RADIO_SOURCES_AGORA}
