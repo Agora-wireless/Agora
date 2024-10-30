@@ -79,8 +79,10 @@ int DpdkTransport::NicInit(uint16_t port, rte_mempool* mbuf_pool,
   rte_flow_error flow_error;
   int en_isolate = rte_flow_isolate(port, 1, &flow_error);
   if (en_isolate != 0) {
-    AGORA_LOG_WARN("Flow cannot be isolated %d message: %s\n", flow_error.type,
-                   flow_error.message);
+    AGORA_LOG_WARN(
+        "Flow cannot be isolated %d message: %s\n",
+        static_cast<int>(flow_error.type),
+        flow_error.message ? flow_error.message : "(no stated reason)");
     //RtAssert(en_isolate == 0, "Unable to set flow isolate mode");
   }
 
