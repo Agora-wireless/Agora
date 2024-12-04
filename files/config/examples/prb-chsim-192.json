@@ -12,7 +12,7 @@
   /* set sample rate to 1Ms
   to make sure tests pass*/
   "sample_rate" : 1e6,
-  "spatial_streams" : 16,
+  "spatial_streams" : 4,
   "ue_radio_num": 192,
   "bs_radio_num": 64,
   "symbol_num_perframe": 40,
@@ -31,8 +31,8 @@
   "ue_core_offset": 1,
   "ue_worker_thread_num": 2,
   "ue_socket_thread_num": 1,
-  "max_frame": 100,
-  "noise_level" : 0,
+  "max_frame": 1000,
+  "noise_level" : 0.001,
   "freq_orthogonal_pilot" : true,
   "freq_domain_channel" : true,
   "scheduler_type" : "helix_share",

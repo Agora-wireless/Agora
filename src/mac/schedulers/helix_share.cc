@@ -29,14 +29,15 @@ RB_Share::RB_Share(Config* const cfg)  // Initialization
 
   //Schedule Buffer Process
   for (size_t gp = 0; gp < num_groups_; gp++) {
-    // for (size_t prb = 0; prb < num_prbs_; prb++) {
-    // //   std::vector<size_t> u_es_idx = groups_vector_[gp];
-    //   for (size_t ue_idx = 0; ue_idx < cfg_->UeAntNum(); ue_idx++) {
-    //     schedule_buffer_[gp][ue_idx + cfg_->UeAntNum() * prb] = 0;
-    //     schedule_buffer_index_[gp][ue_idx + cfg_->SpatialStreamsNum() * prb] =
-    //         u_es_idx[ue_idx];
-    //   }
-    // }
+    for (size_t prb = 0; prb < num_prbs_; prb++) {
+      for (size_t ue = 0; ue < cfg_->SpatialStreamsNum(); ue++) {
+        size_t ue_idx =
+            (prb + (cfg_->UeAntNum() / Num_slice) * ue) % cfg_->UeAntNum();
+        schedule_buffer_[gp][ue_idx + cfg_->UeAntNum() * prb] = 1;
+        schedule_buffer_index_[gp][ue + cfg_->SpatialStreamsNum() * prb] =
+            ue_idx;
+      }
+    }
     for (size_t ue = 0; ue < cfg_->UeAntNum(); ue++) {
       ul_mcs_buffer_[gp][ue] = cfg->MacParams().McsIndex(Direction::kUplink);
       dl_mcs_buffer_[gp][ue] = cfg->MacParams().McsIndex(Direction::kDownlink);
@@ -320,6 +321,8 @@ void RB_Share::Update(size_t frame, const std::vector<arma::cx_fmat>& csi,
       // *******************  Allocation Results Recording  **********************
       size_t frame_next = frame + 1;
       size_t gp = frame_next % num_groups_;
+      std::memset(schedule_buffer_[gp], 0,
+                  num_prbs_ * cfg_->UeAntNum() * sizeof(size_t));
 
       for (size_t i = 0; i < sel_UE_list.size(); i++) {
         schedule_buffer_index_[gp][i + cfg_->SpatialStreamsNum() * sel_rbg] =
@@ -482,7 +485,8 @@ void RB_Share::Update(size_t frame, const std::vector<arma::cx_fmat>& csi,
 
     for (size_t sl = 0; sl < Num_slice; sl++) {
       delta_slice[sl] = SLAs[sl] * (frame + 1) - est_slice_tp_[sl];
-      // std::cout << "Delta of slice" << sl << ":" << delta_slice[sl] << std::endl;
+      std::cout << "Delta of slice" << sl << ":" << delta_slice[sl]
+                << std::endl;
     }
   }
   // auto rb_finish = std::chrono::high_resolution_clock::now();

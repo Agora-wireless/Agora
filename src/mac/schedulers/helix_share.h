@@ -61,7 +61,8 @@ class RB_Share : public SchedulerModel {
 
   const std::vector<int> Num_UE_ps = {9, 11, 17, 19, 24, 32, 44, 36};
   // const int SEL_UE = 16;
-  const std::vector<float> SLAs = {135, 120, 130, 140, 45, 110, 50, 125};
+  const std::vector<float> SLAs = {135 * 1e6, 120 * 1e6, 130 * 1e6, 140 * 1e6,
+                                   45 * 1e6,  110 * 1e6, 50 * 1e6,  125 * 1e6};
 
   const int new_rb_para = 0;  // If RB Parallel
 
