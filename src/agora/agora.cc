@@ -582,7 +582,13 @@ void Agora::Start() {
               this->stats_->MasterSetTsc(TsType::kDemulDone, frame_id);
               stats_->PrintPerFrameDone(PrintType::kDemul, frame_id);
               auto ue_map = mac_sched_->ScheduledUeMap(frame_id, 0u);
-              auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
+              arma::uvec ue_list;
+              for (size_t ue = 0; ue < config_->UeAntNum(); ue++) {
+                if (mac_sched_->IsUeScheduled(frame_id, ue)) {
+                  ue_list = arma::join_cols(ue_list, arma::uvec{ue});
+                }
+              }
+              //auto ue_list = mac_sched_->ScheduledUeList(frame_id, 0u);
               if (kPrintPhyStats) {
                 this->phy_stats_->PrintEvmStats(frame_id, ue_list);
               }
