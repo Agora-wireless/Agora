@@ -312,6 +312,17 @@ void PhyStats::PrintCalibSnrStats(size_t frame_id) {
   AGORA_LOG_INFO("%s", ss.str().c_str());
 }
 
+void PhyStats::PrintGoodputStats(size_t frame_id, const std::vector<float> ue_thpt) {
+  [[maybe_unused]] std::stringstream ss;
+  ss << "Frame " << frame_id << " Goodput at " << std::fixed
+     << std::setw(5) << std::setprecision(1);
+  for (size_t i = 0; i < ue_thpt.size(); i++) {
+    ss << "User " << i << ":  " << ue_thpt.at(i) << ", ";
+  }
+  ss << std::endl;
+  AGORA_LOG_INFO("%s", ss.str().c_str());
+}
+
 void PhyStats::RecordPilotSnr(size_t frame_id) {
   if (kEnableCsvLog) {
     std::stringstream ss_snr;

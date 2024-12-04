@@ -199,6 +199,7 @@ void MacThreadBaseStation::ProcessCsiReportFromPhy(EventData event) {
     // TODO: Will previous frame be up-to-date if the receive processing falls behind?
     std::vector<float> last_throughput =
         this->phy_stats_->GetGoodput(frame_id - 1);
+    this->phy_stats_->PrintGoodputStats(frame_id - 1, last_throughput);
     mac_sched_->UpdateScheduler(frame_id + 1, csi_mat, max_snr_per_ue,
                                 last_throughput);
     size_t stop_tsc = GetTime::WorkerRdtsc();
@@ -277,8 +278,8 @@ void MacThreadBaseStation::SendControlInformation(size_t frame_id,
           mac_sched_->SelectedUlMcs(scheduler_next_frame_id_, ue_id);
       ri.dl_mcs_index_ =
           mac_sched_->SelectedDlMcs(scheduler_next_frame_id_, ue_id);
-      AGORA_LOG_INFO("Sending scheduling message for frame %zu, ue %zu\n",
-                     scheduler_next_frame_id_, next_radio_id_);
+      AGORA_LOG_TRACE("Sending scheduling message for frame %zu, ue %zu\n",
+                      scheduler_next_frame_id_, next_radio_id_);
       udp_comm_->Send(cfg_->UeServerAddr(), kMacBaseClientPort,
                       reinterpret_cast<std::byte*>(&ri), sizeof(RBIndicator));
       next_radio_id_++;

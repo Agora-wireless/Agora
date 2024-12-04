@@ -63,6 +63,7 @@ class PhyStats {
   void PrintCalibSnrStats(size_t frame_id);
   void UpdateCsiCond(size_t frame_id, size_t sc_id, float cond);
   void PrintBeamStats(size_t frame_id);
+  void PrintGoodputStats(size_t frame_id, const std::vector<float> ue_thpt);
   void UpdateUlCsi(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
   void UpdateDlCsi(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
   void UpdateUlBeam(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
