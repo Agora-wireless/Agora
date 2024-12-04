@@ -16,6 +16,22 @@
 static constexpr size_t kJumboFrameSize = 9000;
 ///#define ETH_IN_PROMISCUOUS_MODE
 
+#ifdef DPDK_DEPRECATED_OFFLOADS
+    #define RX_PREFIX RTE_ETH_RX_OFFLOAD
+    #define TX_PREFIX RTE_ETH_TX_OFFLOAD
+#else
+    #define RX_PREFIX DEV_RX_OFFLOAD
+    #define TX_PREFIX DEV_TX_OFFLOAD
+#endif
+
+#define EXPAND_AND_CONCATENATE(PREFIX, SUFFIX) PREFIX##_##SUFFIX
+#define CONCATENATE(PREFIX, SUFFIX) EXPAND_AND_CONCATENATE(PREFIX, SUFFIX)
+
+#define STRINGIFY(x) #x
+#define EXPAND_AND_STRINGIFY(x) STRINGIFY(x)
+
+
+
 std::vector<uint16_t> DpdkTransport::GetPortIDFromMacAddr(
     size_t port_num, const std::string& mac_addrs) {
   RtAssert(mac_addrs.length() == (port_num * (kMacAddrBtyes + 1) - 1),
@@ -110,32 +126,32 @@ int DpdkTransport::NicInit(uint16_t port, rte_mempool* mbuf_pool,
     dev_info.max_rx_pktlen = desired_max_size;
   }
 
-  if ((dev_info.rx_offload_capa & DEV_RX_OFFLOAD_IPV4_CKSUM) ==
-      DEV_TX_OFFLOAD_IPV4_CKSUM) {
-    std::printf("DEV_RX_OFFLOAD_IPV4_CKSUM  enabled\n");
-    port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_IPV4_CKSUM;
+  if ((dev_info.rx_offload_capa & CONCATENATE(RX_PREFIX, IPV4_CKSUM)) ==
+      CONCATENATE(RX_PREFIX, IPV4_CKSUM)) {
+    std::printf("%s enabled\n", EXPAND_AND_STRINGIFY(CONCATENATE(RX_PREFIX, IPV4_CKSUM)));
+    port_conf.rxmode.offloads |= CONCATENATE(RX_PREFIX, IPV4_CKSUM);
   }
-  if ((dev_info.rx_offload_capa & DEV_RX_OFFLOAD_UDP_CKSUM) ==
-      DEV_RX_OFFLOAD_UDP_CKSUM) {
-    std::printf("DEV_RX_OFFLOAD_UDP_CKSUM enabled\n");
-    port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_UDP_CKSUM;
+  if ((dev_info.rx_offload_capa & CONCATENATE(RX_PREFIX, UDP_CKSUM)) ==
+      CONCATENATE(RX_PREFIX, UDP_CKSUM)) {
+    std::printf("%s enabled\n", EXPAND_AND_STRINGIFY(CONCATENATE(RX_PREFIX, UDP_CKSUM)));
+    port_conf.rxmode.offloads |= CONCATENATE(RX_PREFIX, UDP_CKSUM);
   }
 
   //port_conf.rx_adv_conf.rss_conf.rss_hf &= dev_info.flow_type_rss_offloads;
-  if ((dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE) ==
-      DEV_TX_OFFLOAD_MBUF_FAST_FREE) {
-    std::printf("DEV_TX_OFFLOAD_MBUF_FAST_FREE enabled\n");
-    port_conf.txmode.offloads |= DEV_TX_OFFLOAD_MBUF_FAST_FREE;
+  if ((dev_info.tx_offload_capa & CONCATENATE(TX_PREFIX, MBUF_FAST_FREE)) ==
+      CONCATENATE(TX_PREFIX, MBUF_FAST_FREE)) {
+    std::printf("%s enabled\n", EXPAND_AND_STRINGIFY(CONCATENATE(TX_PREFIX, MBUF_FAST_FREE)));
+    port_conf.txmode.offloads |= CONCATENATE(TX_PREFIX, MBUF_FAST_FREE);
   }
-  if ((dev_info.tx_offload_capa & DEV_TX_OFFLOAD_IPV4_CKSUM) ==
-      DEV_TX_OFFLOAD_IPV4_CKSUM) {
-    std::printf("DEV_TX_OFFLOAD_IPV4_CKSUM  enabled\n");
-    port_conf.txmode.offloads |= DEV_TX_OFFLOAD_IPV4_CKSUM;
+  if ((dev_info.tx_offload_capa & CONCATENATE(TX_PREFIX, IPV4_CKSUM)) ==
+      CONCATENATE(TX_PREFIX, IPV4_CKSUM)) {
+    std::printf("%s enabled\n", EXPAND_AND_STRINGIFY(CONCATENATE(TX_PREFIX, IPV4_CKSUM)));
+    port_conf.txmode.offloads |= CONCATENATE(TX_PREFIX, IPV4_CKSUM);
   }
-  if ((dev_info.tx_offload_capa & DEV_TX_OFFLOAD_UDP_CKSUM) ==
-      DEV_TX_OFFLOAD_UDP_CKSUM) {
-    std::printf("DEV_TX_OFFLOAD_UDP_CKSUM enabled\n");
-    port_conf.txmode.offloads |= DEV_TX_OFFLOAD_UDP_CKSUM;
+  if ((dev_info.tx_offload_capa & CONCATENATE(TX_PREFIX, UDP_CKSUM)) ==
+      CONCATENATE(TX_PREFIX, UDP_CKSUM)) {
+    std::printf("%s enabled\n", EXPAND_AND_STRINGIFY(CONCATENATE(TX_PREFIX, UDP_CKSUM)));
+    port_conf.txmode.offloads |=  CONCATENATE(TX_PREFIX, UDP_CKSUM);
   }
 
   retval = rte_eth_dev_configure(port, rx_rings, tx_rings, &port_conf);

@@ -164,6 +164,21 @@ if(ENABLE_DPDK)
   endif()
   include_directories(${DPDK_INCLUDE_DIRS})
 
+  # Parse and check the version - MAJOR.MINOR.PATCH
+  if(DEFINED DPDK_VERSION)
+    string(REPLACE "." ";" DPDK_VERSION_LIST ${DPDK_VERSION})
+    list(GET DPDK_VERSION_LIST 0 MAJOR)
+    list(GET DPDK_VERSION_LIST 1 MINOR)
+    list(GET DPDK_VERSION_LIST 2 PATCH)
+
+    if(${MAJOR} GREATER 22 OR (${MAJOR} EQUAL 22 AND ${MINOR} GREATER_EQUAL 11))
+      message(STATUS "DPDK version >= 22.11 detected, enabling deprecated offloads flag")
+      add_definitions(-DDPDK_DEPRECATED_OFFLOADS)
+    else()
+      message(STATUS "DPDK version < 22.11 detected, no deprecated offloads flag added")
+    endif()
+  endif()
+
   add_definitions(-DUSE_DPDK)
   if (ISA_AVX512)
     message(STATUS "Enabling AVX-512 memcpy implementation for dpdk")
