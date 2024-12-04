@@ -49,12 +49,13 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
       for (size_t h_index = 0; h_index < n_rows; h_index++) {
         arma::cx_fmat H;
         if (cfg_->FreqDomainChannel()) {
+          // The dataset only includes non-null subcarriers
           if (h_index < cfg_->OfdmDataStart() ||
               h_index >= cfg_->OfdmDataStop()) {
-            /*const size_t new_dim =
+            const size_t new_dim =
                 (is_downlink) ? cfg_->BsAntNum() : cfg_->UeAntNum();
-            /H = arma::zeros<arma::cx_fmat>(new_dim, n_cols);*/
-            H = channel_model_->GetMatrix(is_downlink, 0u);
+            H = arma::zeros<arma::cx_fmat>(new_dim, n_cols);
+            //H = channel_model_->GetMatrix(is_downlink, 0u);
           } else {
             H = channel_model_->GetMatrix(is_downlink,
                                           h_index - cfg_->OfdmDataStart());
@@ -82,7 +83,7 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
 }
 
 void Channel::Awgn(const arma::cx_fmat& src, arma::cx_fmat& dst) const {
-  if (cfg_->NoiseLevel() < 0.0001f) {
+  if (cfg_->NoiseLevel() > 0.0001f) {
     const int n_row = src.n_rows;
     const int n_col = src.n_cols;
 

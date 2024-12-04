@@ -201,10 +201,9 @@ EventData DoFFT::Launch(size_t tag) {
     const size_t pilot_symbol_id = cfg_->Frame().GetPilotSymbolIdx(symbol_id);
     if (kCollectPhyStats) {
       if (cfg_->FreqOrthogonalPilot()) {
-        for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
-          if (ue_id / cfg_->PilotScGroupSize() == pilot_symbol_id) {
-            phy_stats_->UpdatePilotSnr(frame_id, ue_id, ant_id, fft_inout_);
-          }
+        for (size_t sc_id = 0; sc_id < cfg_->PilotScGroupSize(); sc_id++) {
+          size_t ue_id = cfg_->PilotScGroupSize() * pilot_symbol_id + sc_id;
+          phy_stats_->UpdatePilotSnr(frame_id, ue_id, ant_id, fft_inout_);
         }
       } else {
         phy_stats_->UpdatePilotSnr(frame_id, pilot_symbol_id, ant_id,

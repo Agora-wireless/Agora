@@ -30,7 +30,6 @@ class Simulator {
  public:
   /* optimization parameters for block transpose (see the slides for more
    * details) */
-  static constexpr size_t kTransposeBlockSize = 8;
   static constexpr size_t kTransposeBlockNum = 256;
   /* dequeue bulk size, used to reduce the overhead of dequeue in main thread
    */
