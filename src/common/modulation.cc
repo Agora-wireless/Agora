@@ -279,6 +279,54 @@ void DemodQpskHardLoop(const float* vec_in, uint8_t* vec_out, int num) {
   }
 }
 
+void DemodQpskSoftAvx2(float* vec_in, int8_t* llr, int num) {
+  float* symbols_ptr = vec_in;
+  auto* result_ptr = reinterpret_cast<__m256i*>(llr);
+  __m256 symbol1;
+  __m256 symbol2;
+  __m256 symbol3;
+  __m256 symbol4;
+  __m256i symbol_i1;
+  __m256i symbol_i2;
+  __m256i symbol_i3;
+  __m256i symbol_i4;
+  __m256i symbol_12;
+  __m256i symbol_34;
+  __m256i symbol_i;
+  __m256 scale_v = _mm256_set1_ps(-SCALE_BYTE_CONV_QPSK * M_SQRT2);
+
+  for (int i = 0; i < num / 16; i++) {
+    symbol1 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol2 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol3 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol4 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol_i1 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol1, scale_v));
+    symbol_i2 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol2, scale_v));
+    symbol_i3 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol3, scale_v));
+    symbol_i4 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol4, scale_v));
+    symbol_12 = _mm256_packs_epi32(symbol_i1, symbol_i2);
+    symbol_12 = _mm256_permute4x64_epi64(symbol_12, 0xd8);
+    symbol_34 = _mm256_packs_epi32(symbol_i3, symbol_i4);
+    symbol_34 = _mm256_permute4x64_epi64(symbol_34, 0xd8);
+    symbol_i = _mm256_packs_epi16(symbol_12, symbol_34);
+    symbol_i = _mm256_permute4x64_epi64(symbol_i, 0xd8);
+
+    _mm256_store_si256(result_ptr, symbol_i);
+    result_ptr++;
+  }
+  // Demodulate last symbols
+  int next_start = 2 * 16 * (num / 16);
+  for (int i = next_start; i < 2 * num; i++) {
+    llr[i] = (int8_t)(vec_in[i] * -SCALE_BYTE_CONV_QPSK * M_SQRT2);
+  }
+  /*DemodQpskSoftSse(vec_in + next_start, llr + next_start,
+                   num - next_start);*/
+}
+
 // /**
 //   * 16-QAM demodulation
 //   *              Q
@@ -2760,7 +2808,7 @@ void Demodulate(float* equal_ptr, int8_t* demod_ptr, size_t data_num,
       hard_demod
           ? DemodQpskHardLoop(equal_ptr, reinterpret_cast<uint8_t*>(demod_ptr),
                               data_num)
-          : DemodQpskSoftSse(equal_ptr, demod_ptr, data_num);
+          : DemodQpskSoftAvx2(equal_ptr, demod_ptr, data_num);
       break;
     case 4:
       hard_demod

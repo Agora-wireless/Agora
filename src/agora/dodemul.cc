@@ -357,14 +357,7 @@ EventData DoDemul::Launch(size_t tag) {
       int8_t* demod_ptr =
           demod_buffers_[frame_slot][data_symbol_idx_ul][ss_id] +
           (mac_sched_->Params().ModOrderBits(Direction::kUplink) * base_sc_id);
-      // Temp Fix: Mismatch between equalizer pointer move and
-      // SSE implementation of QPSK soft demodulator
-      size_t demul_len =
-          (mac_sched_->Params().ModOrderBits(Direction::kUplink) == 2 &&
-           !kUplinkHardDemod)
-              ? max_sc_ite * 2
-              : max_sc_ite;
-      Demodulate(equal_t_ptr, demod_ptr, demul_len,
+      Demodulate(equal_t_ptr, demod_ptr, max_sc_ite,
                  mac_sched_->Params().ModOrderBits(Direction::kUplink),
                  kUplinkHardDemod);
       // if hard demod is enabled calculate BER with modulated bits
