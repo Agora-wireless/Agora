@@ -344,6 +344,7 @@ EventData DoDemul::Launch(size_t tag) {
       } else {
         equal_ptr = reinterpret_cast<float*>(equaled_buffer_temp_ + ss_id);
       }
+
       size_t k_num_double_in_sim_d256 =
           sizeof(__m256) / sizeof(double);  // == 4
       for (size_t j = 0; j < max_sc_ite / k_num_double_in_sim_d256; j++) {
@@ -356,9 +357,11 @@ EventData DoDemul::Launch(size_t tag) {
       int8_t* demod_ptr =
           demod_buffers_[frame_slot][data_symbol_idx_ul][ss_id] +
           (mac_sched_->Params().ModOrderBits(Direction::kUplink) * base_sc_id);
-      Demodulate(equal_t_ptr, demod_ptr, max_sc_ite,
-                 mac_sched_->Params().ModOrderBits(Direction::kUplink),
-                 kUplinkHardDemod);
+      if (mac_sched_->Params().ModOrderBits(Direction::kUplink) == 2) {
+        Demodulate(equal_t_ptr, demod_ptr, max_sc_ite * 2,
+                   mac_sched_->Params().ModOrderBits(Direction::kUplink),
+                   kUplinkHardDemod);
+      }
       // if hard demod is enabled calculate BER with modulated bits
       if (((kPrintPhyStats || kEnableCsvLog) && kUplinkHardDemod)) {
         size_t ue_id =
@@ -404,10 +407,9 @@ EventData DoDemul::Launch(size_t tag) {
           std::printf(
               "Demuled data: frame: %zu, symbol: %zu, ss id: %zu, base sc id: "
               "%zu, "
-              "num sc: %zu\n",
-              frame_id, symbol_idx_ul, ss_id, base_sc_id,
-              max_sc_ite *
-                  mac_sched_->Params().ModOrderBits(Direction::kUplink));
+              "num sc: %zu, mod bits %zu\n",
+              frame_id, symbol_idx_ul, ss_id, base_sc_id, max_sc_ite,
+              mac_sched_->Params().ModOrderBits(Direction::kUplink));
           for (size_t k = 0; k < max_sc_ite * mac_sched_->Params().ModOrderBits(
                                                   Direction::kUplink);
                k++) {
