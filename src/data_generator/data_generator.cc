@@ -386,8 +386,8 @@ size_t DataGenerator::DecodeBroadcastSlots(
       static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::kAlign64,
           cfg->MacParams().BcModOrderBits() * ctrl_sc_num));
-  Demodulate(reinterpret_cast<float*>(&eq_buff[0]), demod_buff_ptr,
-             2 * ctrl_sc_num, cfg->MacParams().BcModOrderBits(), false);
+  Demodulate(reinterpret_cast<float*>(&eq_buff[0]), demod_buff_ptr, ctrl_sc_num,
+             cfg->MacParams().BcModOrderBits(), false);
 
   const int num_bcast_bytes =
       BitsToBytes(cfg->MacParams().BcLdpcConfig().NumCbLen());
@@ -475,11 +475,11 @@ void DataGenerator::GenerateUlTxTestVectors(Config* const cfg) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg->MacParams().MacPayloadMaxLength(Direction::kUplink));
         DataGenerator::GenMacRandomBits(pkt);
-        pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(
-                pkt->Data(),
-                cfg->MacParams().MacPayloadMaxLength(Direction::kUplink)) &
-            0xFFFF));
+        pkt->Crc(
+            (uint16_t)(crc_obj->CalculateCrc24(
+                           pkt->Data(), cfg->MacParams().MacPayloadMaxLength(
+                                            Direction::kUplink)) &
+                       0xFFFF));
       }
     }
 
@@ -616,11 +616,11 @@ void DataGenerator::GenerateDlTxTestVectors(Config* const cfg,
         pkt->Set(0, pkt_id, ue_id,
                  cfg->MacParams().MacPayloadMaxLength(Direction::kDownlink));
         DataGenerator::GenMacRandomBits(pkt);
-        pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(
-                pkt->Data(),
-                cfg->MacParams().MacPayloadMaxLength(Direction::kDownlink)) &
-            0xFFFF));
+        pkt->Crc(
+            (uint16_t)(crc_obj->CalculateCrc24(
+                           pkt->Data(), cfg->MacParams().MacPayloadMaxLength(
+                                            Direction::kDownlink)) &
+                       0xFFFF));
       }
     }
 

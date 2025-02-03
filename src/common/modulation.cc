@@ -315,7 +315,11 @@ void DemodQpskSoftAvx2(float* vec_in, int8_t* llr, int num) {
     symbol_i = _mm256_packs_epi16(symbol_12, symbol_34);
     symbol_i = _mm256_permute4x64_epi64(symbol_i, 0xd8);
 
-    _mm256_store_si256(result_ptr, symbol_i);
+    if (((size_t)(llr)&0x1F) == 0) {
+      _mm256_store_si256(result_ptr, symbol_i);
+    } else {
+      _mm256_storeu_si256(result_ptr, symbol_i);
+    }
     result_ptr++;
   }
   // Demodulate last symbols
