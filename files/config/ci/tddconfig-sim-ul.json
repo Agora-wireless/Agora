@@ -10,6 +10,8 @@
     "bs_server_addr": "127.0.0.1",
     "bs_rru_addr": "127.0.0.1",
     "fft_size": 2048,
+    "max_frame": 100,
+    "noise_level": 0.03,/*33.7db*/
     "ofdm_data_num": 1200,
     "demul_block_size": 64,
     "freq_orthogonal_pilot": true,
