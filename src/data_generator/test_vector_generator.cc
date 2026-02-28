@@ -258,6 +258,11 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
   for (size_t sched = 0; sched < sched_ue_set.size(); sched++) {
     auto sched_id = sched_ue_set.at(sched);
     auto ue_map = Utils::Int2Bits(sched_id, cfg->UeAntNum());
+    // std::cout << "ue_map = ";
+    // for (size_t i = 0; i < ue_map.n_elem; i++) {
+    //     std::cout << ue_map(i) << " ";
+    // }
+    // std::cout << std::endl;
     AGORA_LOG_INFO(
         "Frame Schedule %zu: Generating data for %zu UEs with UL MCS %zu & DL "
         "MCS %zu\n",
@@ -372,6 +377,36 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
             cfg, ofdm_symbol, nullptr, SymbolType::kUL);
       }
 
+      // ========== 输出中间生成数据 ==========
+      if (sched == 0) {
+        std::cout << "\n========== UL Data Generation Pipeline (First Data Symbol, First UE) ==========\n";
+        size_t sample_idx = 0;  // 第一个数据符号的第一个UE
+        
+        // 1. 编码数据 (ul_encoded_codewords) - 前20个字节
+        std::cout << "\n1. Encoded Codewords (first 20 bytes):\n   ";
+        for (size_t i = 0; i < std::min(20UL, ul_encoded_codewords.at(sample_idx).size()); i++) {
+          std::printf("%02X ", static_cast<uint8_t>(ul_encoded_codewords.at(sample_idx).at(i)));
+        }
+        std::cout << "\n   Total encoded bytes: " << ul_encoded_codewords.at(sample_idx).size() << "\n";
+        
+        // 2. 调制符号 (ul_modulated_symbols) - 前10个符号
+        std::cout << "\n2. Modulated Symbols (first 10 complex symbols):\n   ";
+        for (size_t i = 0; i < std::min(10UL, ul_modulated_symbols.at(sample_idx).size()); i++) {
+          complex_float sym = ul_modulated_symbols.at(sample_idx).at(i);
+          std::printf("[%.4f%+.4fi] ", sym.re, sym.im);
+        }
+        std::cout << "\n   Total modulated symbols: " << ul_modulated_symbols.at(sample_idx).size() << "\n";
+        
+        // 计算调制符号的平均功率
+        float total_power = 0.0f;
+        for (const auto& sym : ul_modulated_symbols.at(sample_idx)) {
+          total_power += (sym.re * sym.re + sym.im * sym.im);
+        }
+        float avg_power = total_power / ul_modulated_symbols.at(sample_idx).size();
+        std::cout << "   Average symbol power: " << avg_power << "\n";
+        std::cout << "   Average symbol magnitude: " << std::sqrt(avg_power) << "\n";
+      }
+
       // Place modulated uplink data codewords into central IFFT bins
       RtAssert(ul_ldpc_config.NumBlocksInSymbol() == 1);  // TODO: Assumption
       std::vector<std::vector<complex_float>> pre_ifft_data_syms;
@@ -379,6 +414,34 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
       for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
         pre_ifft_data_syms.at(i) =
             DataGenerator::BinForIfft(cfg, ul_modulated_symbols.at(i));
+      }
+      
+      // 输出 OFDM 映射后的数据
+      if (sched == 0) {
+        size_t sample_idx = 0;
+        std::cout << "\n3. After OFDM Mapping (BinForIfft) - Frequency domain:\n";
+        std::cout << "   Total subcarriers: " << pre_ifft_data_syms.at(sample_idx).size() << "\n";
+        
+        // 统计非零子载波
+        size_t non_zero_count = 0;
+        float total_power = 0.0f;
+        for (const auto& sc : pre_ifft_data_syms.at(sample_idx)) {
+          if (sc.re != 0.0f || sc.im != 0.0f) {
+            non_zero_count++;
+            total_power += (sc.re * sc.re + sc.im * sc.im);
+          }
+        }
+        std::cout << "   Non-zero subcarriers: " << non_zero_count << "\n";
+        std::cout << "   Average power (non-zero): " << (non_zero_count > 0 ? total_power/non_zero_count : 0.0f) << "\n";
+        
+        // 显示数据子载波范围内的前10个
+        std::cout << "   First 10 data subcarriers (starting from OfdmDataStart=" << cfg->OfdmDataStart() << "):\n   ";
+        for (size_t i = cfg->OfdmDataStart(); i < cfg->OfdmDataStart() + 10 && i < pre_ifft_data_syms.at(sample_idx).size(); i++) {
+          complex_float sc = pre_ifft_data_syms.at(sample_idx).at(i);
+          std::printf("[%.4f%+.4fi] ", sc.re, sc.im);
+        }
+        std::cout << "\n";
+        std::cout << "============================================================\n\n";
       }
 
       {
@@ -465,7 +528,11 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
         std::to_string(cfg->UeAntNum()) + ".bin";
     AGORA_LOG_INFO("Saving uplink rx samples to %s\n", filename_rx.c_str());
     auto ue_map_mat = arma::repmat(ue_map, cfg->BsAntNum(), 1);
-    for (size_t i = 0; i < cfg->Frame().NumTotalSyms(); i++) {
+    // Normalize transmit power by sqrt(num_ues) to maintain constant total power
+    
+    float snr_sum = 0.0f;
+    size_t snr_count = 0;
+    for (size_t i = 0; i < cfg->Frame().NumTotalSyms(); i++) {//cfg->Frame().NumTotalSyms(): 128
       arma::cx_fmat mat_input_data(
           reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
           cfg->OfdmCaNum(), cfg->UeAntNum(), false);
@@ -477,13 +544,73 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
         arma::cx_fmat mat_csi(
             reinterpret_cast<arma::cx_float*>(csi_matrices[j]), cfg->BsAntNum(),
             cfg->UeAntNum(), false);
-        mat_output.row(j) =
-            (mat_input_data.row(j) % ue_map) * (mat_csi % ue_map_mat).st();
+        mat_output.row(j) = (mat_input_data.row(j) % ue_map) * (mat_csi % ue_map_mat).st();
       }
+      
+      // Save Hx (signal before noise) for output
+      arma::cx_fmat Hx_signal = mat_output;
+      
       arma::cx_fmat noise_mat(size(mat_output));
       noise_mat.set_real(arma::randn<arma::fmat>(size(real(mat_output))));
       noise_mat.set_imag(arma::randn<arma::fmat>(size(real(mat_output))));
-      mat_output += (noise_mat * cfg->NoiseLevel() * sqrt2_norm);
+      
+      // Calculate scaled noise: n
+      arma::cx_fmat n_noise = noise_mat * cfg->NoiseLevel() * sqrt2_norm;
+      n_noise *= std::sqrt(static_cast<float>(cfg->UeAntNum()));
+      n_noise /= std::sqrt(static_cast<float>(cfg->PilotScGroupSize()));
+
+
+      // Calculate and output min/max SNR for frame 0
+      if (sched == 0) {
+        arma::fmat signal_power = arma::pow(arma::abs(mat_output), 2);
+        arma::fmat noise_power = arma::pow(arma::abs(n_noise), 2);
+        
+        std::cout <<"symbol: "<< i<< " Frame 0 SNR (dB) Range at BS Antennas: " << std::fixed
+                 << std::setw(5) << std::setprecision(1);
+        
+        size_t ue_id = 0; // First UE
+        float max_snr = -std::numeric_limits<float>::infinity();
+        float min_snr = std::numeric_limits<float>::infinity();
+        for (size_t ant_idx = 0; ant_idx < cfg->BsAntNum(); ant_idx++) {
+          // Calculate average SNR only over active data subcarriers
+          float total_signal = 0.0f;
+          float total_noise = 0.0f;
+          
+          // Only calculate over data subcarriers (OfdmDataStart to OfdmDataStop)
+          for (size_t sc_idx = cfg->OfdmDataStart(); sc_idx < cfg->OfdmDataStop(); sc_idx++) {
+            total_signal += signal_power(sc_idx, ant_idx);
+            total_noise += noise_power(sc_idx, ant_idx);
+          }
+          // std::cout << "Ant " << ant_idx << "'s average SNR: "<< std::fixed << std::setprecision(1) << (snr_sum / active_sc_count) << " dB; ";
+          if (total_noise > 0) {
+            float snr_linear = total_signal / total_noise;
+            float snr_db = 10.0f * std::log10(snr_linear);
+            snr_sum+= snr_db;
+            snr_count++;
+            if (snr_db < min_snr) {
+              min_snr = snr_db;
+            }
+            if (snr_db > max_snr) {
+              max_snr = snr_db;
+            }
+          }
+        }
+
+        
+        if (min_snr == std::numeric_limits<float>::infinity()) {
+          min_snr = -100.0f;
+        }
+        if (max_snr == -std::numeric_limits<float>::infinity()) {
+          max_snr = -100.0f;
+        }
+        
+        std::cout << "User " << ue_id << ": [" << min_snr << "," << max_snr << "] ";
+        std::cout << std::endl;
+      }
+      
+      // Add noise to signal: Hx + n      
+      mat_output += n_noise;
+      
       for (size_t j = 0; j < cfg->BsAntNum(); j++) {
         auto* this_ofdm_symbol = rx_data_all_symbols[i] + j * cfg->OfdmCaNum();
         CommsLib::FFTShift(this_ofdm_symbol, cfg->OfdmCaNum());
@@ -497,7 +624,7 @@ static void GenerateTestVectors(Config* cfg, const std::string& profile_flag) {
           rx_data_temp,
           i != 0 || sched != 0);  //Do not append in the first write
     }
-
+    std::cout << "Average SNR: " << std::fixed << std::setprecision(1) << (snr_sum / snr_count) << " dB; ";
     if (kDebugPrintRxData) {
       std::printf("For %zu ue(s), rx data\n", sched_id);
       for (size_t i = 0; i < 10; i++) {
